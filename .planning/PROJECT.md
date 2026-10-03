@@ -22,13 +22,16 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 - [ ] Boxes shown as a mix, like a real shelf: some face-out with BGG box art, others as generated spines (title on a coloured strip, since BGG only provides front images)
 - [ ] Shelves are packed to look natural and full (by box size and shape), not in strict alphabetical order
 - [ ] Expansions appear as thin sideways spines with their name, right beside their base game
-- [ ] Tapping a game pulls the box out of the shelf (animation) and opens a detail card: player count, play time, weight, storage location, expansions, link to BGG
-- [ ] Each game shows where it is stored in the house; the location is maintained in BGG, and the app only reads it
+- [ ] Tapping a game pulls the box out of the shelf (animation) and opens a detail card: player count, play time, weight, storage location, expansions, BGG rating, designers, minimum age, mechanics, link to BGG
+- [ ] Each game shows its storage location to every visitor. Locations are read from BGG's private field if a token spike proves the app can read it; otherwise the owner manages them in home/VPN-only owner tools
 - [ ] Visitors can toggle between one big cabinet and one cabinet per storage location
+- [ ] Box images: the owned version's image if it is a flat cover, otherwise the base game's image (Dutch editions are often 3D perspective shots). The owner can override per game from home/VPN
+- [ ] Box proportions come from the owned version's real BGG dimensions when available
+- [ ] Site labels in English and Dutch (browser default, switchable)
 - [ ] Game-night filters: player count, play time, storage location, search by name (non-matching games dim on the shelf)
 - [ ] On phones the cabinet reflows into a narrower, taller cabinet that still looks like a cabinet
 - [ ] Empty or near-empty collections look intentional, not broken (the owner's BGG collection is still being filled in)
-- [ ] Site is public and read-only with no accounts, reachable from the internet through the existing Traefik reverse proxy
+- [ ] Site is public and read-only with no accounts, reachable from the internet through the existing Traefik reverse proxy. Owner tools are reachable only from the home network or VPN
 - [ ] Runs in its own new LXC on the Proxmox host
 - [ ] Releases follow the ing-dashboard model: a semver tag triggers a GitHub Actions build with artifact attestation, the owner approves the draft release, and a timer on the server pulls, verifies offline, installs and health-checks it. No self-hosted runner
 - [ ] Public GitHub repository created, with `main` protected
@@ -38,7 +41,9 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 - User accounts or login — anyone with the link can view, and there is nothing to edit in the app
 - Adding or editing games in the app — BGG is the single source of truth, and the owner confirmed BGG covers all their games
 - Non-owned BGG statuses (wishlist, preordered, for trade, previously owned) — the owner wants owned games only
-- Editing storage locations in the app — locations live in BGG (unless the research-driven plan B says otherwise; see Context)
+- Location as a `Location: …` line in the public BGG comment — owner declined: the text would be public on BGG itself
+- Storing the owner's BGG password or session cookie on the server — security risk; BGG's private site APIs are unlicensed
+- Game-night extras (best-at-N, weight filter, random picker, co-op/designer search) and sharing extras (URL state, link previews, stats plaque, new-arrival marker) — deferred to v2 by the owner
 - A self-hosted CI runner or push-style deployment — the ing-dashboard pull model is the target
 - Migrating another existing project to the ing-dashboard deploy model — a separate project
 
@@ -53,12 +58,17 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 **Visual inspiration:** a photo of a real wooden, cubby-style board game cabinet. It has irregular cubbies; big boxes face out (Scythe, War of the Ring, Wingspan, Star Wars: Rebellion), while smaller ones stand as vertical spines in rows or lie stacked. There are wooden drawers along the bottom. The app should evoke that look, rendered dynamically.
 
 **BGG data:**
-- The owner's collection on BGG is incomplete. They are still recording games, and the final count is unknown (maybe ~50, possibly more). Design for growth and for a sparse start.
+- The owner has now recorded (nearly) all games: **about 65 owned items, expansions included**. This is the design target; growth to several hundred must still work.
+- The owner has selected the **owned version** of each game on BGG. Dutch editions' version images are often **3D perspective product shots**, not flat covers, and the base game's default image doesn't always match the owned box either. That is why box images use a smart default plus owner override, and box proportions come from version dimensions rather than image aspect ratio.
 - BGG changed XML API access in 2025 (application registration / token requirement). Research must confirm current access rules, rate limits and terms of use.
 - BGG only provides front box images. Spines have to be generated. Box dimensions may be available via BGG version data, which would drive face-out vs spine and realistic packing. Research needed.
 - **Storage location in BGG:** collection items carry private info, including an "inventory location" field. Reading it likely requires the owner's authenticated BGG session rather than an application token. Research needed. **Plan B is deliberately undecided** until research reports. Candidates: (a) a convention in the game's public BGG comment (e.g. "Location: …"), keeping the app database-free; (b) an in-app location editor reachable only from the home network/VPN, backed by a small database.
 
-**Database:** the original assumption was that storage locations need a database. With locations in BGG, the app may need no database at all, only a cache or snapshot of BGG data. If one turns out to be needed (plan B (b)), the existing shared database LXC is available.
+**Plan B outcome (after research):** research found the private field is most likely not readable with an app token; it needs the owner's logged-in session, and possibly not even then. The owner rejected the public-comment convention. Decision: spike first; if the token can't read the field, build plan B (b), home/VPN-only owner tools for locations.
+
+**Database (after research):** no database. The app keeps an atomic JSON snapshot of BGG data, a local image cache, and a small owner-data file (image overrides, plus locations if they are edited in the app) under the systemd state directory. The owner-data file is the only part that can't be rebuilt from BGG, so it is backed up. The shared database LXC is not used.
+
+**BGG API access:** since 2025-07-02 BGG requires a registered application and a Bearer token. Approval can take a week or more, so the owner registers (non-commercial tier) right away. The licence requires a linked "Powered by BGG" credit and forbids ads and donations.
 
 ## Constraints
 
@@ -79,7 +89,12 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | BGG "owned" collection is the single source of truth | Adding a game on BGG makes it appear on the site, so there is no data entry in the app | — Pending |
-| Storage location is stored in BGG; the app only reads it | Keeps the app read-only: no auth, possibly no database, nothing to vandalise on a public URL | — Pending (plan B after research) |
+| Storage location: BGG private field if a token spike proves it readable, otherwise home/VPN-only owner tools; visible to all visitors | Owner rejected putting locations in public BGG comments; the private field is likely unreadable via token | — Pending (spike) |
+| Owner tools (image overrides, maybe locations) reachable only from home network/VPN | No accounts needed; nothing writable on the public internet | — Pending |
+| Box image: owned version's image if flat, else base image; owner override per game | Dutch version images are often 3D product shots | — Pending |
+| No database: JSON snapshot, image cache and a backed-up owner-data file | Data is small and mostly rebuildable from BGG; lighter than a shared SQL Server | — Pending |
+| English and Dutch site labels | Friends are local; BGG titles stay as-is | — Pending |
+| Game-night and sharing extras deferred to v2 | Keep v1 focused on the cabinet itself | — Pending |
 | Public, read-only site with no accounts | Anyone with the link can view; nothing editable to protect | — Pending |
 | Sync about hourly, plus a manual sync button with a global cooldown | Fresh enough after adding a game; can't be abused to hit BGG rate limits | — Pending |
 | Mix of face-out boxes and generated spines, packed to look good | Mirrors the inspiration photo; looks like a real cabinet | — Pending |
@@ -111,4 +126,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-03 after initialization*
+*Last updated: 2026-10-03 after research and requirements definition*
