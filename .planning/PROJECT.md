@@ -72,13 +72,13 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 
 ## Constraints
 
-- **Tech stack**: .NET 10 / ASP.NET Core, structured like ing-dashboard — this is the owner's stack across projects. Research decides the frontend approach for the cabinet visuals.
+- **Tech stack**: .NET 10 / ASP.NET Core, structured like ing-dashboard — this is the owner's stack across projects. Frontend: Razor Pages, vanilla ES modules and modern CSS, with no SPA framework and no Node toolchain (see research/STACK.md).
 - **Hosting**: new unprivileged Ubuntu LXC on the Proxmox host, behind the existing Traefik — low-power shared host, keep the footprint small.
 - **Deployment**: no self-hosted CI runner; the server pulls approved, attested releases, and no GitHub-executed code runs on the server — the ing-dashboard security model.
 - **Repository**: public GitHub repository (not yet created) — free artifact attestations and credential-less release downloads depend on it being public.
 - **Privacy**: no personal data anywhere in the repo, including code, docs, fixtures, test data and commit messages. That covers the BGG username, real domain/hostnames, homelab IPs and real house location names. Personal configuration lives only in the server-side env file; examples use `example.com`-style placeholders; all test data is synthetic — the repo is public.
 - **External dependency**: the BGG API — respect its rate limits and terms of use, cache aggressively, and keep serving the last good snapshot when BGG is down or slow.
-- **Data source**: BGG is the single source of truth for which games are owned and where they are stored.
+- **Data source**: BGG is the single source of truth for which games are owned. Storage locations come from BGG only if the token spike shows the private field is readable; otherwise they come from the owner tools.
 - **Conventions** (carried over from ing-dashboard):
   - No planning references (requirement IDs, phase/plan numbers, planning document names) outside `.planning/`; git commit messages are the only exception.
   - Comments are `///` XML doc summaries only, no `//` comments. If a line needs explaining, rename or extract it.

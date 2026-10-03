@@ -172,13 +172,63 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (filled by roadmap) | | |
+| SYNC-01 | Phase 3 | Pending |
+| SYNC-02 | Phase 3 | Pending |
+| SYNC-03 | Phase 3 | Pending |
+| SYNC-04 | Phase 3 | Pending |
+| SYNC-05 | Phase 3 | Pending |
+| SYNC-06 | Phase 4 | Pending |
+| SYNC-07 | Phase 4 | Pending |
+| SYNC-08 | Phase 3 | Pending |
+| CAB-01 | Phase 2 | Pending |
+| CAB-02 | Phase 2 | Pending |
+| CAB-03 | Phase 4 | Pending |
+| CAB-04 | Phase 2 | Pending |
+| CAB-05 | Phase 2 | Pending |
+| CAB-06 | Phase 2 | Pending |
+| CAB-07 | Phase 2 | Pending |
+| EXP-01 | Phase 2 | Pending |
+| EXP-02 | Phase 2 | Pending |
+| EXP-03 | Phase 2 | Pending |
+| EXP-04 | Phase 7 | Pending |
+| DET-01 | Phase 5 | Pending |
+| DET-02 | Phase 5 | Pending |
+| DET-03 | Phase 5 | Pending |
+| FILT-01 | Phase 7 | Pending |
+| FILT-02 | Phase 7 | Pending |
+| FILT-03 | Phase 7 | Pending |
+| FILT-04 | Phase 7 | Pending |
+| FILT-05 | Phase 7 | Pending |
+| LOC-01 | Phase 7 | Pending |
+| LOC-02 | Phase 3 | Pending |
+| LOC-03 | Phase 6 | Pending (conditional on LOC-02 outcome) |
+| LOC-04 | Phase 6 | Pending (conditional on LOC-02 outcome) |
+| LOC-05 | Phase 7 | Pending |
+| IMG-01 | Phase 4 | Pending |
+| IMG-02 | Phase 6 | Pending |
+| IMG-03 | Phase 4 | Pending |
+| OWN-01 | Phase 6 | Pending |
+| OWN-02 | Phase 6 | Pending |
+| I18N-01 | Phase 5 | Pending |
+| A11Y-01 | Phase 5 | Pending |
+| A11Y-02 | Phase 5 | Pending |
+| OPS-01 | Phase 1 | Pending |
+| OPS-02 | Phase 1 | Pending |
+| OPS-03 | Phase 1 | Pending |
+| OPS-04 | Phase 1 | Pending |
+| OPS-05 | Phase 1 | Pending |
+| SEC-01 | Phase 8 | Pending |
+| SEC-02 | Phase 8 | Pending |
+| SEC-03 | Phase 8 | Pending |
+| SEC-04 | Phase 8 | Pending |
+| SEC-05 | Phase 3 | Pending |
+| SEC-06 | Phase 8 | Pending |
 
 **Coverage:**
 - v1 requirements: 51 total
-- Mapped to phases: 0
-- Unmapped: 51 ⚠️
+- Mapped to phases: 51
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-10-03*
-*Last updated: 2026-10-03 after initial definition (box-image handling added after owner review)*
+*Last updated: 2026-10-03 after roadmap creation (traceability filled)*
