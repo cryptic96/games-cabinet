@@ -92,6 +92,24 @@ assert_notes_rejected() {
   return "$ok"
 }
 
+assert_fixture_rejected() {
+  local description="$1" content="$2"
+  local repo
+  repo="$(mktemp -d)"
+  make_throwaway_repo "$repo"
+  mkdir -p "$repo/deploy/tests/fixtures"
+  printf '%s\n' "$content" >"$repo/deploy/tests/fixtures/data.txt"
+  git -C "$repo" add deploy/tests/fixtures/data.txt .gitleaks.toml
+  git -C "$repo" commit -q -m "fixture"
+  local ok=0
+  if gitleaks_git_mode "$repo"; then
+    echo "self-test failed: ${description} in a test fixture was not detected" >&2
+    ok=1
+  fi
+  rm -rf "$repo"
+  return "$ok"
+}
+
 assert_notes_accepted() {
   local description="$1" content="$2"
   local repo
@@ -167,6 +185,10 @@ self_test() {
 
   assert_notes_rejected "a generated 192.168.x.y address" "server: $(fake_private_ipv4)" || failed=1
   assert_notes_rejected "a generated non-example-domain email" "contact: $(fake_non_example_email)" || failed=1
+
+  assert_fixture_rejected "a generated 192.168.x.y address" "server: $(fake_private_ipv4)" || failed=1
+  assert_fixture_rejected "a generated non-example-domain email" "contact: $(fake_non_example_email)" || failed=1
+  assert_fixture_rejected "a generated internal hostname" "host: $(fake_internal_hostname lan)" || failed=1
 
   local suffix
   for suffix in lan internal home.arpa local; do

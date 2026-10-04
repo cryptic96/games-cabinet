@@ -67,12 +67,6 @@ id = "generic-api-key"
   ]
 
 [[allowlists]]
-description = "public Sigstore bundle fixtures are intentionally not real secrets"
-paths = [
-  '''deploy/tests/fixtures/''',
-]
-
-[[allowlists]]
 description = "gitignored build and test output cannot be committed; the history scan covers everything that can"
 paths = [
   '''(^|/)Cabinet\.[A-Za-z]+/(bin|obj)/''',
