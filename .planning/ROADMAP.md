@@ -41,7 +41,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. On the LXC, the pull timer finds the published release, verifies its attestation offline, installs it and health-checks it, and the hello page loads from the home network. A deliberately broken release rolls back automatically, health does not depend on BGG, and no self-hosted runner exists (GitHub never executes anything on the server).
   5. A fresh LXC can be created and provisioned from documented, repeatable scripts alone, and an image-processing smoke test passes inside it.
 
-**Plans:** 9/15 plans executed
+**Plans:** 11/15 plans executed
 
 Plans:
 **Wave 1**
@@ -67,8 +67,8 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 01-09-PLAN.md — CI and release workflows, tag validation, settings read-back script, settings and release docs
-- [ ] 01-11-PLAN.md — Systemd units, services module, on-host selfcheck with sandboxed image smoke, LXC setup guide
+- [x] 01-09-PLAN.md — CI and release workflows, tag validation, settings read-back script, settings and release docs
+- [x] 01-11-PLAN.md — Systemd units, services module, on-host selfcheck with sandboxed image smoke, LXC setup guide
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
@@ -216,7 +216,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Repo, Guardrails & Walking-Skeleton Deploy | 9/15 | In Progress|  |
+| 1. Repo, Guardrails & Walking-Skeleton Deploy | 11/15 | In Progress|  |
 | 2. Layout Engine & Cabinet Prototype | 0/0 | Not started | - |
 | 3. BGG Access Spike, Real Sync & Snapshot | 0/0 | Not started | - |
 | 4. Enrichment, Box Images & Shape | 0/0 | Not started | - |
