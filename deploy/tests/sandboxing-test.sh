@@ -5,7 +5,9 @@
 ### write allow-list, the app unit carries the full hardening block and no
 ### database dependency, the timer carries the polling schedule, and
 ### sourcing the services module defines its functions without ever calling
-### systemctl. Offline: nothing on the host is touched.
+### systemctl. The selfcheck's comparison of the installed scripts, libraries
+### and units with the active release is exercised against a relocated root.
+### Offline: nothing on the host is touched.
 ###
 set -uo pipefail
 
@@ -216,6 +218,8 @@ check "selfcheck runs the smoke from the release's app directory" "1" \
 check "selfcheck runs the image-smoke command" "1" "$(file_has_text "$SELFCHECK" "Cabinet.Service.dll image-smoke")"
 check "selfcheck compares health with the current symlink target" "1" \
   "$(file_has_text "$SELFCHECK" "readlink -f /opt/cabinet/current")"
+check "selfcheck runs the provisioning comparison" "1" \
+  "$(file_has_line "$SELFCHECK" "  check_provisioning_current")"
 
 if "$SELFCHECK" --help > "${WORK_DIR}/help.txt" 2>&1; then
   check "selfcheck --help exits 0" "1" "1"
@@ -223,6 +227,7 @@ else
   check "selfcheck --help exits 0" "1" "0"
 fi
 check "selfcheck --help prints usage" "1" "$(file_has_text "${WORK_DIR}/help.txt" "Usage: cabinet-selfcheck")"
+check "selfcheck --help mentions the active release" "1" "$(file_has_text "${WORK_DIR}/help.txt" "active release")"
 
 if [ "$(id -u)" -ne 0 ]; then
   if "$SELFCHECK" > /dev/null 2>&1; then
@@ -362,6 +367,105 @@ pgrep() { return 1; }
 run_selfcheck_function check_no_actions_runner
 check "a runner unit fails the check" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
 unset -f systemctl pgrep getent
+
+###
+### Selfcheck: installed provisioning matches the active release
+###
+SELFCHECK_ROOT="${WORK_DIR}/provision-root"
+SC_SBIN="${SELFCHECK_ROOT}/usr/local/sbin"
+SC_LIB="${SELFCHECK_ROOT}/usr/local/lib/cabinet"
+SC_UNITS="${SELFCHECK_ROOT}/etc/systemd/system"
+SC_RELEASE="${SELFCHECK_ROOT}/opt/cabinet/releases/1.0.0"
+
+###
+### Builds an active release carrying the repository's own deploy tree and a
+### host whose installed scripts, libraries and units are identical copies,
+### with a rendered deploy.conf that differs from the release's example.
+###
+make_selfcheck_host() {
+  local file
+  rm -rf "${SELFCHECK_ROOT:?}"
+  mkdir -p "${SC_RELEASE}/deploy/bin" "${SC_RELEASE}/deploy/lib" "${SC_RELEASE}/deploy/systemd" \
+    "$SC_SBIN" "$SC_LIB" "$SC_UNITS" "${SELFCHECK_ROOT}/etc/cabinet"
+  ln -s "$SC_RELEASE" "${SELFCHECK_ROOT}/opt/cabinet/current"
+  for file in "${DEPLOY_DIR}"/bin/*; do
+    cp "$file" "${SC_RELEASE}/deploy/bin/"
+    cp "$file" "${SC_SBIN}/"
+  done
+  for file in "${DEPLOY_DIR}"/lib/*.sh; do
+    cp "$file" "${SC_RELEASE}/deploy/lib/"
+    cp "$file" "${SC_LIB}/"
+  done
+  for file in "${DEPLOY_DIR}"/systemd/*.service "${DEPLOY_DIR}"/systemd/*.timer; do
+    cp "$file" "${SC_RELEASE}/deploy/systemd/"
+    cp "$file" "${SC_UNITS}/"
+  done
+  cp "${DEPLOY_DIR}/deploy.conf.example" "${SC_RELEASE}/deploy/deploy.conf.example"
+  printf 'CABINET_GITHUB_REPO=example-owner/example-repo\n' > "${SELFCHECK_ROOT}/etc/cabinet/deploy.conf"
+}
+
+make_selfcheck_host
+run_selfcheck_function check_provisioning_current
+check "provisioning check passes when every installed file matches the release" "1 0" "${RUN_PASSED} ${RUN_FAILED}"
+
+printf '# local edit\n' >> "${SC_SBIN}/cabinet-deploy"
+INSTALLER_SUM_BEFORE="$(sha256sum "${SC_SBIN}/cabinet-deploy")"
+run_selfcheck_function check_provisioning_current
+check "provisioning check fails when the installed installer differs" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "provisioning failure names the installer" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "usr/local/sbin/cabinet-deploy")"
+check "provisioning failure says to re-run provisioning from the active release" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "re-run deploy/provision.sh from the active release")"
+check "the provisioning check leaves the drifted installer untouched" "$INSTALLER_SUM_BEFORE" \
+  "$(sha256sum "${SC_SBIN}/cabinet-deploy")"
+
+make_selfcheck_host
+printf '# local edit\n' >> "${SC_LIB}/common.sh"
+run_selfcheck_function check_provisioning_current
+check "provisioning check fails when an installed library differs" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "provisioning failure names the library" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "usr/local/lib/cabinet/common.sh")"
+
+make_selfcheck_host
+printf '# local edit\n' >> "${SC_UNITS}/cabinet-deploy-poll.service"
+run_selfcheck_function check_provisioning_current
+check "provisioning check fails when an installed unit differs" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "provisioning failure names the unit" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "etc/systemd/system/cabinet-deploy-poll.service")"
+
+make_selfcheck_host
+printf '# local edit\n' >> "${SC_SBIN}/cabinet-deploy"
+printf '# local edit\n' >> "${SC_UNITS}/cabinet.service"
+run_selfcheck_function check_provisioning_current
+check "provisioning check reports one failure per differing file" "0 2" "${RUN_PASSED} ${RUN_FAILED}"
+
+make_selfcheck_host
+rm -f "${SC_UNITS}/cabinet.service"
+run_selfcheck_function check_provisioning_current
+check "provisioning check fails when an installed unit is missing" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+
+make_selfcheck_host
+run_selfcheck_function check_provisioning_current
+check "provisioning check ignores the rendered deploy.conf" "1 0" "${RUN_PASSED} ${RUN_FAILED}"
+
+make_selfcheck_host
+rm -rf "${SC_RELEASE}/deploy"
+run_selfcheck_function check_provisioning_current
+check "provisioning check fails when the active release has no deploy directory" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+
+make_selfcheck_host
+rm -f "${SELFCHECK_ROOT}/opt/cabinet/current"
+run_selfcheck_function check_provisioning_current
+check "provisioning check fails when there is no active release" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+
+make_selfcheck_host
+DRIFT_FUNCTION="$(declare -f cabinet_provisioning_drift)"
+unset -f cabinet_provisioning_drift
+run_selfcheck_function check_provisioning_current
+eval "$DRIFT_FUNCTION"
+check "provisioning check fails when the deploy library cannot compare" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "provisioning failure explains the missing comparison" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "cannot compare provisioning")"
 
 check "the whole test made no systemctl or pkexec call" "" "$(host_guard_calls)"
 
