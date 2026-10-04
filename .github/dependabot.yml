@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      # The managed SkiaSharp package and its Linux native-assets package must
+      # always move on the same version, so they are proposed together.
+      skiasharp:
+        patterns:
+          - "SkiaSharp*"
+
+  - package-ecosystem: "docker-compose"
+    directory: "/build/lint"
+    schedule:
+      interval: "weekly"
