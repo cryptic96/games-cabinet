@@ -211,10 +211,18 @@ cabinet_fetch_latest_release() {
 }
 
 # Records VERSION (plain X.Y.Z) as the highest release that failed its health
-# check, writing a temporary file in STATE_DIR and renaming it into place.
+# check, writing a temporary file in STATE_DIR and renaming it into place. The
+# recorded value only ever rises: recording a version that is not newer than
+# the one already recorded changes nothing.
 cabinet_record_rejected_version() {
   local version="$1"
   local state_dir="$2"
+
+  local recorded
+  recorded="$(cabinet_read_rejected_version "$state_dir")"
+  if [ -n "$recorded" ] && ! cabinet_semver_gt "$version" "$recorded"; then
+    return 0
+  fi
 
   mkdir -p "$state_dir"
   local tmp
@@ -232,10 +240,20 @@ cabinet_read_rejected_version() {
   fi
 }
 
-# Forgets any recorded rejected version.
+# Forgets the recorded rejected version. When INSTALLED_VERSION is given, the
+# record is kept if it is newer than that version, because a successful install
+# of an older release says nothing about a newer release that failed.
 cabinet_clear_rejected_version() {
   local state_dir="$1"
+  local installed_version="${2:-}"
 
+  if [ -n "$installed_version" ]; then
+    local recorded
+    recorded="$(cabinet_read_rejected_version "$state_dir")"
+    if [ -n "$recorded" ] && cabinet_semver_gt "$recorded" "$installed_version"; then
+      return 0
+    fi
+  fi
   rm -f "${state_dir}/rejected"
 }
 

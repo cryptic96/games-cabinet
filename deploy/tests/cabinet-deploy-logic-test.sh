@@ -275,6 +275,18 @@ check "a version above the recorded one is not rejected" "1" "$(cabinet_is_rejec
 
 cabinet_record_rejected_version "0.0.9" "$REJECT_STATE"
 check "recording again replaces the marker" "0.0.9" "$(cabinet_read_rejected_version "$REJECT_STATE")"
+cabinet_record_rejected_version "0.0.4" "$REJECT_STATE"
+check "recording a lower version keeps the higher marker" "0.0.9" "$(cabinet_read_rejected_version "$REJECT_STATE")"
+cabinet_record_rejected_version "0.0.9" "$REJECT_STATE"
+check "recording the same version keeps the marker" "0.0.9" "$(cabinet_read_rejected_version "$REJECT_STATE")"
+cabinet_clear_rejected_version "$REJECT_STATE" "0.0.7"
+check "installing a version below the marker keeps it" "0.0.9" "$(cabinet_read_rejected_version "$REJECT_STATE")"
+cabinet_clear_rejected_version "$REJECT_STATE" "0.0.9"
+check "installing the marked version clears it" "" "$(cabinet_read_rejected_version "$REJECT_STATE")"
+cabinet_record_rejected_version "0.0.9" "$REJECT_STATE"
+cabinet_clear_rejected_version "$REJECT_STATE" "0.1.0"
+check "installing a version above the marker clears it" "" "$(cabinet_read_rejected_version "$REJECT_STATE")"
+cabinet_record_rejected_version "0.0.9" "$REJECT_STATE"
 cabinet_clear_rejected_version "$REJECT_STATE"
 check "clear removes the marker" "" "$(cabinet_read_rejected_version "$REJECT_STATE")"
 check "nothing is rejected after clearing" "1" "$(cabinet_is_rejected 0.0.1 "$REJECT_STATE"; echo $?)"
@@ -688,6 +700,21 @@ ROLLBACK_LOG="$( (cmd_rollback) 2>&1 )" || ROLLBACK_RC=$?
 check "a recorded previous release that failed its health check is not reactivated" "1" "$ROLLBACK_RC"
 check "the refusal tells the operator to name a version" "yes" "$(contains "$ROLLBACK_LOG" "name the version to roll back to")"
 check "the refused release stays inactive" "0.0.5" "$(basename "$(readlink -f "$CURRENT_LINK")")"
+
+# --- A manual rollback never lowers the rejected version -------------------------------
+
+rm -rf "${CABINET_DEPLOY_ROOT}/opt/cabinet" "${STATE_DIR}"
+mkdir -p "${RELEASES_DIR}/0.0.4" "${RELEASES_DIR}/0.0.6" "$STATE_DIR"
+ln -s "${RELEASES_DIR}/0.0.6" "$CURRENT_LINK"
+cabinet_record_rejected_version 0.0.8 "$STATE_DIR"
+(cmd_rollback 0.0.4) >/dev/null 2>&1
+check "a manual rollback keeps the higher rejected version" "0.0.8" "$(cabinet_read_rejected_version "$STATE_DIR")"
+
+INSTALL_STATUS_TO_RETURN=0
+make_assets 0.0.7 "${WORK}/assets-0.0.7-fresh"
+run_install v0.0.7 --from-dir "${WORK}/assets-0.0.7-fresh"
+check "a successful install below the rejected version succeeds" "0" "$I_RC"
+check "a successful install below the rejected version keeps the marker" "0.0.8" "$(cabinet_read_rejected_version "$STATE_DIR")"
 
 # --- Single run lock ---------------------------------------------------------------
 

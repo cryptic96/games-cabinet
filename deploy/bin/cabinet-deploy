@@ -204,7 +204,7 @@ cmd_install() {
 
   case "$install_status" in
     0)
-      cabinet_clear_rejected_version "$STATE_DIR"
+      cabinet_clear_rejected_version "$STATE_DIR" "$numeric_version"
       ;;
     "$CABINET_INSTALL_ROLLED_BACK")
       cabinet_record_rejected_version "$numeric_version" "$STATE_DIR"
