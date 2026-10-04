@@ -97,12 +97,13 @@ write_binary() {
   printf 'IMG\000\000\001meta %s\000\000tail\n' "$value" >"$path"
 }
 
-BINARY_REPO="$WORK_DIR/binary"
-new_repo "$BINARY_REPO"
-printf 'an ordinary line\n' >"$BINARY_REPO/notes.txt"
-write_binary "$BINARY_REPO/images/shot.png" "$SYNTH_ONE"
-commit_all "$BINARY_REPO" "add files"
-run_scan "$BINARY_REPO"
+DIRTY_REPO="$WORK_DIR/dirty"
+new_repo "$DIRTY_REPO"
+printf 'an ordinary line\n' >"$DIRTY_REPO/notes.txt"
+write_binary "$DIRTY_REPO/images/shot.png" "$SYNTH_ONE"
+commit_all "$DIRTY_REPO" "add files"
+GIT_COMMITTER_EMAIL='someone@example.com' git -C "$DIRTY_REPO" tag -a -m "release" v1.0.0
+run_scan "$DIRTY_REPO"
 
 binary_case() {
   [ "$LAST_STATUS" -eq 1 ] &&
@@ -111,7 +112,31 @@ binary_case() {
     output_lacks_synthetic
 }
 
+tagger_case() {
+  output_has 'FAIL noreply-identities' &&
+    output_has 'annotated tag object' &&
+    output_has 'tagger email is not a GitHub noreply address'
+}
+
 check "the scanner finds a denylisted value inside a binary file without echoing it" binary_case
+check "the scanner flags an annotated tag whose tagger email is not a noreply address" tagger_case
+
+CLEAN_REPO="$WORK_DIR/clean"
+new_repo "$CLEAN_REPO"
+printf 'an ordinary line\n' >"$CLEAN_REPO/notes.txt"
+commit_all "$CLEAN_REPO" "add files"
+git -C "$CLEAN_REPO" tag -a -m "release" v1.0.0
+run_scan "$CLEAN_REPO"
+
+clean_case() {
+  output_has 'PASS denylist-trees' &&
+    output_has 'PASS denylist-messages' &&
+    output_has 'PASS denylist-identities' &&
+    output_has 'PASS noreply-identities' &&
+    output_has 'PASS absolute-paths'
+}
+
+check "the scanner passes a clean repository with a noreply-tagged release" clean_case
 
 if [ "$FAILURES" -ne 0 ]; then
   echo "$FAILURES check(s) failed" >&2

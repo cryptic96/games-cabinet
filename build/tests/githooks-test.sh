@@ -442,7 +442,68 @@ push_binary_case() {
     ! remote_has_branch main
 }
 
+remote_has_tag() {
+  git -C "$REMOTE_PATH" rev-parse --verify --quiet "refs/tags/$1" >/dev/null
+}
+
+push_tag() {
+  local dir="$1" denylist="$2" tag="$3"
+  run_hooked "$dir" "$denylist" git push --quiet origin "$tag"
+}
+
+push_tag_identity_case() {
+  local dir="$WORK_DIR/push-tag-identity"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "an ordinary line"
+  commit_with_hooks "$dir" "$DENYLIST" "first"
+  GIT_COMMITTER_EMAIL='someone@example.com' git -C "$dir" tag -a -m "release" v1.0.0
+  push_tag "$dir" "$DENYLIST" v1.0.0
+  status_is_nonzero &&
+    stderr_contains 'tagger email is not a GitHub noreply address' &&
+    ! remote_has_tag v1.0.0
+}
+
+push_tag_identity_absent_denylist_case() {
+  local dir="$WORK_DIR/push-tag-identity-absent"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "an ordinary line"
+  commit_with_hooks "$dir" "$DENYLIST" "first"
+  GIT_COMMITTER_EMAIL='someone@example.com' git -C "$dir" tag -a -m "release" v1.0.0
+  push_tag "$dir" "$MISSING_DENYLIST" v1.0.0
+  status_is_nonzero &&
+    stderr_contains 'tagger email is not a GitHub noreply address' &&
+    ! remote_has_tag v1.0.0
+}
+
+push_tag_message_case() {
+  local dir="$WORK_DIR/push-tag-message"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "an ordinary line"
+  commit_with_hooks "$dir" "$DENYLIST" "first"
+  git -C "$dir" tag -a -m "mention ${SYNTH_ONE}" v1.0.0
+  push_tag "$dir" "$DENYLIST" v1.0.0
+  status_is_nonzero &&
+    stderr_contains 'tag ' &&
+    stderr_contains 'denylist match #1' &&
+    stderr_lacks_synthetic &&
+    ! remote_has_tag v1.0.0
+}
+
+push_tag_clean_case() {
+  local dir="$WORK_DIR/push-tag-clean"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "an ordinary line"
+  commit_with_hooks "$dir" "$DENYLIST" "first"
+  git -C "$dir" tag -a -m "release" v1.0.0
+  push_tag "$dir" "$DENYLIST" v1.0.0
+  status_is_zero && remote_has_tag v1.0.0
+}
+
 check "pre-push refuses a skipped-hook binary file whose bytes match the denylist" push_binary_case
+check "pre-push refuses an annotated tag whose tagger email is not a noreply address" push_tag_identity_case
+check "pre-push still checks the tagger email when the denylist is absent" push_tag_identity_absent_denylist_case
+check "pre-push refuses an annotated tag whose message matches the denylist" push_tag_message_case
+check "pre-push allows an annotated tag with a noreply tagger" push_tag_clean_case
 check "pre-push allows clean commits, including an incremental push" push_clean_case
 check "pre-push refuses a skipped-hook commit whose added lines match the denylist" push_content_case
 check "pre-push scans only the commits not yet on the remote" push_incremental_content_case

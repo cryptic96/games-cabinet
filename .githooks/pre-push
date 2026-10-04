@@ -3,8 +3,9 @@
 # about to be pushed (patch, message and identity) against the personal-data
 # denylist, so content committed with hooks skipped is still caught. Independently
 # of the denylist, it refuses commits whose author or committer email is not a
-# GitHub noreply address. Merge commits are not diff-scanned because the commits
-# they bring in are scanned individually. See docs/development.md.
+# GitHub noreply address, and annotated tags whose tagger email is not one.
+# Merge commits are not diff-scanned because the commits they bring in are
+# scanned individually. See docs/development.md.
 set -euo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -57,6 +58,20 @@ check_identity() {
   return "$ok"
 }
 
+check_tag_object() {
+  local object="$1" short="$2" tagger_email ok=0
+  tagger_email="$(git cat-file tag "$object" | sed -n 's/^tagger .*<\(.*\)> [0-9]* [-+][0-9]*$/\1/p' | head -n 1)"
+  tagger_email="${tagger_email,,}"
+  if [ -n "$tagger_email" ] && [[ "$tagger_email" != *"$NOREPLY_SUFFIX" && "$tagger_email" != "$WEB_FLOW_EMAIL" ]]; then
+    echo "blocked: tag $short tagger email is not a GitHub noreply address" >&2
+    ok=1
+  fi
+  if [ "$denylist_active" -eq 1 ]; then
+    git cat-file -p "$object" | denylist_scan "tag $short object" || ok=1
+  fi
+  return "$ok"
+}
+
 check_denylist() {
   local commit="$1" short="$2" ok=0 position=0 path label full_label
   git log -1 --format=%B "$commit" | denylist_scan "commit $short message" || ok=1
@@ -82,6 +97,13 @@ blocked=0
 while read -r _ local_sha _ remote_sha; do
   if [[ "$local_sha" =~ $ZERO_PATTERN ]]; then
     continue
+  fi
+  if [ "$(git cat-file -t "$local_sha")" = "tag" ] && [ -z "${seen[$local_sha]:-}" ]; then
+    seen[$local_sha]=1
+    if ! check_tag_object "$local_sha" "${local_sha:0:12}"; then
+      echo "blocked: tag object ${local_sha:0:12} must be recreated before it is pushed" >&2
+      blocked=1
+    fi
   fi
   commits="$(new_commits "$local_sha" "$remote_sha")"
   while IFS= read -r commit; do

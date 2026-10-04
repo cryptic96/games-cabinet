@@ -197,6 +197,16 @@ check_noreply_identities() {
       findings+=("$commit committer email is not a GitHub noreply address")
     fi
   done < <(git_repo log --all --format='%H%x09%ae%x09%ce')
+  local tag_object tagger_email
+  while IFS=$'\t' read -r tag_object tagger_email; do
+    tagger_email="${tagger_email#<}"
+    tagger_email="${tagger_email%>}"
+    tagger_email="${tagger_email,,}"
+    [ -n "$tagger_email" ] || continue
+    if [[ "$tagger_email" != *"$NOREPLY_SUFFIX" && "$tagger_email" != "$WEB_FLOW_EMAIL" ]]; then
+      findings+=("annotated tag object ${tag_object:0:12} tagger email is not a GitHub noreply address")
+    fi
+  done < <(git_repo for-each-ref --format='%(objectname)%09%(taggeremail)' refs/tags)
   report noreply-identities "${findings[@]}"
 }
 
