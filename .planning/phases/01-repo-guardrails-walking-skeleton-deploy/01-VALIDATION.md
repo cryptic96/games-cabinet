@@ -60,6 +60,45 @@ Filled in by the planner/executor per task; requirement-level map from research:
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
+### Task-level map (from the plans)
+
+| Task | Wave | Requirement | Automated command | Status |
+|------|------|-------------|-------------------|--------|
+| 01-01 T1 | 1 | OPS-01 | `build/scan-history.sh --repo "$DRY_RUN_MIRROR"` | ⬜ |
+| 01-01 T2 | 1 | OPS-01 | checkpoint:decision (owner approves rewrite) | ⬜ |
+| 01-01 T3 | 1 | OPS-01 | `build/scan-history.sh` plus commit-count and fsck checks | ⬜ |
+| 01-02 T1 | 2 | OPS-01 | `bash build/tests/githooks-test.sh` | ⬜ |
+| 01-02 T2 | 2 | OPS-01 | `bash build/tests/githooks-test.sh` and `git config --get core.hooksPath` | ⬜ |
+| 01-03 T1 | 2 | OPS-03, OPS-04 | `CABINET_E2E=1 bash build/tests/package-release-e2e-test.sh` | ⬜ |
+| 01-03 T2 | 2 | OPS-04 | `dotnet test --solution Cabinet.slnx` | ⬜ |
+| 01-03 T3 | 2 | OPS-05 | `dotnet test --solution Cabinet.slnx` and the package e2e test | ⬜ |
+| 01-04 T1 | 2 | OPS-01, OPS-02 | `build/lint.sh repo-rules shell` | ⬜ |
+| 01-04 T2 | 2 | OPS-01 | `build/lint.sh secrets script-tests` | ⬜ |
+| 01-04 T3 | 2 | OPS-02 | `build/lint.sh` | ⬜ |
+| 01-07 T1 | 2 | OPS-05 | `bash deploy/tests/provision-logic-test.sh` | ⬜ |
+| 01-07 T2 | 2 | OPS-05 | `bash deploy/tests/render-templates-test.sh` and `CABINET_LINT_NETWORK=1 bash deploy/tests/versions-network-test.sh` | ⬜ |
+| 01-05 T1 | 3 | OPS-02, OPS-03 | `build/lint.sh workflows repo-rules` and `bash build/tests/validate-release-tag-test.sh` | ⬜ |
+| 01-05 T2 | 3 | OPS-01 | `bash build/tests/check-github-settings-test.sh` | ⬜ |
+| 01-05 T3 | 3 | OPS-01, OPS-03 | `build/lint.sh repo-rules secrets` | ⬜ |
+| 01-06 T1 | 3 | OPS-04 | `CABINET_E2E=1 bash deploy/tests/cabinet-deploy-e2e-test.sh` | ⬜ |
+| 01-06 T2 | 3 | OPS-04 | `bash deploy/tests/cabinet-deploy-logic-test.sh` and the installer e2e test | ⬜ |
+| 01-06 T3 | 3 | OPS-04 | `CABINET_LINT_NETWORK=1 bash deploy/tests/verify-rejects-tampered-artifact-network-test.sh` | ⬜ |
+| 01-08 T1 | 4 | OPS-04, OPS-05 | `bash deploy/tests/sandboxing-test.sh` | ⬜ |
+| 01-08 T2 | 4 | OPS-04, OPS-05 | `bash deploy/tests/sandboxing-test.sh` and `deploy/bin/cabinet-selfcheck --help` | ⬜ |
+| 01-08 T3 | 4 | OPS-05 | `build/lint.sh repo-rules secrets` | ⬜ |
+| 01-09 T1 | 5 | OPS-01, OPS-02 | `build/lint.sh`, `dotnet test --solution Cabinet.slnx`, `build/scan-history.sh` | ⬜ |
+| 01-09 T2 | 5 | OPS-01 | checkpoint:decision (owner approves going public) | ⬜ |
+| 01-09 T3 | 5 | OPS-01, OPS-02, OPS-03 | `build/check-github-settings.sh` and merged PR state | ⬜ |
+| 01-10 T1 | 6 | OPS-03 | draft v0.1.0 exists and verifies | ⬜ |
+| 01-10 T2 | 6 | OPS-03 | checkpoint:decision (owner approves publish) | ⬜ |
+| 01-10 T3 | 6 | OPS-04, OPS-05 | `build/verify-published-release.sh v0.1.0` and `cabinet-selfcheck` on the container | ⬜ |
+| 01-11 T1 | 7 | OPS-04 | draft v0.1.1 labelled as a rehearsal | ⬜ |
+| 01-11 T2 | 7 | OPS-04 | checkpoint:decision (owner approves the broken release) | ⬜ |
+| 01-11 T3 | 7 | OPS-04 | rejected marker holds 0.1.1 and `cabinet-selfcheck` passes | ⬜ |
+| 01-12 T1 | 8 | OPS-04 | draft v0.1.2 exists and main has the restored port | ⬜ |
+| 01-12 T2 | 8 | OPS-03 | checkpoint:decision (owner approves publish) | ⬜ |
+| 01-12 T3 | 8 | OPS-01, OPS-03, OPS-04, OPS-05 | settings read-back, release verification, container selfcheck, marker cleared | ⬜ |
+
 ---
 
 ## Wave 0 Requirements
