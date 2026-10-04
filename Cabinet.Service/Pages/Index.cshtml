@@ -1,0 +1,18 @@
+@page
+@inject BuildInfo Build
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Games Cabinet</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <main>
+        <h1>Games Cabinet</h1>
+        <p>The cabinet is being built. Check back soon to browse the collection.</p>
+        <p class="version">Version @Build.Version (@Build.ShortCommit)</p>
+    </main>
+</body>
+</html>
