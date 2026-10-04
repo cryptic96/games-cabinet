@@ -13,6 +13,23 @@ readonly POLL_UNIT="cabinet-deploy-poll.service"
 readonly DEPLOY_CONF="/etc/cabinet/deploy.conf"
 readonly DEFAULT_OPS_URL="http://127.0.0.1:5081"
 
+SELFCHECK_BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SELFCHECK_BIN_DIR}/../lib/common.sh" ]]; then
+  SELFCHECK_LIB_DIR="${SELFCHECK_BIN_DIR}/../lib"
+else
+  SELFCHECK_LIB_DIR="/usr/local/lib/cabinet"
+fi
+# shellcheck source=deploy/lib/common.sh
+source "${SELFCHECK_LIB_DIR}/common.sh" 2>/dev/null
+
+###
+### The prefix under which the provisioning comparison looks up the active
+### release and the installed files. Always empty on a real host and never
+### read from the environment, so the root-run selfcheck cannot be redirected;
+### the offline tests reassign it after sourcing this file.
+###
+SELFCHECK_ROOT=""
+
 PASSED=0
 FAILED=0
 
@@ -21,7 +38,8 @@ usage() {
 Usage: cabinet-selfcheck [-h|--help]
 
 Checks, as root, that this host is correctly provisioned: units, file modes,
-listeners, firewall, health at the installed version, SSH key-only login, no
+listeners, firewall, health at the installed version, that the installed
+scripts, libraries and units match the active release, SSH key-only login, no
 GitHub credential or Actions runner, and the image smoke in a sandbox.
 Prints PASS or FAIL per check and exits 1 when any check fails.
 EOF
@@ -158,6 +176,39 @@ check_health() {
   fi
 }
 
+###
+### Compares the installed scripts, libraries and units, byte for byte, with
+### the copies shipped in the active release's deploy directory: one PASS when
+### they all match, one FAIL per installed file that is missing or differs,
+### and a FAIL when there is nothing to compare against or the loaded deploy
+### library cannot compare. Only reads; it never copies, installs or runs
+### anything, because re-running provisioning is an operator action.
+###
+check_provisioning_current() {
+  local drifted status=0 path
+
+  if ! declare -F cabinet_provisioning_drift > /dev/null; then
+    fail "the installed deploy library cannot compare provisioning; re-run deploy/provision.sh from the active release"
+    return
+  fi
+
+  drifted="$(cabinet_provisioning_drift "${SELFCHECK_ROOT}/opt/cabinet/current/deploy" "$SELFCHECK_ROOT")" || status=$?
+
+  case "$status" in
+    0)
+      pass "the installed scripts, libraries and units match the active release"
+      ;;
+    1)
+      while IFS= read -r path; do
+        fail "${path} does not match the active release; re-run deploy/provision.sh from the active release"
+      done <<<"$drifted"
+      ;;
+    *)
+      fail "there is no active release deploy directory to compare the installed scripts, libraries and units against"
+      ;;
+  esac
+}
+
 check_ssh() {
   local settings setting
   if ! settings="$(sshd -T 2>&1)"; then
@@ -270,6 +321,7 @@ main() {
   check_listeners
   check_firewall
   check_health
+  check_provisioning_current
   check_ssh
   check_no_github_credentials
   check_no_actions_runner

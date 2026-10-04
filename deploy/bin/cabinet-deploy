@@ -255,7 +255,16 @@ cmd_rollback() {
 }
 
 cmd_poll() {
-  local tag="" fetch_status=0
+  local tag="" fetch_status=0 drift_status=0
+
+  # Only signals: a differing installed script, library or unit logs one
+  # warning and nothing else changes. Provisioning stays an operator action
+  # run from the active release; nothing is ever copied or executed from it.
+  cabinet_provisioning_drift "${CURRENT_LINK}/deploy" "$DEPLOY_ROOT" >/dev/null || drift_status=$?
+  if [ "$drift_status" -eq 1 ]; then
+    cabinet_log "WARNING: provisioning is out of date; re-run deploy/provision.sh from the active release"
+  fi
+
   tag="$(cabinet_fetch_latest_release "$CABINET_GITHUB_REPO")" || fetch_status=$?
   if [ "$fetch_status" -eq "$CABINET_STATUS_QUIET" ]; then
     return 0
