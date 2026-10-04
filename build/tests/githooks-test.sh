@@ -190,6 +190,227 @@ check "pre-commit allows removing a denylisted line" removal_case
 check "pre-commit warns and allows when the denylist is absent" absent_denylist_case
 check "pre-commit ignores a denylist that only has comments and blanks, without a warning" comment_only_case
 
+message_block_case() {
+  local dir="$WORK_DIR/msg-block"
+  new_repo "$dir"
+  stage "$dir" notes/a.txt "an ordinary line"
+  commit_with_hooks "$dir" "$DENYLIST" "mention ${SYNTH_TWO^^} here"
+  status_is_nonzero &&
+    stderr_contains 'commit message:1:' &&
+    stderr_contains 'denylist match #5' &&
+    stderr_contains 'blocked:' &&
+    stderr_lacks_synthetic &&
+    ! git -C "$dir" rev-parse --verify --quiet HEAD >/dev/null
+}
+
+message_clean_case() {
+  local dir="$WORK_DIR/msg-clean"
+  new_repo "$dir"
+  stage "$dir" notes/a.txt "an ordinary line"
+  commit_with_hooks "$dir" "$DENYLIST" "an ordinary message"
+  status_is_zero &&
+    [ "$(git -C "$dir" rev-list --count HEAD)" -eq 1 ]
+}
+
+message_comment_case() {
+  local dir="$WORK_DIR/msg-comment"
+  new_repo "$dir"
+  stage "$dir" notes/a.txt "an ordinary line"
+  run_hooked "$dir" "$DENYLIST" git commit --quiet -m "an ordinary message" -m "# note about ${SYNTH_ONE}"
+  status_is_zero &&
+    [ "$(git -C "$dir" rev-list --count HEAD)" -eq 1 ]
+}
+
+message_absent_case() {
+  local dir="$WORK_DIR/msg-absent"
+  new_repo "$dir"
+  stage "$dir" notes/a.txt "an ordinary line"
+  commit_with_hooks "$dir" "$MISSING_DENYLIST" "mention ${SYNTH_TWO}"
+  status_is_zero &&
+    stderr_contains 'warning' &&
+    [ "$(git -C "$dir" rev-list --count HEAD)" -eq 1 ]
+}
+
+check "commit-msg refuses a message matching the denylist without echoing it" message_block_case
+check "commit-msg allows a clean message" message_clean_case
+check "commit-msg ignores comment lines" message_comment_case
+check "commit-msg warns and allows when the denylist is absent" message_absent_case
+
+REMOTE_DIR="$WORK_DIR/remotes"
+mkdir -p "$REMOTE_DIR"
+
+new_repo_with_remote() {
+  local dir="$1" remote="$REMOTE_DIR/$(basename "$1").git"
+  new_repo "$dir"
+  git init --quiet --bare --initial-branch=main "$remote"
+  git -C "$dir" remote add origin "$remote"
+  REMOTE_PATH="$remote"
+}
+
+remote_has_branch() {
+  git -C "$REMOTE_PATH" rev-parse --verify --quiet "refs/heads/$1" >/dev/null
+}
+
+push_branch() {
+  local dir="$1" denylist="$2" branch="$3"
+  run_hooked "$dir" "$denylist" git push --quiet origin "$branch"
+}
+
+push_clean_case() {
+  local dir="$WORK_DIR/push-clean"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "an ordinary line"
+  commit_with_hooks "$dir" "$DENYLIST" "first"
+  push_branch "$dir" "$DENYLIST" main
+  status_is_zero && remote_has_branch main || return 1
+  stage "$dir" notes/b.txt "another ordinary line"
+  commit_with_hooks "$dir" "$DENYLIST" "second"
+  push_branch "$dir" "$DENYLIST" main
+  status_is_zero &&
+    [ "$(git -C "$REMOTE_PATH" rev-list --count main)" -eq 2 ]
+}
+
+push_content_case() {
+  local dir="$WORK_DIR/push-content"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "line with ${SYNTH_ONE^^}"
+  commit_unchecked "$dir" "innocent message"
+  push_branch "$dir" "$DENYLIST" main
+  status_is_nonzero &&
+    stderr_contains 'notes/a.txt:1:' &&
+    stderr_contains 'denylist match #1' &&
+    stderr_contains 'blocked: commit' &&
+    stderr_lacks_synthetic &&
+    ! remote_has_branch main
+}
+
+push_incremental_content_case() {
+  local dir="$WORK_DIR/push-incremental"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "an ordinary line"
+  commit_with_hooks "$dir" "$DENYLIST" "first"
+  push_branch "$dir" "$DENYLIST" main
+  status_is_zero || return 1
+  stage "$dir" notes/b.txt "line with ${SYNTH_TWO}"
+  commit_unchecked "$dir" "second"
+  push_branch "$dir" "$DENYLIST" main
+  status_is_nonzero &&
+    stderr_contains 'notes/b.txt:1:' &&
+    [ "$(git -C "$REMOTE_PATH" rev-list --count main)" -eq 1 ]
+}
+
+push_message_case() {
+  local dir="$WORK_DIR/push-message"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "an ordinary line"
+  commit_unchecked "$dir" "mention ${SYNTH_ONE}"
+  push_branch "$dir" "$DENYLIST" main
+  status_is_nonzero &&
+    stderr_contains 'message:1:' &&
+    stderr_contains 'blocked: commit' &&
+    stderr_lacks_synthetic &&
+    ! remote_has_branch main
+}
+
+push_author_email_case() {
+  local dir="$WORK_DIR/push-author"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "an ordinary line"
+  GIT_AUTHOR_EMAIL='someone@example.com' commit_unchecked "$dir" "first"
+  push_branch "$dir" "$DENYLIST" main
+  status_is_nonzero &&
+    stderr_contains 'author email is not a GitHub noreply address' &&
+    ! remote_has_branch main
+}
+
+push_committer_email_case() {
+  local dir="$WORK_DIR/push-committer"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "an ordinary line"
+  GIT_COMMITTER_EMAIL='someone@example.com' commit_unchecked "$dir" "first"
+  push_branch "$dir" "$DENYLIST" main
+  status_is_nonzero &&
+    stderr_contains 'committer email is not a GitHub noreply address' &&
+    ! remote_has_branch main
+}
+
+push_web_flow_committer_case() {
+  local dir="$WORK_DIR/push-web-flow"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "an ordinary line"
+  GIT_COMMITTER_EMAIL='noreply@github.com' commit_unchecked "$dir" "first"
+  push_branch "$dir" "$DENYLIST" main
+  status_is_zero && remote_has_branch main
+}
+
+push_merge_case() {
+  local dir="$WORK_DIR/push-merge"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "an ordinary line"
+  commit_with_hooks "$dir" "$DENYLIST" "base"
+  git -C "$dir" checkout --quiet -b topic
+  stage "$dir" notes/topic.txt "line with ${SYNTH_ONE}"
+  commit_unchecked "$dir" "topic work"
+  push_branch "$dir" "$COMMENT_ONLY_DENYLIST" topic
+  status_is_zero || return 1
+  git -C "$dir" checkout --quiet main
+  stage "$dir" notes/main.txt "main work"
+  commit_with_hooks "$dir" "$DENYLIST" "main work"
+  git -C "$dir" merge --quiet --no-ff --no-verify -m "merge topic" topic
+  push_branch "$dir" "$DENYLIST" main
+  status_is_zero && remote_has_branch main
+}
+
+push_delete_case() {
+  local dir="$WORK_DIR/push-delete"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "an ordinary line"
+  commit_with_hooks "$dir" "$DENYLIST" "first"
+  git -C "$dir" checkout --quiet -b topic
+  push_branch "$dir" "$DENYLIST" topic
+  status_is_zero && remote_has_branch topic || return 1
+  git -C "$dir" checkout --quiet main
+  stage "$dir" notes/b.txt "line with ${SYNTH_ONE}"
+  commit_unchecked "$dir" "unpushed and unchecked"
+  run_hooked "$dir" "$DENYLIST" git push --quiet origin --delete topic
+  status_is_zero && ! remote_has_branch topic
+}
+
+push_absent_case() {
+  local dir="$WORK_DIR/push-absent"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "line with ${SYNTH_ONE}"
+  commit_unchecked "$dir" "first"
+  push_branch "$dir" "$MISSING_DENYLIST" main
+  status_is_zero &&
+    stderr_contains 'warning' &&
+    remote_has_branch main
+}
+
+push_absent_identity_case() {
+  local dir="$WORK_DIR/push-absent-identity"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "an ordinary line"
+  GIT_AUTHOR_EMAIL='someone@example.com' commit_unchecked "$dir" "first"
+  push_branch "$dir" "$MISSING_DENYLIST" main
+  status_is_nonzero &&
+    stderr_contains 'warning' &&
+    stderr_contains 'author email is not a GitHub noreply address' &&
+    ! remote_has_branch main
+}
+
+check "pre-push allows clean commits, including an incremental push" push_clean_case
+check "pre-push refuses a skipped-hook commit whose added lines match the denylist" push_content_case
+check "pre-push scans only the commits not yet on the remote" push_incremental_content_case
+check "pre-push refuses a commit whose message matches the denylist" push_message_case
+check "pre-push refuses a non-noreply author email" push_author_email_case
+check "pre-push refuses a non-noreply committer email" push_committer_email_case
+check "pre-push accepts the GitHub web-flow committer address" push_web_flow_committer_case
+check "pre-push does not diff-scan merge commits" push_merge_case
+check "pre-push allows a branch deletion without scanning" push_delete_case
+check "pre-push warns and allows content when the denylist is absent" push_absent_case
+check "pre-push still enforces noreply identities when the denylist is absent" push_absent_identity_case
+
 if [ "$FAILURES" -ne 0 ]; then
   echo "$FAILURES check(s) failed" >&2
   exit 1
