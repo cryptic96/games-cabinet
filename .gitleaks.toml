@@ -14,6 +14,24 @@ description = "RFC 1918 private IPv4 address"
 regex = '''\b(?:10\.(?:[0-9]{1,3}\.){2}[1-9][0-9]{0,2}|172\.(?:1[6-9]|2[0-9]|3[01])\.[0-9]{1,3}\.[1-9][0-9]{0,2}|192\.168\.[0-9]{1,3}\.[1-9][0-9]{0,2})\b'''
 
 [[rules]]
+id = "private-ipv4-network"
+description = "RFC 1918 private IPv4 network range in CIDR notation"
+# A network address ends in ".0", which the private-ipv4 rule deliberately
+# skips, so ranges such as a home or lab subnet are matched by this separate
+# rule. Only the three whole RFC 1918 blocks, written out when describing the
+# ranges themselves, are allowed.
+regex = '''\b(?:10(?:\.[0-9]{1,3}){3}|172\.(?:1[6-9]|2[0-9]|3[01])(?:\.[0-9]{1,3}){2}|192\.168(?:\.[0-9]{1,3}){2})/[0-9]{1,2}\b'''
+
+  [[rules.allowlists]]
+  description = "the three whole RFC 1918 blocks are documentation of the ranges, not a network in use"
+  regexTarget = "match"
+  regexes = [
+    '''^10\.0\.0\.0/8$''',
+    '''^172\.16\.0\.0/12$''',
+    '''^192\.168\.0\.0/16$''',
+  ]
+
+[[rules]]
 id = "email-address"
 description = "Email address that is not a placeholder or GitHub noreply address"
 regex = '''\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'''

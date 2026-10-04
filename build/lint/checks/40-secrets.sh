@@ -27,6 +27,14 @@ fake_private_ipv4() {
   printf '192.168.%d.%d' "$((RANDOM % 256))" "$((1 + RANDOM % 254))"
 }
 
+fake_private_network() {
+  case "$1" in
+    ten) printf '10.%d.%d.0/24' "$((RANDOM % 256))" "$((RANDOM % 256))" ;;
+    one-seventy-two) printf '172.%d.%d.0/24' "$((16 + RANDOM % 16))" "$((RANDOM % 256))" ;;
+    one-ninety-two) printf '192.168.%d.0/24' "$((RANDOM % 256))" ;;
+  esac
+}
+
 fake_non_example_email() {
   printf '%s@%s.nl' "$(random_lower_letters 8)" "$(random_lower_letters 6)"
 }
@@ -136,6 +144,9 @@ self_test() {
   assert_notes_accepted "loopback, documentation, example and noreply content" \
     "$(printf 'loopback address: 127.0.0.1\ndocumentation address: 192.0.2.10\ncontact: someone@example.com\nnoreply: someone@users.noreply.github.com\nweb flow: noreply@github.com\n')" || failed=1
 
+  assert_notes_accepted "the three whole RFC 1918 blocks written out" \
+    "$(printf 'blocks: 10.0.0.0/8, 172.16.0.0/12 and 192.168.0.0/16\n')" || failed=1
+
   local json_name
   json_name="$(printf 'settings file: appsettings%sjson' '.local.')"
   assert_notes_accepted "a local settings file name" "$json_name" || failed=1
@@ -185,6 +196,13 @@ self_test() {
 
   assert_notes_rejected "a generated 192.168.x.y address" "server: $(fake_private_ipv4)" || failed=1
   assert_notes_rejected "a generated non-example-domain email" "contact: $(fake_non_example_email)" || failed=1
+
+  local network_kind
+  for network_kind in ten one-seventy-two one-ninety-two; do
+    assert_notes_rejected "a generated private network range (${network_kind})" \
+      "allowed from: $(fake_private_network "$network_kind")" || failed=1
+  done
+  assert_notes_rejected "a private network range narrower than a whole block" "allowed from: $(printf '192.168.%d.0/24' 0)" || failed=1
 
   assert_fixture_rejected "a generated 192.168.x.y address" "server: $(fake_private_ipv4)" || failed=1
   assert_fixture_rejected "a generated non-example-domain email" "contact: $(fake_non_example_email)" || failed=1
