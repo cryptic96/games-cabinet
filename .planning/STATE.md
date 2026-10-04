@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-03)
 Phase: 2 — Layout Engine & Cabinet Prototype
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-10-04 — Phase 01 complete, transitioned to Phase 2
+Last activity: 2026-10-04 - Completed quick task 261004-vqo: Make out-of-date provisioning visible on the server
 
 Progress: [██████████] 100%
 
@@ -80,11 +80,17 @@ None yet.
 ### Blockers/Concerns
 
 - [Phase 1]: Owner must register the BGG application (non-commercial) on day one; approval may take a week or more and gates Phase 3.
-- [Phase 1]: Owner actions needed before first push: create empty public repo, choose OSI licence (MIT or Apache-2.0), confirm public git identity, configure protected `main`, tag ruleset and a `deploy` environment with a reviewer.
 - [Phase 2]: Packing quality is subjective; the owner's visual review is the acceptance gate and may take several rounds.
 - [Phase 3]: Location spike outcome decides whether LOC-03 and LOC-04 are built in Phase 6. BGG throttle numbers are unpublished; treat all rates as unconfirmed.
 - [Phase 4]: Coverage and units of BGG version dimensions are unconfirmed; image resizing under BGG terms is ambiguous (downscale only, never crop, keep the credit).
 - [Phase 8]: DNS, TLS and router port-forward are owner actions; the router stays LAN-only until the go-public checklist passes.
+- [Phase 8]: Before go-public, revoke or downgrade the development admin account (passwordless sudo) on the server and drop the LAN/VPN allow-list from the route (accepted risk AR-08 expires then).
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 261004-vqo | Make out-of-date provisioning visible on the server (poll warning + selfcheck per-file check) | 2026-10-04 | fa25c8f | [261004-vqo-make-out-of-date-provisioning-visible-on](./quick/261004-vqo-make-out-of-date-provisioning-visible-on/) |
 
 ## Deferred Items
 
