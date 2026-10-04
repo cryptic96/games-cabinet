@@ -12,7 +12,9 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 
 ### Validated
 
-(None yet — ship to validate)
+- ✓ Runs in its own new LXC on the Proxmox host, created and provisioned from documented scripts — Phase 1
+- ✓ Releases follow the ing-dashboard model: semver tag → attested draft → owner approval in the `deploy` environment → server timer pulls, verifies offline, installs, health-checks and rolls back automatically. No self-hosted runner — Phase 1 (rollback rehearsed for real)
+- ✓ Public GitHub repository with `main` protected, required PR checks and personal-data guardrails (hooks, full-history scan, secrets lint) — Phase 1
 
 ### Active
 
@@ -31,10 +33,8 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 - [ ] Game-night filters: player count, play time, storage location, search by name (non-matching games dim on the shelf)
 - [ ] On phones the cabinet reflows into a narrower, taller cabinet that still looks like a cabinet
 - [ ] Empty or near-empty collections look intentional, not broken (the owner's BGG collection is still being filled in)
+- [ ] Before the site goes public: revoke or downgrade the development admin account (passwordless sudo) on the server, and drop the LAN/VPN allow-list from the route
 - [ ] Site is public and read-only with no accounts, reachable from the internet through the existing Traefik reverse proxy. Owner tools are reachable only from the home network or VPN
-- [ ] Runs in its own new LXC on the Proxmox host
-- [ ] Releases follow the ing-dashboard model: a semver tag triggers a GitHub Actions build with artifact attestation, the owner approves the draft release, and a timer on the server pulls, verifies offline, installs and health-checks it. No self-hosted runner
-- [ ] Public GitHub repository created, with `main` protected
 
 ### Out of Scope
 
@@ -104,9 +104,11 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 | Tap shows a pull-out animation and a detail card | Delight plus the info friends need to pick a game | — Pending |
 | Owned games only | Wishlist, preordered and for-trade statuses are not wanted | — Pending |
 | Public internet exposure via existing Traefik | "Anyone with the link" must work from anywhere | — Pending |
-| .NET 10 with the ing-dashboard release/deploy pattern | Owner's stack; proven secure pull-based deploy without a runner | — Pending |
-| Public GitHub repo | Required for free attestations and credential-less release pulls | — Pending |
-| Planning and build work on `milestone/v1-games-cabinet`; `main` protected | Same branching rules as ing-dashboard | — Pending |
+| .NET 10 with the ing-dashboard release/deploy pattern | Owner's stack; proven secure pull-based deploy without a runner | ✓ Good — four releases shipped, automatic rollback proven on the real server (Phase 1) |
+| Public GitHub repo | Required for free attestations and credential-less release pulls | ✓ Good — public with all controls read back; history scrubbed before go-live (Phase 1) |
+| Planning and build work on `milestone/v1-games-cabinet`; `main` protected | Same branching rules as ing-dashboard | ✓ Good — main ruleset enforced; merge commits for the milestone branch, squash for small PRs (Phase 1) |
+| Release workflow split into test, package and attest jobs; only attest can sign | Test code and test-only packages must not run inside the provenance boundary | ✓ Good (Phase 1 code review) |
+| Owner's handle and first-name commit author display name are public | The handle is the repository owner, licence holder and release signer; emails stay noreply | ✓ Accepted (Phase 1 UAT) |
 
 ## Evolution
 
@@ -126,4 +128,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-03 after research and requirements definition*
+*Last updated: 2026-10-04 after Phase 1 (repo guardrails, walking skeleton, deploy)*
