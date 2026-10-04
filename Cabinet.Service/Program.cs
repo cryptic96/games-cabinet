@@ -18,6 +18,8 @@ builder.Services.Configure<KestrelServerOptions>(options => options.AddServerHea
 
 builder.Services.AddHealthChecks();
 
+builder.Services.AddRazorPages();
+
 var buildInfo = BuildInfo.Parse(
     typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
 builder.Services.AddSingleton(buildInfo);
@@ -61,6 +63,11 @@ app.UseHealthChecks("/health", opsPort, new HealthCheckOptions
         });
     }
 });
+
+app.UseRouting();
+
+app.MapStaticAssets();
+app.MapRazorPages().WithStaticAssets();
 
 await app.RunAsync();
 
