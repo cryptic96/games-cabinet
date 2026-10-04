@@ -189,6 +189,8 @@ This proves the host end to end and prints PASS or FAIL for each check:
 - the firewall's input chain drops by default;
 - the health endpoint reports `Healthy` at exactly the version the `current`
   link points at;
+- the installed installer, its libraries and the systemd units match, byte
+  for byte, the copies shipped in the active release's `deploy/` directory;
 - SSH accepts keys only;
 - there is no GitHub credential and no Actions runner anywhere on the host;
 - the image smoke: the deployed binary runs its imaging self-test as the
@@ -213,18 +215,32 @@ journalctl -u cabinet-deploy-poll.service -f
 ## 12. When to re-run provisioning
 
 Provisioning is idempotent. Re-run it whenever a package pin, a systemd unit,
-the firewall template or a server-side value changes:
+the firewall template or a server-side value changes. Once a release is
+installed, run it from the active release:
 
 ```bash
-cd /root/cabinet-src && git pull && git checkout {latest-release-tag}
+/opt/cabinet/current/deploy/provision.sh
+```
+
+Running from the active release is what makes the installed scripts,
+libraries and units match what every poll and the selfcheck compare against.
+A source checkout gives the same result only when it is checked out at the
+active release's tag. Before any release is installed, use the checkout from
+the earlier steps:
+
+```bash
+cd /root/cabinet-src && git pull && git checkout {main-or-latest-release-tag}
 deploy/provision.sh
 ```
 
-Once a release is installed, the same scripts also ship inside it, so
-`/opt/cabinet/current/deploy/provision.sh` works too. A re-run never
-overwrites `/etc/cabinet/cabinet.env` or `/etc/cabinet/provision.conf`; edit
-those by hand. Only files whose content changed are rewritten, and a changed
-unit restarts only the service it describes.
+There is no need to track by hand whether the installed scripts, libraries
+and units are current: every poll logs a warning and `cabinet-selfcheck`
+fails until provisioning is re-run. See
+[the deploy guide](deploy.md#when-to-re-run-provisioning) for exactly what is
+compared and what is not. A re-run never overwrites `/etc/cabinet/cabinet.env`
+or `/etc/cabinet/provision.conf`; edit those by hand. Only files whose content
+changed are rewritten, and a changed unit restarts only the service it
+describes.
 
 ## What this guide never does
 

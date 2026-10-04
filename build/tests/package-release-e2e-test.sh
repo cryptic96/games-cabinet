@@ -45,6 +45,16 @@ grep -qx 'app/Cabinet.Service.dll' <<<"$LISTING" || fail "zip lacks app/Cabinet.
 grep -qx 'release-manifest.json' <<<"$LISTING" || fail "zip lacks release-manifest.json"
 grep -qx 'app/libSkiaSharp.so' <<<"$LISTING" || fail "zip lacks app/libSkiaSharp.so"
 grep -qx 'app/SkiaSharp.dll' <<<"$LISTING" || fail "zip lacks app/SkiaSharp.dll"
+for shipped in \
+  deploy/bin/cabinet-deploy deploy/bin/cabinet-selfcheck \
+  deploy/lib/common.sh deploy/lib/deploy.sh \
+  deploy/systemd/cabinet.service deploy/systemd/cabinet-deploy-poll.service \
+  deploy/systemd/cabinet-deploy-poll.timer deploy/provision.sh; do
+  grep -qx "$shipped" <<<"$LISTING" || fail "zip lacks $shipped, which the server compares its installed copies against"
+done
+if grep -q '^deploy/tests/' <<<"$LISTING"; then
+  fail "zip ships deploy/tests/, which must stay out of releases"
+fi
 
 (cd "$OUTPUT" && sha256sum -c "cabinet-$VERSION.zip.sha256" >/dev/null) || fail "sha256 does not match the zip"
 
