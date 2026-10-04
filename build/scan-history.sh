@@ -101,7 +101,7 @@ OVERALL=0
 matching_lines() {
   local text="$1" i found=""
   for ((i = 0; i < ${#PATTERNS[@]}; i++)); do
-    if grep -q -i -F -e "${PATTERNS[i]}" <<<"$text"; then
+    if grep -a -q -i -F -e "${PATTERNS[i]}" <<<"$text"; then
       found+="${PATTERN_LINES[i]} "
     fi
   done
@@ -132,11 +132,11 @@ report() {
 check_denylist_trees() {
   local findings=() commit hits names text
   for commit in "${COMMITS[@]}"; do
-    hits="$(git_repo grep -I -i -F -l -f "$PATTERN_FILE" "$commit" -- 2>/dev/null || true)"
+    hits="$(git_repo grep -a -i -F -l -f "$PATTERN_FILE" "$commit" -- 2>/dev/null || true)"
     if [ -n "$hits" ]; then
       while IFS= read -r hit; do
         [ -n "$hit" ] || continue
-        text="$(git_repo grep -I -i -F -h -f "$PATTERN_FILE" "$commit" -- "${hit#*:}" 2>/dev/null || true)"
+        text="$(git_repo grep -a -i -F -h -f "$PATTERN_FILE" "$commit" -- "${hit#*:}" 2>/dev/null | tr -d '\000' || true)"
         findings+=("$hit denylist line(s) $(matching_lines "$text")")
       done <<<"$hits"
     fi
@@ -210,7 +210,7 @@ check_absolute_paths() {
     -e '[A-Za-z]:[\\]User[s][\\]'
   )
   for commit in "${COMMITS[@]}"; do
-    hits="$(git_repo grep -I -n -E "${patterns[@]}" "$commit" -- 2>/dev/null | cut -d: -f1-3 || true)"
+    hits="$(git_repo grep -a -n -E "${patterns[@]}" "$commit" -- 2>/dev/null | cut -d: -f1-3 || true)"
     if [ -n "$hits" ]; then
       while IFS= read -r hit; do
         [ -n "$hit" ] && findings+=("$hit absolute local path")

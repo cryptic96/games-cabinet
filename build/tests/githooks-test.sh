@@ -183,6 +183,35 @@ comment_only_case() {
     [ "$(git -C "$dir" rev-list --count HEAD)" -eq 1 ]
 }
 
+stage_binary() {
+  local dir="$1" path="$2" value="$3"
+  mkdir -p "$dir/$(dirname "$path")"
+  printf 'IMG\000\000\001meta %s\000\000tail\n' "$value" >"$dir/$path"
+  git -C "$dir" add -- "$path"
+}
+
+staged_binary_case() {
+  local dir="$WORK_DIR/block-binary"
+  new_repo "$dir"
+  stage_binary "$dir" images/shot.png "${SYNTH_ONE^^}"
+  commit_with_hooks "$dir" "$DENYLIST" "add image"
+  status_is_nonzero &&
+    stderr_contains 'images/shot.png:' &&
+    stderr_contains 'denylist match #1' &&
+    stderr_lacks_synthetic
+}
+
+staged_clean_binary_case() {
+  local dir="$WORK_DIR/allow-binary"
+  new_repo "$dir"
+  stage_binary "$dir" images/shot.png "an ordinary value"
+  commit_with_hooks "$dir" "$DENYLIST" "add image"
+  status_is_zero &&
+    [ "$(git -C "$dir" rev-list --count HEAD)" -eq 1 ]
+}
+
+check "pre-commit refuses a binary file whose bytes match the denylist without echoing it" staged_binary_case
+check "pre-commit allows a clean binary file" staged_clean_binary_case
 check "pre-commit refuses an added line matching the denylist, case-insensitively, without echoing it" staged_block_case
 check "pre-commit allows clean content" staged_clean_case
 check "pre-commit refuses a staged file name matching the denylist without echoing it" staged_name_case
@@ -400,6 +429,20 @@ push_absent_identity_case() {
     ! remote_has_branch main
 }
 
+push_binary_case() {
+  local dir="$WORK_DIR/push-binary"
+  new_repo_with_remote "$dir"
+  stage_binary "$dir" images/shot.png "${SYNTH_TWO^^}"
+  commit_unchecked "$dir" "innocent message"
+  push_branch "$dir" "$DENYLIST" main
+  status_is_nonzero &&
+    stderr_contains 'images/shot.png:' &&
+    stderr_contains 'denylist match #5' &&
+    stderr_lacks_synthetic &&
+    ! remote_has_branch main
+}
+
+check "pre-push refuses a skipped-hook binary file whose bytes match the denylist" push_binary_case
 check "pre-push allows clean commits, including an incremental push" push_clean_case
 check "pre-push refuses a skipped-hook commit whose added lines match the denylist" push_content_case
 check "pre-push scans only the commits not yet on the remote" push_incremental_content_case

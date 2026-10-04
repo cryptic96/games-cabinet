@@ -71,7 +71,7 @@ check_denylist() {
     if [ "$label" != "$path" ]; then
       printf '%s\n' "$path" | denylist_scan "$full_label" || ok=1
     fi
-    git diff-tree -p -U0 --root --no-commit-id --no-color --no-ext-diff "$commit" -- ":(literal)$path" |
+    git diff-tree -p -U0 --root --no-commit-id --no-color --no-ext-diff --no-textconv --text "$commit" -- ":(literal)$path" |
       denylist_added_lines | denylist_scan "$full_label" || ok=1
   done < <(git diff-tree -r --root --no-commit-id --name-only -z --diff-filter=d "$commit")
   return "$ok"
