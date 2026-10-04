@@ -1,0 +1,23 @@
+# Example configuration for the deploy installer.
+# Copy to /etc/cabinet/deploy.conf, owned by root and not group- or
+# world-writable (for example `chmod 600`). The installer reads only the keys
+# below and never executes the file.
+
+# GitHub owner/repo this installer polls, downloads from and verifies
+# attestations against.
+CABINET_GITHUB_REPO=cryptic96/games-cabinet
+
+# Path, relative to the repository root, of the workflow file that must have
+# produced the release's attestation.
+CABINET_SIGNER_WORKFLOW=.github/workflows/release.yml
+
+# Number of release directories to keep on disk. The active and previous
+# releases are always kept, even when that exceeds this number.
+CABINET_KEEP_RELEASES=3
+
+# Seconds to wait for the app to report healthy at the expected version after
+# a restart, before the release is rolled back.
+CABINET_HEALTH_TIMEOUT_SECONDS=60
+
+# Base URL of the app's loopback-only ops listener (serves /health).
+CABINET_OPS_URL=http://127.0.0.1:5081
