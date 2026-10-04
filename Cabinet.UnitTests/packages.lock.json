@@ -159,11 +159,21 @@
           "xunit.v3.runner.common": "[4.0.1]"
         }
       },
+      "cabinet.domain": {
+        "type": "Project"
+      },
       "cabinet.repository": {
         "type": "Project",
         "dependencies": {
           "SkiaSharp": "[4.153.1, )",
           "SkiaSharp.NativeAssets.Linux.NoDependencies": "[4.153.1, )"
+        }
+      },
+      "cabinet.service": {
+        "type": "Project",
+        "dependencies": {
+          "Cabinet.Domain": "[1.0.0, )",
+          "Cabinet.Repository": "[1.0.0, )"
         }
       }
     }
