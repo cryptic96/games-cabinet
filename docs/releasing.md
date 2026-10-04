@@ -42,9 +42,12 @@ longer be changed or deleted, only superseded by a newer release.
 2. Create an annotated tag matching `v<major>.<minor>.<patch>` on the latest
    commit of `main`. Only the repository's admin role can create `v*` tags.
 3. Push the tag. This starts the `release` workflow on a GitHub-hosted
-   runner: it validates the tag, packages the application, runs the test
-   suite, attests the archive's provenance and creates a **draft** release
-   with the three files. The draft is not publicly downloadable yet.
+   runner. A first job validates the tag and runs the test suite with
+   read-only access. A second job, also read-only, packages the application
+   and records the archive's digest. A third job, the only one that can sign
+   or write, checks the archive against that digest without running any test
+   or build code, attests its provenance and creates a **draft** release with
+   the three files. The draft is not publicly downloadable yet.
 4. Check the draft. If the release needs a label in its notes (for example a
    deliberate rollback rehearsal), edit the draft's release notes **before**
    approving. A published release is immutable.
