@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/Tests/">
+    <Project Path="Cabinet.UnitTests/Cabinet.UnitTests.csproj" />
+  </Folder>
+  <Project Path="Cabinet.Domain/Cabinet.Domain.csproj" />
+  <Project Path="Cabinet.Repository/Cabinet.Repository.csproj" />
+  <Project Path="Cabinet.Service/Cabinet.Service.csproj" />
+</Solution>
