@@ -25,7 +25,7 @@ while IFS= read -r -d '' path; do
   if [ "$label" != "$path" ]; then
     printf '%s\n' "$path" | denylist_scan "$label" || blocked=1
   fi
-  if ! git diff --cached -U0 --no-color --no-ext-diff -- ":(literal)$path" | denylist_added_lines | denylist_scan "$label"; then
+  if ! git diff --cached -U0 --no-color --no-ext-diff --no-textconv --text -- ":(literal)$path" | denylist_added_lines | denylist_scan "$label"; then
     blocked=1
   fi
 done < <(git diff --cached --name-only -z --diff-filter=d)

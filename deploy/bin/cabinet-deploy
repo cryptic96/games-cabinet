@@ -52,9 +52,23 @@ load_configuration() {
   CABINET_OPS_URL="${CABINET_OPS_URL:-http://127.0.0.1:5081}"
   CABINET_GITHUB_REPO="${CABINET_GITHUB_REPO:-}"
 
+  CABINET_HEALTH_INTERVAL_SECONDS="${CABINET_HEALTH_INTERVAL_SECONDS:-2}"
+
   cabinet_load_conf "$CONF_PATH"
 
+  cabinet_require_uint CABINET_KEEP_RELEASES
+  cabinet_require_uint CABINET_HEALTH_TIMEOUT_SECONDS
+  cabinet_require_uint CABINET_HEALTH_INTERVAL_SECONDS
   [ -n "$CABINET_GITHUB_REPO" ] || cabinet_die "CABINET_GITHUB_REPO is not configured"
+}
+
+WORK_DIRS=()
+
+remove_work_dirs() {
+  local dir
+  for dir in "${WORK_DIRS[@]}"; do
+    rm -rf "$dir"
+  done
 }
 
 acquire_lock() {
@@ -109,10 +123,8 @@ cmd_verify() {
 verify_checksum() {
   local artifact="$1" checksum_file="$2"
 
-  [ -f "$checksum_file" ] || cabinet_die "checksum file not found: $checksum_file"
-  if ! (cd "$(dirname "$artifact")" && sha256sum --check --status "$(basename "$checksum_file")"); then
-    cabinet_die "checksum mismatch for $(basename "$artifact"), refusing to unpack"
-  fi
+  cabinet_verify_checksum "$artifact" "$checksum_file" \
+    || cabinet_die "checksum check failed for $(basename "$artifact"), refusing to unpack"
 }
 
 cmd_install() {
@@ -143,19 +155,28 @@ cmd_install() {
   fi
 
   local artifact_name="cabinet-${numeric_version}.zip"
-  local artifact bundle checksum_file
+  local artifact bundle checksum_file asset
+  local -a assets=("$artifact_name" "${artifact_name}.sha256" "${artifact_name}.sigstore.json")
+
+  mkdir -p "$DOWNLOAD_DIR"
+  find "$DOWNLOAD_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+  local work_dir
+  work_dir="$(mktemp -d "${DOWNLOAD_DIR}/${numeric_version}.XXXXXX")"
+  chmod 700 "$work_dir"
+  WORK_DIRS+=("$work_dir")
+
   if [ -n "$from_dir" ]; then
-    artifact="${from_dir}/${artifact_name}"
+    for asset in "${assets[@]}"; do
+      [ -f "${from_dir}/${asset}" ] || cabinet_die "required file not found: ${from_dir}/${asset}"
+      cp -- "${from_dir}/${asset}" "${work_dir}/${asset}" || cabinet_die "cannot copy ${asset} from ${from_dir}"
+    done
   else
-    local download_dir="${DOWNLOAD_DIR}/${numeric_version}"
-    mkdir -p "$download_dir"
-    artifact="${download_dir}/${artifact_name}"
-    local asset
-    for asset in "$artifact_name" "${artifact_name}.sha256" "${artifact_name}.sigstore.json"; do
-      download_release_asset "$CABINET_GITHUB_REPO" "$version" "$asset" "${download_dir}/${asset}" \
+    for asset in "${assets[@]}"; do
+      download_release_asset "$CABINET_GITHUB_REPO" "$version" "$asset" "${work_dir}/${asset}" \
         || cabinet_die "failed to download ${asset}"
     done
   fi
+  artifact="${work_dir}/${artifact_name}"
   checksum_file="${artifact}.sha256"
   bundle="${artifact}.sigstore.json"
 
@@ -179,10 +200,11 @@ cmd_install() {
     "$version" "$numeric_version" "$artifact" "$active_version" \
     "$RELEASES_DIR" "$CURRENT_LINK" "$STATE_DIR" "$CABINET_KEEP_RELEASES" \
     "$CABINET_OPS_URL" "$CABINET_HEALTH_TIMEOUT_SECONDS" || install_status=$?
+  rm -rf "$work_dir"
 
   case "$install_status" in
     0)
-      cabinet_clear_rejected_version "$STATE_DIR"
+      cabinet_clear_rejected_version "$STATE_DIR" "$numeric_version"
       ;;
     "$CABINET_INSTALL_ROLLED_BACK")
       cabinet_record_rejected_version "$numeric_version" "$STATE_DIR"
@@ -207,8 +229,14 @@ cmd_rollback() {
     version="$(head -n 1 "${STATE_DIR}/previous")"
   fi
   [ -n "$version" ] || cabinet_die "no previous release is recorded; name the version to roll back to"
+  local named_explicitly=no
+  [ -z "${1:-}" ] || named_explicitly=yes
   version="${version#v}"
   [[ "$version" =~ $CABINET_STRICT_SEMVER_REGEX ]] || cabinet_die "rollback requires a plain version, e.g. 1.2.3"
+
+  if [ "$named_explicitly" = no ] && [ "$version" = "$(cabinet_read_rejected_version "$STATE_DIR")" ]; then
+    cabinet_die "the recorded previous release ${version} failed its health check; name the version to roll back to"
+  fi
 
   local active_version
   active_version="$(active_release_version)"
@@ -217,7 +245,7 @@ cmd_rollback() {
   local rollback_status=0
   cabinet_rollback_release \
     "$version" "$RELEASES_DIR" "$CURRENT_LINK" "$STATE_DIR" \
-    "$CABINET_OPS_URL" "$CABINET_HEALTH_TIMEOUT_SECONDS" || rollback_status=$?
+    "$CABINET_OPS_URL" "$CABINET_HEALTH_TIMEOUT_SECONDS" yes || rollback_status=$?
 
   if [ -n "$active_version" ] && cabinet_semver_gt "$active_version" "$version"; then
     cabinet_record_rejected_version "$active_version" "$STATE_DIR"
@@ -264,6 +292,7 @@ main() {
       ;;
   esac
 
+  trap remove_work_dirs EXIT
   require_root
   load_configuration
 

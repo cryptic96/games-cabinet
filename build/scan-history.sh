@@ -101,7 +101,7 @@ OVERALL=0
 matching_lines() {
   local text="$1" i found=""
   for ((i = 0; i < ${#PATTERNS[@]}; i++)); do
-    if grep -q -i -F -e "${PATTERNS[i]}" <<<"$text"; then
+    if grep -a -q -i -F -e "${PATTERNS[i]}" <<<"$text"; then
       found+="${PATTERN_LINES[i]} "
     fi
   done
@@ -129,15 +129,30 @@ report() {
   OVERALL=1
 }
 
+# Prints a location that is safe to show for PATH in COMMIT: the commit and
+# path, or, when the path itself matches the denylist, the commit and a
+# numbered placeholder so the matched value is never printed.
+safe_location() {
+  local commit="$1" path="$2" position="$3"
+  if [ -n "$(matching_lines "$path")" ]; then
+    printf '%s file number %s' "$commit" "$position"
+  else
+    printf '%s:%s' "$commit" "$path"
+  fi
+}
+
 check_denylist_trees() {
-  local findings=() commit hits names text
+  local findings=() commit hits names text hit hit_path position
   for commit in "${COMMITS[@]}"; do
-    hits="$(git_repo grep -I -i -F -l -f "$PATTERN_FILE" "$commit" -- 2>/dev/null || true)"
+    hits="$(git_repo grep -a -i -F -l -f "$PATTERN_FILE" "$commit" -- 2>/dev/null || true)"
     if [ -n "$hits" ]; then
+      position=0
       while IFS= read -r hit; do
         [ -n "$hit" ] || continue
-        text="$(git_repo grep -I -i -F -h -f "$PATTERN_FILE" "$commit" -- "${hit#*:}" 2>/dev/null || true)"
-        findings+=("$hit denylist line(s) $(matching_lines "$text")")
+        position=$((position + 1))
+        hit_path="${hit#*:}"
+        text="$(git_repo grep -a -i -F -h -f "$PATTERN_FILE" "$commit" -- ":(literal)${hit_path}" 2>/dev/null | tr -d '\000' || true)"
+        findings+=("$(safe_location "$commit" "$hit_path" "$position") denylist line(s) $(matching_lines "$text")")
       done <<<"$hits"
     fi
     names="$(git_repo ls-tree -r --name-only "$commit" | grep -i -F -f "$PATTERN_FILE" || true)"
@@ -197,11 +212,21 @@ check_noreply_identities() {
       findings+=("$commit committer email is not a GitHub noreply address")
     fi
   done < <(git_repo log --all --format='%H%x09%ae%x09%ce')
+  local tag_object tagger_email
+  while IFS=$'\t' read -r tag_object tagger_email; do
+    tagger_email="${tagger_email#<}"
+    tagger_email="${tagger_email%>}"
+    tagger_email="${tagger_email,,}"
+    [ -n "$tagger_email" ] || continue
+    if [[ "$tagger_email" != *"$NOREPLY_SUFFIX" && "$tagger_email" != "$WEB_FLOW_EMAIL" ]]; then
+      findings+=("annotated tag object ${tag_object:0:12} tagger email is not a GitHub noreply address")
+    fi
+  done < <(git_repo for-each-ref --format='%(objectname)%09%(taggeremail)' refs/tags)
   report noreply-identities "${findings[@]}"
 }
 
 check_absolute_paths() {
-  local findings=() commit hits
+  local findings=() commit hits hit rest hit_path position
   local patterns=(
     -e '/hom[e]/[^/[:space:]]+/'
     -e '/mn[t]/[^/[:space:]]+/'
@@ -210,10 +235,15 @@ check_absolute_paths() {
     -e '[A-Za-z]:[\\]User[s][\\]'
   )
   for commit in "${COMMITS[@]}"; do
-    hits="$(git_repo grep -I -n -E "${patterns[@]}" "$commit" -- 2>/dev/null | cut -d: -f1-3 || true)"
+    hits="$(git_repo grep -a -n -E "${patterns[@]}" "$commit" -- 2>/dev/null | cut -d: -f1-3 || true)"
     if [ -n "$hits" ]; then
+      position=0
       while IFS= read -r hit; do
-        [ -n "$hit" ] && findings+=("$hit absolute local path")
+        [ -n "$hit" ] || continue
+        position=$((position + 1))
+        rest="${hit#*:}"
+        hit_path="${rest%:*}"
+        findings+=("$(safe_location "$commit" "$hit_path" "$position") line ${rest##*:} absolute local path")
       done <<<"$hits"
     fi
   done

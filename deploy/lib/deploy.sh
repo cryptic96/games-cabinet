@@ -11,6 +11,34 @@ CABINET_STATUS_QUIET=10
 CABINET_INSTALL_ROLLED_BACK=10
 CABINET_INSTALL_FAILED=11
 
+# Checks ARTIFACT against CHECKSUM_FILE, a single "HASH  NAME" line. The hash
+# is compared with the artifact's own hash, and the file name inside the
+# checksum file must be the artifact's own name, so a checksum file that lists
+# some other file can never vouch for the artifact. Returns non-zero, after
+# logging the reason, on any mismatch or malformed checksum file.
+cabinet_verify_checksum() {
+  local artifact="$1"
+  local checksum_file="$2"
+
+  [ -f "$checksum_file" ] || { cabinet_log "checksum file not found: $checksum_file"; return 1; }
+
+  local line_count expected listed_name actual
+  line_count="$(wc -l < "$checksum_file" | tr -d ' ')"
+  read -r expected listed_name < "$checksum_file" || true
+  listed_name="${listed_name#\*}"
+  if [ "$line_count" != "1" ] || [[ ! "$expected" =~ ^[0-9a-f]{64}$ ]] \
+      || [ "$listed_name" != "$(basename "$artifact")" ]; then
+    cabinet_log "malformed checksum file $checksum_file"
+    return 1
+  fi
+
+  actual="$(sha256sum -- "$artifact" | awk '{print $1}')"
+  if [ "$expected" != "$actual" ]; then
+    cabinet_log "checksum mismatch for $(basename "$artifact")"
+    return 1
+  fi
+}
+
 # Verifies a downloaded release artifact against the Sigstore bundle
 # published with it. No GitHub credential is read or used and no GitHub API
 # call is made: gh runs with GH_TOKEN, GITHUB_TOKEN and GH_ENTERPRISE_TOKEN
@@ -183,10 +211,18 @@ cabinet_fetch_latest_release() {
 }
 
 # Records VERSION (plain X.Y.Z) as the highest release that failed its health
-# check, writing a temporary file in STATE_DIR and renaming it into place.
+# check, writing a temporary file in STATE_DIR and renaming it into place. The
+# recorded value only ever rises: recording a version that is not newer than
+# the one already recorded changes nothing.
 cabinet_record_rejected_version() {
   local version="$1"
   local state_dir="$2"
+
+  local recorded
+  recorded="$(cabinet_read_rejected_version "$state_dir")"
+  if [ -n "$recorded" ] && ! cabinet_semver_gt "$version" "$recorded"; then
+    return 0
+  fi
 
   mkdir -p "$state_dir"
   local tmp
@@ -204,10 +240,20 @@ cabinet_read_rejected_version() {
   fi
 }
 
-# Forgets any recorded rejected version.
+# Forgets the recorded rejected version. When INSTALLED_VERSION is given, the
+# record is kept if it is newer than that version, because a successful install
+# of an older release says nothing about a newer release that failed.
 cabinet_clear_rejected_version() {
   local state_dir="$1"
+  local installed_version="${2:-}"
 
+  if [ -n "$installed_version" ]; then
+    local recorded
+    recorded="$(cabinet_read_rejected_version "$state_dir")"
+    if [ -n "$recorded" ] && cabinet_semver_gt "$recorded" "$installed_version"; then
+      return 0
+    fi
+  fi
   rm -f "${state_dir}/rejected"
 }
 
@@ -223,21 +269,24 @@ cabinet_is_rejected() {
   ! cabinet_semver_gt "$version" "$rejected"
 }
 
-# Atomically repoints CURRENT_LINK at RELEASES_DIR/VERSION. Records the
-# previously active version (if any) into STATE_DIR/previous before
-# swapping. The new symlink is built under a temporary name and moved into
-# place with mv -T so the swap is a single atomic rename.
+# Atomically repoints CURRENT_LINK at RELEASES_DIR/VERSION. Unless
+# RECORD_PREVIOUS is "no", records the previously active version (if any) into
+# STATE_DIR/previous before swapping; a rollback passes "no" so the release it
+# leaves is never remembered as the one to go back to. The new symlink is
+# built under a temporary name and moved into place with mv -T so the swap is
+# a single atomic rename.
 cabinet_activate_release() {
   local version="$1"
   local releases_dir="$2"
   local current_link="$3"
   local state_dir="$4"
+  local record_previous="${5:-yes}"
 
   local target="${releases_dir}/${version}"
   [ -d "$target" ] || cabinet_die "cannot activate ${version}: ${target} does not exist"
 
   mkdir -p "$state_dir" || cabinet_die "cannot create ${state_dir}"
-  if [ -L "$current_link" ]; then
+  if [ "$record_previous" != "no" ] && [ -L "$current_link" ]; then
     local previous_version
     previous_version="$(basename "$(readlink -f "$current_link")")"
     printf '%s\n' "$previous_version" > "${state_dir}/previous"
@@ -278,7 +327,7 @@ cabinet_prune_releases() {
   mapfile -t sorted < <(printf '%s\n' "${versions[@]}" | sort -V)
 
   local total="${#sorted[@]}"
-  local to_delete_count=$(( total > keep ? total - keep : 0 ))
+  local to_delete_count=$(( total > 10#${keep} ? total - 10#${keep} : 0 ))
   [ "$to_delete_count" -gt 0 ] || return 0
 
   local deleted=0
@@ -309,7 +358,7 @@ cabinet_wait_for_health() {
   local timeout_seconds="$3"
 
   local interval="${CABINET_HEALTH_INTERVAL_SECONDS:-2}"
-  local deadline=$(( $(date +%s) + timeout_seconds ))
+  local deadline=$(( $(date +%s) + 10#${timeout_seconds} ))
   local body status reported
   while [ "$(date +%s)" -lt "$deadline" ]; do
     if body="$(curl --silent --max-time 5 "${ops_url}/health" 2>/dev/null)"; then
@@ -327,8 +376,12 @@ cabinet_wait_for_health() {
 
 # Reactivates the existing releases/VERSION directory (a plain version, no
 # leading v), restarts the application and waits for it to report that
-# version healthy. Returns 0 when it does and 1 when it does not; an
-# unhealthy result is logged at error level.
+# version healthy. A rollback never changes the recorded previous release.
+# Returns 0 when the release is healthy and 1 when it is not, logging the
+# unhealthy result at error level. When RESTORE_ON_FAILURE is "yes" and the
+# release is not healthy, the release it replaced is put back first; the
+# automatic rollback after a rejected install leaves it "no" because the
+# release it replaced is the one that just failed.
 cabinet_rollback_release() {
   local version="$1"
   local releases_dir="$2"
@@ -336,15 +389,27 @@ cabinet_rollback_release() {
   local state_dir="$4"
   local ops_url="$5"
   local health_timeout="$6"
+  local restore_on_failure="${7:-no}"
 
   local target="${releases_dir}/${version}"
   [ -d "$target" ] || cabinet_die "cannot roll back to ${version}: ${target} does not exist"
 
-  cabinet_activate_release "$version" "$releases_dir" "$current_link" "$state_dir"
+  local replaced=""
+  if [ -L "$current_link" ]; then
+    replaced="$(basename "$(readlink -f "$current_link")")"
+  fi
+
+  cabinet_activate_release "$version" "$releases_dir" "$current_link" "$state_dir" no
   cabinet_restart_app
 
   if ! cabinet_wait_for_health "$ops_url" "$version" "$health_timeout"; then
     cabinet_log "ERROR: release ${version} was reactivated but did not report healthy within ${health_timeout} seconds"
+    if [ "$restore_on_failure" = "yes" ] && [ -n "$replaced" ] && [ "$replaced" != "$version" ] \
+        && [ -d "${releases_dir}/${replaced}" ]; then
+      cabinet_log "restoring release ${replaced}"
+      cabinet_activate_release "$replaced" "$releases_dir" "$current_link" "$state_dir" no
+      cabinet_restart_app
+    fi
     return 1
   fi
   cabinet_log "release ${version} is active and healthy"
