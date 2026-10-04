@@ -1,10 +1,26 @@
 using System.Net;
 using System.Reflection;
 using Cabinet.Domain;
+using Cabinet.Repository.Images;
 using Cabinet.Service.Hosting;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+
+if (args.Length > 0 && args[0] == "image-smoke")
+{
+    try
+    {
+        var (width, height, bytes) = ImageSmoke.Run();
+        Console.WriteLine($"PASS image-smoke {width}x{height} webp {bytes} bytes");
+        return 0;
+    }
+    catch (Exception exception)
+    {
+        Console.Error.WriteLine($"FAIL image-smoke {exception.Message}");
+        return 1;
+    }
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -70,6 +86,8 @@ app.MapStaticAssets();
 app.MapRazorPages().WithStaticAssets();
 
 await app.RunAsync();
+
+return 0;
 
 /// <summary>Entry point for the cabinet host, exposed as a partial class so integration tests can boot it in-process.</summary>
 public partial class Program;

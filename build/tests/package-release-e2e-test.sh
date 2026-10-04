@@ -43,6 +43,8 @@ ZIP="$OUTPUT/cabinet-$VERSION.zip"
 LISTING="$(unzip -Z1 "$ZIP")"
 grep -qx 'app/Cabinet.Service.dll' <<<"$LISTING" || fail "zip lacks app/Cabinet.Service.dll"
 grep -qx 'release-manifest.json' <<<"$LISTING" || fail "zip lacks release-manifest.json"
+grep -qx 'app/libSkiaSharp.so' <<<"$LISTING" || fail "zip lacks app/libSkiaSharp.so"
+grep -qx 'app/SkiaSharp.dll' <<<"$LISTING" || fail "zip lacks app/SkiaSharp.dll"
 
 (cd "$OUTPUT" && sha256sum -c "cabinet-$VERSION.zip.sha256" >/dev/null) || fail "sha256 does not match the zip"
 
@@ -59,6 +61,12 @@ OPS_PORT="$(free_port)"
 while [ "$OPS_PORT" = "$WEB_PORT" ]; do
   OPS_PORT="$(free_port)"
 done
+
+SMOKE_OUTPUT="$(cd "$TMP/current/app" && dotnet "$TMP/current/app/Cabinet.Service.dll" image-smoke)" \
+  || fail "image-smoke did not exit 0"
+grep -qE '^PASS image-smoke 480x360 webp [0-9]+ bytes$' <<<"$SMOKE_OUTPUT" \
+  || fail "image-smoke output was unexpected: $SMOKE_OUTPUT"
+echo "$SMOKE_OUTPUT"
 
 (
   cd "$TMP/current/app"
