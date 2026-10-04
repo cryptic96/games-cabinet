@@ -24,7 +24,7 @@ Three hooks then run automatically:
 | `commit-msg` | The commit message. Lines starting with `#` are ignored. |
 | `pre-push` | Every commit about to leave your machine: its patch, message, and author and committer names and emails. Annotated tags are checked too: their message and tagger. |
 
-`pre-push` is the safety net for commits made with hooks skipped (for example `git commit --no-verify`). It also refuses any commit whose author or committer email is not a GitHub noreply address, and any annotated tag whose tagger email is not one, whether or not a denylist exists. The GitHub web-flow committer address is accepted as a committer, because GitHub uses it when it creates merge commits. A merge commit is checked for what the merge itself introduced, such as text written while resolving a conflict, because the commits it brings in are scanned on their own.
+`pre-push` is the safety net for commits made with hooks skipped (for example `git commit --no-verify`). It also refuses any commit whose author or committer email is not a GitHub noreply address, and any annotated tag whose tagger email is not one, whether or not a denylist exists. The GitHub web-flow committer address is accepted as a committer, because GitHub uses it when it creates merge commits. A merge commit is checked for what the merge itself introduced, such as text written while resolving a conflict, because the commits it brings in are scanned on their own. Git cannot compute that comparison for a merge with more than two parents, so `pre-push` refuses any commit with more than two parents; merge branches one at a time instead.
 
 Removing a denylisted string is always allowed: only added lines are checked, so scrubbing is never blocked.
 

@@ -6,7 +6,9 @@
 # GitHub noreply address, and annotated tags whose tagger email is not one.
 # A merge commit is scanned for what the merge itself introduced, such as
 # conflict resolutions, compared with an automatic remerge, because the commits
-# it brings in are scanned individually. See docs/development.md.
+# it brings in are scanned individually. Git cannot compute that comparison for
+# a merge with more than two parents, so such commits are refused outright.
+# See docs/development.md.
 set -euo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -40,6 +42,12 @@ is_merge_commit() {
   local fields
   read -ra fields <<<"$(git rev-list --parents -n 1 "$1")"
   [ "${#fields[@]}" -gt 2 ]
+}
+
+has_more_than_two_parents() {
+  local fields
+  read -ra fields <<<"$(git rev-list --parents -n 1 "$1")"
+  [ "${#fields[@]}" -gt 3 ]
 }
 
 check_identity() {
@@ -115,6 +123,10 @@ while read -r _ local_sha _ remote_sha; do
     seen[$commit]=1
     short="${commit:0:12}"
     commit_ok=1
+    if has_more_than_two_parents "$commit"; then
+      echo "blocked: commit $short has more than two parents; its content cannot be scanned, so merge the branches one at a time" >&2
+      commit_ok=0
+    fi
     check_identity "$commit" "$short" || commit_ok=0
     if [ "$denylist_active" -eq 1 ]; then
       check_denylist "$commit" "$short" || commit_ok=0

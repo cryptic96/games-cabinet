@@ -542,8 +542,34 @@ push_merge_resolution_clean_case() {
   status_is_zero && remote_has_branch main
 }
 
+push_octopus_merge_case() {
+  local dir="$WORK_DIR/push-octopus"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "base line"
+  commit_with_hooks "$dir" "$DENYLIST" "base"
+  git -C "$dir" checkout --quiet -b t1
+  stage "$dir" notes/t1.txt "first topic"
+  commit_with_hooks "$dir" "$DENYLIST" "first topic"
+  git -C "$dir" checkout --quiet main
+  git -C "$dir" checkout --quiet -b t2
+  stage "$dir" notes/t2.txt "second topic"
+  commit_with_hooks "$dir" "$DENYLIST" "second topic"
+  git -C "$dir" checkout --quiet main
+  git -C "$dir" merge --quiet --no-ff --no-commit t1 t2 >/dev/null 2>&1
+  stage "$dir" notes/leak.txt "added in the merge: ${SYNTH_ONE}"
+  commit_unchecked "$dir" "merge topics"
+  [ "$(git -C "$dir" rev-list --parents -n 1 HEAD | wc -w)" -eq 4 ] || return 1
+  push_branch "$dir" "$DENYLIST" main
+  status_is_nonzero &&
+    stderr_contains 'more than two parents' &&
+    stderr_contains 'blocked: commit' &&
+    stderr_lacks_synthetic &&
+    ! remote_has_branch main
+}
+
 check "pre-push refuses a merge commit whose conflict resolution matches the denylist" push_merge_resolution_case
 check "pre-push allows a merge commit with a clean conflict resolution" push_merge_resolution_clean_case
+check "pre-push refuses a merge with more than two parents instead of skipping its content" push_octopus_merge_case
 check "pre-push refuses a skipped-hook binary file whose bytes match the denylist" push_binary_case
 check "pre-push refuses an annotated tag whose tagger email is not a noreply address" push_tag_identity_case
 check "pre-push still checks the tagger email when the denylist is absent" push_tag_identity_absent_denylist_case
