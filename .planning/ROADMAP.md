@@ -41,7 +41,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. On the LXC, the pull timer finds the published release, verifies its attestation offline, installs it and health-checks it, and the hello page loads from the home network. A deliberately broken release rolls back automatically, health does not depend on BGG, and no self-hosted runner exists (GitHub never executes anything on the server).
   5. A fresh LXC can be created and provisioned from documented, repeatable scripts alone, and an image-processing smoke test passes inside it.
 
-**Plans:** 1/15 plans executed
+**Plans:** 5/15 plans executed
 
 Plans:
 **Wave 1**
@@ -50,10 +50,10 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-02-PLAN.md — Personal-data guard hooks (pre-commit, commit-msg, pre-push) and developer guide
-- [ ] 01-03-PLAN.md — App foundation: hello page with its version and loopback-only ops health
-- [ ] 01-04-PLAN.md — Lint framework: runner, repository and licence rules, shellcheck, gitleaks over all refs, script tests, MIT licence, README
-- [ ] 01-05-PLAN.md — Provisioning framework: packages, accounts, firewall, Traefik template, pinned versions
+- [x] 01-02-PLAN.md — Personal-data guard hooks (pre-commit, commit-msg, pre-push) and developer guide
+- [x] 01-03-PLAN.md — App foundation: hello page with its version and loopback-only ops health
+- [x] 01-04-PLAN.md — Lint framework: runner, repository and licence rules, shellcheck, gitleaks over all refs, script tests, MIT licence, README
+- [x] 01-05-PLAN.md — Provisioning framework: packages, accounts, firewall, Traefik template, pinned versions
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -216,7 +216,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Repo, Guardrails & Walking-Skeleton Deploy | 1/15 | In Progress|  |
+| 1. Repo, Guardrails & Walking-Skeleton Deploy | 5/15 | In Progress|  |
 | 2. Layout Engine & Cabinet Prototype | 0/0 | Not started | - |
 | 3. BGG Access Spike, Real Sync & Snapshot | 0/0 | Not started | - |
 | 4. Enrichment, Box Images & Shape | 0/0 | Not started | - |
