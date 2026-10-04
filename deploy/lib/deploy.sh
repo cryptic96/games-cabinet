@@ -281,7 +281,7 @@ cabinet_prune_releases() {
   mapfile -t sorted < <(printf '%s\n' "${versions[@]}" | sort -V)
 
   local total="${#sorted[@]}"
-  local to_delete_count=$(( total > keep ? total - keep : 0 ))
+  local to_delete_count=$(( total > 10#${keep} ? total - 10#${keep} : 0 ))
   [ "$to_delete_count" -gt 0 ] || return 0
 
   local deleted=0
@@ -312,7 +312,7 @@ cabinet_wait_for_health() {
   local timeout_seconds="$3"
 
   local interval="${CABINET_HEALTH_INTERVAL_SECONDS:-2}"
-  local deadline=$(( $(date +%s) + timeout_seconds ))
+  local deadline=$(( $(date +%s) + 10#${timeout_seconds} ))
   local body status reported
   while [ "$(date +%s)" -lt "$deadline" ]; do
     if body="$(curl --silent --max-time 5 "${ops_url}/health" 2>/dev/null)"; then

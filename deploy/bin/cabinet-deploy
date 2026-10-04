@@ -52,8 +52,13 @@ load_configuration() {
   CABINET_OPS_URL="${CABINET_OPS_URL:-http://127.0.0.1:5081}"
   CABINET_GITHUB_REPO="${CABINET_GITHUB_REPO:-}"
 
+  CABINET_HEALTH_INTERVAL_SECONDS="${CABINET_HEALTH_INTERVAL_SECONDS:-2}"
+
   cabinet_load_conf "$CONF_PATH"
 
+  cabinet_require_uint CABINET_KEEP_RELEASES
+  cabinet_require_uint CABINET_HEALTH_TIMEOUT_SECONDS
+  cabinet_require_uint CABINET_HEALTH_INTERVAL_SECONDS
   [ -n "$CABINET_GITHUB_REPO" ] || cabinet_die "CABINET_GITHUB_REPO is not configured"
 }
 

@@ -365,6 +365,46 @@ load_configuration_for_tests() {
 }
 load_configuration_for_tests
 
+# --- Numeric configuration is validated before anything is activated ---------------
+
+CONF_PATH="${WORK}/numeric.conf"
+INJECTION_MARKER="${WORK}/arithmetic-injected"
+
+load_with_conf() {
+  printf '%s\n' 'CABINET_GITHUB_REPO=example-owner/example-repo' "$@" > "$CONF_PATH"
+  chmod 600 "$CONF_PATH"
+  LOAD_RC=0
+  LOAD_LOG="$( (load_configuration) 2>&1 )" || LOAD_RC=$?
+}
+
+load_with_conf 'CABINET_KEEP_RELEASES=5' 'CABINET_HEALTH_TIMEOUT_SECONDS=30'
+check "whole-number settings are accepted" "0" "$LOAD_RC"
+
+for bad_value in '60s' '' '0' '-3' '1.5' '1234567' ' 7' "PATH[\$(touch ${INJECTION_MARKER})0]"; do
+  load_with_conf "CABINET_HEALTH_TIMEOUT_SECONDS=${bad_value}"
+  check "timeout '${bad_value}' is refused at load time" "1" "$LOAD_RC"
+  check "the timeout refusal names the setting" "yes" "$(contains "$LOAD_LOG" "CABINET_HEALTH_TIMEOUT_SECONDS must be a positive whole number")"
+  load_with_conf "CABINET_KEEP_RELEASES=${bad_value}"
+  check "release count '${bad_value}' is refused at load time" "1" "$LOAD_RC"
+  check "the release count refusal names the setting" "yes" "$(contains "$LOAD_LOG" "CABINET_KEEP_RELEASES must be a positive whole number")"
+done
+check "no numeric setting is ever evaluated as arithmetic" "absent" \
+  "$([ -e "$INJECTION_MARKER" ] && echo present || echo absent)"
+
+LOAD_RC=0
+(CABINET_HEALTH_INTERVAL_SECONDS="PATH[\$(touch ${INJECTION_MARKER})0]"; load_with_conf 'CABINET_KEEP_RELEASES=5'; [ "$LOAD_RC" -eq 1 ]) || LOAD_RC=$?
+check "a malformed health interval from the environment is refused" "0" "$LOAD_RC"
+check "the health interval is never evaluated as arithmetic" "absent" \
+  "$([ -e "$INJECTION_MARKER" ] && echo present || echo absent)"
+
+CABINET_HEALTH_INTERVAL_SECONDS=""
+unset CABINET_HEALTH_INTERVAL_SECONDS
+load_with_conf 'CABINET_KEEP_RELEASES=5'
+check "the health interval defaults to a valid number" "0" "$LOAD_RC"
+
+CONF_PATH="${CABINET_DEPLOY_CONF:-${CABINET_DEPLOY_ROOT}/etc/cabinet/deploy.conf}"
+load_configuration_for_tests
+
 REAL_CMD_INSTALL="$(declare -f cmd_install)"
 INSTALL_CALLS="${WORK}/install-calls.log"
 cmd_install() {
