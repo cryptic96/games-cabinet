@@ -740,7 +740,12 @@ Plans 2 to 5 can run in parallel after 1; 5 depends on 2 for the health contract
 
 ## Open Questions
 
-1. **ImageSharp 3.1.12 or 4.1.2 with a community key?**
+> **Resolved at planning time (owner decisions, recorded as D-17 and D-18 in CONTEXT.md, which take precedence over this document):**
+> - Question 1: the owner chose **SkiaSharp 4.153.1 + SkiaSharp.NativeAssets.Linux.NoDependencies 4.153.1** instead of either ImageSharp option. Every ImageSharp recommendation, code example and Dependabot ignore in this document is superseded. Verified by the orchestrator in a scratch project: Release `linux-x64` framework-dependent publish with warnings-as-errors succeeds; decode → `SKBitmap.Resize(new SKImageInfo(w,h), new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear))` → `SKImage.FromBitmap(...).Encode(SKEncodedImageFormat.Webp, 80)` → decode-back round trip works (RIFF/WEBP header, expected dimensions and pixel); output contains `SkiaSharp.dll` and a ~12 MB `libSkiaSharp.so` (glibc ≥ 2.27, libstdc++, libgcc_s; no fontconfig). Release zip size grows by ~12 MB; nothing extra is needed in provisioning on Ubuntu 24.04. Dependabot should group both SkiaSharp packages so they move together.
+> - Question 2: allow **merge and squash**, decided per PR; rebase stays disabled.
+> - Questions 3–5: follow the recommendations below.
+
+1. **ImageSharp 3.1.12 or 4.1.2 with a community key?** *(resolved: SkiaSharp, see note above)*
    - What we know: 4.x fails Release builds without a key (verified); 3.1.12 works with no key and no known advisories today; the project stack research selected 4.1.2 without this finding.
    - What's unclear: the owner's appetite for a secret in CI plus an application with unknown latency; long-term security fixes for 3.x.
    - Recommendation: pin 3.1.12 in this phase, add the Dependabot major ignore, record the decision, and revisit when the image pipeline phase starts. Needs explicit owner confirmation before planning locks it.
