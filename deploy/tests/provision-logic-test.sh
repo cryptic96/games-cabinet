@@ -157,6 +157,7 @@ assert_refuses "provision_load_conf: refuses a file not owned by root" \
 ### the mode checks can be exercised without being root.
 ###
 STAT_FAKE_MODE=600
+# shellcheck disable=SC2329
 stat() {
   case "$*" in
     *%U*) echo root ;;
@@ -223,6 +224,7 @@ assert_refuses "provision_validate_safe_value: refuses a closing brace" \
 assert_refuses "provision_validate_safe_value: refuses a newline" \
   provision_validate_safe_value $'a\nb'
 
+# shellcheck disable=SC2329
 validate_with() {
   CABINET_TRAEFIK_IP="$1" CABINET_ADMIN_SSH_SOURCES="$2" CABINET_GITHUB_REPO="$3" \
     provision_validate_conf
@@ -237,6 +239,7 @@ assert_refuses "provision_validate_conf: refuses a malformed repository" \
   validate_with "192.0.2.10" "192.0.2.0/24" "not a slug"
 
 example_conf="${DEPLOY_DIR}/provision.conf.example"
+# shellcheck disable=SC2329
 validate_example() {
   unset CABINET_TRAEFIK_IP CABINET_ADMIN_SSH_SOURCES CABINET_GITHUB_REPO
   _provision_parse_kv_file "$example_conf" PROVISION_CONF_ALLOWED_KEYS

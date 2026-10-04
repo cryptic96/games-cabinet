@@ -191,6 +191,7 @@ foreign_hostnames="$(grep -vE '(^|\.)example\.com$' <<<"$hostnames" || true)"
 assert_eq "traefik example: every hostname is under example.com" \
   "" "$foreign_hostnames"
 
+# shellcheck disable=SC2016
 assert_matches "traefik example: routes the placeholder hostname" \
   'Host\(`cabinet\.example\.com`\)' "$traefik_example"
 

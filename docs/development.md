@@ -79,7 +79,7 @@ Run it before the first push of a new remote and after any history rewrite. It u
 - C#: only `///` XML doc summaries on types and members. No `//` comments; if a line needs explaining, rename or extract it.
 - JavaScript: only `/** ... */` doc blocks. No `//` comments.
 - Shell: `#` comments are fine.
-- Planning identifiers (requirement keys, phase or plan numbers, planning document names) never appear in code, docs, comments, strings or tests. Commit messages are the only place outside `.planning/` where they may appear.
+- Planning identifiers (requirement keys, phase or plan numbers, planning document names) never appear in code, docs, comments, strings or tests. Commit messages are the only place outside the planning directory where they may appear.
 
 ## Running the checks
 

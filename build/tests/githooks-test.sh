@@ -240,7 +240,8 @@ REMOTE_DIR="$WORK_DIR/remotes"
 mkdir -p "$REMOTE_DIR"
 
 new_repo_with_remote() {
-  local dir="$1" remote="$REMOTE_DIR/$(basename "$1").git"
+  local dir="$1" remote
+  remote="$REMOTE_DIR/$(basename "$1").git"
   new_repo "$dir"
   git init --quiet --bare --initial-branch=main "$remote"
   git -C "$dir" remote add origin "$remote"
