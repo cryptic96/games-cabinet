@@ -165,8 +165,8 @@ on the first failure.
 
 - The journal of the poll unit, `journalctl -u cabinet-deploy-poll`, shows
   every poll: the remaining rate limit, quiet outcomes, skipped releases,
-  installs, rollbacks and errors. A manual `cabinet-deploy` run prints the
-  same lines to the terminal.
+  installs, rollbacks, errors and the warning that provisioning is out of
+  date. A manual `cabinet-deploy` run prints the same lines to the terminal.
 - The application's own journal, `journalctl -u cabinet`, shows why a release
   that failed its health check did not start.
 - Loopback `/health` on the server shows the version that is running now:
@@ -174,7 +174,60 @@ on the first failure.
 
 ## When to re-run provisioning
 
-The installer only changes the application. If a release needs something the
-one-time server setup is responsible for (a system unit, a firewall rule, an
-operating-system package), re-run provisioning from the newly active
-release's own `deploy/` directory after the install completes.
+The installer only changes the application. By design it never runs
+provisioning and never copies anything from a release into a system path, so
+everything the one-time server setup owns (the installed scripts and
+libraries, the systemd units, the firewall, the operating-system packages) is
+updated only when an operator re-runs provisioning.
+
+### How out-of-date provisioning shows up
+
+Every release ships its own `deploy/` directory, and the active release's copy
+is at `/opt/cabinet/current/deploy`. Two things compare the installed copies
+with it, byte for byte:
+
+- Every poll does, and while any installed file differs or is missing it logs
+  one line, visible with `journalctl -u cabinet-deploy-poll`, that reads:
+
+  ```text
+  WARNING: provisioning is out of date; re-run deploy/provision.sh from the active release
+  ```
+
+  The warning changes nothing else: installs, rollbacks and the exit status
+  behave exactly as they do without it.
+- `cabinet-selfcheck` fails with one line naming each installed file that
+  differs or is missing, and fails when the active release has no `deploy/`
+  directory to compare against.
+
+What is compared, using the same byte-for-byte comparison provisioning itself
+uses to decide what to rewrite:
+
+| Active release | Installed copy |
+| --- | --- |
+| `/opt/cabinet/current/deploy/bin/*` | `/usr/local/sbin/` |
+| `/opt/cabinet/current/deploy/lib/*.sh` | `/usr/local/lib/cabinet/` |
+| `/opt/cabinet/current/deploy/systemd/*.service` and `*.timer` | `/etc/systemd/system/` |
+
+What is not compared, because provisioning renders or the operator owns it, or
+because there is no counterpart to compare with, and so still needs judgement
+from the release notes:
+
+- `/etc/cabinet/deploy.conf` (rendered from `deploy.conf.example`)
+- `/etc/nftables.conf` (rendered from the firewall template)
+- `/etc/cabinet/cabinet.env` and `/etc/cabinet/provision.conf`
+- operating-system packages
+- installed files that a newer release no longer ships
+
+### Fixing it
+
+Run provisioning from the active release as root, then confirm with the
+selfcheck:
+
+```bash
+/opt/cabinet/current/deploy/provision.sh
+cabinet-selfcheck
+```
+
+The warning and the check come from the installed installer and selfcheck
+themselves, so a host whose installed copies predate the comparison stays
+silent until provisioning has been re-run once.
