@@ -191,6 +191,7 @@ check "rolled back install leaves the previous release active" "1.0.0" "$(basena
 check "rolled back install restarts for the install and for the rollback" "2" "$(count_lines "$RESTART_LOG")"
 check "rollback awaits health for the previous version" "1.0.0" "$(tail -n 1 "$HEALTH_LOG")"
 check "rolled back install is not logged as a failed rollback" "no" "$(contains "$CORE_OUTPUT" "rollback to 1.0.0 failed")"
+check "an automatic rollback keeps the last good release as the previous one" "1.0.0" "$(cat "${CORE_ROOT}/state/previous")"
 
 fresh_core_root
 HEALTH_SEQUENCE=(1 1)
@@ -229,6 +230,8 @@ cabinet_rollback_release "1.0.0" "${CORE_ROOT}/releases" "${CORE_ROOT}/current" 
   "http://127.0.0.1:0" 5 2>/dev/null || ROLLBACK_RC=$?
 check "rollback reactivates an earlier release" "1.0.0" "$(basename "$(readlink -f "${CORE_ROOT}/current")")"
 check "rollback of a healthy earlier release succeeds" "0" "$ROLLBACK_RC"
+check "a rollback does not record the release it left as the previous one" "" \
+  "$(cat "${CORE_ROOT}/state/previous" 2>/dev/null || true)"
 
 HEALTH_SEQUENCE=(1)
 ROLLBACK_RC=0
@@ -236,6 +239,19 @@ ROLLBACK_LOG="$(cabinet_rollback_release "1.1.0" "${CORE_ROOT}/releases" "${CORE
   "http://127.0.0.1:0" 5 2>&1)" || ROLLBACK_RC=$?
 check "rollback to an unhealthy release fails" "1" "$ROLLBACK_RC"
 check "rollback failure is logged at error level" "yes" "$(contains "$ROLLBACK_LOG" "ERROR:")"
+check "an unrequested restore leaves the unhealthy target active" "1.1.0" \
+  "$(basename "$(readlink -f "${CORE_ROOT}/current")")"
+
+ln -sfn "${CORE_ROOT}/releases/1.0.0" "${CORE_ROOT}/current"
+: > "$RESTART_LOG"
+HEALTH_SEQUENCE=(1)
+ROLLBACK_RC=0
+cabinet_rollback_release "1.1.0" "${CORE_ROOT}/releases" "${CORE_ROOT}/current" "${CORE_ROOT}/state" \
+  "http://127.0.0.1:0" 5 yes 2>/dev/null || ROLLBACK_RC=$?
+check "a failed rollback that asked for a restore reports failure" "1" "$ROLLBACK_RC"
+check "a failed rollback puts the release it replaced back" "1.0.0" \
+  "$(basename "$(readlink -f "${CORE_ROOT}/current")")"
+check "restoring the replaced release restarts the application again" "2" "$(count_lines "$RESTART_LOG")"
 
 MISSING_EXIT=0
 (cabinet_rollback_release "0.0.1" "${CORE_ROOT}/releases" "${CORE_ROOT}/current" "${CORE_ROOT}/state" \
@@ -553,6 +569,28 @@ check "rolling back to the active release is refused" "1" "$ROLLBACK_RC"
 ROLLBACK_RC=0
 (cmd_rollback not-a-version) >/dev/null 2>&1 || ROLLBACK_RC=$?
 check "rollback of a malformed version is refused" "1" "$ROLLBACK_RC"
+
+# --- Manual rollback after an automatic rollback ------------------------------------
+
+rm -rf "${CABINET_DEPLOY_ROOT}/opt/cabinet" "${STATE_DIR}"
+mkdir -p "${RELEASES_DIR}/0.0.5" "${RELEASES_DIR}/0.0.6" "$STATE_DIR"
+ln -s "${RELEASES_DIR}/0.0.5" "$CURRENT_LINK"
+cabinet_activate_release 0.0.6 "$RELEASES_DIR" "$CURRENT_LINK" "$STATE_DIR"
+cabinet_rollback_release 0.0.5 "$RELEASES_DIR" "$CURRENT_LINK" "$STATE_DIR" "http://127.0.0.1:0" 5 2>/dev/null
+cabinet_record_rejected_version 0.0.6 "$STATE_DIR"
+: > "$RESTART_LOG"
+ROLLBACK_RC=0
+(cmd_rollback) >/dev/null 2>&1 || ROLLBACK_RC=$?
+check "a manual rollback after an automatic rollback is refused" "1" "$ROLLBACK_RC"
+check "that manual rollback leaves the good release active" "0.0.5" "$(basename "$(readlink -f "$CURRENT_LINK")")"
+check "that manual rollback never restarts the application" "0" "$(count_lines "$RESTART_LOG")"
+
+printf '0.0.6\n' > "${STATE_DIR}/previous"
+ROLLBACK_RC=0
+ROLLBACK_LOG="$( (cmd_rollback) 2>&1 )" || ROLLBACK_RC=$?
+check "a recorded previous release that failed its health check is not reactivated" "1" "$ROLLBACK_RC"
+check "the refusal tells the operator to name a version" "yes" "$(contains "$ROLLBACK_LOG" "name the version to roll back to")"
+check "the refused release stays inactive" "0.0.5" "$(basename "$(readlink -f "$CURRENT_LINK")")"
 
 # --- Single run lock ---------------------------------------------------------------
 

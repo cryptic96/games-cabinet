@@ -207,8 +207,14 @@ cmd_rollback() {
     version="$(head -n 1 "${STATE_DIR}/previous")"
   fi
   [ -n "$version" ] || cabinet_die "no previous release is recorded; name the version to roll back to"
+  local named_explicitly=no
+  [ -z "${1:-}" ] || named_explicitly=yes
   version="${version#v}"
   [[ "$version" =~ $CABINET_STRICT_SEMVER_REGEX ]] || cabinet_die "rollback requires a plain version, e.g. 1.2.3"
+
+  if [ "$named_explicitly" = no ] && [ "$version" = "$(cabinet_read_rejected_version "$STATE_DIR")" ]; then
+    cabinet_die "the recorded previous release ${version} failed its health check; name the version to roll back to"
+  fi
 
   local active_version
   active_version="$(active_release_version)"
@@ -217,7 +223,7 @@ cmd_rollback() {
   local rollback_status=0
   cabinet_rollback_release \
     "$version" "$RELEASES_DIR" "$CURRENT_LINK" "$STATE_DIR" \
-    "$CABINET_OPS_URL" "$CABINET_HEALTH_TIMEOUT_SECONDS" || rollback_status=$?
+    "$CABINET_OPS_URL" "$CABINET_HEALTH_TIMEOUT_SECONDS" yes || rollback_status=$?
 
   if [ -n "$active_version" ] && cabinet_semver_gt "$active_version" "$version"; then
     cabinet_record_rejected_version "$active_version" "$STATE_DIR"

@@ -223,21 +223,24 @@ cabinet_is_rejected() {
   ! cabinet_semver_gt "$version" "$rejected"
 }
 
-# Atomically repoints CURRENT_LINK at RELEASES_DIR/VERSION. Records the
-# previously active version (if any) into STATE_DIR/previous before
-# swapping. The new symlink is built under a temporary name and moved into
-# place with mv -T so the swap is a single atomic rename.
+# Atomically repoints CURRENT_LINK at RELEASES_DIR/VERSION. Unless
+# RECORD_PREVIOUS is "no", records the previously active version (if any) into
+# STATE_DIR/previous before swapping; a rollback passes "no" so the release it
+# leaves is never remembered as the one to go back to. The new symlink is
+# built under a temporary name and moved into place with mv -T so the swap is
+# a single atomic rename.
 cabinet_activate_release() {
   local version="$1"
   local releases_dir="$2"
   local current_link="$3"
   local state_dir="$4"
+  local record_previous="${5:-yes}"
 
   local target="${releases_dir}/${version}"
   [ -d "$target" ] || cabinet_die "cannot activate ${version}: ${target} does not exist"
 
   mkdir -p "$state_dir" || cabinet_die "cannot create ${state_dir}"
-  if [ -L "$current_link" ]; then
+  if [ "$record_previous" != "no" ] && [ -L "$current_link" ]; then
     local previous_version
     previous_version="$(basename "$(readlink -f "$current_link")")"
     printf '%s\n' "$previous_version" > "${state_dir}/previous"
@@ -327,8 +330,12 @@ cabinet_wait_for_health() {
 
 # Reactivates the existing releases/VERSION directory (a plain version, no
 # leading v), restarts the application and waits for it to report that
-# version healthy. Returns 0 when it does and 1 when it does not; an
-# unhealthy result is logged at error level.
+# version healthy. A rollback never changes the recorded previous release.
+# Returns 0 when the release is healthy and 1 when it is not, logging the
+# unhealthy result at error level. When RESTORE_ON_FAILURE is "yes" and the
+# release is not healthy, the release it replaced is put back first; the
+# automatic rollback after a rejected install leaves it "no" because the
+# release it replaced is the one that just failed.
 cabinet_rollback_release() {
   local version="$1"
   local releases_dir="$2"
@@ -336,15 +343,27 @@ cabinet_rollback_release() {
   local state_dir="$4"
   local ops_url="$5"
   local health_timeout="$6"
+  local restore_on_failure="${7:-no}"
 
   local target="${releases_dir}/${version}"
   [ -d "$target" ] || cabinet_die "cannot roll back to ${version}: ${target} does not exist"
 
-  cabinet_activate_release "$version" "$releases_dir" "$current_link" "$state_dir"
+  local replaced=""
+  if [ -L "$current_link" ]; then
+    replaced="$(basename "$(readlink -f "$current_link")")"
+  fi
+
+  cabinet_activate_release "$version" "$releases_dir" "$current_link" "$state_dir" no
   cabinet_restart_app
 
   if ! cabinet_wait_for_health "$ops_url" "$version" "$health_timeout"; then
     cabinet_log "ERROR: release ${version} was reactivated but did not report healthy within ${health_timeout} seconds"
+    if [ "$restore_on_failure" = "yes" ] && [ -n "$replaced" ] && [ "$replaced" != "$version" ] \
+        && [ -d "${releases_dir}/${replaced}" ]; then
+      cabinet_log "restoring release ${replaced}"
+      cabinet_activate_release "$replaced" "$releases_dir" "$current_link" "$state_dir" no
+      cabinet_restart_app
+    fi
     return 1
   fi
   cabinet_log "release ${version} is active and healthy"
