@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RuntimeIdentifiers>linux-x64</RuntimeIdentifiers>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Cabinet.Domain\Cabinet.Domain.csproj" />
+    <ProjectReference Include="..\Cabinet.Repository\Cabinet.Repository.csproj" />
+  </ItemGroup>
+
+</Project>

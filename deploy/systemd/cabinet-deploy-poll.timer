@@ -1,0 +1,10 @@
+[Unit]
+Description=Periodically poll for a newer published release
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=10min
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target

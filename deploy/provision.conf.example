@@ -1,0 +1,16 @@
+# Placeholder-only template. provision.sh installs a copy of this file at
+# /etc/cabinet/provision.conf on its first run and then stops. Replace every
+# CHANGE-ME value below with the real server-side detail and re-run
+# provision.sh. Provisioning refuses to apply while a placeholder remains.
+# Never commit real values to this file.
+
+# The Traefik host's address; the app trusts X-Forwarded-For only from it and
+# the firewall admits the app port only from it. A single IPv4 address.
+CABINET_TRAEFIK_IP=CHANGE-ME
+
+# Address range(s) allowed to reach SSH, comma-separated CIDR list such as
+# 192.0.2.0/24,198.51.100.0/24.
+CABINET_ADMIN_SSH_SOURCES=CHANGE-ME
+
+# owner/name of the public GitHub repository releases are pulled from.
+CABINET_GITHUB_REPO=cryptic96/games-cabinet

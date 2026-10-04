@@ -1,0 +1,285 @@
+#!/usr/bin/env bash
+###
+### On-host acceptance check: proves a provisioned host is correct. Prints one
+### PASS or FAIL line per check and exits 1 when any check failed. Run as root.
+### Command output is captured into a variable before it is matched, never
+### piped into a quiet grep, so an early-closed pipe cannot fake a pass.
+###
+set -uo pipefail
+
+readonly APP_UNIT="cabinet.service"
+readonly TIMER_UNIT="cabinet-deploy-poll.timer"
+readonly POLL_UNIT="cabinet-deploy-poll.service"
+readonly DEPLOY_CONF="/etc/cabinet/deploy.conf"
+readonly DEFAULT_OPS_URL="http://127.0.0.1:5081"
+
+PASSED=0
+FAILED=0
+
+usage() {
+  cat <<'EOF'
+Usage: cabinet-selfcheck [-h|--help]
+
+Checks, as root, that this host is correctly provisioned: units, file modes,
+listeners, firewall, health at the installed version, SSH key-only login, no
+GitHub credential or Actions runner, and the image smoke in a sandbox.
+Prints PASS or FAIL per check and exits 1 when any check fails.
+EOF
+}
+
+pass() { echo "PASS - $*"; PASSED=$((PASSED + 1)); }
+fail() { echo "FAIL - $*"; FAILED=$((FAILED + 1)); }
+
+### Succeeds when TEXT ($1) contains LINE ($2) as one complete line.
+has_line() {
+  local text="$1" line="$2"
+  [[ $'\n'"$text"$'\n' == *$'\n'"$line"$'\n'* ]]
+}
+
+check_units() {
+  local unit state
+  for unit in "$APP_UNIT" "$TIMER_UNIT"; do
+    for state in active enabled; do
+      if systemctl "is-${state}" --quiet "$unit"; then
+        pass "${unit} is ${state}"
+      else
+        fail "${unit} is not ${state}"
+      fi
+    done
+  done
+}
+
+check_path() {
+  local path="$1" want_mode="$2" want_owner="$3" actual
+  if [[ ! -e "$path" ]]; then
+    fail "${path} is missing"
+    return
+  fi
+  actual="$(stat -c '%a %U:%G' "$path")"
+  if [[ "$actual" == "${want_mode} ${want_owner}" ]]; then
+    pass "${path} is ${want_mode} ${want_owner}"
+  else
+    fail "${path} is ${actual}, expected ${want_mode} ${want_owner}"
+  fi
+}
+
+check_modes() {
+  check_path /etc/cabinet 750 root:cabinet
+  check_path /etc/cabinet/cabinet.env 640 root:cabinet
+  check_path /etc/cabinet/deploy.conf 600 root:root
+  check_path /etc/cabinet/provision.conf 600 root:root
+  check_path /var/lib/cabinet-deploy 700 root:root
+  check_path /opt/cabinet/releases 755 root:root
+}
+
+### Prints the local address of each listener on port $2 in `ss -ltnH` output $1.
+listener_addresses() {
+  awk -v port="$2" '{ n = split($4, parts, ":"); if (parts[n] == port) print $4 }' <<<"$1"
+}
+
+check_listeners() {
+  local sockets ops address loopback_only=1
+  if ! sockets="$(ss -ltnH 2>&1)"; then
+    fail "could not list listening sockets: ${sockets}"
+    return
+  fi
+
+  if [[ -n "$(listener_addresses "$sockets" 5080)" ]]; then
+    pass "the app listens on port 5080"
+  else
+    fail "nothing listens on port 5080"
+  fi
+
+  ops="$(listener_addresses "$sockets" 5081)"
+  if [[ -z "$ops" ]]; then
+    fail "nothing listens on the ops port 5081"
+    return
+  fi
+  for address in $ops; do
+    case "$address" in
+      127.0.0.1:5081 | "[::1]:5081") ;;
+      *) loopback_only=0 ;;
+    esac
+  done
+  if [[ "$loopback_only" -eq 1 ]]; then
+    pass "the ops port 5081 is bound to loopback only"
+  else
+    fail "the ops port 5081 is reachable beyond loopback"
+  fi
+}
+
+check_firewall() {
+  local ruleset pattern='hook input priority [^;]*; policy drop'
+  if ! ruleset="$(nft list table inet cabinet_filter 2>&1)"; then
+    fail "could not read the firewall table cabinet_filter: ${ruleset}"
+    return
+  fi
+  if [[ "$ruleset" =~ $pattern ]]; then
+    pass "the firewall input chain drops by default"
+  else
+    fail "the firewall input chain does not default to drop"
+  fi
+}
+
+ops_url() {
+  local configured=""
+  if [[ -r "$DEPLOY_CONF" ]]; then
+    configured="$(sed -n 's/^CABINET_OPS_URL=//p' "$DEPLOY_CONF")"
+    configured="${configured##*$'\n'}"
+  fi
+  echo "${configured:-$DEFAULT_OPS_URL}"
+}
+
+check_health() {
+  local url body status version expected
+  if [[ ! -L /opt/cabinet/current ]]; then
+    fail "/opt/cabinet/current is not a symlink to an installed release"
+    return
+  fi
+  expected="$(basename "$(readlink -f /opt/cabinet/current)")"
+
+  url="$(ops_url)"
+  if ! body="$(curl -fsS --max-time 10 "${url}/health" 2>&1)"; then
+    fail "the health endpoint ${url}/health did not answer: ${body}"
+    return
+  fi
+  status="$(jq -r '.status // empty' <<<"$body" 2>/dev/null)"
+  version="$(jq -r '.version // empty' <<<"$body" 2>/dev/null)"
+
+  if [[ "$status" == "Healthy" ]]; then
+    pass "health reports Healthy"
+  else
+    fail "health status is '${status}', expected Healthy"
+  fi
+  if [[ -n "$version" && "$version" == "$expected" ]]; then
+    pass "health reports version ${version}, the release the current link points at"
+  else
+    fail "health reports version '${version}', the current link points at '${expected}'"
+  fi
+}
+
+check_ssh() {
+  local settings setting
+  if ! settings="$(sshd -T 2>&1)"; then
+    fail "could not read the effective sshd configuration: ${settings}"
+    return
+  fi
+  for setting in passwordauthentication kbdinteractiveauthentication; do
+    if has_line "$settings" "${setting} no"; then
+      pass "SSH ${setting} is off"
+    else
+      fail "SSH ${setting} is not off"
+    fi
+  done
+}
+
+check_no_github_credentials() {
+  local hits unit_env home path found=0
+  hits="$(grep -lE '^(export +)?(GH_TOKEN|GITHUB_TOKEN|GH_ENTERPRISE_TOKEN)=' /etc/cabinet/* 2>/dev/null)"
+  [[ -n "$hits" ]] && { fail "a GitHub token variable is set in: ${hits//$'\n'/ }"; found=1; }
+
+  unit_env="$(systemctl show "$POLL_UNIT" -p Environment -p EnvironmentFiles 2>&1)"
+  if [[ "$unit_env" == *GH_TOKEN* || "$unit_env" == *GITHUB_TOKEN* ]]; then
+    fail "a GitHub token variable is set in the poll unit environment"; found=1
+  fi
+
+  IFS=: read -r _ _ _ _ _ home _ <<<"$(getent passwd cabinet)"
+  for path in /root/.config/gh/hosts.yml /var/lib/cabinet/.config/gh/hosts.yml "${home:-/nonexistent}/.config/gh/hosts.yml"; do
+    [[ -e "$path" ]] && { fail "a GitHub CLI credential file exists: ${path}"; found=1; }
+  done
+
+  if [[ "$found" -eq 0 ]]; then
+    pass "no GitHub credential is present on the host"
+  fi
+}
+
+check_no_actions_runner() {
+  local units files procs path found=0
+  units="$(systemctl list-units --all --no-legend --plain 'actions.runner.*' 2>&1)"
+  files="$(systemctl list-unit-files --no-legend 'actions.runner.*' 2>&1)"
+  procs="$(pgrep -fl 'Runner[.]Listener' 2>&1)"
+
+  [[ -n "$units$files" ]] && { fail "an Actions runner unit exists: ${units}${files}"; found=1; }
+  [[ -n "$procs" ]] && { fail "an Actions runner process is running: ${procs}"; found=1; }
+  while IFS=: read -r _ _ _ _ _ path _; do
+    [[ -n "$path" ]] && compgen -G "${path}/actions-runner*" > /dev/null && { fail "an Actions runner directory exists under ${path}"; found=1; }
+  done <<<"$(getent passwd)"
+  for path in /opt/actions-runner* /srv/actions-runner*; do
+    [[ -e "$path" ]] && { fail "an Actions runner directory exists: ${path}"; found=1; }
+  done
+
+  if [[ "$found" -eq 0 ]]; then
+    pass "no Actions runner is present on the host"
+  fi
+}
+
+### Runs the deployed binary's image-smoke command as the service user in a
+### transient sandbox: nothing writable, no home, private tmp and devices, no
+### namespaces, no capabilities and no network beyond local sockets.
+check_image_smoke() {
+  local output line passed=""
+  output="$(systemd-run --quiet --pipe --wait --collect \
+    --uid=cabinet --gid=cabinet \
+    --working-directory=/opt/cabinet/current/app \
+    --property=NoNewPrivileges=yes \
+    --property=ProtectSystem=strict \
+    --property=ProtectHome=yes \
+    --property=PrivateTmp=yes \
+    --property=PrivateDevices=yes \
+    --property=ProtectKernelTunables=yes \
+    --property=ProtectKernelModules=yes \
+    --property=ProtectControlGroups=yes \
+    --property=RestrictNamespaces=yes \
+    --property=LockPersonality=yes \
+    --property=CapabilityBoundingSet= \
+    --property=RestrictAddressFamilies=AF_UNIX \
+    --property=Environment=DOTNET_NOLOGO=1 \
+    /usr/bin/dotnet Cabinet.Service.dll image-smoke 2>&1)"
+
+  while IFS= read -r line; do
+    [[ "$line" == "PASS image-smoke "* ]] && passed="$line"
+  done <<<"$output"
+
+  if [[ -n "$passed" ]]; then
+    pass "image smoke in the production sandbox: ${passed}"
+  else
+    fail "image smoke did not pass: ${output}"
+  fi
+}
+
+main() {
+  case "${1:-}" in
+    -h | --help)
+      usage
+      return 0
+      ;;
+    "") ;;
+    *)
+      usage >&2
+      return 2
+      ;;
+  esac
+
+  if [[ "$(id -u)" -ne 0 ]]; then
+    echo "cabinet-selfcheck must be run as root." >&2
+    return 1
+  fi
+
+  check_units
+  check_modes
+  check_listeners
+  check_firewall
+  check_health
+  check_ssh
+  check_no_github_credentials
+  check_no_actions_runner
+  check_image_smoke
+
+  echo ""
+  echo "cabinet-selfcheck: ${PASSED} passed, ${FAILED} failed"
+  [[ "$FAILED" -eq 0 ]]
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi
