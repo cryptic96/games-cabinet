@@ -24,10 +24,11 @@ trap cleanup EXIT
 
 SYNTH_ONE="$(printf '%s%s' 'zqx' 'orbit')"
 SYNTH_TWO="$(printf '%s-%s' 'plover' 'mesa')"
+SYNTH_UMLAUT="$(printf '%s\303\266%s' 'plov' 'rix')"
 NOREPLY_EMAIL='1+tester@users.noreply.github.com'
 
 DENYLIST="$WORK_DIR/denylist.txt"
-printf '%s\n' '# synthetic values' "$SYNTH_ONE" "$SYNTH_TWO" >"$DENYLIST"
+printf '%s\n' '# synthetic values' "$SYNTH_ONE" "$SYNTH_TWO" "$SYNTH_UMLAUT" >"$DENYLIST"
 
 FAILURES=0
 OUT_FILE="$WORK_DIR/output"
@@ -83,7 +84,7 @@ output_has() {
 output_lacks_synthetic() {
   local lowered value
   lowered="$(tr '[:upper:]' '[:lower:]' <"$OUT_FILE")"
-  for value in "$SYNTH_ONE" "$SYNTH_TWO"; do
+  for value in "$SYNTH_ONE" "$SYNTH_TWO" "$SYNTH_UMLAUT"; do
     if [[ "$lowered" == *"${value,,}"* ]]; then
       return 1
     fi
@@ -132,6 +133,58 @@ hidden_path_case() {
 check "the scanner finds a denylisted value inside a binary file without echoing it" binary_case
 check "the scanner hides a path that matches the denylist in every finding" hidden_path_case
 check "the scanner flags an annotated tag whose tagger email is not a noreply address" tagger_case
+
+output_lacks_quoted_path() {
+  ! grep -q -F -e '\303' "$OUT_FILE"
+}
+
+UMLAUT_REPO="$WORK_DIR/umlaut-path"
+new_repo "$UMLAUT_REPO"
+mkdir -p "$UMLAUT_REPO/docs"
+printf 'line with %s and %s\n' "$SYNTH_UMLAUT" "$LOCAL_PATH_TEXT" >"$UMLAUT_REPO/docs/${SYNTH_UMLAUT}-notes.txt"
+commit_all "$UMLAUT_REPO" "add files"
+run_scan "$UMLAUT_REPO"
+
+umlaut_path_case() {
+  [ "$LAST_STATUS" -eq 1 ] &&
+    output_has 'file number 1 denylist line(s) 4' &&
+    output_has 'file number 1 line 1 absolute local path' &&
+    output_lacks_synthetic &&
+    output_lacks_quoted_path
+}
+
+check "the scanner hides a non-ASCII path that matches the denylist instead of printing its quoted form" umlaut_path_case
+
+UMLAUT_NAME_REPO="$WORK_DIR/umlaut-name"
+new_repo "$UMLAUT_NAME_REPO"
+mkdir -p "$UMLAUT_NAME_REPO/docs"
+printf 'an ordinary line\n' >"$UMLAUT_NAME_REPO/docs/${SYNTH_UMLAUT}.txt"
+commit_all "$UMLAUT_NAME_REPO" "add files"
+run_scan "$UMLAUT_NAME_REPO"
+
+umlaut_name_case() {
+  [ "$LAST_STATUS" -eq 1 ] &&
+    output_has 'a file name matches denylist line(s) 4' &&
+    output_lacks_synthetic &&
+    output_lacks_quoted_path
+}
+
+check "the scanner detects a denylisted value in a non-ASCII file name" umlaut_name_case
+
+COLON_REPO="$WORK_DIR/colon-path"
+new_repo "$COLON_REPO"
+mkdir -p "$COLON_REPO/docs"
+printf 'line with %s\n' "$LOCAL_PATH_TEXT" >"$COLON_REPO/docs/notes:${SYNTH_ONE}-x.txt"
+commit_all "$COLON_REPO" "add files"
+run_scan "$COLON_REPO"
+
+colon_path_case() {
+  [ "$LAST_STATUS" -eq 1 ] &&
+    output_has 'file number 1 line 1 absolute local path' &&
+    output_lacks_synthetic
+}
+
+check "the scanner hides a denylisted value in a path that contains a colon" colon_path_case
 
 CLEAN_REPO="$WORK_DIR/clean"
 new_repo "$CLEAN_REPO"
