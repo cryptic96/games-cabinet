@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Refuses a commit whose message matches the personal-data denylist. Comment
+# lines (starting with '#') are ignored. See docs/development.md.
+set -euo pipefail
+
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/denylist.sh
+. "$HOOK_DIR/lib/denylist.sh"
+
+message_file="${1:?usage: commit-msg <message-file>}"
+
+status=0
+denylist_init || status=$?
+if [ "$status" -eq "$DENYLIST_ABSENT_STATUS" ]; then
+  denylist_warn_absent
+  exit 0
+fi
+if [ "${#DENYLIST_PATTERNS[@]}" -eq 0 ]; then
+  exit 0
+fi
+
+if ! sed 's/^#.*$//' "$message_file" | denylist_scan "commit message"; then
+  echo "blocked: commit message matches the personal-data denylist" >&2
+  exit 1
+fi

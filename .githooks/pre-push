@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+# Last local gate before commits leave the machine. Rescans every commit that is
+# about to be pushed (patch, message and identity) against the personal-data
+# denylist, so content committed with hooks skipped is still caught. Independently
+# of the denylist, it refuses commits whose author or committer email is not a
+# GitHub noreply address. Merge commits are not diff-scanned because the commits
+# they bring in are scanned individually. See docs/development.md.
+set -euo pipefail
+
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/denylist.sh
+. "$HOOK_DIR/lib/denylist.sh"
+
+NOREPLY_SUFFIX='@users.noreply.github.com'
+WEB_FLOW_EMAIL='noreply@github.com'
+ZERO_PATTERN='^0+$'
+
+denylist_active=1
+status=0
+denylist_init || status=$?
+if [ "$status" -eq "$DENYLIST_ABSENT_STATUS" ]; then
+  denylist_warn_absent
+  denylist_active=0
+elif [ "${#DENYLIST_PATTERNS[@]}" -eq 0 ]; then
+  denylist_active=0
+fi
+
+new_commits() {
+  local local_sha="$1" remote_sha="$2"
+  if [[ "$remote_sha" =~ $ZERO_PATTERN ]]; then
+    git rev-list "$local_sha" --not --remotes
+  else
+    git rev-list "$remote_sha..$local_sha" 2>/dev/null || git rev-list "$local_sha" --not --remotes
+  fi
+}
+
+is_merge_commit() {
+  local fields
+  read -ra fields <<<"$(git rev-list --parents -n 1 "$1")"
+  [ "${#fields[@]}" -gt 2 ]
+}
+
+check_identity() {
+  local commit="$1" short="$2" author_email committer_email ok=0
+  author_email="$(git log -1 --format=%ae "$commit")"
+  committer_email="$(git log -1 --format=%ce "$commit")"
+  author_email="${author_email,,}"
+  committer_email="${committer_email,,}"
+  if [[ "$author_email" != *"$NOREPLY_SUFFIX" ]]; then
+    echo "blocked: commit $short author email is not a GitHub noreply address" >&2
+    ok=1
+  fi
+  if [[ "$committer_email" != *"$NOREPLY_SUFFIX" && "$committer_email" != "$WEB_FLOW_EMAIL" ]]; then
+    echo "blocked: commit $short committer email is not a GitHub noreply address" >&2
+    ok=1
+  fi
+  return "$ok"
+}
+
+check_denylist() {
+  local commit="$1" short="$2" ok=0 position=0 path label full_label
+  git log -1 --format=%B "$commit" | denylist_scan "commit $short message" || ok=1
+  git log -1 --format='%an%n%ae%n%cn%n%ce' "$commit" | denylist_scan "commit $short identity" || ok=1
+  if is_merge_commit "$commit"; then
+    return "$ok"
+  fi
+  while IFS= read -r -d '' path; do
+    position=$((position + 1))
+    label="$(denylist_safe_label "$path" "file" "$position")"
+    full_label="commit $short $label"
+    if [ "$label" != "$path" ]; then
+      printf '%s\n' "$path" | denylist_scan "$full_label" || ok=1
+    fi
+    git diff-tree -p -U0 --root --no-commit-id --no-color --no-ext-diff "$commit" -- ":(literal)$path" |
+      denylist_added_lines | denylist_scan "$full_label" || ok=1
+  done < <(git diff-tree -r --root --no-commit-id --name-only -z --diff-filter=d "$commit")
+  return "$ok"
+}
+
+declare -A seen=()
+blocked=0
+while read -r _ local_sha _ remote_sha; do
+  if [[ "$local_sha" =~ $ZERO_PATTERN ]]; then
+    continue
+  fi
+  commits="$(new_commits "$local_sha" "$remote_sha")"
+  while IFS= read -r commit; do
+    if [ -z "$commit" ] || [ -n "${seen[$commit]:-}" ]; then
+      continue
+    fi
+    seen[$commit]=1
+    short="${commit:0:12}"
+    commit_ok=1
+    check_identity "$commit" "$short" || commit_ok=0
+    if [ "$denylist_active" -eq 1 ]; then
+      check_denylist "$commit" "$short" || commit_ok=0
+    fi
+    if [ "$commit_ok" -eq 0 ]; then
+      echo "blocked: commit $short must be rewritten before it is pushed" >&2
+      blocked=1
+    fi
+  done <<<"$commits"
+done
+
+if [ "$blocked" -ne 0 ]; then
+  echo "push refused: nothing was sent to the remote" >&2
+  exit 1
+fi
