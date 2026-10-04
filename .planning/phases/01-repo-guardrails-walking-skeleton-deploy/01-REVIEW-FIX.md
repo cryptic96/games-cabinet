@@ -132,3 +132,33 @@ Fixes that change behaviour (CR-01, CR-02, WR-03) are marked "requires human ver
 _Fixed: 2026-10-04T20:10:00Z_
 _Fixer: Claude (gsd-code-fixer)_
 _Iteration: 1_
+
+---
+
+## Second round: security re-audit
+
+**Fixed at:** 2026-10-04
+**Iteration:** 2
+**Scope:** two HIGH threats left open by the first round, plus one small hardening item.
+
+### History scan could echo a denylisted value
+
+**Files modified:** `build/scan-history.sh`, `build/tests/scan-history-test.sh`
+**Commit:** 092e78d
+**Applied fix:** `git_repo` now runs every git call with `core.quotePath=false`. Tree hits and absolute-path hits are read from NUL-delimited output (`git grep -l -z`, `ls-tree -z`), so non-ASCII paths are matched in raw form and colons in file names can no longer split a path. The absolute-path check now finds the files first and then asks for line numbers per file, so the matched text is never parsed. File names are matched on the NUL stream, so non-ASCII denylisted names are detected. An unsafe path is reported as commit plus a position number only. Three new tests (non-ASCII path, path containing a colon, non-ASCII file name) assert the synthetic value is absent from the output and each case is still reported; all three fail against the previous script.
+
+### Pre-push skipped octopus merges
+
+**Files modified:** `.githooks/pre-push`, `build/tests/githooks-test.sh`, `docs/development.md`
+**Commit:** b0c9a16
+**Applied fix:** `--remerge-diff` is skipped by git for merges with more than two parents, so content added in such a merge was never scanned. The hook now fails closed and refuses any commit with more than two parents, regardless of denylist availability. Two-parent merges keep the remerge scan. A new test reproduces the audit scenario (`merge --no-ff --no-commit` of two branches, a denylisted file added, `commit --no-verify`, push): the push is refused, the value is not echoed and the remote stays empty; the test fails against the previous hook. The developer guide mentions the refusal.
+
+### Agent worktrees ignored
+
+**Files modified:** `.gitignore`
+**Commit:** b5a8966
+**Applied fix:** `.claude/worktrees/` is ignored on every clone.
+
+### Verification
+
+Run in the isolated worktree (not the main checkout): `build/lint.sh` (all five groups pass), `build/tests/githooks-test.sh`, `build/tests/scan-history-test.sh` and `build/scan-history.sh` (all six checks pass, including the container-based secret scan).
