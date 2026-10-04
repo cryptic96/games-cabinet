@@ -170,6 +170,63 @@ check "no rejected marker after a successful install" "absent" \
 check "the application was restarted exactly once" "1" "$(restart_count)"
 check "no service manager or polkit call was recorded" "" "$(host_guard_calls)"
 
+SERVED_TAG_FILE="${TMP}/served-tag"
+
+cabinet_http_get() {
+  printf 'HTTP/2 200\r\nx-ratelimit-remaining: 55\r\n' > "$2"
+  printf '{"tag_name":"%s"}' "$(cat "$SERVED_TAG_FILE")" > "$3"
+  printf '200'
+}
+
+download_release_asset() {
+  cp "${ASSETS}/$3" "$4"
+}
+
+BROKEN_STAGE="${TMP}/stage-0.0.2"
+cp -a "${TMP}/stage-0.0.1" "$BROKEN_STAGE"
+jq '.version = "0.0.2"' "${BROKEN_STAGE}/release-manifest.json" > "${TMP}/broken-manifest.json"
+cp "${TMP}/broken-manifest.json" "${BROKEN_STAGE}/release-manifest.json"
+set_listeners "$BROKEN_STAGE" "$WEB_PORT" "$MOVED_OPS_PORT"
+pack_release "$BROKEN_STAGE" 0.0.2
+
+printf 'v0.0.2' > "$SERVED_TAG_FILE"
+POLL_RC=0
+(cmd_poll) >"${TMP}/poll-broken.log" 2>&1 || POLL_RC=$?
+cat "${TMP}/poll-broken.log"
+
+check "polling a release that never reports healthy exits non-zero" "1" "$POLL_RC"
+check "rollback to 0.0.1: current resolves to releases/0.0.1" "${CABINET_DEPLOY_ROOT}/opt/cabinet/releases/0.0.1" \
+  "$(readlink -f "${CABINET_DEPLOY_ROOT}/opt/cabinet/current")"
+check "rollback to 0.0.1: health reports Healthy" "Healthy" "$(ops_health | jq -r '.status // empty')"
+check "rollback to 0.0.1: health reports version 0.0.1" "0.0.1" "$(ops_health | jq -r '.version // empty')"
+check "marker 0.0.2: the rejected marker holds the broken version" "0.0.2" "$(cat "${STATE_DIR}/rejected")"
+check "install and rollback restarted the application twice more" "3" "$(restart_count)"
+
+for attempt in 1 2; do
+  SKIP_RC=0
+  (cmd_poll) >"${TMP}/poll-skip-${attempt}.log" 2>&1 || SKIP_RC=$?
+  check "skip poll ${attempt} exits 0" "0" "$SKIP_RC"
+  check "skip poll ${attempt} says the release was rolled back" "yes" \
+    "$(grep -q 'was rolled back after a failed health check' "${TMP}/poll-skip-${attempt}.log" && echo yes || echo no)"
+  check "skip poll ${attempt} leaves the restart count unchanged" "3" "$(restart_count)"
+done
+check "skip polls keep 0.0.1 active and healthy" "0.0.1" "$(ops_health | jq -r '.version // empty')"
+
+build_release 0.0.3
+printf 'v0.0.3' > "$SERVED_TAG_FILE"
+FIXED_RC=0
+(cmd_poll) >"${TMP}/poll-fixed.log" 2>&1 || FIXED_RC=$?
+cat "${TMP}/poll-fixed.log"
+
+check "install of 0.0.3: the poll exits 0" "0" "$FIXED_RC"
+check "install of 0.0.3: current resolves to releases/0.0.3" "${CABINET_DEPLOY_ROOT}/opt/cabinet/releases/0.0.3" \
+  "$(readlink -f "${CABINET_DEPLOY_ROOT}/opt/cabinet/current")"
+check "install of 0.0.3: health reports version 0.0.3" "0.0.3" "$(ops_health | jq -r '.version // empty')"
+check "marker removed after the successful install" "absent" \
+  "$([ -e "${STATE_DIR}/rejected" ] && echo present || echo absent)"
+check "install of 0.0.3 restarted the application once more" "4" "$(restart_count)"
+check "no service manager or polkit call was recorded across the whole sequence" "" "$(host_guard_calls)"
+
 if [ "$FAILURES" -ne 0 ]; then
   printf '%d check(s) failed\n' "$FAILURES" >&2
   exit 1
