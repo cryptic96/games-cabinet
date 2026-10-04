@@ -37,21 +37,24 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Pushing a semver tag produces an attested draft release, and nothing is published until the owner approves it in the protected deploy environment.
   4. On the LXC, the pull timer finds the published release, verifies its attestation offline, installs it and health-checks it, and the hello page loads from the home network. A deliberately broken release rolls back automatically, health does not depend on BGG, and no self-hosted runner exists (GitHub never executes anything on the server).
   5. A fresh LXC can be created and provisioned from documented, repeatable scripts alone, and an image-processing smoke test passes inside it.
-**Plans:** 12 plans
+**Plans:** 15 plans
 
 Plans:
 - [ ] 01-01-PLAN.md — Privacy gate: full-history scan script, scrub and in-place history rewrite (owner-approved)
 - [ ] 01-02-PLAN.md — Personal-data guard hooks (pre-commit, commit-msg, pre-push) and developer guide
-- [ ] 01-03-PLAN.md — Hello page, version-reporting ops health, SkiaSharp image smoke, release packaging
-- [ ] 01-04-PLAN.md — Lint framework, gitleaks over all refs, Dependabot, MIT licence, README
-- [ ] 01-05-PLAN.md — CI and release workflows, tag validation, settings read-back script, settings and release docs
-- [ ] 01-06-PLAN.md — Installer with rejected-version memory and quiet poll statuses, end-to-end and tamper tests
-- [ ] 01-07-PLAN.md — Provisioning framework: packages, accounts, firewall, Traefik template, pinned versions
-- [ ] 01-08-PLAN.md — Systemd units, services module, on-host selfcheck with sandboxed image smoke, LXC setup guide
-- [ ] 01-09-PLAN.md — Go-live: public repository, CI on the PR, every control applied and read back (owner-approved)
-- [ ] 01-10-PLAN.md — First release v0.1.0 approved, pulled, verified, installed and health-checked on the LXC
-- [ ] 01-11-PLAN.md — Rollback rehearsal: deliberately broken v0.1.1 rolls back and is skipped
-- [ ] 01-12-PLAN.md — Fixed v0.1.2 installs past the rejected version; final phase gate
+- [ ] 01-03-PLAN.md — App foundation: hello page with its version and loopback-only ops health
+- [ ] 01-04-PLAN.md — Lint framework: runner, repository and licence rules, shellcheck, gitleaks over all refs, script tests, MIT licence, README
+- [ ] 01-05-PLAN.md — Provisioning framework: packages, accounts, firewall, Traefik template, pinned versions
+- [ ] 01-06-PLAN.md — Release packaging run from a symlinked release directory, SkiaSharp image-smoke subcommand
+- [ ] 01-07-PLAN.md — Workflow lint (actionlint, zizmor, pin rules) and Dependabot with grouped SkiaSharp updates
+- [ ] 01-08-PLAN.md — Unit and integration tests pinning the health, page and configuration contract
+- [ ] 01-09-PLAN.md — CI and release workflows, tag validation, settings read-back script, settings and release docs
+- [ ] 01-10-PLAN.md — Installer with rejected-version memory and quiet poll statuses, end-to-end and tamper tests
+- [ ] 01-11-PLAN.md — Systemd units, services module, on-host selfcheck with sandboxed image smoke, LXC setup guide
+- [ ] 01-12-PLAN.md — Go-live: public repository, CI on the PR, every control applied and read back (owner-approved)
+- [ ] 01-13-PLAN.md — First release v0.1.0 approved, pulled, verified, installed and health-checked on the LXC
+- [ ] 01-14-PLAN.md — Rollback rehearsal: deliberately broken v0.1.1 rolls back and is skipped
+- [ ] 01-15-PLAN.md — Fixed v0.1.2 installs past the rejected version; final phase gate
 
 ### Phase 2: Layout Engine & Cabinet Prototype
 **Goal:** A deterministic, natural-looking cabinet layout, built on synthetic data while the BGG approval is pending, that the owner has reviewed and approved visually from an empty cabinet up to several hundred games, on desktop and phone widths.
