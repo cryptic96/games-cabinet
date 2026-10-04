@@ -11,6 +11,34 @@ CABINET_STATUS_QUIET=10
 CABINET_INSTALL_ROLLED_BACK=10
 CABINET_INSTALL_FAILED=11
 
+# Checks ARTIFACT against CHECKSUM_FILE, a single "HASH  NAME" line. The hash
+# is compared with the artifact's own hash, and the file name inside the
+# checksum file must be the artifact's own name, so a checksum file that lists
+# some other file can never vouch for the artifact. Returns non-zero, after
+# logging the reason, on any mismatch or malformed checksum file.
+cabinet_verify_checksum() {
+  local artifact="$1"
+  local checksum_file="$2"
+
+  [ -f "$checksum_file" ] || { cabinet_log "checksum file not found: $checksum_file"; return 1; }
+
+  local line_count expected listed_name actual
+  line_count="$(wc -l < "$checksum_file" | tr -d ' ')"
+  read -r expected listed_name < "$checksum_file" || true
+  listed_name="${listed_name#\*}"
+  if [ "$line_count" != "1" ] || [[ ! "$expected" =~ ^[0-9a-f]{64}$ ]] \
+      || [ "$listed_name" != "$(basename "$artifact")" ]; then
+    cabinet_log "malformed checksum file $checksum_file"
+    return 1
+  fi
+
+  actual="$(sha256sum -- "$artifact" | awk '{print $1}')"
+  if [ "$expected" != "$actual" ]; then
+    cabinet_log "checksum mismatch for $(basename "$artifact")"
+    return 1
+  fi
+}
+
 # Verifies a downloaded release artifact against the Sigstore bundle
 # published with it. No GitHub credential is read or used and no GitHub API
 # call is made: gh runs with GH_TOKEN, GITHUB_TOKEN and GH_ENTERPRISE_TOKEN

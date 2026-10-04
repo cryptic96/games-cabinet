@@ -560,6 +560,26 @@ run_install v0.0.7 --from-dir "${WORK}/assets-0.0.7"
 check "an artifact that does not match its checksum is refused" "1" "$I_RC"
 check "a checksum mismatch never reaches the install core" "0" "$(count_lines "$INSTALL_CORE_CALLS")"
 
+make_assets 0.0.9 "${WORK}/assets-0.0.9"
+printf 'unrelated file\n' > "${WORK}/assets-0.0.9/other.txt"
+(cd "${WORK}/assets-0.0.9" && sha256sum other.txt > cabinet-0.0.9.zip.sha256)
+printf 'tampered\n' >> "${WORK}/assets-0.0.9/cabinet-0.0.9.zip"
+run_install v0.0.9 --from-dir "${WORK}/assets-0.0.9"
+check "a checksum file that lists another file cannot vouch for the artifact" "1" "$I_RC"
+check "that checksum file never reaches the install core" "0" "$(count_lines "$INSTALL_CORE_CALLS")"
+
+CHECKSUM_ARTIFACT="${WORK}/assets-0.0.6/cabinet-0.0.6.zip"
+CHECKSUM_FILE="${CHECKSUM_ARTIFACT}.sha256"
+check "a checksum file for the artifact itself is accepted" "0" "$(cabinet_verify_checksum "$CHECKSUM_ARTIFACT" "$CHECKSUM_FILE" 2>/dev/null; echo $?)"
+ARTIFACT_HASH="$(sha256sum "$CHECKSUM_ARTIFACT" | awk '{print $1}')"
+printf '%s  /etc/hostname\n' "$ARTIFACT_HASH" > "${WORK}/path.sha256"
+check "a checksum file naming another path is refused" "1" "$(cabinet_verify_checksum "$CHECKSUM_ARTIFACT" "${WORK}/path.sha256" 2>/dev/null; echo $?)"
+printf '%s  cabinet-0.0.6.zip\n%s  other.txt\n' "$ARTIFACT_HASH" "$ARTIFACT_HASH" > "${WORK}/two-lines.sha256"
+check "a checksum file with more than one entry is refused" "1" "$(cabinet_verify_checksum "$CHECKSUM_ARTIFACT" "${WORK}/two-lines.sha256" 2>/dev/null; echo $?)"
+printf 'not-a-hash  cabinet-0.0.6.zip\n' > "${WORK}/malformed.sha256"
+check "a checksum file without a valid hash is refused" "1" "$(cabinet_verify_checksum "$CHECKSUM_ARTIFACT" "${WORK}/malformed.sha256" 2>/dev/null; echo $?)"
+check "a missing checksum file is refused" "1" "$(cabinet_verify_checksum "$CHECKSUM_ARTIFACT" "${WORK}/absent.sha256" 2>/dev/null; echo $?)"
+
 make_assets 0.0.8 "${WORK}/assets-0.0.8"
 # shellcheck disable=SC2329
 cabinet_verify_attestation() {

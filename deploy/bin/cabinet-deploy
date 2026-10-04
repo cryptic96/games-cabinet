@@ -114,10 +114,8 @@ cmd_verify() {
 verify_checksum() {
   local artifact="$1" checksum_file="$2"
 
-  [ -f "$checksum_file" ] || cabinet_die "checksum file not found: $checksum_file"
-  if ! (cd "$(dirname "$artifact")" && sha256sum --check --status "$(basename "$checksum_file")"); then
-    cabinet_die "checksum mismatch for $(basename "$artifact"), refusing to unpack"
-  fi
+  cabinet_verify_checksum "$artifact" "$checksum_file" \
+    || cabinet_die "checksum check failed for $(basename "$artifact"), refusing to unpack"
 }
 
 cmd_install() {

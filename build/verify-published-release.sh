@@ -102,7 +102,7 @@ for asset in "$ARTIFACT_NAME" "$CHECKSUM_NAME" "$BUNDLE_NAME"; do
   pass "downloaded ${asset} from the public release page"
 done
 
-if ! (cd "$WORK_DIR" && sha256sum --check --status "$CHECKSUM_NAME"); then
+if ! cabinet_verify_checksum "$ARTIFACT_PATH" "${WORK_DIR}/${CHECKSUM_NAME}" 2>/dev/null; then
   fail "the checksum file matches ${ARTIFACT_NAME}"
 fi
 pass "the checksum file matches ${ARTIFACT_NAME}"

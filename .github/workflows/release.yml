@@ -113,8 +113,11 @@ jobs:
           VERSION: ${{ needs.build.outputs.version }}
         run: |
           set -euo pipefail
-          cd release
-          sha256sum -c "cabinet-$VERSION.zip.sha256"
+          expected="$(awk 'NR == 1 { print $1 }' "release/cabinet-$VERSION.zip.sha256")"
+          listed="$(awk 'NR == 1 { print $2 }' "release/cabinet-$VERSION.zip.sha256")"
+          actual="$(sha256sum "release/cabinet-$VERSION.zip" | awk '{ print $1 }')"
+          [ "$listed" = "cabinet-$VERSION.zip" ] || { echo "::error::the checksum file lists $listed" >&2; exit 1; }
+          [ "$expected" = "$actual" ] || { echo "::error::checksum mismatch for cabinet-$VERSION.zip" >&2; exit 1; }
 
       - name: Re-verify build provenance attestation
         env:
