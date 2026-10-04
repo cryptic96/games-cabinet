@@ -176,19 +176,23 @@ did not expect.
 Apply:
 
 ```bash
-gh api --method POST repos/{owner}/{repo}/rulesets \
-  -f name='release tags' \
-  -f target='tag' \
-  -f enforcement='active' \
-  -f 'conditions[ref_name][include][]=refs/tags/v*' \
-  -f 'rules[][type]=creation' \
-  -f 'rules[][type]=update' \
-  -f 'rules[][type]=deletion' \
-  -f 'bypass_actors[][actor_type]=RepositoryRole' \
-  -F 'bypass_actors[][actor_id]=5'
+gh api --method POST repos/{owner}/{repo}/rulesets --input - <<'EOF'
+{
+  "name": "release tags",
+  "target": "tag",
+  "enforcement": "active",
+  "bypass_actors": [
+    { "actor_type": "RepositoryRole", "actor_id": 5, "bypass_mode": "always" }
+  ],
+  "conditions": { "ref_name": { "include": ["refs/tags/v*"], "exclude": [] } },
+  "rules": [ { "type": "creation" }, { "type": "update" }, { "type": "deletion" } ]
+}
+EOF
 ```
 
-Actor id 5 is the Admin repository role, the only bypass actor.
+Actor id 5 is the Admin repository role, the only bypass actor. The body is
+sent as JSON because the API requires the `exclude` list, which the `-f` field
+syntax cannot express as an empty array.
 
 Read back:
 
