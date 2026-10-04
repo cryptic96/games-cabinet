@@ -101,6 +101,9 @@ DIRTY_REPO="$WORK_DIR/dirty"
 new_repo "$DIRTY_REPO"
 printf 'an ordinary line\n' >"$DIRTY_REPO/notes.txt"
 write_binary "$DIRTY_REPO/images/shot.png" "$SYNTH_ONE"
+LOCAL_PATH_TEXT="$(printf '/%s/%s/dir' 'home' 'someone')"
+mkdir -p "$DIRTY_REPO/docs"
+printf 'line with %s and %s\n' "$SYNTH_ONE" "$LOCAL_PATH_TEXT" >"$DIRTY_REPO/docs/${SYNTH_TWO}-notes.txt"
 commit_all "$DIRTY_REPO" "add files"
 GIT_COMMITTER_EMAIL='someone@example.com' git -C "$DIRTY_REPO" tag -a -m "release" v1.0.0
 run_scan "$DIRTY_REPO"
@@ -118,7 +121,16 @@ tagger_case() {
     output_has 'tagger email is not a GitHub noreply address'
 }
 
+hidden_path_case() {
+  output_has 'FAIL denylist-trees' &&
+    output_has 'file number' &&
+    output_has 'FAIL absolute-paths' &&
+    output_has 'line 1 absolute local path' &&
+    output_lacks_synthetic
+}
+
 check "the scanner finds a denylisted value inside a binary file without echoing it" binary_case
+check "the scanner hides a path that matches the denylist in every finding" hidden_path_case
 check "the scanner flags an annotated tag whose tagger email is not a noreply address" tagger_case
 
 CLEAN_REPO="$WORK_DIR/clean"
