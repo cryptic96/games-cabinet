@@ -54,6 +54,19 @@ run_actionlint_on() {
   return 1
 }
 
+service_token_visible() {
+  local service="$1"
+  lint_compose --entrypoint /usr/bin/env "$service" 2>/dev/null | grep -q '^GH_TOKEN=.'
+}
+
+zizmor_token_visible() {
+  service_token_visible zizmor
+}
+
+actionlint_token_visible() {
+  service_token_visible actionlint
+}
+
 check_fixture_rejected() {
   local fixture="$1" tool="$2"
   local tmp
@@ -125,6 +138,21 @@ self_test() {
 
   if ! check_fixture_accepted "run-only.yml"; then
     echo "self-test failed: run-only.yml fixture was rejected by zizmor or actionlint" >&2
+    failures=1
+  fi
+
+  if ! (GH_TOKEN="synthetic-value-for-self-test" zizmor_token_visible); then
+    echo "self-test failed: a host GH_TOKEN was not forwarded into the zizmor container, so its online audits would be skipped" >&2
+    failures=1
+  fi
+
+  if (unset GH_TOKEN; zizmor_token_visible); then
+    echo "self-test failed: GH_TOKEN appeared in the zizmor container although the host has none" >&2
+    failures=1
+  fi
+
+  if (GH_TOKEN="synthetic-value-for-self-test" actionlint_token_visible); then
+    echo "self-test failed: GH_TOKEN was forwarded into the actionlint container" >&2
     failures=1
   fi
 
