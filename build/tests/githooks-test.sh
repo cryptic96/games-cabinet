@@ -499,6 +499,51 @@ push_tag_clean_case() {
   status_is_zero && remote_has_tag v1.0.0
 }
 
+push_merge_resolution_case() {
+  local dir="$WORK_DIR/push-merge-resolution"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "base line"
+  commit_with_hooks "$dir" "$DENYLIST" "base"
+  git -C "$dir" checkout --quiet -b topic
+  stage "$dir" notes/a.txt "topic line"
+  commit_with_hooks "$dir" "$DENYLIST" "topic work"
+  git -C "$dir" checkout --quiet main
+  stage "$dir" notes/a.txt "main line"
+  commit_with_hooks "$dir" "$DENYLIST" "main work"
+  git -C "$dir" merge --quiet --no-verify topic >/dev/null 2>&1 || true
+  printf 'resolved with %s\n' "${SYNTH_ONE^^}" >"$dir/notes/a.txt"
+  git -C "$dir" add notes/a.txt
+  git -C "$dir" commit --quiet --no-verify -m "merge topic"
+  push_branch "$dir" "$DENYLIST" main
+  status_is_nonzero &&
+    stderr_contains 'notes/a.txt:1:' &&
+    stderr_contains 'denylist match #1' &&
+    stderr_contains 'blocked: commit' &&
+    stderr_lacks_synthetic &&
+    ! remote_has_branch main
+}
+
+push_merge_resolution_clean_case() {
+  local dir="$WORK_DIR/push-merge-resolution-clean"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "base line"
+  commit_with_hooks "$dir" "$DENYLIST" "base"
+  git -C "$dir" checkout --quiet -b topic
+  stage "$dir" notes/a.txt "topic line"
+  commit_with_hooks "$dir" "$DENYLIST" "topic work"
+  git -C "$dir" checkout --quiet main
+  stage "$dir" notes/a.txt "main line"
+  commit_with_hooks "$dir" "$DENYLIST" "main work"
+  git -C "$dir" merge --quiet --no-verify topic >/dev/null 2>&1 || true
+  printf 'resolved line\n' >"$dir/notes/a.txt"
+  git -C "$dir" add notes/a.txt
+  git -C "$dir" commit --quiet --no-verify -m "merge topic"
+  push_branch "$dir" "$DENYLIST" main
+  status_is_zero && remote_has_branch main
+}
+
+check "pre-push refuses a merge commit whose conflict resolution matches the denylist" push_merge_resolution_case
+check "pre-push allows a merge commit with a clean conflict resolution" push_merge_resolution_clean_case
 check "pre-push refuses a skipped-hook binary file whose bytes match the denylist" push_binary_case
 check "pre-push refuses an annotated tag whose tagger email is not a noreply address" push_tag_identity_case
 check "pre-push still checks the tagger email when the denylist is absent" push_tag_identity_absent_denylist_case

@@ -4,8 +4,9 @@
 # denylist, so content committed with hooks skipped is still caught. Independently
 # of the denylist, it refuses commits whose author or committer email is not a
 # GitHub noreply address, and annotated tags whose tagger email is not one.
-# Merge commits are not diff-scanned because the commits they bring in are
-# scanned individually. See docs/development.md.
+# A merge commit is scanned for what the merge itself introduced, such as
+# conflict resolutions, compared with an automatic remerge, because the commits
+# it brings in are scanned individually. See docs/development.md.
 set -euo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -74,10 +75,11 @@ check_tag_object() {
 
 check_denylist() {
   local commit="$1" short="$2" ok=0 position=0 path label full_label
+  local -a tree_options=()
   git log -1 --format=%B "$commit" | denylist_scan "commit $short message" || ok=1
   git log -1 --format='%an%n%ae%n%cn%n%ce' "$commit" | denylist_scan "commit $short identity" || ok=1
   if is_merge_commit "$commit"; then
-    return "$ok"
+    tree_options=(--remerge-diff)
   fi
   while IFS= read -r -d '' path; do
     position=$((position + 1))
@@ -86,9 +88,9 @@ check_denylist() {
     if [ "$label" != "$path" ]; then
       printf '%s\n' "$path" | denylist_scan "$full_label" || ok=1
     fi
-    git diff-tree -p -U0 --root --no-commit-id --no-color --no-ext-diff --no-textconv --text "$commit" -- ":(literal)$path" |
+    git diff-tree "${tree_options[@]}" -p -U0 --root --no-commit-id --no-color --no-ext-diff --no-textconv --text "$commit" -- ":(literal)$path" |
       denylist_added_lines | denylist_scan "$full_label" || ok=1
-  done < <(git diff-tree -r --root --no-commit-id --name-only -z --diff-filter=d "$commit")
+  done < <(git diff-tree "${tree_options[@]}" -r --root --no-commit-id --name-only -z --diff-filter=d "$commit")
   return "$ok"
 }
 
