@@ -1,0 +1,57 @@
+# Traefik v3 dynamic (file-provider) configuration for the games cabinet.
+# This file is not read by anything in this repository - copy it into the
+# existing Traefik host's dynamic configuration directory (the directory its
+# file provider already watches) and replace every placeholder below with
+# the real values. The real file lives only on the Traefik host.
+#
+# One router serves the whole site on its own hostname, behind an IP
+# allow-list restricted to the home network and VPN. Nothing else is routed:
+# the operations listener binds to loopback only and is not reachable
+# through the reverse proxy.
+#
+# The application trusts forwarded headers (X-Forwarded-For) only from the
+# address configured as ReverseProxy__KnownProxies__0 in the server-side
+# application environment file - that value must be this Traefik host's own
+# address.
+#
+# Every hostname and address below is a placeholder from the documentation
+# ranges (RFC 5737) or an example.com domain; replace all of them and never
+# commit a real value here.
+
+http:
+  middlewares:
+    cabinet-lan-only:
+      ipAllowList:
+        sourceRange:
+          # Replace with the real LAN subnet.
+          - "192.0.2.0/24"
+          # Replace with the real VPN subnet.
+          - "198.51.100.0/24"
+
+    cabinet-security-headers:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        contentTypeNosniff: true
+        frameDeny: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+
+  routers:
+    cabinet:
+      rule: "Host(`cabinet.example.com`)"
+      entryPoints:
+        - websecure
+      middlewares:
+        - cabinet-lan-only
+        - cabinet-security-headers
+      service: cabinet
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    cabinet:
+      loadBalancer:
+        servers:
+          # Replace with the cabinet host's real address, port 5080.
+          - url: "http://192.0.2.20:5080"
