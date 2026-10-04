@@ -494,8 +494,11 @@ eval "$REAL_CMD_INSTALL"
 
 INSTALL_STATUS_TO_RETURN=0
 INSTALL_CORE_CALLS="${WORK}/install-core-calls.log"
+INSTALL_CORE_ARTIFACTS="${WORK}/install-core-artifacts.log"
+: > "$INSTALL_CORE_ARTIFACTS"
 cabinet_install_verified_release() {
   printf '%s\n' "$1" >> "$INSTALL_CORE_CALLS"
+  printf '%s\n' "$3" >> "$INSTALL_CORE_ARTIFACTS"
   return "$INSTALL_STATUS_TO_RETURN"
 }
 
@@ -551,6 +554,29 @@ run_install v0.0.6 --from-dir "${WORK}/assets-0.0.6"
 check "a manual install of the rejected version proceeds" "v0.0.6" "$(cat "$INSTALL_CORE_CALLS")"
 check "a successful manual install clears the marker" "" "$(cabinet_read_rejected_version "$STATE_DIR")"
 
+: > "$INSTALL_CORE_ARTIFACTS"
+run_install v0.0.6 --from-dir "${WORK}/assets-0.0.6"
+check "a manual install verifies and unpacks a private copy, not the caller's files" "no" \
+  "$(contains "$(cat "$INSTALL_CORE_ARTIFACTS")" "${WORK}/assets-0.0.6")"
+check "the private copy is under the download directory" "yes" \
+  "$(contains "$(cat "$INSTALL_CORE_ARTIFACTS")" "${DOWNLOAD_DIR}/")"
+check "a finished install leaves nothing in the download directory" "0" \
+  "$(find "$DOWNLOAD_DIR" -mindepth 1 | wc -l | tr -d ' ')"
+
+download_release_asset() {
+  cp "${WORK}/assets-0.0.6/$3" "$4"
+}
+run_install v0.0.6
+check "a downloaded install reaches the install core" "v0.0.6" "$(cat "$INSTALL_CORE_CALLS")"
+check "a finished downloaded install leaves nothing in the download directory" "0" \
+  "$(find "$DOWNLOAD_DIR" -mindepth 1 | wc -l | tr -d ' ')"
+
+mkdir -p "${DOWNLOAD_DIR}/0.0.1"
+printf 'left behind by an earlier run\n' > "${DOWNLOAD_DIR}/0.0.1/cabinet-0.0.1.zip"
+run_install v0.0.6 --from-dir "${WORK}/assets-0.0.6"
+check "an install clears downloads left behind by earlier runs" "0" \
+  "$(find "$DOWNLOAD_DIR" -mindepth 1 | wc -l | tr -d ' ')"
+
 run_install v0.0.5 --from-dir "${WORK}/assets-0.0.6"
 check "installing the active version is refused" "1" "$I_RC"
 check "a refused downgrade never reaches the install core" "0" "$(count_lines "$INSTALL_CORE_CALLS")"
@@ -559,6 +585,17 @@ printf 'tampered\n' >> "${WORK}/assets-0.0.7/cabinet-0.0.7.zip"
 run_install v0.0.7 --from-dir "${WORK}/assets-0.0.7"
 check "an artifact that does not match its checksum is refused" "1" "$I_RC"
 check "a checksum mismatch never reaches the install core" "0" "$(count_lines "$INSTALL_CORE_CALLS")"
+
+REFUSED_ROOT="${WORK}/refused-root"
+mkdir -p "${REFUSED_ROOT}/etc/cabinet" "${REFUSED_ROOT}/run/cabinet-deploy"
+printf 'CABINET_GITHUB_REPO=example-owner/example-repo\n' > "${REFUSED_ROOT}/etc/cabinet/deploy.conf"
+chmod 600 "${REFUSED_ROOT}/etc/cabinet/deploy.conf"
+REFUSED_EXIT=0
+CABINET_DEPLOY_ROOT="$REFUSED_ROOT" "${REPO_ROOT}/deploy/bin/cabinet-deploy" install v0.0.7 \
+  --from-dir "${WORK}/assets-0.0.7" >/dev/null 2>&1 || REFUSED_EXIT=$?
+check "the installer refuses an artifact that does not match its checksum" "1" "$REFUSED_EXIT"
+check "a refused install leaves nothing in the download directory" "0" \
+  "$(find "${REFUSED_ROOT}/var/lib/cabinet-deploy/downloads" -mindepth 1 | wc -l | tr -d ' ')"
 
 make_assets 0.0.9 "${WORK}/assets-0.0.9"
 printf 'unrelated file\n' > "${WORK}/assets-0.0.9/other.txt"

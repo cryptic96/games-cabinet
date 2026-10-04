@@ -62,6 +62,15 @@ load_configuration() {
   [ -n "$CABINET_GITHUB_REPO" ] || cabinet_die "CABINET_GITHUB_REPO is not configured"
 }
 
+WORK_DIRS=()
+
+remove_work_dirs() {
+  local dir
+  for dir in "${WORK_DIRS[@]}"; do
+    rm -rf "$dir"
+  done
+}
+
 acquire_lock() {
   mkdir -p "$(dirname "$LOCK_PATH")"
   exec 9>"$LOCK_PATH"
@@ -146,19 +155,28 @@ cmd_install() {
   fi
 
   local artifact_name="cabinet-${numeric_version}.zip"
-  local artifact bundle checksum_file
+  local artifact bundle checksum_file asset
+  local -a assets=("$artifact_name" "${artifact_name}.sha256" "${artifact_name}.sigstore.json")
+
+  mkdir -p "$DOWNLOAD_DIR"
+  find "$DOWNLOAD_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+  local work_dir
+  work_dir="$(mktemp -d "${DOWNLOAD_DIR}/${numeric_version}.XXXXXX")"
+  chmod 700 "$work_dir"
+  WORK_DIRS+=("$work_dir")
+
   if [ -n "$from_dir" ]; then
-    artifact="${from_dir}/${artifact_name}"
+    for asset in "${assets[@]}"; do
+      [ -f "${from_dir}/${asset}" ] || cabinet_die "required file not found: ${from_dir}/${asset}"
+      cp -- "${from_dir}/${asset}" "${work_dir}/${asset}" || cabinet_die "cannot copy ${asset} from ${from_dir}"
+    done
   else
-    local download_dir="${DOWNLOAD_DIR}/${numeric_version}"
-    mkdir -p "$download_dir"
-    artifact="${download_dir}/${artifact_name}"
-    local asset
-    for asset in "$artifact_name" "${artifact_name}.sha256" "${artifact_name}.sigstore.json"; do
-      download_release_asset "$CABINET_GITHUB_REPO" "$version" "$asset" "${download_dir}/${asset}" \
+    for asset in "${assets[@]}"; do
+      download_release_asset "$CABINET_GITHUB_REPO" "$version" "$asset" "${work_dir}/${asset}" \
         || cabinet_die "failed to download ${asset}"
     done
   fi
+  artifact="${work_dir}/${artifact_name}"
   checksum_file="${artifact}.sha256"
   bundle="${artifact}.sigstore.json"
 
@@ -182,6 +200,7 @@ cmd_install() {
     "$version" "$numeric_version" "$artifact" "$active_version" \
     "$RELEASES_DIR" "$CURRENT_LINK" "$STATE_DIR" "$CABINET_KEEP_RELEASES" \
     "$CABINET_OPS_URL" "$CABINET_HEALTH_TIMEOUT_SECONDS" || install_status=$?
+  rm -rf "$work_dir"
 
   case "$install_status" in
     0)
@@ -273,6 +292,7 @@ main() {
       ;;
   esac
 
+  trap remove_work_dirs EXIT
   require_root
   load_configuration
 
