@@ -87,6 +87,10 @@ services_render_example_overrides() {
 
 ###
 ### Installs every script under deploy/bin into /usr/local/sbin (755, root).
+### The destinations of this function and of the library and unit installers
+### below are mirrored by cabinet_provisioning_drift in deploy/lib/common.sh,
+### which the poll and the selfcheck use to spot out-of-date provisioning;
+### keep the two in step.
 ###
 services_install_scripts() {
   local script

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Shared logging, safe configuration loading and version comparison used by
-# the deploy tooling. Sourced, never executed directly.
+# Shared logging, safe configuration loading, version comparison and the
+# provisioning comparison (installed scripts, libraries and units against the
+# active release) used by the deploy tooling and the selfcheck. Sourced, never
+# executed directly.
 
 if [ -n "${CABINET_COMMON_SH_LOADED:-}" ]; then
   return 0
@@ -121,4 +123,70 @@ cabinet_semver_gt() {
     return
   fi
   (( 10#$a_patch > 10#$b_patch ))
+}
+
+# Succeeds (returns 0) when the installed file INSTALLED is not a regular
+# file or differs byte for byte from SOURCE. Only reads both files.
+cabinet_provisioning_file_differs() {
+  local source="$1" installed="$2"
+
+  if [ -f "$installed" ] && cmp -s "$source" "$installed"; then
+    return 1
+  fi
+  return 0
+}
+
+# Compares, byte for byte, every file provisioning installs verbatim with the
+# copy shipped in the active release, and prints the installed path of each
+# file that is missing or differs, one per line, on stdout.
+#
+# RELEASE_DEPLOY_DIR is the release's own deploy directory. INSTALL_ROOT is
+# the prefix the installed files live under; it is empty on a real host and
+# only a relocated root in offline tests. The mapping mirrors
+# deploy/provision.d/40-services.sh and must be kept in step with it:
+# bin/* to usr/local/sbin, lib/*.sh to usr/local/lib/cabinet, and
+# systemd/*.service and systemd/*.timer to etc/systemd/system.
+#
+# Rendered files (deploy.conf, nftables.conf, the env files) are deliberately
+# not compared because provisioning does not install them verbatim. Installed
+# files the release no longer ships are not reported, because provisioning
+# does not remove them either.
+#
+# Returns 0 when everything matches, 1 when at least one file drifted and 2
+# when RELEASE_DEPLOY_DIR is not a directory, so there is nothing to compare
+# against. It only reads: it never writes, copies, sources or executes any
+# file, and it never exits the caller.
+cabinet_provisioning_drift() {
+  local release_deploy="$1" install_root="$2"
+  local source installed drifted=0
+
+  [ -d "$release_deploy" ] || return 2
+
+  for source in "${release_deploy}"/bin/*; do
+    [ -f "$source" ] || continue
+    installed="${install_root}/usr/local/sbin/$(basename "$source")"
+    if cabinet_provisioning_file_differs "$source" "$installed"; then
+      printf '%s\n' "$installed"
+      drifted=1
+    fi
+  done
+  for source in "${release_deploy}"/lib/*.sh; do
+    [ -f "$source" ] || continue
+    installed="${install_root}/usr/local/lib/cabinet/$(basename "$source")"
+    if cabinet_provisioning_file_differs "$source" "$installed"; then
+      printf '%s\n' "$installed"
+      drifted=1
+    fi
+  done
+  for source in "${release_deploy}"/systemd/*.service "${release_deploy}"/systemd/*.timer; do
+    [ -f "$source" ] || continue
+    installed="${install_root}/etc/systemd/system/$(basename "$source")"
+    if cabinet_provisioning_file_differs "$source" "$installed"; then
+      printf '%s\n' "$installed"
+      drifted=1
+    fi
+  done
+
+  [ "$drifted" -eq 0 ] || return 1
+  return 0
 }

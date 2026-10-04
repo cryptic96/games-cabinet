@@ -2,7 +2,8 @@
 # Proves the decision logic of the installer without root, network, systemd
 # or the .NET SDK: version comparison, configuration loading, atomic
 # activation, pruning, rollback, health-acceptance outcomes, the
-# rejected-version memory, the poll decisions and the quiet poll statuses.
+# rejected-version memory, the poll decisions, the quiet poll statuses and the
+# provisioning drift comparison behind the out-of-date warning the poll logs.
 # Everything runs against a relocated temporary root; the service manager and
 # polkit stand-ins from the host guard record any call that slips through.
 set -euo pipefail
@@ -499,6 +500,147 @@ FIXTURE_STATUS=000 FIXTURE_BODY='' FIXTURE_HEADERS=''
 P_RC=0
 P_LOG="$(cmd_poll 2>&1 >/dev/null)" || P_RC=$?
 check "poll with a network error exits 1" "1" "$P_RC"
+
+# --- Provisioning drift ---------------------------------------------------------
+
+PROVISION_WARNING="WARNING: provisioning is out of date; re-run deploy/provision.sh from the active release"
+
+INSTALLED_SBIN="${CABINET_DEPLOY_ROOT}/usr/local/sbin"
+INSTALLED_LIB="${CABINET_DEPLOY_ROOT}/usr/local/lib/cabinet"
+INSTALLED_UNITS="${CABINET_DEPLOY_ROOT}/etc/systemd/system"
+
+# Builds an active release carrying the repository's own deploy tree and a
+# host whose installed scripts, libraries and units are identical copies.
+make_provisioned_host() {
+  local release_deploy file
+  set_active "$1"
+  rm -rf "${CABINET_DEPLOY_ROOT:?}/usr" "${CABINET_DEPLOY_ROOT:?}/etc/systemd"
+  release_deploy="${CURRENT_LINK}/deploy"
+  mkdir -p "${release_deploy}/bin" "${release_deploy}/lib" "${release_deploy}/systemd" \
+    "$INSTALLED_SBIN" "$INSTALLED_LIB" "$INSTALLED_UNITS"
+  for file in "${REPO_ROOT}"/deploy/bin/*; do
+    cp "$file" "${release_deploy}/bin/"
+    cp "$file" "${INSTALLED_SBIN}/"
+  done
+  for file in "${REPO_ROOT}"/deploy/lib/*.sh; do
+    cp "$file" "${release_deploy}/lib/"
+    cp "$file" "${INSTALLED_LIB}/"
+  done
+  for file in "${REPO_ROOT}"/deploy/systemd/*.service "${REPO_ROOT}"/deploy/systemd/*.timer; do
+    cp "$file" "${release_deploy}/systemd/"
+    cp "$file" "${INSTALLED_UNITS}/"
+  done
+  cp "${REPO_ROOT}/deploy/deploy.conf.example" "${release_deploy}/deploy.conf.example"
+}
+
+run_drift() {
+  D_RC=0
+  D_OUT="$(cabinet_provisioning_drift "${CURRENT_LINK}/deploy" "$CABINET_DEPLOY_ROOT")" || D_RC=$?
+}
+
+count_warnings() {
+  printf '%s\n' "$1" | grep -c "$PROVISION_WARNING" || true
+}
+
+release_tree_sums() {
+  (cd "${CURRENT_LINK}/deploy" && find . -type f -exec sha256sum {} + | sort -k2)
+}
+
+make_provisioned_host 0.0.5
+run_drift
+check "identical installed copies report no drift" "0" "$D_RC"
+check "identical installed copies print nothing" "" "$D_OUT"
+
+printf '# local edit\n' >> "${INSTALLED_SBIN}/cabinet-deploy"
+run_drift
+check "a changed installed installer is drift" "1" "$D_RC"
+check "the changed installer is named" "${INSTALLED_SBIN}/cabinet-deploy" "$D_OUT"
+
+make_provisioned_host 0.0.5
+printf '# local edit\n' >> "${INSTALLED_LIB}/deploy.sh"
+run_drift
+check "a changed installed library is drift" "1" "$D_RC"
+check "the changed library is named" "${INSTALLED_LIB}/deploy.sh" "$D_OUT"
+
+make_provisioned_host 0.0.5
+printf '# local edit\n' >> "${INSTALLED_UNITS}/cabinet.service"
+run_drift
+check "a changed installed unit is drift" "1" "$D_RC"
+check "the changed unit is named" "${INSTALLED_UNITS}/cabinet.service" "$D_OUT"
+
+make_provisioned_host 0.0.5
+rm -f "${INSTALLED_UNITS}/cabinet-deploy-poll.timer"
+run_drift
+check "a missing installed unit is drift" "1" "$D_RC"
+check "the missing unit is named" "${INSTALLED_UNITS}/cabinet-deploy-poll.timer" "$D_OUT"
+
+make_provisioned_host 0.0.5
+printf '# local edit\n' >> "${INSTALLED_SBIN}/cabinet-deploy"
+printf '# local edit\n' >> "${INSTALLED_LIB}/common.sh"
+run_drift
+check "two drifted files are two lines" "2" "$(printf '%s\n' "$D_OUT" | grep -c .)"
+
+make_provisioned_host 0.0.5
+run_drift
+check "the rendered configuration differs from its example" "yes" \
+  "$(cmp -s "${CABINET_DEPLOY_ROOT}/etc/cabinet/deploy.conf" "${CURRENT_LINK}/deploy/deploy.conf.example" || printf 'yes')"
+check "the rendered configuration is not compared" "0" "$D_RC"
+
+printf '# retired\n' > "${INSTALLED_LIB}/retired.sh"
+run_drift
+check "an installed library the release no longer ships is not drift" "0" "$D_RC"
+
+rm -rf "${CURRENT_LINK}/deploy"
+run_drift
+check "a release without a deploy directory has nothing to compare" "2" "$D_RC"
+check "a release without a deploy directory prints nothing" "" "$D_OUT"
+
+rm -rf "${CABINET_DEPLOY_ROOT}/opt/cabinet"
+run_drift
+check "no active release has nothing to compare" "2" "$D_RC"
+
+make_provisioned_host 0.0.5
+run_poll v0.0.5
+check "poll with identical installed copies succeeds" "0" "$P_RC"
+check "poll with identical installed copies installs nothing" "0" "$(count_lines "$INSTALL_CALLS")"
+check "poll with identical installed copies logs no provisioning warning" "0" "$(count_warnings "$P_LOG")"
+
+printf '# local edit\n' >> "${INSTALLED_SBIN}/cabinet-deploy"
+INSTALLED_SUM_BEFORE="$(sha256sum "${INSTALLED_SBIN}/cabinet-deploy")"
+RELEASE_SUMS_BEFORE="$(release_tree_sums)"
+run_poll v0.0.5
+check "poll with a drifted installer and nothing newer succeeds" "0" "$P_RC"
+check "poll with a drifted installer and nothing newer installs nothing" "0" "$(count_lines "$INSTALL_CALLS")"
+check "poll with a drifted installer still reports being up to date" "yes" "$(contains "$P_LOG" "up to date at 0.0.5")"
+check "poll with a drifted installer warns on exactly one line" "1" "$(count_warnings "$P_LOG")"
+check "poll with a drifted installer makes exactly one request" "1" "$(count_lines "$HTTP_CALLS")"
+check "a poll leaves the drifted installer untouched" "$INSTALLED_SUM_BEFORE" "$(sha256sum "${INSTALLED_SBIN}/cabinet-deploy")"
+check "a poll leaves the release deploy tree untouched" "$RELEASE_SUMS_BEFORE" "$(release_tree_sums)"
+
+run_poll v0.0.6
+check "poll with a drifted installer installs a newer tag" "v0.0.6" "$(cat "$INSTALL_CALLS")"
+check "poll with a drifted installer and a newer tag succeeds" "0" "$P_RC"
+check "poll with a drifted installer and a newer tag warns once" "1" "$(count_warnings "$P_LOG")"
+
+: > "$INSTALL_CALLS"
+FIXTURE_STATUS=500 FIXTURE_BODY='{}' FIXTURE_HEADERS='HTTP/2 500\r\n'
+P_RC=0
+P_LOG="$(cmd_poll 2>&1 >/dev/null)" || P_RC=$?
+check "poll with a drifted installer and a server error still exits 1" "1" "$P_RC"
+check "poll with a drifted installer and a server error still warns once" "1" "$(count_warnings "$P_LOG")"
+
+FIXTURE_STATUS=404 FIXTURE_BODY='{}' FIXTURE_HEADERS='HTTP/2 404\r\n'
+P_RC=0
+P_LOG="$(cmd_poll 2>&1 >/dev/null)" || P_RC=$?
+check "poll with a drifted installer and no published release exits 0" "0" "$P_RC"
+check "poll with a drifted installer and no published release installs nothing" "0" "$(count_lines "$INSTALL_CALLS")"
+
+rm -rf "${CURRENT_LINK}/deploy"
+run_poll v0.0.5
+check "poll when the active release has no deploy directory logs no provisioning warning" "0" "$(count_warnings "$P_LOG")"
+
+set_active 0.0.5
+rm -rf "${CABINET_DEPLOY_ROOT:?}/usr" "${CABINET_DEPLOY_ROOT:?}/etc/systemd"
 
 # --- Install outcomes and the rejected marker -------------------------------------
 
