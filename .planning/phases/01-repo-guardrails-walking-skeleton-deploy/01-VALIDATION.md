@@ -81,9 +81,9 @@ Filled in by the planner/executor per task; requirement-level map from research:
 | 01-07 T2 | 3 | OPS-02 | `build/lint.sh` | ⬜ |
 | 01-08 T1 | 4 | OPS-04 | `dotnet test --solution Cabinet.slnx` (integration tests on real sockets) | ⬜ |
 | 01-08 T2 | 4 | OPS-04 | `dotnet test --solution Cabinet.slnx` (unit tests) | ⬜ |
-| 01-09 T1 | 4 | OPS-02, OPS-03 | `build/lint.sh workflows repo-rules` and `bash build/tests/validate-release-tag-test.sh` | ⬜ |
-| 01-09 T2 | 4 | OPS-01 | `bash build/tests/check-github-settings-test.sh` | ⬜ |
-| 01-09 T3 | 4 | OPS-01, OPS-03 | `build/lint.sh repo-rules secrets` | ⬜ |
+| 01-09 T1 | 5 | OPS-02, OPS-03 | `build/lint.sh workflows repo-rules`, `bash build/tests/validate-release-tag-test.sh` and `test -f` on every script `ci.yml` runs (including the installer e2e test) | ⬜ |
+| 01-09 T2 | 5 | OPS-01 | `bash build/tests/check-github-settings-test.sh` | ⬜ |
+| 01-09 T3 | 5 | OPS-01, OPS-03 | `build/lint.sh repo-rules secrets` | ⬜ |
 | 01-10 T1 | 4 | OPS-04 | `CABINET_E2E=1 bash deploy/tests/cabinet-deploy-e2e-test.sh` | ⬜ |
 | 01-10 T2 | 4 | OPS-04 | `bash deploy/tests/cabinet-deploy-logic-test.sh` and the installer e2e test | ⬜ |
 | 01-10 T3 | 4 | OPS-04 | `CABINET_LINT_NETWORK=1 bash deploy/tests/verify-rejects-tampered-artifact-network-test.sh` | ⬜ |
