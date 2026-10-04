@@ -183,6 +183,35 @@ comment_only_case() {
     [ "$(git -C "$dir" rev-list --count HEAD)" -eq 1 ]
 }
 
+stage_binary() {
+  local dir="$1" path="$2" value="$3"
+  mkdir -p "$dir/$(dirname "$path")"
+  printf 'IMG\000\000\001meta %s\000\000tail\n' "$value" >"$dir/$path"
+  git -C "$dir" add -- "$path"
+}
+
+staged_binary_case() {
+  local dir="$WORK_DIR/block-binary"
+  new_repo "$dir"
+  stage_binary "$dir" images/shot.png "${SYNTH_ONE^^}"
+  commit_with_hooks "$dir" "$DENYLIST" "add image"
+  status_is_nonzero &&
+    stderr_contains 'images/shot.png:' &&
+    stderr_contains 'denylist match #1' &&
+    stderr_lacks_synthetic
+}
+
+staged_clean_binary_case() {
+  local dir="$WORK_DIR/allow-binary"
+  new_repo "$dir"
+  stage_binary "$dir" images/shot.png "an ordinary value"
+  commit_with_hooks "$dir" "$DENYLIST" "add image"
+  status_is_zero &&
+    [ "$(git -C "$dir" rev-list --count HEAD)" -eq 1 ]
+}
+
+check "pre-commit refuses a binary file whose bytes match the denylist without echoing it" staged_binary_case
+check "pre-commit allows a clean binary file" staged_clean_binary_case
 check "pre-commit refuses an added line matching the denylist, case-insensitively, without echoing it" staged_block_case
 check "pre-commit allows clean content" staged_clean_case
 check "pre-commit refuses a staged file name matching the denylist without echoing it" staged_name_case
@@ -400,6 +429,126 @@ push_absent_identity_case() {
     ! remote_has_branch main
 }
 
+push_binary_case() {
+  local dir="$WORK_DIR/push-binary"
+  new_repo_with_remote "$dir"
+  stage_binary "$dir" images/shot.png "${SYNTH_TWO^^}"
+  commit_unchecked "$dir" "innocent message"
+  push_branch "$dir" "$DENYLIST" main
+  status_is_nonzero &&
+    stderr_contains 'images/shot.png:' &&
+    stderr_contains 'denylist match #5' &&
+    stderr_lacks_synthetic &&
+    ! remote_has_branch main
+}
+
+remote_has_tag() {
+  git -C "$REMOTE_PATH" rev-parse --verify --quiet "refs/tags/$1" >/dev/null
+}
+
+push_tag() {
+  local dir="$1" denylist="$2" tag="$3"
+  run_hooked "$dir" "$denylist" git push --quiet origin "$tag"
+}
+
+push_tag_identity_case() {
+  local dir="$WORK_DIR/push-tag-identity"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "an ordinary line"
+  commit_with_hooks "$dir" "$DENYLIST" "first"
+  GIT_COMMITTER_EMAIL='someone@example.com' git -C "$dir" tag -a -m "release" v1.0.0
+  push_tag "$dir" "$DENYLIST" v1.0.0
+  status_is_nonzero &&
+    stderr_contains 'tagger email is not a GitHub noreply address' &&
+    ! remote_has_tag v1.0.0
+}
+
+push_tag_identity_absent_denylist_case() {
+  local dir="$WORK_DIR/push-tag-identity-absent"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "an ordinary line"
+  commit_with_hooks "$dir" "$DENYLIST" "first"
+  GIT_COMMITTER_EMAIL='someone@example.com' git -C "$dir" tag -a -m "release" v1.0.0
+  push_tag "$dir" "$MISSING_DENYLIST" v1.0.0
+  status_is_nonzero &&
+    stderr_contains 'tagger email is not a GitHub noreply address' &&
+    ! remote_has_tag v1.0.0
+}
+
+push_tag_message_case() {
+  local dir="$WORK_DIR/push-tag-message"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "an ordinary line"
+  commit_with_hooks "$dir" "$DENYLIST" "first"
+  git -C "$dir" tag -a -m "mention ${SYNTH_ONE}" v1.0.0
+  push_tag "$dir" "$DENYLIST" v1.0.0
+  status_is_nonzero &&
+    stderr_contains 'tag ' &&
+    stderr_contains 'denylist match #1' &&
+    stderr_lacks_synthetic &&
+    ! remote_has_tag v1.0.0
+}
+
+push_tag_clean_case() {
+  local dir="$WORK_DIR/push-tag-clean"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "an ordinary line"
+  commit_with_hooks "$dir" "$DENYLIST" "first"
+  git -C "$dir" tag -a -m "release" v1.0.0
+  push_tag "$dir" "$DENYLIST" v1.0.0
+  status_is_zero && remote_has_tag v1.0.0
+}
+
+push_merge_resolution_case() {
+  local dir="$WORK_DIR/push-merge-resolution"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "base line"
+  commit_with_hooks "$dir" "$DENYLIST" "base"
+  git -C "$dir" checkout --quiet -b topic
+  stage "$dir" notes/a.txt "topic line"
+  commit_with_hooks "$dir" "$DENYLIST" "topic work"
+  git -C "$dir" checkout --quiet main
+  stage "$dir" notes/a.txt "main line"
+  commit_with_hooks "$dir" "$DENYLIST" "main work"
+  git -C "$dir" merge --quiet --no-verify topic >/dev/null 2>&1 || true
+  printf 'resolved with %s\n' "${SYNTH_ONE^^}" >"$dir/notes/a.txt"
+  git -C "$dir" add notes/a.txt
+  git -C "$dir" commit --quiet --no-verify -m "merge topic"
+  push_branch "$dir" "$DENYLIST" main
+  status_is_nonzero &&
+    stderr_contains 'notes/a.txt:1:' &&
+    stderr_contains 'denylist match #1' &&
+    stderr_contains 'blocked: commit' &&
+    stderr_lacks_synthetic &&
+    ! remote_has_branch main
+}
+
+push_merge_resolution_clean_case() {
+  local dir="$WORK_DIR/push-merge-resolution-clean"
+  new_repo_with_remote "$dir"
+  stage "$dir" notes/a.txt "base line"
+  commit_with_hooks "$dir" "$DENYLIST" "base"
+  git -C "$dir" checkout --quiet -b topic
+  stage "$dir" notes/a.txt "topic line"
+  commit_with_hooks "$dir" "$DENYLIST" "topic work"
+  git -C "$dir" checkout --quiet main
+  stage "$dir" notes/a.txt "main line"
+  commit_with_hooks "$dir" "$DENYLIST" "main work"
+  git -C "$dir" merge --quiet --no-verify topic >/dev/null 2>&1 || true
+  printf 'resolved line\n' >"$dir/notes/a.txt"
+  git -C "$dir" add notes/a.txt
+  git -C "$dir" commit --quiet --no-verify -m "merge topic"
+  push_branch "$dir" "$DENYLIST" main
+  status_is_zero && remote_has_branch main
+}
+
+check "pre-push refuses a merge commit whose conflict resolution matches the denylist" push_merge_resolution_case
+check "pre-push allows a merge commit with a clean conflict resolution" push_merge_resolution_clean_case
+check "pre-push refuses a skipped-hook binary file whose bytes match the denylist" push_binary_case
+check "pre-push refuses an annotated tag whose tagger email is not a noreply address" push_tag_identity_case
+check "pre-push still checks the tagger email when the denylist is absent" push_tag_identity_absent_denylist_case
+check "pre-push refuses an annotated tag whose message matches the denylist" push_tag_message_case
+check "pre-push allows an annotated tag with a noreply tagger" push_tag_clean_case
 check "pre-push allows clean commits, including an incremental push" push_clean_case
 check "pre-push refuses a skipped-hook commit whose added lines match the denylist" push_content_case
 check "pre-push scans only the commits not yet on the remote" push_incremental_content_case

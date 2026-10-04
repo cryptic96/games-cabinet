@@ -41,7 +41,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. On the LXC, the pull timer finds the published release, verifies its attestation offline, installs it and health-checks it, and the hello page loads from the home network. A deliberately broken release rolls back automatically, health does not depend on BGG, and no self-hosted runner exists (GitHub never executes anything on the server).
   5. A fresh LXC can be created and provisioned from documented, repeatable scripts alone, and an image-processing smoke test passes inside it.
 
-**Plans:** 11/15 plans executed
+**Plans:** 15/15 plans executed
 
 Plans:
 **Wave 1**
@@ -72,19 +72,19 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 01-12-PLAN.md — Go-live: public repository, CI on the PR, every control applied and read back (owner-approved)
+- [x] 01-12-PLAN.md — Go-live: public repository, CI on the PR, every control applied and read back (owner-approved)
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 01-13-PLAN.md — First release v0.1.0 approved, pulled, verified, installed and health-checked on the LXC
+- [x] 01-13-PLAN.md — First release v0.1.0 approved, pulled, verified, installed and health-checked on the LXC
 
 **Wave 8** *(blocked on Wave 7 completion)*
 
-- [ ] 01-14-PLAN.md — Rollback rehearsal: deliberately broken v0.1.1 rolls back and is skipped
+- [x] 01-14-PLAN.md — Rollback rehearsal: deliberately broken v0.1.1 rolls back and is skipped
 
 **Wave 9** *(blocked on Wave 8 completion)*
 
-- [ ] 01-15-PLAN.md — Fixed v0.1.2 installs past the rejected version; final phase gate
+- [x] 01-15-PLAN.md — Fixed v0.1.2 installs past the rejected version; final phase gate
 
 ### Phase 2: Layout Engine & Cabinet Prototype
 
@@ -216,7 +216,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Repo, Guardrails & Walking-Skeleton Deploy | 11/15 | In Progress|  |
+| 1. Repo, Guardrails & Walking-Skeleton Deploy | 15/15 | In Progress|  |
 | 2. Layout Engine & Cabinet Prototype | 0/0 | Not started | - |
 | 3. BGG Access Spike, Real Sync & Snapshot | 0/0 | Not started | - |
 | 4. Enrichment, Box Images & Shape | 0/0 | Not started | - |

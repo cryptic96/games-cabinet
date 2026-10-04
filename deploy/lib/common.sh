@@ -92,6 +92,17 @@ cabinet_load_conf() {
   done < "$conf_file"
 }
 
+# Exits with an error unless the variable named NAME holds a positive decimal
+# integer of at most six digits. Numeric settings must pass this before they
+# are used anywhere, because bash evaluates the value of a variable named in
+# an arithmetic expression as an expression itself, which can run commands.
+cabinet_require_uint() {
+  local name="$1"
+  local value="${!name-}"
+
+  [[ "$value" =~ ^[1-9][0-9]{0,5}$ ]] || cabinet_die "${name} must be a positive whole number"
+}
+
 # Compares two MAJOR.MINOR.PATCH version strings numerically. Succeeds
 # (returns 0) when A is strictly greater than B.
 cabinet_semver_gt() {

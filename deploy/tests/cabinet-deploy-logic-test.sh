@@ -191,6 +191,7 @@ check "rolled back install leaves the previous release active" "1.0.0" "$(basena
 check "rolled back install restarts for the install and for the rollback" "2" "$(count_lines "$RESTART_LOG")"
 check "rollback awaits health for the previous version" "1.0.0" "$(tail -n 1 "$HEALTH_LOG")"
 check "rolled back install is not logged as a failed rollback" "no" "$(contains "$CORE_OUTPUT" "rollback to 1.0.0 failed")"
+check "an automatic rollback keeps the last good release as the previous one" "1.0.0" "$(cat "${CORE_ROOT}/state/previous")"
 
 fresh_core_root
 HEALTH_SEQUENCE=(1 1)
@@ -229,6 +230,8 @@ cabinet_rollback_release "1.0.0" "${CORE_ROOT}/releases" "${CORE_ROOT}/current" 
   "http://127.0.0.1:0" 5 2>/dev/null || ROLLBACK_RC=$?
 check "rollback reactivates an earlier release" "1.0.0" "$(basename "$(readlink -f "${CORE_ROOT}/current")")"
 check "rollback of a healthy earlier release succeeds" "0" "$ROLLBACK_RC"
+check "a rollback does not record the release it left as the previous one" "" \
+  "$(cat "${CORE_ROOT}/state/previous" 2>/dev/null || true)"
 
 HEALTH_SEQUENCE=(1)
 ROLLBACK_RC=0
@@ -236,6 +239,19 @@ ROLLBACK_LOG="$(cabinet_rollback_release "1.1.0" "${CORE_ROOT}/releases" "${CORE
   "http://127.0.0.1:0" 5 2>&1)" || ROLLBACK_RC=$?
 check "rollback to an unhealthy release fails" "1" "$ROLLBACK_RC"
 check "rollback failure is logged at error level" "yes" "$(contains "$ROLLBACK_LOG" "ERROR:")"
+check "an unrequested restore leaves the unhealthy target active" "1.1.0" \
+  "$(basename "$(readlink -f "${CORE_ROOT}/current")")"
+
+ln -sfn "${CORE_ROOT}/releases/1.0.0" "${CORE_ROOT}/current"
+: > "$RESTART_LOG"
+HEALTH_SEQUENCE=(1)
+ROLLBACK_RC=0
+cabinet_rollback_release "1.1.0" "${CORE_ROOT}/releases" "${CORE_ROOT}/current" "${CORE_ROOT}/state" \
+  "http://127.0.0.1:0" 5 yes 2>/dev/null || ROLLBACK_RC=$?
+check "a failed rollback that asked for a restore reports failure" "1" "$ROLLBACK_RC"
+check "a failed rollback puts the release it replaced back" "1.0.0" \
+  "$(basename "$(readlink -f "${CORE_ROOT}/current")")"
+check "restoring the replaced release restarts the application again" "2" "$(count_lines "$RESTART_LOG")"
 
 MISSING_EXIT=0
 (cabinet_rollback_release "0.0.1" "${CORE_ROOT}/releases" "${CORE_ROOT}/current" "${CORE_ROOT}/state" \
@@ -259,6 +275,18 @@ check "a version above the recorded one is not rejected" "1" "$(cabinet_is_rejec
 
 cabinet_record_rejected_version "0.0.9" "$REJECT_STATE"
 check "recording again replaces the marker" "0.0.9" "$(cabinet_read_rejected_version "$REJECT_STATE")"
+cabinet_record_rejected_version "0.0.4" "$REJECT_STATE"
+check "recording a lower version keeps the higher marker" "0.0.9" "$(cabinet_read_rejected_version "$REJECT_STATE")"
+cabinet_record_rejected_version "0.0.9" "$REJECT_STATE"
+check "recording the same version keeps the marker" "0.0.9" "$(cabinet_read_rejected_version "$REJECT_STATE")"
+cabinet_clear_rejected_version "$REJECT_STATE" "0.0.7"
+check "installing a version below the marker keeps it" "0.0.9" "$(cabinet_read_rejected_version "$REJECT_STATE")"
+cabinet_clear_rejected_version "$REJECT_STATE" "0.0.9"
+check "installing the marked version clears it" "" "$(cabinet_read_rejected_version "$REJECT_STATE")"
+cabinet_record_rejected_version "0.0.9" "$REJECT_STATE"
+cabinet_clear_rejected_version "$REJECT_STATE" "0.1.0"
+check "installing a version above the marker clears it" "" "$(cabinet_read_rejected_version "$REJECT_STATE")"
+cabinet_record_rejected_version "0.0.9" "$REJECT_STATE"
 cabinet_clear_rejected_version "$REJECT_STATE"
 check "clear removes the marker" "" "$(cabinet_read_rejected_version "$REJECT_STATE")"
 check "nothing is rejected after clearing" "1" "$(cabinet_is_rejected 0.0.1 "$REJECT_STATE"; echo $?)"
@@ -347,6 +375,46 @@ load_configuration_for_tests() {
   chmod 600 "${CABINET_DEPLOY_ROOT}/etc/cabinet/deploy.conf"
   load_configuration
 }
+load_configuration_for_tests
+
+# --- Numeric configuration is validated before anything is activated ---------------
+
+CONF_PATH="${WORK}/numeric.conf"
+INJECTION_MARKER="${WORK}/arithmetic-injected"
+
+load_with_conf() {
+  printf '%s\n' 'CABINET_GITHUB_REPO=example-owner/example-repo' "$@" > "$CONF_PATH"
+  chmod 600 "$CONF_PATH"
+  LOAD_RC=0
+  LOAD_LOG="$( (load_configuration) 2>&1 )" || LOAD_RC=$?
+}
+
+load_with_conf 'CABINET_KEEP_RELEASES=5' 'CABINET_HEALTH_TIMEOUT_SECONDS=30'
+check "whole-number settings are accepted" "0" "$LOAD_RC"
+
+for bad_value in '60s' '' '0' '-3' '1.5' '1234567' ' 7' "PATH[\$(touch ${INJECTION_MARKER})0]"; do
+  load_with_conf "CABINET_HEALTH_TIMEOUT_SECONDS=${bad_value}"
+  check "timeout '${bad_value}' is refused at load time" "1" "$LOAD_RC"
+  check "the timeout refusal names the setting" "yes" "$(contains "$LOAD_LOG" "CABINET_HEALTH_TIMEOUT_SECONDS must be a positive whole number")"
+  load_with_conf "CABINET_KEEP_RELEASES=${bad_value}"
+  check "release count '${bad_value}' is refused at load time" "1" "$LOAD_RC"
+  check "the release count refusal names the setting" "yes" "$(contains "$LOAD_LOG" "CABINET_KEEP_RELEASES must be a positive whole number")"
+done
+check "no numeric setting is ever evaluated as arithmetic" "absent" \
+  "$([ -e "$INJECTION_MARKER" ] && echo present || echo absent)"
+
+LOAD_RC=0
+(CABINET_HEALTH_INTERVAL_SECONDS="PATH[\$(touch ${INJECTION_MARKER})0]"; load_with_conf 'CABINET_KEEP_RELEASES=5'; [ "$LOAD_RC" -eq 1 ]) || LOAD_RC=$?
+check "a malformed health interval from the environment is refused" "0" "$LOAD_RC"
+check "the health interval is never evaluated as arithmetic" "absent" \
+  "$([ -e "$INJECTION_MARKER" ] && echo present || echo absent)"
+
+CABINET_HEALTH_INTERVAL_SECONDS=""
+unset CABINET_HEALTH_INTERVAL_SECONDS
+load_with_conf 'CABINET_KEEP_RELEASES=5'
+check "the health interval defaults to a valid number" "0" "$LOAD_RC"
+
+CONF_PATH="${CABINET_DEPLOY_CONF:-${CABINET_DEPLOY_ROOT}/etc/cabinet/deploy.conf}"
 load_configuration_for_tests
 
 REAL_CMD_INSTALL="$(declare -f cmd_install)"
@@ -438,8 +506,11 @@ eval "$REAL_CMD_INSTALL"
 
 INSTALL_STATUS_TO_RETURN=0
 INSTALL_CORE_CALLS="${WORK}/install-core-calls.log"
+INSTALL_CORE_ARTIFACTS="${WORK}/install-core-artifacts.log"
+: > "$INSTALL_CORE_ARTIFACTS"
 cabinet_install_verified_release() {
   printf '%s\n' "$1" >> "$INSTALL_CORE_CALLS"
+  printf '%s\n' "$3" >> "$INSTALL_CORE_ARTIFACTS"
   return "$INSTALL_STATUS_TO_RETURN"
 }
 
@@ -495,6 +566,29 @@ run_install v0.0.6 --from-dir "${WORK}/assets-0.0.6"
 check "a manual install of the rejected version proceeds" "v0.0.6" "$(cat "$INSTALL_CORE_CALLS")"
 check "a successful manual install clears the marker" "" "$(cabinet_read_rejected_version "$STATE_DIR")"
 
+: > "$INSTALL_CORE_ARTIFACTS"
+run_install v0.0.6 --from-dir "${WORK}/assets-0.0.6"
+check "a manual install verifies and unpacks a private copy, not the caller's files" "no" \
+  "$(contains "$(cat "$INSTALL_CORE_ARTIFACTS")" "${WORK}/assets-0.0.6")"
+check "the private copy is under the download directory" "yes" \
+  "$(contains "$(cat "$INSTALL_CORE_ARTIFACTS")" "${DOWNLOAD_DIR}/")"
+check "a finished install leaves nothing in the download directory" "0" \
+  "$(find "$DOWNLOAD_DIR" -mindepth 1 | wc -l | tr -d ' ')"
+
+download_release_asset() {
+  cp "${WORK}/assets-0.0.6/$3" "$4"
+}
+run_install v0.0.6
+check "a downloaded install reaches the install core" "v0.0.6" "$(cat "$INSTALL_CORE_CALLS")"
+check "a finished downloaded install leaves nothing in the download directory" "0" \
+  "$(find "$DOWNLOAD_DIR" -mindepth 1 | wc -l | tr -d ' ')"
+
+mkdir -p "${DOWNLOAD_DIR}/0.0.1"
+printf 'left behind by an earlier run\n' > "${DOWNLOAD_DIR}/0.0.1/cabinet-0.0.1.zip"
+run_install v0.0.6 --from-dir "${WORK}/assets-0.0.6"
+check "an install clears downloads left behind by earlier runs" "0" \
+  "$(find "$DOWNLOAD_DIR" -mindepth 1 | wc -l | tr -d ' ')"
+
 run_install v0.0.5 --from-dir "${WORK}/assets-0.0.6"
 check "installing the active version is refused" "1" "$I_RC"
 check "a refused downgrade never reaches the install core" "0" "$(count_lines "$INSTALL_CORE_CALLS")"
@@ -503,6 +597,37 @@ printf 'tampered\n' >> "${WORK}/assets-0.0.7/cabinet-0.0.7.zip"
 run_install v0.0.7 --from-dir "${WORK}/assets-0.0.7"
 check "an artifact that does not match its checksum is refused" "1" "$I_RC"
 check "a checksum mismatch never reaches the install core" "0" "$(count_lines "$INSTALL_CORE_CALLS")"
+
+REFUSED_ROOT="${WORK}/refused-root"
+mkdir -p "${REFUSED_ROOT}/etc/cabinet" "${REFUSED_ROOT}/run/cabinet-deploy"
+printf 'CABINET_GITHUB_REPO=example-owner/example-repo\n' > "${REFUSED_ROOT}/etc/cabinet/deploy.conf"
+chmod 600 "${REFUSED_ROOT}/etc/cabinet/deploy.conf"
+REFUSED_EXIT=0
+CABINET_DEPLOY_ROOT="$REFUSED_ROOT" "${REPO_ROOT}/deploy/bin/cabinet-deploy" install v0.0.7 \
+  --from-dir "${WORK}/assets-0.0.7" >/dev/null 2>&1 || REFUSED_EXIT=$?
+check "the installer refuses an artifact that does not match its checksum" "1" "$REFUSED_EXIT"
+check "a refused install leaves nothing in the download directory" "0" \
+  "$(find "${REFUSED_ROOT}/var/lib/cabinet-deploy/downloads" -mindepth 1 | wc -l | tr -d ' ')"
+
+make_assets 0.0.9 "${WORK}/assets-0.0.9"
+printf 'unrelated file\n' > "${WORK}/assets-0.0.9/other.txt"
+(cd "${WORK}/assets-0.0.9" && sha256sum other.txt > cabinet-0.0.9.zip.sha256)
+printf 'tampered\n' >> "${WORK}/assets-0.0.9/cabinet-0.0.9.zip"
+run_install v0.0.9 --from-dir "${WORK}/assets-0.0.9"
+check "a checksum file that lists another file cannot vouch for the artifact" "1" "$I_RC"
+check "that checksum file never reaches the install core" "0" "$(count_lines "$INSTALL_CORE_CALLS")"
+
+CHECKSUM_ARTIFACT="${WORK}/assets-0.0.6/cabinet-0.0.6.zip"
+CHECKSUM_FILE="${CHECKSUM_ARTIFACT}.sha256"
+check "a checksum file for the artifact itself is accepted" "0" "$(cabinet_verify_checksum "$CHECKSUM_ARTIFACT" "$CHECKSUM_FILE" 2>/dev/null; echo $?)"
+ARTIFACT_HASH="$(sha256sum "$CHECKSUM_ARTIFACT" | awk '{print $1}')"
+printf '%s  /etc/hostname\n' "$ARTIFACT_HASH" > "${WORK}/path.sha256"
+check "a checksum file naming another path is refused" "1" "$(cabinet_verify_checksum "$CHECKSUM_ARTIFACT" "${WORK}/path.sha256" 2>/dev/null; echo $?)"
+printf '%s  cabinet-0.0.6.zip\n%s  other.txt\n' "$ARTIFACT_HASH" "$ARTIFACT_HASH" > "${WORK}/two-lines.sha256"
+check "a checksum file with more than one entry is refused" "1" "$(cabinet_verify_checksum "$CHECKSUM_ARTIFACT" "${WORK}/two-lines.sha256" 2>/dev/null; echo $?)"
+printf 'not-a-hash  cabinet-0.0.6.zip\n' > "${WORK}/malformed.sha256"
+check "a checksum file without a valid hash is refused" "1" "$(cabinet_verify_checksum "$CHECKSUM_ARTIFACT" "${WORK}/malformed.sha256" 2>/dev/null; echo $?)"
+check "a missing checksum file is refused" "1" "$(cabinet_verify_checksum "$CHECKSUM_ARTIFACT" "${WORK}/absent.sha256" 2>/dev/null; echo $?)"
 
 make_assets 0.0.8 "${WORK}/assets-0.0.8"
 # shellcheck disable=SC2329
@@ -553,6 +678,43 @@ check "rolling back to the active release is refused" "1" "$ROLLBACK_RC"
 ROLLBACK_RC=0
 (cmd_rollback not-a-version) >/dev/null 2>&1 || ROLLBACK_RC=$?
 check "rollback of a malformed version is refused" "1" "$ROLLBACK_RC"
+
+# --- Manual rollback after an automatic rollback ------------------------------------
+
+rm -rf "${CABINET_DEPLOY_ROOT}/opt/cabinet" "${STATE_DIR}"
+mkdir -p "${RELEASES_DIR}/0.0.5" "${RELEASES_DIR}/0.0.6" "$STATE_DIR"
+ln -s "${RELEASES_DIR}/0.0.5" "$CURRENT_LINK"
+cabinet_activate_release 0.0.6 "$RELEASES_DIR" "$CURRENT_LINK" "$STATE_DIR"
+cabinet_rollback_release 0.0.5 "$RELEASES_DIR" "$CURRENT_LINK" "$STATE_DIR" "http://127.0.0.1:0" 5 2>/dev/null
+cabinet_record_rejected_version 0.0.6 "$STATE_DIR"
+: > "$RESTART_LOG"
+ROLLBACK_RC=0
+(cmd_rollback) >/dev/null 2>&1 || ROLLBACK_RC=$?
+check "a manual rollback after an automatic rollback is refused" "1" "$ROLLBACK_RC"
+check "that manual rollback leaves the good release active" "0.0.5" "$(basename "$(readlink -f "$CURRENT_LINK")")"
+check "that manual rollback never restarts the application" "0" "$(count_lines "$RESTART_LOG")"
+
+printf '0.0.6\n' > "${STATE_DIR}/previous"
+ROLLBACK_RC=0
+ROLLBACK_LOG="$( (cmd_rollback) 2>&1 )" || ROLLBACK_RC=$?
+check "a recorded previous release that failed its health check is not reactivated" "1" "$ROLLBACK_RC"
+check "the refusal tells the operator to name a version" "yes" "$(contains "$ROLLBACK_LOG" "name the version to roll back to")"
+check "the refused release stays inactive" "0.0.5" "$(basename "$(readlink -f "$CURRENT_LINK")")"
+
+# --- A manual rollback never lowers the rejected version -------------------------------
+
+rm -rf "${CABINET_DEPLOY_ROOT}/opt/cabinet" "${STATE_DIR}"
+mkdir -p "${RELEASES_DIR}/0.0.4" "${RELEASES_DIR}/0.0.6" "$STATE_DIR"
+ln -s "${RELEASES_DIR}/0.0.6" "$CURRENT_LINK"
+cabinet_record_rejected_version 0.0.8 "$STATE_DIR"
+(cmd_rollback 0.0.4) >/dev/null 2>&1
+check "a manual rollback keeps the higher rejected version" "0.0.8" "$(cabinet_read_rejected_version "$STATE_DIR")"
+
+INSTALL_STATUS_TO_RETURN=0
+make_assets 0.0.7 "${WORK}/assets-0.0.7-fresh"
+run_install v0.0.7 --from-dir "${WORK}/assets-0.0.7-fresh"
+check "a successful install below the rejected version succeeds" "0" "$I_RC"
+check "a successful install below the rejected version keeps the marker" "0.0.8" "$(cabinet_read_rejected_version "$STATE_DIR")"
 
 # --- Single run lock ---------------------------------------------------------------
 

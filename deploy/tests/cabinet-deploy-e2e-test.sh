@@ -201,6 +201,7 @@ check "rollback to 0.0.1: health reports Healthy" "Healthy" "$(ops_health | jq -
 check "rollback to 0.0.1: health reports version 0.0.1" "0.0.1" "$(ops_health | jq -r '.version // empty')"
 check "marker 0.0.2: the rejected marker holds the broken version" "0.0.2" "$(cat "${STATE_DIR}/rejected")"
 check "install and rollback restarted the application twice more" "3" "$(restart_count)"
+check "the last good release is still the previous one after the rollback" "0.0.1" "$(cat "${STATE_DIR}/previous")"
 
 for attempt in 1 2; do
   SKIP_RC=0

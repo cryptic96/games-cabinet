@@ -63,7 +63,7 @@ denylist_warn_absent() {
 denylist_text_matches() {
   local text="$1" i
   for ((i = 0; i < ${#DENYLIST_PATTERNS[@]}; i++)); do
-    if grep -q -i -F -e "${DENYLIST_PATTERNS[i]}" <<<"$text"; then
+    if grep -a -q -i -F -e "${DENYLIST_PATTERNS[i]}" <<<"$text"; then
       return 0
     fi
   done
@@ -75,9 +75,9 @@ denylist_text_matches() {
 # returns 1; returns 0 when nothing matches. The label is the first argument.
 denylist_scan() {
   local label="$1" text hits hit i found=0
-  text="$(cat)"
+  text="$(tr -d '\000')"
   for ((i = 0; i < ${#DENYLIST_PATTERNS[@]}; i++)); do
-    hits="$(grep -n -i -F -e "${DENYLIST_PATTERNS[i]}" <<<"$text" | cut -d: -f1 || true)"
+    hits="$(grep -a -n -i -F -e "${DENYLIST_PATTERNS[i]}" <<<"$text" | cut -d: -f1 || true)"
     [ -n "$hits" ] || continue
     while IFS= read -r hit; do
       printf '%s:%s: denylist match #%s\n' "$label" "$hit" "${DENYLIST_NUMBERS[i]}" >&2
@@ -100,9 +100,12 @@ denylist_safe_label() {
 }
 
 # Converts one file's unified diff on stdin into its added lines, padded with
-# empty lines so that line N of the output is line N of the new file.
+# empty lines so that line N of the output is line N of the new file. Callers
+# must produce the diff with --text so that binary files contribute their
+# bytes instead of a one-line "Binary files differ" notice; NUL bytes are
+# dropped here so a binary file's text still reaches the matcher.
 denylist_added_lines() {
-  awk '
+  tr -d '\000' | LC_ALL=C awk '
     /^diff / { inhunk = 0; emitted = 0; next }
     /^@@ / {
       inhunk = 1
