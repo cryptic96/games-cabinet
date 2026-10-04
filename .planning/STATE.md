@@ -5,7 +5,7 @@ milestone_name: milestone
 current_phase: 01
 current_phase_name: repo-guardrails-walking-skeleton-deploy
 status: executing
-stopped_at: Completed 01-12 (repository public and protected)
+stopped_at: "01-13 paused before Task 3: v0.1.0 tagged on 8772316, release run 37224402734 build+publish success, release published and immutable, checksum+attestation (no credentials)+manifest verified; owner approved deploy. Awaiting owner LXC setup (docs/lxc-setup.md 1-7) and cabinet-lxc SSH alias. Resume 01-13 at Task 3; do not re-tag."
 last_updated: "2026-10-04T18:24:28.923Z"
 last_activity: 2026-10-04
 last_activity_desc: Phase 01 execution started
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-03)
 
 Phase: 01 (repo-guardrails-walking-skeleton-deploy) — EXECUTING
 Plan: 13 of 15
-Status: Ready to execute
+Status: Paused — waiting on owner LXC setup (01-13 Task 3)
 Last activity: 2026-10-04 — Phase 01 execution started
 
 Progress: [████████░░] 80%
