@@ -91,7 +91,7 @@ if [ "${#PATTERNS[@]}" -eq 0 ]; then
 fi
 
 git_repo() {
-  git -C "$REPO" "$@"
+  git -C "$REPO" -c core.quotePath=false "$@"
 }
 
 mapfile -t COMMITS < <(git_repo rev-list --all)
@@ -142,20 +142,16 @@ safe_location() {
 }
 
 check_denylist_trees() {
-  local findings=() commit hits names text hit hit_path position
+  local findings=() commit names text hit hit_path position
   for commit in "${COMMITS[@]}"; do
-    hits="$(git_repo grep -a -i -F -l -f "$PATTERN_FILE" "$commit" -- 2>/dev/null || true)"
-    if [ -n "$hits" ]; then
-      position=0
-      while IFS= read -r hit; do
-        [ -n "$hit" ] || continue
-        position=$((position + 1))
-        hit_path="${hit#*:}"
-        text="$(git_repo grep -a -i -F -h -f "$PATTERN_FILE" "$commit" -- ":(literal)${hit_path}" 2>/dev/null | tr -d '\000' || true)"
-        findings+=("$(safe_location "$commit" "$hit_path" "$position") denylist line(s) $(matching_lines "$text")")
-      done <<<"$hits"
-    fi
-    names="$(git_repo ls-tree -r --name-only "$commit" | grep -i -F -f "$PATTERN_FILE" || true)"
+    position=0
+    while IFS= read -r -d '' hit; do
+      position=$((position + 1))
+      hit_path="${hit#"$commit":}"
+      text="$(git_repo grep -a -i -F -h -f "$PATTERN_FILE" "$commit" -- ":(literal)${hit_path}" 2>/dev/null | tr -d '\000' || true)"
+      findings+=("$(safe_location "$commit" "$hit_path" "$position") denylist line(s) $(matching_lines "$text")")
+    done < <(git_repo grep -a -i -F -l -z -f "$PATTERN_FILE" "$commit" -- 2>/dev/null || true)
+    names="$(git_repo ls-tree -r --name-only -z "$commit" | grep -z -a -i -F -f "$PATTERN_FILE" | tr '\000' '\n' || true)"
     if [ -n "$names" ]; then
       findings+=("$commit a file name matches denylist line(s) $(matching_lines "$names")")
     fi
@@ -226,7 +222,7 @@ check_noreply_identities() {
 }
 
 check_absolute_paths() {
-  local findings=() commit hits hit rest hit_path position
+  local findings=() commit hit hit_path line position
   local patterns=(
     -e '/hom[e]/[^/[:space:]]+/'
     -e '/mn[t]/[^/[:space:]]+/'
@@ -235,17 +231,15 @@ check_absolute_paths() {
     -e '[A-Za-z]:[\\]User[s][\\]'
   )
   for commit in "${COMMITS[@]}"; do
-    hits="$(git_repo grep -a -n -E "${patterns[@]}" "$commit" -- 2>/dev/null | cut -d: -f1-3 || true)"
-    if [ -n "$hits" ]; then
-      position=0
-      while IFS= read -r hit; do
-        [ -n "$hit" ] || continue
-        position=$((position + 1))
-        rest="${hit#*:}"
-        hit_path="${rest%:*}"
-        findings+=("$(safe_location "$commit" "$hit_path" "$position") line ${rest##*:} absolute local path")
-      done <<<"$hits"
-    fi
+    position=0
+    while IFS= read -r -d '' hit; do
+      position=$((position + 1))
+      hit_path="${hit#"$commit":}"
+      while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        findings+=("$(safe_location "$commit" "$hit_path" "$position") line $line absolute local path")
+      done < <(git_repo grep -a -h -n -E "${patterns[@]}" "$commit" -- ":(literal)${hit_path}" 2>/dev/null | cut -d: -f1 || true)
+    done < <(git_repo grep -a -l -z -E "${patterns[@]}" "$commit" -- 2>/dev/null || true)
   done
   report absolute-paths "${findings[@]}"
 }

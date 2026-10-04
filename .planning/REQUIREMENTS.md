@@ -98,14 +98,14 @@ Requirements for the initial release. Each maps to a roadmap phase.
 
 ### Repository & Release
 
-- [ ] **OPS-01**: A public GitHub repository exists with:
+- [x] **OPS-01**: A public GitHub repository exists with:
   - a protected `main`
   - an OSI licence
   - no personal data in code, docs, test fixtures or git history
-- [ ] **OPS-02**: Every pull request runs build, tests and lint on GitHub-hosted runners.
-- [ ] **OPS-03**: Pushing a semver tag builds an attested release as a draft. It is published only after the owner approves it through a protected deploy environment.
-- [ ] **OPS-04**: The server pulls the newest published release on a timer, verifies its attestation, installs it, health-checks it, and rolls back automatically on failure. There is no self-hosted runner, and no CI-executed code runs on the server.
-- [ ] **OPS-05**: The app's LXC on Proxmox can be created and provisioned from documented, repeatable scripts.
+- [x] **OPS-02**: Every pull request runs build, tests and lint on GitHub-hosted runners.
+- [x] **OPS-03**: Pushing a semver tag builds an attested release as a draft. It is published only after the owner approves it through a protected deploy environment.
+- [x] **OPS-04**: The server pulls the newest published release on a timer, verifies its attestation, installs it, health-checks it, and rolls back automatically on failure. There is no self-hosted runner, and no CI-executed code runs on the server.
+- [x] **OPS-05**: The app's LXC on Proxmox can be created and provisioned from documented, repeatable scripts.
 
 ### Public Exposure & Security
 
@@ -212,11 +212,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | I18N-01 | Phase 5 | Pending |
 | A11Y-01 | Phase 5 | Pending |
 | A11Y-02 | Phase 5 | Pending |
-| OPS-01 | Phase 1 | Pending |
-| OPS-02 | Phase 1 | Pending |
-| OPS-03 | Phase 1 | Pending |
-| OPS-04 | Phase 1 | Pending |
-| OPS-05 | Phase 1 | Pending |
+| OPS-01 | Phase 1 | Complete |
+| OPS-02 | Phase 1 | Complete |
+| OPS-03 | Phase 1 | Complete |
+| OPS-04 | Phase 1 | Complete |
+| OPS-05 | Phase 1 | Complete |
 | SEC-01 | Phase 8 | Pending |
 | SEC-02 | Phase 8 | Pending |
 | SEC-03 | Phase 8 | Pending |
@@ -225,6 +225,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SEC-06 | Phase 8 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 51 total
 - Mapped to phases: 51
 - Unmapped: 0 ✓

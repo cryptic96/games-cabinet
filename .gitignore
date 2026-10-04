@@ -19,3 +19,6 @@ TestResults/
 
 # Deployment tooling, not build output, despite the directory name
 !deploy/bin/
+
+# Agent worktrees must never be committable
+.claude/worktrees/

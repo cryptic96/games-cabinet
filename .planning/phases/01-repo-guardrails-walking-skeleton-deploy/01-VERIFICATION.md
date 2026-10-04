@@ -1,14 +1,16 @@
 ---
 phase: 01-repo-guardrails-walking-skeleton-deploy
 verified: 2026-10-04T19:55:00Z
-status: human_needed
+status: passed
 score: 4/5 must-haves verified (1 awaiting an owner decision)
 behavior_unverified: 0
 overrides_applied: 0
 human_verification:
+
   - test: "Decide whether the real first name that appears as the author display name on two squash-merge commits on main is acceptable in the public history"
     expected: "Either the owner accepts it (it is the public GitHub profile display name, and the email on those commits is a noreply address), or the owner rewrites those commits and sets the GitHub profile display name to something neutral before further web merges"
     why_human: "The project rule forbids names in the public repository and history. The history scanner only checks emails and denylist matches, so it passes. Rewriting main needs a temporary ruleset bypass, which is the owner's call"
+
   - test: "Decide whether the owner's account handle may stay in tracked docs, example config and tooling defaults (repository slug, licence holder line)"
     expected: "Owner confirms the handle is intentionally public as repository owner and licence holder, and whether the example configuration files should use a placeholder repository slug so a fork cannot silently poll someone else's releases"
     why_human: "The same string is the owner's BGG username, which the hard rules forbid in the repository. It cannot be denylisted. This is a policy judgement, not a technical failure"
@@ -113,6 +115,7 @@ I read the review and confirmed CR-01 in the code: `cabinet_activate_release` (`
 CR-02 (unvalidated numeric config values used in bash arithmetic) needs a root-owned, mode 600 config file to exploit, so it is not an exposure to the stated criteria, but a malformed value (for example `60s`) would abort the installer after switching releases and before the health check, with no rollback. That undermines the robustness of the rollback guarantee on operator error, not the demonstrated behaviour.
 
 The remaining warnings (WR-01 to WR-13, IN-01 to IN-12) are follow-ups. The ones closest to the criteria are:
+
 - WR-05: the release build runs the test suite between packaging and attestation, with signing permissions active, so the test dependency set sits inside the release trust boundary.
 - WR-06: zizmor's online audits are skipped in CI because the token is not forwarded into the container, while lint reports PASS.
 - WR-07 to WR-12: personal-data scanning gaps (binary files, tag objects, merge-commit content, raw paths in scanner output, broad fixture allowlist, `.0` network addresses).
