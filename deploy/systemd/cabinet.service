@@ -1,0 +1,32 @@
+[Unit]
+Description=Games cabinet web application
+After=network.target
+
+[Service]
+User=cabinet
+Group=cabinet
+WorkingDirectory=/opt/cabinet/current/app
+ExecStart=/usr/bin/dotnet /opt/cabinet/current/app/Cabinet.Service.dll
+EnvironmentFile=/etc/cabinet/cabinet.env
+Environment=DOTNET_NOLOGO=1
+Environment=HOME=/var/lib/cabinet
+StateDirectory=cabinet
+Restart=always
+RestartSec=10
+SyslogIdentifier=cabinet
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
