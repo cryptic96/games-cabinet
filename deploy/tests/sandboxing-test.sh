@@ -22,6 +22,7 @@ APP_UNIT="${DEPLOY_DIR}/systemd/cabinet.service"
 POLL_UNIT="${DEPLOY_DIR}/systemd/cabinet-deploy-poll.service"
 POLL_TIMER="${DEPLOY_DIR}/systemd/cabinet-deploy-poll.timer"
 SERVICES_MODULE="${DEPLOY_DIR}/provision.d/40-services.sh"
+SELFCHECK="${DEPLOY_DIR}/bin/cabinet-selfcheck"
 
 FAILURES=0
 
@@ -38,6 +39,15 @@ check() {
 file_has_line() {
   local file="$1" line="$2"
   if grep -qxF -- "$line" "$file"; then
+    echo 1
+  else
+    echo 0
+  fi
+}
+
+file_has_text() {
+  local file="$1" text="$2"
+  if grep -qF -- "$text" "$file"; then
     echo 1
   else
     echo 0
@@ -187,6 +197,171 @@ if (services_render_example_overrides "${DEPLOY_DIR}/deploy.conf.example" "${WOR
 else
   check "an override with a semicolon is refused" "refused" "refused"
 fi
+
+###
+### Selfcheck: sandbox properties, as written and as actually passed
+###
+for property in \
+  NoNewPrivileges=yes ProtectSystem=strict ProtectHome=yes PrivateTmp=yes \
+  PrivateDevices=yes ProtectKernelTunables=yes ProtectKernelModules=yes \
+  ProtectControlGroups=yes RestrictNamespaces=yes LockPersonality=yes \
+  CapabilityBoundingSet= RestrictAddressFamilies=AF_UNIX \
+  Environment=DOTNET_NOLOGO=1; do
+  check "selfcheck passes ${property} to systemd-run" "1" \
+    "$(file_has_text "$SELFCHECK" "--property=${property} ")"
+done
+check "selfcheck runs the smoke as the service user" "1" "$(file_has_text "$SELFCHECK" "--uid=cabinet")"
+check "selfcheck runs the smoke from the release's app directory" "1" \
+  "$(file_has_text "$SELFCHECK" "--working-directory=/opt/cabinet/current/app")"
+check "selfcheck runs the image-smoke command" "1" "$(file_has_text "$SELFCHECK" "Cabinet.Service.dll image-smoke")"
+check "selfcheck compares health with the current symlink target" "1" \
+  "$(file_has_text "$SELFCHECK" "readlink -f /opt/cabinet/current")"
+
+if "$SELFCHECK" --help > "${WORK_DIR}/help.txt" 2>&1; then
+  check "selfcheck --help exits 0" "1" "1"
+else
+  check "selfcheck --help exits 0" "1" "0"
+fi
+check "selfcheck --help prints usage" "1" "$(file_has_text "${WORK_DIR}/help.txt" "Usage: cabinet-selfcheck")"
+
+if [ "$(id -u)" -ne 0 ]; then
+  if "$SELFCHECK" > /dev/null 2>&1; then
+    check "selfcheck refuses to run without root" "refused" "ran"
+  else
+    check "selfcheck refuses to run without root" "refused" "refused"
+  fi
+fi
+
+# shellcheck source=deploy/bin/cabinet-selfcheck
+source "$SELFCHECK"
+set -uo pipefail
+set +e
+
+STUB_BIN="${WORK_DIR}/stub-bin"
+mkdir -p "$STUB_BIN"
+export STUB_ARGS_LOG="${WORK_DIR}/stub-args.log"
+
+for stub in systemd-run ss nft sshd; do
+  cat > "${STUB_BIN}/${stub}" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${STUB_ARGS_LOG}"
+case "$(basename "$0")" in
+  systemd-run) printf '%s\n' "${STUB_SYSTEMD_RUN_OUTPUT:-}" ;;
+  ss) printf '%s\n' "${STUB_SS_OUTPUT:-}" ;;
+  nft) printf '%s\n' "${STUB_NFT_OUTPUT:-}" ;;
+  sshd) printf '%s\n' "${STUB_SSHD_OUTPUT:-}" ;;
+esac
+STUB
+  chmod +x "${STUB_BIN}/${stub}"
+done
+export PATH="${STUB_BIN}:${PATH}"
+
+###
+### Runs the selfcheck function $1 with fresh counters and reports the
+### counters through RUN_PASSED and RUN_FAILED; its report lands in run.out.
+###
+run_selfcheck_function() {
+  PASSED=0
+  FAILED=0
+  : > "$STUB_ARGS_LOG"
+  "$1" > "${WORK_DIR}/run.out" 2>&1
+  RUN_PASSED="$PASSED"
+  RUN_FAILED="$FAILED"
+}
+
+STUB_SYSTEMD_RUN_OUTPUT="PASS image-smoke 480x360 webp 1234 bytes"
+export STUB_SYSTEMD_RUN_OUTPUT
+run_selfcheck_function check_image_smoke
+check "image smoke passes when the binary prints its PASS line" "1 0" "${RUN_PASSED} ${RUN_FAILED}"
+check "image smoke echoes the PASS line in the report" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "PASS image-smoke 480x360 webp 1234 bytes")"
+
+SMOKE_ARGS="$(cat "$STUB_ARGS_LOG")"
+for property in \
+  NoNewPrivileges=yes ProtectSystem=strict ProtectHome=yes PrivateTmp=yes \
+  PrivateDevices=yes ProtectKernelTunables=yes ProtectKernelModules=yes \
+  ProtectControlGroups=yes RestrictNamespaces=yes LockPersonality=yes \
+  CapabilityBoundingSet= RestrictAddressFamilies=AF_UNIX; do
+  case " ${SMOKE_ARGS} " in
+    *" --property=${property} "*) check "the smoke run carries ${property}" "1" "1" ;;
+    *) check "the smoke run carries ${property}" "1" "0" ;;
+  esac
+done
+case "$SMOKE_ARGS" in
+  *"--uid=cabinet --gid=cabinet --working-directory=/opt/cabinet/current/app"*"/usr/bin/dotnet Cabinet.Service.dll image-smoke")
+    check "the smoke run is the service user running the binary's smoke command" "1" "1" ;;
+  *) check "the smoke run is the service user running the binary's smoke command" "1" "0" ;;
+esac
+
+STUB_SYSTEMD_RUN_OUTPUT="FAIL image-smoke no decoder"
+run_selfcheck_function check_image_smoke
+check "image smoke fails when the binary reports a failure" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+
+STUB_SYSTEMD_RUN_OUTPUT=""
+run_selfcheck_function check_image_smoke
+check "image smoke fails when the binary prints nothing" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+
+STUB_SS_OUTPUT=$'LISTEN 0 512 0.0.0.0:5080 0.0.0.0:*\nLISTEN 0 512 127.0.0.1:5081 0.0.0.0:*'
+export STUB_SS_OUTPUT
+run_selfcheck_function check_listeners
+check "listeners pass with 5080 public and 5081 on loopback" "2 0" "${RUN_PASSED} ${RUN_FAILED}"
+
+STUB_SS_OUTPUT=$'LISTEN 0 512 0.0.0.0:5080 0.0.0.0:*\nLISTEN 0 512 0.0.0.0:5081 0.0.0.0:*'
+run_selfcheck_function check_listeners
+check "listeners fail when the ops port is bound beyond loopback" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+
+STUB_SS_OUTPUT=$'LISTEN 0 512 127.0.0.1:5081 0.0.0.0:*'
+run_selfcheck_function check_listeners
+check "listeners fail when nothing serves the public port" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+
+STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain input {\n\t\ttype filter hook input priority filter; policy drop;\n\t}\n}'
+export STUB_NFT_OUTPUT
+run_selfcheck_function check_firewall
+check "firewall passes with a default-drop input chain" "1 0" "${RUN_PASSED} ${RUN_FAILED}"
+
+STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain input {\n\t\ttype filter hook input priority filter; policy accept;\n\t}\n}'
+run_selfcheck_function check_firewall
+check "firewall fails with a default-accept input chain" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+
+STUB_SSHD_OUTPUT=$'port 22\npasswordauthentication no\nkbdinteractiveauthentication no'
+export STUB_SSHD_OUTPUT
+run_selfcheck_function check_ssh
+check "ssh passes when passwords and keyboard-interactive are off" "2 0" "${RUN_PASSED} ${RUN_FAILED}"
+
+STUB_SSHD_OUTPUT=$'passwordauthentication yes\nkbdinteractiveauthentication no'
+run_selfcheck_function check_ssh
+check "ssh fails when password authentication is on" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+
+RUNNER_HOME="${WORK_DIR}/runner-home"
+mkdir -p "$RUNNER_HOME"
+
+# shellcheck disable=SC2329 # invoked by the selfcheck function under test
+systemctl() { return 0; }
+# shellcheck disable=SC2329
+pgrep() { return 1; }
+# shellcheck disable=SC2329
+getent() { printf 'builder:x:1000:1000::%s:/bin/bash\n' "$RUNNER_HOME"; }
+
+run_selfcheck_function check_no_actions_runner
+check "no runner passes when nothing runner-shaped exists" "1 0" "${RUN_PASSED} ${RUN_FAILED}"
+
+mkdir -p "${RUNNER_HOME}/actions-runner"
+run_selfcheck_function check_no_actions_runner
+check "a runner directory in an account's home fails the check" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+rmdir "${RUNNER_HOME}/actions-runner"
+
+# shellcheck disable=SC2329
+pgrep() { echo "4242 Runner.Listener"; return 0; }
+run_selfcheck_function check_no_actions_runner
+check "a running runner process fails the check" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+
+# shellcheck disable=SC2329
+systemctl() { echo "actions.runner.example.service loaded active running"; return 0; }
+# shellcheck disable=SC2329
+pgrep() { return 1; }
+run_selfcheck_function check_no_actions_runner
+check "a runner unit fails the check" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+unset -f systemctl pgrep getent
 
 check "the whole test made no systemctl or pkexec call" "" "$(host_guard_calls)"
 
