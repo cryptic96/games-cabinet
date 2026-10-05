@@ -59,6 +59,33 @@ Filled in by the planner once task IDs exist. Requirement-to-test intent from re
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
+### Task-level map (filled by the planner)
+
+| Task | Requirements | Automated verify | Notes |
+|------|--------------|------------------|-------|
+| 02-01 T1 (tracer) | CAB-01, CAB-04 | `dotnet test --project Cabinet.IntegrationTests/Cabinet.IntegrationTests.csproj` + ES-module syntax check | Scratch browser check: 65 placements on `/` |
+| 02-01 T2 | CAB-01, CAB-04, CAB-05 | quick command | Invariants, shuffled-input bytes, 200-seed append stability, sample tests |
+| 02-02 T1 (tracer) | CAB-02, CAB-06 | quick command | Strategies, hash pins, few-games switch |
+| 02-02 T2 | CAB-02 | quick command + `--filter-trait "Category=Configuration"` | Settings binding and startup validation |
+| 02-02 T3 | CAB-02, CAB-04, CAB-06 | quick command | Share band, boundaries 11/12/13, flat stacks, independence |
+| 02-03 T1 (tracer) | CAB-02, CAB-04 | quick command + syntax check | Palette contrast >= 4.5:1, tone/pattern independence |
+| 02-03 T2 | CAB-02 | quick command | Label shortening in text elements |
+| 02-04 T1 (tracer) | CAB-01, CAB-06 | integration project | Sample switcher, unknown sample not echoed, prototype off |
+| 02-04 T2 | CAB-07 | integration project + syntax check | ETag/304, no style attributes or inline scripts, profile by media query |
+| 02-04 T3 | CAB-01 | docs grep + `build/lint.sh repo-rules` | Settings and stability guide |
+| 02-05 T1 (tracer) | EXP-01, EXP-03 | quick command + syntax check | Stacks beside bases, "+N more", stack height |
+| 02-05 T2 | EXP-02 | quick command | Orphans, multi-parent, few-games count |
+| 02-05 T3 | CAB-05, EXP-01, EXP-03 | quick command | Family append stability, first-expansion exception |
+| 02-06 T1 (tracer) | CAB-07 | quick command + integration project | Derived phone floors, phone endpoint |
+| 02-06 T2 | CAB-01, CAB-04 | quick command | Design validator, box clamp, worst-case family |
+| 02-06 T3 | CAB-05 | quick command | Goldens 0/1/5/12/65, 400 digest, version-bump guard |
+| 02-07 T1 (tracer) | all phase requirements | `dotnet test --solution Cabinet.slnx` | Scratch geometry and strict-CSP check on every sample and width |
+| 02-07 T2 | all | n/a (owner decision) | Blocking owner checkpoint |
+| 02-07 T3 | all | `dotnet test --solution Cabinet.slnx` | Tuning round; goldens and version when arrangement changes |
+| 02-08 T1 (tracer) | all | `gh release list` draft check | PR, merge, tag, attested draft |
+| 02-08 T2 | all | n/a (owner decision) | Owner publishes |
+| 02-08 T3 | all | `build/verify-published-release.sh` + `cabinet-selfcheck` | Deployed owner check (human) |
+
 ---
 
 ## Wave 0 Requirements
