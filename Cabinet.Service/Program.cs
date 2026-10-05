@@ -3,6 +3,7 @@ using System.Reflection;
 using Cabinet.Domain;
 using Cabinet.Repository.Images;
 using Cabinet.Service.Hosting;
+using Cabinet.Service.Layout;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
@@ -84,6 +85,7 @@ app.UseRouting();
 
 app.MapStaticAssets();
 app.MapRazorPages().WithStaticAssets();
+app.MapCabinetLayout();
 
 await app.RunAsync();
 

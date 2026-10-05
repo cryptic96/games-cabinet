@@ -1,0 +1,52 @@
+namespace Cabinet.Domain.Layout;
+
+/// <summary>One horizontal band of a section: a height and the widths of the cubbies side by side in it.</summary>
+/// <param name="HeightMm">Height of every cubby in the row.</param>
+/// <param name="CubbyWidthsMm">Cubby widths from left to right.</param>
+public sealed record ShelfRow(int HeightMm, IReadOnlyList<int> CubbyWidthsMm);
+
+/// <summary>A cubby rectangle of a design. Position is measured from the top-left corner of the section interior.</summary>
+/// <param name="Index">Reading-order index across the whole section, counted from zero.</param>
+/// <param name="XMm">Distance from the interior's left edge.</param>
+/// <param name="YMm">Distance from the interior's top edge.</param>
+/// <param name="WidthMm">Cubby width.</param>
+/// <param name="HeightMm">Cubby height.</param>
+public sealed record CubbyDesign(int Index, int XMm, int YMm, int WidthMm, int HeightMm);
+
+/// <summary>
+/// The fixed furniture: a hand-designed section of irregular cubbies. Frame, shelf and divider thickness are all
+/// <see cref="FrameMm"/>, so a gap of that size separates neighbouring cubbies and rows.
+/// </summary>
+/// <param name="Name">The design's name, used as the layout profile.</param>
+/// <param name="InteriorWidthMm">Interior width, which every row fills exactly.</param>
+/// <param name="FrameMm">Thickness of the frame, shelves and dividers.</param>
+/// <param name="Rows">The shelf rows from top to bottom.</param>
+public sealed record SectionDesign(string Name, int InteriorWidthMm, int FrameMm, IReadOnlyList<ShelfRow> Rows)
+{
+    /// <summary>Interior height: the row heights plus one frame between each pair of rows.</summary>
+    public int InteriorHeightMm => Rows.Sum(row => row.HeightMm) + (FrameMm * Math.Max(0, Rows.Count - 1));
+
+    /// <summary>Every cubby in reading order: rows top to bottom, cubbies left to right.</summary>
+    public IReadOnlyList<CubbyDesign> Cubbies => BuildCubbies();
+
+    private List<CubbyDesign> BuildCubbies()
+    {
+        var cubbies = new List<CubbyDesign>();
+        var y = 0;
+
+        foreach (var row in Rows)
+        {
+            var x = 0;
+
+            foreach (var width in row.CubbyWidthsMm)
+            {
+                cubbies.Add(new CubbyDesign(cubbies.Count, x, y, width, row.HeightMm));
+                x += width + FrameMm;
+            }
+
+            y += row.HeightMm + FrameMm;
+        }
+
+        return cubbies;
+    }
+}
