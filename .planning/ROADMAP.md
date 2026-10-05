@@ -102,12 +102,12 @@ Plans:
   4. Each expansion appears as a thin sideways spine with its name beside its base game; an expansion whose base game is absent stands alone, labelled with the game it expands; a base game with many expansions collapses the extras into a "+N more" stack that never overflows its shelf.
   5. On a phone-width screen the cabinet reflows into a narrower, taller cabinet that still looks like a cabinet, with spines readable and large enough to tap.
 
-**Plans:** 8 plans
+**Plans:** 1/8 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 02-01-PLAN.md — Tracer: invented 65-item collection drawn as spines in wooden cubbies end to end; determinism and append-stability harness
+- [x] 02-01-PLAN.md — Tracer: invented 65-item collection drawn as spines in wooden cubbies end to end; determinism and append-stability harness
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -248,7 +248,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Repo, Guardrails & Walking-Skeleton Deploy | 15/15 | Complete    | 2026-10-04 |
-| 2. Layout Engine & Cabinet Prototype | 0/0 | Not started | - |
+| 2. Layout Engine & Cabinet Prototype | 1/8 | In Progress|  |
 | 3. BGG Access Spike, Real Sync & Snapshot | 0/0 | Not started | - |
 | 4. Enrichment, Box Images & Shape | 0/0 | Not started | - |
 | 5. Game Detail, Accessibility & Language | 0/0 | Not started | - |
