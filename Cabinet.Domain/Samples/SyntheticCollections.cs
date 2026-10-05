@@ -14,6 +14,7 @@ public static class SyntheticCollections
     private const ulong SampleSeedBase = 0x5EED0CABUL << 16;
     private const int MaxBggGap = 40;
     private const int MaxCollectionGap = 30;
+    private const string EdgeSampleName = "edge";
 
     private static readonly string[] FirstSyllables =
     [
@@ -39,12 +40,22 @@ public static class SyntheticCollections
         ["400"] = 400,
     };
 
-    /// <summary>The sample names a visitor may ask for; each is also its item count.</summary>
-    public static IReadOnlyList<string> SampleNames { get; } = ["0", "1", "5", "12", "65", "400"];
+    /// <summary>
+    /// The sample names a visitor may ask for. Numeric names are also their item count; the edge sample is a small
+    /// set of games with awkward titles for checking how labels cope.
+    /// </summary>
+    public static IReadOnlyList<string> SampleNames { get; } = ["0", "1", "5", "12", "65", "400", EdgeSampleName];
 
     /// <summary>Finds a named sample by exact, case-sensitive name; anything else finds nothing.</summary>
     public static bool TryGetSample(string? name, out IReadOnlyList<CabinetItem> items)
     {
+        if (string.Equals(name, EdgeSampleName, StringComparison.Ordinal))
+        {
+            items = CreateEdgeSample();
+
+            return true;
+        }
+
         if (name is not null && SampleSizes.TryGetValue(name, out var count))
         {
             items = Generate(new SplitMix64(SampleSeedBase + (ulong)count), count);
@@ -78,6 +89,39 @@ public static class SyntheticCollections
             : items.Max(item => item.CollectionId) + 1 + generator.NextInt(0, MaxCollectionGap);
 
         return CreateItem(generator, bggId, collectionId, UniqueTitle(generator, titles));
+    }
+
+    private static List<CabinetItem> CreateEdgeSample()
+    {
+        string[] titles =
+        [
+            "Brindle Vossmere Quaymont and the Tarnwyn Zimdrel of Orvley Pellford Tavquin Grovmere Heskra Lumthan Noxdle",
+            "Kelmont: The Vossmere Accord",
+            "Tarnwyn - Brindle Reborn",
+            "Zimdrelsulorvpelltavgrovheskluminox",
+            "\u30D6\u30EA\u30F3\u30C9\u30EB\u30B2\u30FC\u30E0",
+            "Voss \U0001F3B2 Tarn",
+            "\u05D1\u05E8\u05D9\u05E0\u05D3\u05DC",
+            "Orva\u0308 Kelmont",
+            "",
+            "Drel",
+            "Pell Tav Grov",
+            "Hesk of the Lum",
+            "Nox: Yar and Wend",
+            "Cassjorulm",
+        ];
+        int[] heights = [210, 380, 150, 260, 320, 190, 300, 240, 340, 130, 280, 220, 360, 200];
+        int[] depths = [45, 100, 25, 60, 80, 35, 55, 40, 90, 22, 70, 50, 105, 30];
+
+        return titles
+            .Select((title, index) => new CabinetItem(
+                FirstBggId + (index * 7),
+                FirstCollectionId + (index * 3),
+                title,
+                ItemKind.Base,
+                new BoxDimensions(heights[index] * 3 / 4, heights[index], depths[index]),
+                []))
+            .ToList();
     }
 
     private static List<CabinetItem> Generate(SplitMix64 generator, int count)
