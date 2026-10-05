@@ -23,7 +23,10 @@ public static class SectionDesigns
             new ShelfRow(400, [460, 300, 400]),
             new ShelfRow(260, [300, 220, 300, 320]),
             new ShelfRow(330, [420, 340, 400]),
-        ]);
+        ])
+    {
+        MaxSpineHeightMm = 330,
+    };
 
     /// <summary>Every design the engine can build for.</summary>
     public static IReadOnlyList<SectionDesign> All { get; } = [Desktop];
