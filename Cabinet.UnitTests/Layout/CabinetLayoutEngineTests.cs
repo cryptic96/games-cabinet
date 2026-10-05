@@ -13,6 +13,8 @@ public class CabinetLayoutEngineTests
     private const int StabilitySeeds = 200;
     private const int StabilityCollectionSize = 120;
 
+    private static readonly LayoutOptions SpinesOnly = new(0, CoverStrategy.SizeWeighted, 6, 0);
+
     public static TheoryData<string> SampleNames => new(SyntheticCollections.SampleNames);
 
     [Theory]
@@ -85,24 +87,25 @@ public class CabinetLayoutEngineTests
 
     [Fact]
     [Trait("Category", "Layout")]
-    public void Two_items_in_the_same_collection_entry_are_ordered_by_game_identifier()
+    public void Two_items_in_the_same_collection_entry_are_taken_in_game_identifier_order()
     {
-        var low = ItemOf(bggId: 100, collectionId: 7, depth: 30);
-        var high = ItemOf(bggId: 200, collectionId: 7, depth: 30);
+        var design = new SectionDesign("test", 220, 10, [new ShelfRow(300, [100, 100])]);
+        var low = ItemOf(bggId: 100, collectionId: 7, depth: 60);
+        var high = ItemOf(bggId: 200, collectionId: 7, depth: 60);
 
-        var layout = CabinetLayoutEngine.Build([high, low], SectionDesigns.Desktop);
+        var layout = CabinetLayoutEngine.Build([high, low], design, SpinesOnly);
 
-        var firstCubby = layout.Sections[0].Cubbies.First(cubby => cubby.Placements.Count > 0);
-        firstCubby.Placements.Select(placement => placement.GameId).Should().Equal(100, 200);
+        layout.Sections[0].Cubbies[0].Placements.Select(placement => placement.GameId).Should().Equal(100);
+        layout.Sections[0].Cubbies[1].Placements.Select(placement => placement.GameId).Should().Equal(200);
     }
 
     [Fact]
     [Trait("Category", "Layout")]
     public void A_repeated_collection_and_game_pair_is_rejected()
     {
-        var item = ItemOf(bggId: 100, collectionId: 7, depth: 30);
+        var item = ItemOf(bggId: 100, collectionId: 7, depth: 60);
 
-        var act = () => CabinetLayoutEngine.Build([item, item], SectionDesigns.Desktop);
+        var act = () => CabinetLayoutEngine.Build([item, item], SectionDesigns.Desktop, SpinesOnly);
 
         act.Should().Throw<ArgumentException>().WithMessage("*100*");
     }
@@ -145,32 +148,33 @@ public class CabinetLayoutEngineTests
     [Trait("Category", "Layout")]
     public void A_game_exactly_as_wide_as_the_remaining_space_is_placed_in_that_cubby()
     {
-        var design = new SectionDesign("test", 100, 10, [new ShelfRow(200, [100])]);
+        var design = new SectionDesign("test", 105, 10, [new ShelfRow(300, [105])]);
         var wide = ItemOf(bggId: 1, collectionId: 1, depth: 60);
-        var exact = ItemOf(bggId: 2, collectionId: 2, depth: 40);
+        var exact = ItemOf(bggId: 2, collectionId: 2, depth: 45);
 
-        var layout = CabinetLayoutEngine.Build([wide, exact], design);
+        var layout = CabinetLayoutEngine.Build([wide, exact], design, SpinesOnly);
 
         layout.Sections.Should().ContainSingle();
         var placements = layout.Sections[0].Cubbies[0].Placements;
-        placements.Select(placement => placement.GameId).Should().Equal(1, 2);
-        placements[1].XMm.Should().Be(60);
-        (placements[1].XMm + placements[1].WidthMm).Should().Be(100);
+        placements.Select(placement => placement.GameId).Should().BeEquivalentTo([1, 2]);
+        placements.Should().OnlyContain(placement => placement.Kind == PlacementKind.Spine);
+        placements.Sum(placement => placement.WidthMm).Should().Be(105);
+        placements.Max(placement => placement.XMm + placement.WidthMm).Should().Be(105);
     }
 
     [Fact]
     [Trait("Category", "Layout")]
     public void A_game_that_fits_no_empty_section_is_rejected_instead_of_looping()
     {
-        var design = new SectionDesign("test", 100, 10, [new ShelfRow(200, [100])]);
-        var tooTall = ItemOf(bggId: 1, collectionId: 1, depth: 30, height: 250);
+        var design = new SectionDesign("test", 100, 10, [new ShelfRow(300, [100])]);
+        var tooTall = ItemOf(bggId: 1, collectionId: 1, depth: 50, height: 350);
 
-        var act = () => CabinetLayoutEngine.Build([tooTall], design);
+        var act = () => CabinetLayoutEngine.Build([tooTall], design, SpinesOnly);
 
         act.Should().Throw<InvalidOperationException>().WithMessage("*1*test*");
     }
 
-    private static CabinetItem ItemOf(int bggId, long collectionId, int depth, int height = 150) =>
+    private static CabinetItem ItemOf(int bggId, long collectionId, int depth, int height = 250) =>
         new(bggId, collectionId, $"Invented Title {(char)('a' + (bggId % 26))}", ItemKind.Base, new BoxDimensions(100, height, depth), []);
 
     private static List<CabinetItem> Shuffle(IReadOnlyList<CabinetItem> items, ulong seed)

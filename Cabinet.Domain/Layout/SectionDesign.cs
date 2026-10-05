@@ -23,6 +23,12 @@ public sealed record CubbyDesign(int Index, int XMm, int YMm, int WidthMm, int H
 /// <param name="Rows">The shelf rows from top to bottom.</param>
 public sealed record SectionDesign(string Name, int InteriorWidthMm, int FrameMm, IReadOnlyList<ShelfRow> Rows)
 {
+    /// <summary>
+    /// The tallest box that may stand upright, in millimetres; the oversize-only strategy faces out every box taller than
+    /// this. The default suits a design whose tallest cubby is about as high as the usual large box.
+    /// </summary>
+    public int MaxSpineHeightMm { get; init; } = 330;
+
     /// <summary>Interior height: the row heights plus one frame between each pair of rows.</summary>
     public int InteriorHeightMm => Rows.Sum(row => row.HeightMm) + (FrameMm * Math.Max(0, Rows.Count - 1));
 

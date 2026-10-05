@@ -82,8 +82,10 @@ public sealed record LayoutSection(
 /// <summary>The whole cabinet for one collection and one section design.</summary>
 /// <param name="LayoutVersion">Bumped whenever the algorithm or a design changes on purpose.</param>
 /// <param name="Profile">The name of the section design the layout was built for.</param>
+/// <param name="OptionsFingerprint">Identifies the layout settings the cabinet was built with, so a change of settings is visible.</param>
 /// <param name="Sections">The sections in order; there is always at least one.</param>
 public sealed record CabinetLayout(
     int LayoutVersion,
     string Profile,
+    string OptionsFingerprint,
     IReadOnlyList<LayoutSection> Sections);

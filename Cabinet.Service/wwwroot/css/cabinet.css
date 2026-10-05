@@ -64,6 +64,36 @@
   max-height: 100%;
 }
 
+.placement[data-kind="cover"] .placement-label {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  max-width: 100%;
+  padding: 0 4px;
+  box-sizing: border-box;
+  text-align: center;
+  font-weight: 600;
+  font-size: clamp(12px, calc(var(--w) * var(--u) * 0.10), 22px);
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.placement[data-kind="flatBox"] {
+  justify-content: flex-start;
+}
+
+.placement[data-kind="flatBox"] .placement-label {
+  display: block;
+  min-width: 0;
+  padding: 0 6px;
+  font-weight: 600;
+  font-size: clamp(12px, calc(var(--h) * var(--u) * 0.5), 14px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .placement:focus-visible {
   outline: 2px solid var(--wood-light);
   outline-offset: 2px;
