@@ -1,0 +1,189 @@
+using Cabinet.Domain.Layout;
+using Cabinet.Domain.Samples;
+using FluentAssertions;
+
+namespace Cabinet.UnitTests.Layout;
+
+/// <summary>
+/// Pins the determinism contract of the layout engine: valid output for every sample, a total ordering of items, byte
+/// identical output for the same set, and appends that touch at most one cubby.
+/// </summary>
+public class CabinetLayoutEngineTests
+{
+    private const int StabilitySeeds = 200;
+    private const int StabilityCollectionSize = 120;
+
+    public static TheoryData<string> SampleNames => new(SyntheticCollections.SampleNames);
+
+    [Theory]
+    [MemberData(nameof(SampleNames))]
+    [Trait("Category", "Layout")]
+    public void Every_sample_builds_a_valid_layout(string name)
+    {
+        SyntheticCollections.TryGetSample(name, out var items);
+
+        var layout = CabinetLayoutEngine.Build(items, SectionDesigns.Desktop);
+
+        LayoutAssertions.AssertValid(layout, items);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void An_empty_collection_gives_one_section_with_every_cubby_and_no_placements()
+    {
+        var layout = CabinetLayoutEngine.Build([], SectionDesigns.Desktop);
+
+        layout.Sections.Should().ContainSingle();
+        layout.Sections[0].Cubbies.Should().HaveCount(SectionDesigns.Desktop.Cubbies.Count);
+        layout.Sections[0].Cubbies.Should().OnlyContain(cubby => cubby.Placements.Count == 0);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_one_game_collection_gives_one_section_with_one_placement()
+    {
+        SyntheticCollections.TryGetSample("1", out var items);
+
+        var layout = CabinetLayoutEngine.Build(items, SectionDesigns.Desktop);
+
+        layout.Sections.Should().ContainSingle();
+        layout.Sections[0].Cubbies.SelectMany(cubby => cubby.Placements).Should().ContainSingle();
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void Section_counts_never_decrease_as_samples_grow_and_the_largest_needs_several()
+    {
+        var counts = new[] { "0", "1", "5", "12", "65", "400" }
+            .Select(name =>
+            {
+                SyntheticCollections.TryGetSample(name, out var items);
+
+                return CabinetLayoutEngine.Build(items, SectionDesigns.Desktop).Sections.Count;
+            })
+            .ToList();
+
+        counts.Should().BeInAscendingOrder();
+        counts[^1].Should().BeGreaterThan(1);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void Shuffling_the_input_order_gives_byte_identical_json()
+    {
+        var items = SyntheticCollections.Random(3, 80);
+        var expected = LayoutJson.Serialize(CabinetLayoutEngine.Build(items, SectionDesigns.Desktop));
+
+        for (var seed = 1; seed <= 10; seed++)
+        {
+            var shuffled = Shuffle(items, (ulong)seed);
+
+            LayoutJson.Serialize(CabinetLayoutEngine.Build(shuffled, SectionDesigns.Desktop))
+                .Should().Be(expected, "shuffle seed {0}", seed);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void Two_items_in_the_same_collection_entry_are_ordered_by_game_identifier()
+    {
+        var low = ItemOf(bggId: 100, collectionId: 7, depth: 30);
+        var high = ItemOf(bggId: 200, collectionId: 7, depth: 30);
+
+        var layout = CabinetLayoutEngine.Build([high, low], SectionDesigns.Desktop);
+
+        var firstCubby = layout.Sections[0].Cubbies.First(cubby => cubby.Placements.Count > 0);
+        firstCubby.Placements.Select(placement => placement.GameId).Should().Equal(100, 200);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_repeated_collection_and_game_pair_is_rejected()
+    {
+        var item = ItemOf(bggId: 100, collectionId: 7, depth: 30);
+
+        var act = () => CabinetLayoutEngine.Build([item, item], SectionDesigns.Desktop);
+
+        act.Should().Throw<ArgumentException>().WithMessage("*100*");
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void Appending_a_game_changes_at_most_one_cubby_across_seeded_collections()
+    {
+        for (var seed = 1; seed <= StabilitySeeds; seed++)
+        {
+            var items = SyntheticCollections.Random(seed, StabilityCollectionSize);
+            var next = SyntheticCollections.NextBaseGame(items, seed);
+            var before = CabinetLayoutEngine.Build(items, SectionDesigns.Desktop);
+            var after = CabinetLayoutEngine.Build([.. items, next], SectionDesigns.Desktop);
+
+            var changed = LayoutAssertions.ChangedCubbies(before, after);
+
+            changed.Should().HaveCountLessThanOrEqualTo(1, "seed {0}", seed);
+            LayoutAssertions.AssertValid(after, [.. items, next]);
+
+            if (after.Sections.Count > before.Sections.Count)
+            {
+                changed.Should().OnlyContain(position => position.Section >= before.Sections.Count, "seed {0} opened a new section", seed);
+            }
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void Appending_the_first_game_to_an_empty_collection_changes_only_its_cubby()
+    {
+        var before = CabinetLayoutEngine.Build([], SectionDesigns.Desktop);
+        var first = SyntheticCollections.NextBaseGame([], 9);
+        var after = CabinetLayoutEngine.Build([first], SectionDesigns.Desktop);
+
+        LayoutAssertions.ChangedCubbies(before, after).Should().ContainSingle();
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_game_exactly_as_wide_as_the_remaining_space_is_placed_in_that_cubby()
+    {
+        var design = new SectionDesign("test", 100, 10, [new ShelfRow(200, [100])]);
+        var wide = ItemOf(bggId: 1, collectionId: 1, depth: 60);
+        var exact = ItemOf(bggId: 2, collectionId: 2, depth: 40);
+
+        var layout = CabinetLayoutEngine.Build([wide, exact], design);
+
+        layout.Sections.Should().ContainSingle();
+        var placements = layout.Sections[0].Cubbies[0].Placements;
+        placements.Select(placement => placement.GameId).Should().Equal(1, 2);
+        placements[1].XMm.Should().Be(60);
+        (placements[1].XMm + placements[1].WidthMm).Should().Be(100);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_game_that_fits_no_empty_section_is_rejected_instead_of_looping()
+    {
+        var design = new SectionDesign("test", 100, 10, [new ShelfRow(200, [100])]);
+        var tooTall = ItemOf(bggId: 1, collectionId: 1, depth: 30, height: 250);
+
+        var act = () => CabinetLayoutEngine.Build([tooTall], design);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*1*test*");
+    }
+
+    private static CabinetItem ItemOf(int bggId, long collectionId, int depth, int height = 150) =>
+        new(bggId, collectionId, $"Invented Title {(char)('a' + (bggId % 26))}", ItemKind.Base, new BoxDimensions(100, height, depth), []);
+
+    private static List<CabinetItem> Shuffle(IReadOnlyList<CabinetItem> items, ulong seed)
+    {
+        var shuffled = items.ToList();
+        var generator = new SplitMix64(seed);
+
+        for (var index = shuffled.Count - 1; index > 0; index--)
+        {
+            var other = generator.NextInt(0, index + 1);
+            (shuffled[index], shuffled[other]) = (shuffled[other], shuffled[index]);
+        }
+
+        return shuffled;
+    }
+}
