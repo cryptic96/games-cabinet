@@ -6,12 +6,17 @@ namespace Cabinet.Domain.Layout;
 /// </summary>
 public static class CubbyArrangement
 {
+    /// <summary>The most flat boxes in one stack. A starting value for review.</summary>
+    public const int MaxFlatStackCount = 4;
+
     /// <summary>
     /// Orders the members by a stable hash of their game identifier salted with the cubby, so the order looks varied but
     /// changes only when the cubby's members change, and packs them from the left with no gap, bottom-aligned on the
-    /// cubby floor. A box facing out is as wide as its front and a spine is as wide as its depth. Returns null when the
-    /// members are wider than the cubby or any member is taller than it; a total width or height exactly equal to the
-    /// cubby's still fits.
+    /// cubby floor. A box facing out is as wide as its front and a spine is as wide as its depth. Flat boxes lie with the
+    /// spine out, as wide as the box is tall and as tall as it is deep, and gather into short stacks of up to four that
+    /// start on the cubby floor; a stack sits where its first box falls in the order and is as wide as its widest box.
+    /// Returns null when the members are wider than the cubby or any member or stack is taller than it; a total width or
+    /// height exactly equal to the cubby's still fits.
     /// </summary>
     /// <param name="design">The section design the cubby belongs to.</param>
     /// <param name="cubby">The cubby to arrange.</param>
@@ -35,26 +40,118 @@ public static class CubbyArrangement
             .ThenBy(member => member.Item.CollectionId)
             .ThenBy(member => member.Item.BggId)
             .ToList();
+        var columns = BuildFlatColumns(ordered, cubby.HeightMm);
+
+        if (columns is null)
+        {
+            return null;
+        }
+
         var placements = new List<Placement>(ordered.Count);
         var x = 0;
 
-        foreach (var member in ordered)
+        for (var index = 0; index < ordered.Count; index++)
         {
-            var (kind, width, height) = member.Pose == BoxPose.Cover
-                ? (PlacementKind.Cover, member.Item.Box.WidthMm, member.Item.Box.HeightMm)
-                : (PlacementKind.Spine, member.Item.Box.DepthMm, member.Item.Box.HeightMm);
+            if (ordered[index].Pose == BoxPose.Flat)
+            {
+                if (!columns.TryGetValue(index, out var column))
+                {
+                    continue;
+                }
 
-            if (x + width > cubby.WidthMm || height > cubby.HeightMm)
+                var columnWidth = column.Max(box => box.Item.Box.HeightMm);
+
+                if (x + columnWidth > cubby.WidthMm)
+                {
+                    return null;
+                }
+
+                PlaceColumn(column, x, placements);
+                x += columnWidth;
+
+                continue;
+            }
+
+            var placed = PlaceStanding(ordered[index], x, cubby);
+
+            if (placed is null)
             {
                 return null;
             }
 
-            placements.Add(Place(member.Item, kind, x, 0, width, height));
-
-            x += width;
+            placements.Add(placed);
+            x += placed.WidthMm;
         }
 
         return placements;
+    }
+
+    /// <summary>
+    /// Groups the flat members, in slot order, into columns: a box joins the current column while it holds fewer than
+    /// <see cref="MaxFlatStackCount"/> boxes and the stack stays within the cubby height. Each column is keyed by the slot
+    /// index of its first box, which is where the column sits. Returns null when one flat box alone is taller than the cubby.
+    /// </summary>
+    private static Dictionary<int, List<LayoutMember>>? BuildFlatColumns(List<LayoutMember> ordered, int cubbyHeightMm)
+    {
+        var columns = new Dictionary<int, List<LayoutMember>>();
+        var currentStart = -1;
+        var currentHeight = 0;
+
+        for (var index = 0; index < ordered.Count; index++)
+        {
+            if (ordered[index].Pose != BoxPose.Flat)
+            {
+                continue;
+            }
+
+            var depth = ordered[index].Item.Box.DepthMm;
+
+            if (depth > cubbyHeightMm)
+            {
+                return null;
+            }
+
+            var opensColumn = currentStart < 0
+                || columns[currentStart].Count >= MaxFlatStackCount
+                || currentHeight + depth > cubbyHeightMm;
+
+            if (opensColumn)
+            {
+                currentStart = index;
+                currentHeight = 0;
+                columns[currentStart] = [];
+            }
+
+            columns[currentStart].Add(ordered[index]);
+            currentHeight += depth;
+        }
+
+        return columns;
+    }
+
+    private static void PlaceColumn(List<LayoutMember> column, int x, List<Placement> placements)
+    {
+        var y = 0;
+
+        foreach (var box in column)
+        {
+            var depth = box.Item.Box.DepthMm;
+
+            placements.Add(Place(box.Item, PlacementKind.FlatBox, x, y, box.Item.Box.HeightMm, depth));
+            y += depth;
+        }
+    }
+
+    private static Placement? PlaceStanding(LayoutMember member, int x, CubbyDesign cubby)
+    {
+        var box = member.Item.Box;
+        var (kind, width) = member.Pose == BoxPose.Cover
+            ? (PlacementKind.Cover, box.WidthMm)
+            : (PlacementKind.Spine, box.DepthMm);
+
+        return x + width > cubby.WidthMm || box.HeightMm > cubby.HeightMm
+            ? null
+            : Place(member.Item, kind, x, 0, width, box.HeightMm);
     }
 
     private static Placement Place(CabinetItem item, PlacementKind kind, int x, int y, int width, int height) =>

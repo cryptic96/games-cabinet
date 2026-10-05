@@ -39,6 +39,12 @@ public static class Orientation
     /// <summary>Boxes lower than this and not small stand as standard ones; taller boxes are large, in millimetres.</summary>
     public const int StandardBelowHeightMm = 320;
 
+    /// <summary>A box at most this deep may lie flat whatever its size, in millimetres. A starting value for review.</summary>
+    public const int FlatDepthLimitMm = 40;
+
+    /// <summary>The chance, in basis points, that an eligible box lies flat instead of standing. A starting value for review.</summary>
+    public const int FlatChanceBasisPoints = 5000;
+
     private const int SmallWeight = 30;
     private const int StandardWeight = 100;
     private const int LargeWeight = 220;
@@ -77,8 +83,8 @@ public static class Orientation
     }
 
     /// <summary>
-    /// Decides whether the game faces out or stands as a spine. When <paramref name="fewGames"/> is true every box faces
-    /// out. Otherwise the strategy picks the covers.
+    /// Decides whether the game faces out, stands as a spine or lies flat. When <paramref name="fewGames"/> is true every
+    /// box faces out. Otherwise the strategy picks the covers, and a small or thin box that does not face out may lie flat.
     /// </summary>
     public static BoxPose Decide(CabinetItem item, LayoutOptions options, SectionDesign design, bool fewGames)
     {
@@ -91,8 +97,13 @@ public static class Orientation
             return BoxPose.Cover;
         }
 
-        return BoxPose.Spine;
+        return CanLieFlat(item.Box) && StableHash.Bucket(item.BggId, StableHash.FlatSalt, BasisPoints) < FlatChanceBasisPoints
+            ? BoxPose.Flat
+            : BoxPose.Spine;
     }
+
+    private static bool CanLieFlat(BoxDimensions box) =>
+        SizeClassOf(box) == SizeClass.Small || box.DepthMm <= FlatDepthLimitMm;
 
     private static bool FacesOut(CabinetItem item, LayoutOptions options, SectionDesign design)
     {
