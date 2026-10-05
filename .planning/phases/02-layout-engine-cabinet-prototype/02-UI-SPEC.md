@@ -1,7 +1,7 @@
 ---
 phase: 2
 slug: layout-engine-cabinet-prototype
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-10-05
@@ -240,30 +240,50 @@ Plain, short, no jargon. All copy is English only in this phase; the language sw
 
 ## UI Considerations
 
-Applicable state considerations resolved: 15 covered, 4 backstop, 1 unresolved.
+Probed over 8 surfaces with confirmed element kinds: cabinet (list-collection), placement buttons (interactive-control, static-content), generated cover (media, static-content), expansion stack (list-collection), sample switcher (nav), status line (static-content), load states (interactive-control), footer (static-content). 35 applicable considerations: 24 resolved (explicit), 11 dismissed with reason. Plus 5 extra rows: 4 resolved (backstop, owner review) and 1 resolved (explicit). Copy for the empty, loading and error states is in the Copywriting Contract and is referenced, not repeated, here.
 
-| Category | Element(s) | Status | Resolution / Reason |
-|----------|------------|--------|---------------------|
-| empty | cabinet (list-collection) | ✅ covered | A zero-item collection renders one full minimum section of bare, shaded empty cubbies with no text inside; the status line reads "Invented collection of 0 items." |
-| zero-one-many | cabinet (list-collection) | ✅ covered | 1, 5 and 12 items render as face-out covers in one section; singular and plural status copy ("1 item", "N items"); 65 and 400 add further sections |
-| loading | cabinet (list-collection) | ✅ covered | "Loading the cabinet..." in Body style is shown in `main` until the first render, then removed; section height is reserved from its aspect ratio once rendering starts |
-| error | cabinet (list-collection) | ✅ covered | Fetch failure or 404 shows the documented error heading, body and a "Try again" button that repeats the request |
-| error | page without JavaScript | ✅ covered | `<noscript>` message documented in Copywriting; the sample links still work as plain links |
-| populated | cabinet (list-collection) | ✅ covered | 65-item sample shows covers mixed with spines and flat stacks in irregular cubbies, family stacks beside base games, "+N more" on the large family, orphan expansions, bare cubbies in the unused part of the last section |
-| partial | cabinet (list-collection) | ✅ covered | The unused part of the last section and unfilled cubbies stay bare shaded wood; a missing title renders "Untitled game" |
-| overflow | cabinet sections | ✅ covered | Sections wrap into rows with vertical scroll only; no horizontal scroll from 320px; a family never exceeds its cubby (stack truncates to "+N more") |
-| overflow | expansion stack | ✅ covered | The stack shows as many layers as fit under the shelf above, up to the server-set maximum, the rest collapse to "+N more" (a unit test asserts stack height never exceeds the cubby) |
-| overflow | sample switcher (nav) | ✅ covered | Links wrap onto further lines at narrow widths; each link keeps its 44px height |
-| long-text | spine and layer labels | ✅ covered | Titles shorten at a colon or dash, then truncate with an ellipsis; the 12px floor holds; the full title stays in the accessible name and `title` |
-| long-text | cover titles | ✅ covered | Up to 4 lines inside the solid title plate, then clamp with ellipsis |
-| long-text | orphan sub-label | ✅ covered | One line with ellipsis; the title line keeps priority |
-| media | generated cover (missing image) | ✅ covered | Every cover in this phase is a generated cover (palette, pattern, title plate); it stays as the permanent fallback for a game without a usable image |
-| interactive-control | placement buttons, sample links, retry | ✅ covered | 24px minimum target on phone (enforced in the engine and tested), 44px minimum for links and the retry button, visible focus ring |
-| long-text | spine text with unusual scripts (CJK, emoji, right-to-left, very long single word) | 🧪 backstop | The `edge` sample is reviewed in screenshots and on the deployed prototype; no automated pixel check |
-| overflow | very wide viewports (1920 and 2560px) | 🧪 backstop | Section track bounds and the number of sections per row are judged in the screenshot rounds at 1280, 1440, 1920 and 2560px |
-| populated | dark palette tones against the dark cubby back | 🧪 backstop | Legibility of the box edge and contact shadow is judged by the owner; contrast of text on boxes is separately unit-tested |
-| zero-one-many | few-games look (1 to 11 items) | 🧪 backstop | Whether the minimum cabinet looks intentional (scattered covers versus a compact arrangement) is decided by owner review in round one |
-| partial | game with missing or implausible box size | ⚠ unresolved | The engine clamps sizes to the design limits, but how a clamped box should look (for example a standard default shape) is not defined here; planner treats it as an assumption: the placement is simply drawn at the clamped size with no visual flag |
+| Category | Element | Status | Verification | Resolution / Reason |
+|----------|---------|--------|--------------|---------------------|
+| empty | cabinet | resolved | explicit | A zero-item collection renders exactly one minimum section whose cubbies are all bare shaded wood with no text, icons or props inside; the status line shows the zero-items copy |
+| loading | cabinet | resolved | explicit | The loading copy is shown in `main` until the first render and removed on success; once rendering starts, each section's height is reserved by its `aspect-ratio` (no layout shift) |
+| error | cabinet | resolved | explicit | A failed fetch or 404 shows the error heading, body and the "Try again" button from the Copywriting Contract; the button repeats the same request |
+| populated | cabinet | resolved | explicit | The 65-item sample contains at least one cover, one upright spine, one flat box, one family stack beside its base, one "+N more" marker, one orphan expansion box and at least one empty cubby in the last section |
+| partial | cabinet | resolved | explicit | Unused cubbies and the unused part of the last section stay bare shaded wood; a game with a missing or blank title renders "Untitled game" as label and accessible name |
+| overflow | cabinet | resolved | explicit | Sections wrap into rows with vertical scroll only; there is no horizontal scroll at any viewport width from 320px |
+| zero-one-many | cabinet | resolved | explicit | Below the few-games threshold every top-level game is a cover and the cabinet is one section; the status line uses "1 item" for one and "{n} items" otherwise; 65 and 400 items add further sections |
+| loading | placement buttons | dismissed | n/a | Placements exist only after the layout JSON has arrived; the cabinet-level loading state covers this |
+| error | placement buttons | dismissed | n/a | Click and tap do nothing in this phase, so a placement has no failure path |
+| overflow | placement buttons | resolved | explicit | No label text overflows its box: spine, flat-box and layer labels shorten at a colon or dash, then truncate with an ellipsis, never below the 12px floor |
+| long-text | placement buttons | resolved | explicit | Long titles shorten deterministically on the box; the full title stays in the accessible name and the `title` attribute |
+| empty | generated cover | resolved | explicit | Every cover in this phase is generated (palette background, pattern, title plate); it remains the permanent fallback for a game without usable box art |
+| loading | generated cover | dismissed | n/a | Covers are drawn with CSS only in this phase; there is no image request to wait for |
+| error | generated cover | dismissed | n/a | No image is fetched in this phase, so there is no image failure to show |
+| populated | generated cover | resolved | explicit | A cover shows its palette background, a pattern chosen from the game's own hash, and a solid title plate; box text contrast is at least 4.5:1 for every palette entry (unit-tested) |
+| overflow | generated cover | resolved | explicit | The cover title wraps inside the title plate for up to 4 lines, then clamps with an ellipsis; text never leaves the plate |
+| long-text | generated cover | resolved | explicit | A very long single word breaks inside the title plate rather than widening it; the full title stays in the accessible name |
+| empty | expansion stack | resolved | explicit | A base game with no owned expansions has no stack column and occupies only its own width |
+| loading | expansion stack | dismissed | n/a | The stack is drawn in the same render pass as the rest of the cabinet |
+| error | expansion stack | dismissed | n/a | The stack has no separate request; the cabinet-level error state covers it |
+| populated | expansion stack | resolved | explicit | Each owned expansion with an owned base is a thin sideways layer in the fixed-width column to the right of its base, stacked upward from the cubby floor, with accessible name "{expansion title}, expansion for {base title}" |
+| partial | expansion stack | resolved | explicit | An expansion whose base game is not owned is drawn as its own orphan box with the sub-label "Expansion for {base game title}"; an expansion with several owned bases joins the lowest-id base |
+| overflow | expansion stack | resolved | explicit | Layers beyond the stack maximum or beyond the height under the shelf above collapse into the "+N more" marker; a unit test asserts the stack never exceeds the cubby height |
+| zero-one-many | expansion stack | resolved | explicit | Zero expansions: no column; one: a single layer; more than the maximum: the maximum or fewer layers plus "+N more", with "1 more expansion" in the accessible name when N is 1 |
+| loading | sample switcher | dismissed | n/a | The links are server-rendered plain anchors; nothing loads |
+| error | sample switcher | resolved | explicit | An unknown or non-allowlisted sample value silently shows the default 65-item sample and is never echoed into the page; with the prototype setting off, the switcher is not rendered |
+| overflow | sample switcher | resolved | explicit | Links wrap onto further lines at narrow widths and each keeps its 44px minimum height |
+| long-text | sample switcher | dismissed | n/a | Labels are fixed short strings; "Edge cases" is the longest |
+| overflow | status line | resolved | explicit | The status line wraps as normal body text if needed and is never truncated |
+| long-text | status line | dismissed | n/a | Fixed template with a number; no user-supplied text |
+| loading | load states | resolved | explicit | The loading copy appears before the first fetch completes and is removed when the cabinet renders |
+| error | load states | resolved | explicit | "Try again" repeats the fetch; with JavaScript off, the noscript message is shown and the sample links still work |
+| long-text | load states | dismissed | n/a | All state copy is fixed and short |
+| overflow | footer | resolved | explicit | The footer is a wrapping flex row (gap 16px), so the version text and the later credit wrap rather than overflow |
+| long-text | footer | dismissed | n/a | Fixed version string; no user-supplied text |
+| partial | game with missing or implausible box size | resolved | explicit | The engine clamps the size to the design limits and the placement is drawn at its clamped size like any other box, with no visual flag |
+| long-text | spine text with unusual scripts (CJK, emoji, right-to-left, very long single word) | resolved | backstop | statement: the `edge` sample stays legible and contained in screenshots and on the deployed prototype; verification: backstop |
+| overflow | very wide viewports (1920 and 2560px) | resolved | backstop | statement: section track bounds and sections per row look right in the screenshot rounds at 1280, 1440, 1920 and 2560px; verification: backstop |
+| populated | dark palette tones against the dark cubby back | resolved | backstop | statement: box edges and contact shadows keep dark boxes distinguishable from the cubby back in owner review; verification: backstop |
+| zero-one-many | few-games look (1 to 11 items) | resolved | backstop | statement: the owner confirms in review round one that the minimum cabinet with few games looks intentional (scattered covers versus a compact arrangement); verification: backstop |
 
 ---
 
@@ -315,11 +335,11 @@ No component registry, package or external asset is introduced by this contract.
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-10-05
