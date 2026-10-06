@@ -11,14 +11,16 @@ namespace Cabinet.UnitTests.Layout;
 public class FamilyLayoutTests
 {
     private static readonly SectionDesign Design = SectionDesigns.Desktop;
+    private const int MaxThinDepthMm = 45;
     private static readonly LayoutOptions SpinesOnly = new(0, CoverStrategy.SizeWeighted, 6, 0);
+    private static readonly LayoutOptions EveryBoxFacesOut = new(100, CoverStrategy.Random, 6, 0);
 
     public static TheoryData<string> LargeSamples => new("65", "400");
 
     [Theory]
     [MemberData(nameof(LargeSamples))]
     [Trait("Category", "Layout")]
-    public void Every_expansion_with_an_owned_base_is_a_layer_right_of_its_base_or_counted_in_its_marker(string name)
+    public void Every_expansion_with_an_owned_base_is_an_upright_a_layer_right_of_the_uprights_or_counted_in_its_marker(string name)
     {
         SyntheticCollections.TryGetSample(name, out var items);
         var layout = CabinetLayoutEngine.Build(items, Design);
@@ -29,15 +31,58 @@ public class FamilyLayoutTests
         {
             familyCount++;
             var baseEntry = placed.Single(entry => entry.Placement.GameId == family.Key && IsStanding(entry.Placement));
+            var uprights = UprightsOf(placed, family.Key);
             var layers = LayersOf(placed, family.Key);
             var marker = placed.SingleOrDefault(entry => entry.Placement.Kind == PlacementKind.MoreMarker && entry.Placement.FamilyId == family.Key);
+            var columnX = baseEntry.Placement.XMm + baseEntry.Placement.WidthMm + uprights.Sum(upright => upright.Placement.WidthMm);
 
-            layers.Should().OnlyContain(layer => layer.Placement.XMm == baseEntry.Placement.XMm + baseEntry.Placement.WidthMm, "family {0}", family.Key);
+            layers.Should().OnlyContain(layer => layer.Placement.XMm == columnX, "family {0}", family.Key);
             layers.Should().OnlyContain(layer => layer.Placement.WidthMm == Design.StackColumnWidthMm);
-            (layers.Count + (marker.Placement?.MoreCount ?? 0)).Should().Be(family.Count(), "family {0}", family.Key);
+            (uprights.Count + layers.Count + (marker.Placement?.MoreCount ?? 0)).Should().Be(family.Count(), "family {0}", family.Key);
         }
 
         familyCount.Should().BeGreaterThan(0);
+    }
+
+    [Theory]
+    [InlineData("65", 1)]
+    [InlineData("400", 5)]
+    [Trait("Category", "Layout")]
+    public void Thick_expansions_stand_upright_in_collection_order_until_the_room_or_the_maximum_is_used(string name, int atLeast)
+    {
+        SyntheticCollections.TryGetSample(name, out var items);
+        var layout = CabinetLayoutEngine.Build(items, Design);
+        var placed = LayoutAssertions.PlacementsWithPosition(layout);
+        var totalUprights = 0;
+
+        foreach (var family in FamiliesOf(items))
+        {
+            var baseEntry = placed.Single(entry => entry.Placement.GameId == family.Key && IsStanding(entry.Placement));
+            var uprights = UprightsOf(placed, family.Key);
+            var thick = family
+                .OrderBy(item => item.CollectionId).ThenBy(item => item.BggId)
+                .Where(Orientation.StandsUpright)
+                .ToList();
+            totalUprights += uprights.Count;
+
+            uprights.Select(entry => entry.Placement.GameId).Should().Equal(
+                thick.Take(uprights.Count).Select(item => item.BggId), "family {0}: uprights are the earliest thick expansions", family.Key);
+
+            if (uprights.Count < Math.Min(Orientation.MaxUprightExpansions, thick.Count))
+            {
+                var next = thick[uprights.Count];
+                var room = Design.Limits.MaxWidthMm - baseEntry.Placement.WidthMm - Design.StackColumnWidthMm
+                    - uprights.Sum(entry => entry.Placement.WidthMm);
+
+                Math.Max(Math.Min(next.Box.DepthMm, SectionDesign.MaxBoxDepthMm), Design.MinUprightExpansionWidthMm)
+                    .Should().BeGreaterThan(room, "family {0}: the next thick expansion did not fit", family.Key);
+            }
+
+            uprights.Select(entry => entry.Placement.GameId)
+                .Should().OnlyContain(id => Orientation.StandsUpright(family.Single(item => item.BggId == id)), "family {0}: thin expansions never stand upright", family.Key);
+        }
+
+        totalUprights.Should().BeGreaterThanOrEqualTo(atLeast);
     }
 
     [Theory]
@@ -54,7 +99,12 @@ public class FamilyLayoutTests
             var baseEntry = placed.Single(entry => entry.Placement.GameId == family.Key && IsStanding(entry.Placement));
             var cubbyHeight = layout.Sections[baseEntry.Section].Cubbies[baseEntry.Cubby].HeightMm;
             var layers = LayersOf(placed, family.Key);
-            var expected = family.OrderBy(item => item.CollectionId).ThenBy(item => item.BggId).Select(item => item.BggId).Take(layers.Count);
+            var uprightIds = UprightsOf(placed, family.Key).Select(entry => entry.Placement.GameId).ToHashSet();
+            var expected = family
+                .Where(item => !uprightIds.Contains(item.BggId))
+                .OrderBy(item => item.CollectionId).ThenBy(item => item.BggId)
+                .Select(item => item.BggId)
+                .Take(layers.Count);
             var top = 0;
 
             layers.Select(layer => layer.Placement.GameId).Should().Equal(expected, "family {0} lists its layers in collection order", family.Key);
@@ -92,7 +142,7 @@ public class FamilyLayoutTests
         markers.Should().NotBeEmpty();
         markers.Should().OnlyContain(marker => marker.MoreCount >= 1 && marker.Label.Length == 0);
         markers.Should().OnlyContain(marker => marker.HeightMm == Design.MarkerHeightMm && marker.WidthMm == Design.StackColumnWidthMm);
-        markers.Max(marker => marker.MoreCount).Should().BeGreaterThanOrEqualTo(3, "the family of nine shows at most six layers at the default maximum");
+        markers.Max(marker => marker.MoreCount).Should().BeGreaterThanOrEqualTo(1, "the family of nine has at most two uprights and shows at most six layers at the default maximum");
     }
 
     [Theory]
@@ -164,7 +214,7 @@ public class FamilyLayoutTests
     {
         var items = SyntheticCollections.Random(6, 40);
         var baseGame = items[3];
-        var expansion = SyntheticCollections.NextExpansion(items, baseGame.BggId, 6);
+        var expansion = Thin(SyntheticCollections.NextExpansion(items, baseGame.BggId, 6));
 
         var layout = CabinetLayoutEngine.Build([.. items, expansion], Design);
 
@@ -175,7 +225,7 @@ public class FamilyLayoutTests
 
     [Fact]
     [Trait("Category", "Layout")]
-    public void An_expansion_that_comes_before_its_base_game_still_stands_in_the_base_games_stack()
+    public void An_expansion_that_comes_before_its_base_game_still_stands_beside_it_upright_or_in_its_stack()
     {
         SyntheticCollections.TryGetSample("65", out var items);
         var earlier = items
@@ -189,7 +239,7 @@ public class FamilyLayoutTests
         var placed = LayoutAssertions.PlacementsWithPosition(layout);
         var baseEntry = placed.Single(entry => entry.Placement.GameId == earlier.ParentId && IsStanding(entry.Placement));
         var layer = placed.Single(entry => entry.Placement.GameId == earlier.Expansion.BggId);
-        layer.Placement.Kind.Should().Be(PlacementKind.ExpansionLayer);
+        layer.Placement.Kind.Should().BeOneOf(PlacementKind.ExpansionLayer, PlacementKind.ExpansionSpine);
         (layer.Section, layer.Cubby).Should().Be((baseEntry.Section, baseEntry.Cubby));
     }
 
@@ -238,12 +288,18 @@ public class FamilyLayoutTests
     {
         var baseGame = BaseOf(1, depth: 60);
         var thin = ExpansionOf(2, baseGame, depth: 10);
-        var thick = ExpansionOf(3, baseGame, depth: 200);
+        var uprightOne = ExpansionOf(3, baseGame, depth: 200);
+        var uprightTwo = ExpansionOf(4, baseGame, depth: 200);
+        var thick = ExpansionOf(5, baseGame, depth: 200);
         var design = new SectionDesign("test", 620, 20, [new ShelfRow(400, [600])]);
 
-        var layout = CabinetLayoutEngine.Build([baseGame, thin, thick], design, SpinesOnly);
+        var layout = CabinetLayoutEngine.Build([baseGame, thin, uprightOne, uprightTwo, thick], design, SpinesOnly);
 
-        var layers = layout.Sections[0].Cubbies[0].Placements.Where(placement => placement.Kind == PlacementKind.ExpansionLayer).OrderBy(placement => placement.YMm).ToList();
+        var placements = layout.Sections[0].Cubbies[0].Placements;
+        placements.Where(placement => placement.Kind == PlacementKind.ExpansionSpine).Select(placement => placement.GameId)
+            .Should().Equal(3, 4);
+        var layers = placements.Where(placement => placement.Kind == PlacementKind.ExpansionLayer).OrderBy(placement => placement.YMm).ToList();
+        layers.Select(layer => layer.GameId).Should().Equal(2, 5);
         layers.Select(layer => layer.HeightMm).Should().Equal(design.MinLayerHeightMm, design.MaxLayerHeightMm);
         layers.Select(layer => layer.YMm).Should().Equal(0, design.MinLayerHeightMm);
     }
@@ -381,7 +437,7 @@ public class FamilyLayoutTests
 
         var standing = LayoutAssertions.PlacementsWithPosition(layout)
             .Select(entry => entry.Placement)
-            .Where(placement => placement.Kind is not (PlacementKind.ExpansionLayer or PlacementKind.MoreMarker))
+            .Where(placement => placement.Kind is not (PlacementKind.ExpansionLayer or PlacementKind.MoreMarker or PlacementKind.ExpansionSpine))
             .ToList();
         standing.Should().HaveCount(11).And.OnlyContain(placement => placement.Kind == PlacementKind.Cover);
         LayoutAssertions.AssertValid(layout, items);
@@ -440,6 +496,148 @@ public class FamilyLayoutTests
         boxes.Select(box => box.HeightMm).OrderBy(height => height).Should().Equal(design.MinOrphanHeightMm, 120);
     }
 
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_narrow_spine_base_shows_two_uprights_and_stacks_the_third_thick_and_the_thin_expansion()
+    {
+        var design = new SectionDesign("test", 620, 20, [new ShelfRow(400, [600])]);
+        var baseGame = BaseOf(1, depth: 40);
+        var items = new[]
+        {
+            baseGame,
+            ExpansionOf(2, baseGame, depth: 60),
+            ExpansionOf(3, baseGame, depth: 60),
+            ExpansionOf(4, baseGame, depth: 60),
+            ExpansionOf(5, baseGame, depth: 30),
+        };
+
+        var layout = CabinetLayoutEngine.Build(items, design, SpinesOnly);
+
+        var placements = layout.Sections[0].Cubbies[0].Placements;
+        var uprights = placements.Where(placement => placement.Kind == PlacementKind.ExpansionSpine).OrderBy(placement => placement.XMm).ToList();
+        uprights.Select(placement => placement.GameId).Should().Equal(2, 3);
+        uprights.Select(placement => placement.XMm).Should().Equal(40, 40 + design.MinUprightExpansionWidthMm);
+        placements.Where(placement => placement.Kind == PlacementKind.ExpansionLayer).Select(placement => placement.GameId)
+            .Should().BeEquivalentTo([4, 5]);
+        placements.Where(placement => placement.Kind == PlacementKind.ExpansionLayer)
+            .Should().OnlyContain(placement => placement.XMm == 40 + (2 * design.MinUprightExpansionWidthMm));
+        LayoutAssertions.AssertValid(layout, items);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_cover_base_at_the_family_width_limit_stacks_a_thin_and_a_thick_expansion()
+    {
+        var design = new SectionDesign("test", 620, 20, [new ShelfRow(400, [600])]);
+        var baseGame = new CabinetItem(1, 1, "Invented Wide Base", ItemKind.Base, new BoxDimensions(design.Limits.MaxFamilyBaseWidthMm, 380, 60), []);
+        var items = new[] { baseGame, ExpansionOf(2, baseGame, depth: 30), ExpansionOf(3, baseGame, depth: 70) };
+
+        var layout = CabinetLayoutEngine.Build(items, design, EveryBoxFacesOut);
+
+        var placements = layout.Sections[0].Cubbies[0].Placements;
+        placements.Single(placement => placement.GameId == 1).Kind.Should().Be(PlacementKind.Cover);
+        placements.Should().NotContain(placement => placement.Kind == PlacementKind.ExpansionSpine);
+        placements.Where(placement => placement.Kind == PlacementKind.ExpansionLayer).Select(placement => placement.GameId)
+            .Should().BeEquivalentTo([2, 3]);
+        LayoutAssertions.AssertValid(layout, items);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_two_hundred_millimetre_cover_base_with_two_thick_expansions_shows_one_upright_because_the_column_room_is_counted()
+    {
+        var design = new SectionDesign("test", 460, 20, [new ShelfRow(400, [460])]);
+        var baseGame = new CabinetItem(1, 1, "Invented Cover Base", ItemKind.Base, new BoxDimensions(200, 380, 60), []);
+        var items = new[] { baseGame, ExpansionOf(2, baseGame, depth: 60), ExpansionOf(3, baseGame, depth: 60) };
+
+        var layout = CabinetLayoutEngine.Build(items, design, EveryBoxFacesOut);
+
+        var placements = layout.Sections[0].Cubbies[0].Placements;
+        placements.Where(placement => placement.Kind == PlacementKind.ExpansionSpine).Select(placement => placement.GameId)
+            .Should().Equal(2);
+        placements.Where(placement => placement.Kind == PlacementKind.ExpansionLayer).Select(placement => placement.GameId)
+            .Should().Equal(3);
+        LayoutAssertions.AssertValid(layout, items);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_family_with_only_uprights_has_no_layers_and_no_marker_and_takes_base_plus_upright_width()
+    {
+        var design = new SectionDesign("test", 620, 20, [new ShelfRow(400, [600])]);
+        var baseGame = BaseOf(1, depth: 40);
+        var member = new LayoutMember(baseGame, BoxPose.Spine)
+        {
+            Uprights = [ExpansionOf(2, baseGame, depth: 60), ExpansionOf(3, baseGame, depth: 60)],
+        };
+        var width = 40 + (2 * design.MinUprightExpansionWidthMm);
+        var exactFit = new CubbyDesign(0, 0, 0, width, 400);
+
+        var placements = CubbyArrangement.TryArrange(design, exactFit, [member], SpinesOnly, 0);
+
+        placements.Should().NotBeNull("no stack column is reserved when nothing lies in the stack");
+        placements!.Select(placement => placement.Kind).Should().Equal(
+            PlacementKind.Spine, PlacementKind.ExpansionSpine, PlacementKind.ExpansionSpine);
+        placements.Max(placement => placement.XMm + placement.WidthMm).Should().Be(width);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void An_upright_carries_its_family_its_base_title_a_label_cut_to_its_height_and_the_least_width()
+    {
+        var design = new SectionDesign("test", 620, 20, [new ShelfRow(400, [600])]);
+        var baseGame = BaseOf(1, depth: 40);
+        var title = string.Concat(Enumerable.Repeat("Orvä Brin", 12));
+        var expansion = ExpansionOf(2, baseGame, depth: 52) with { Title = title };
+
+        var layout = CabinetLayoutEngine.Build([baseGame, expansion], design, SpinesOnly);
+
+        var upright = layout.Sections[0].Cubbies[0].Placements.Single(placement => placement.Kind == PlacementKind.ExpansionSpine);
+        upright.FamilyId.Should().Be(1);
+        upright.BaseTitle.Should().Be(baseGame.Title);
+        upright.Title.Should().Be(title);
+        upright.WidthMm.Should().Be(design.MinUprightExpansionWidthMm, "a 52 mm deep box is drawn at the least upright width");
+        upright.HeightMm.Should().Be(expansion.Box.HeightMm);
+        upright.YMm.Should().Be(0);
+        upright.Label.Should().Be(SpineLabel.Shorten(title, expansion.Box.HeightMm / design.LabelCharPitchMm));
+        upright.Label.Should().NotBe(title);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void In_the_few_games_look_an_upright_stands_beside_a_cover_base()
+    {
+        var baseGame = new CabinetItem(1, 1, "Invented Cover Base", ItemKind.Base, new BoxDimensions(150, 250, 40), []);
+        var others = Enumerable.Range(2, 3).Select(id => new CabinetItem(id, id, $"Invented Other {id}", ItemKind.Base, new BoxDimensions(150, 250, 40), []));
+        var items = new List<CabinetItem>([baseGame, .. others, ExpansionOf(9, baseGame, depth: 60)]);
+
+        var layout = CabinetLayoutEngine.Build(items, Design);
+
+        var placed = LayoutAssertions.PlacementsWithPosition(layout);
+        var cover = placed.Single(entry => entry.Placement.GameId == 1).Placement;
+        var upright = placed.Single(entry => entry.Placement.GameId == 9).Placement;
+        cover.Kind.Should().Be(PlacementKind.Cover);
+        upright.Kind.Should().Be(PlacementKind.ExpansionSpine);
+        upright.XMm.Should().Be(cover.XMm + cover.WidthMm);
+        LayoutAssertions.AssertValid(layout, items);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void An_upright_expansion_taller_than_any_cubby_is_scaled_to_fit()
+    {
+        var baseGame = BaseOf(1, depth: 40);
+        var tall = ExpansionOf(2, baseGame, depth: 60) with { Box = new BoxDimensions(900, 1200, 60) };
+        var items = new[] { baseGame, tall };
+
+        var layout = CabinetLayoutEngine.Build(items, Design, SpinesOnly);
+
+        var upright = LayoutAssertions.PlacementsWithPosition(layout).Single(entry => entry.Placement.GameId == 2);
+        upright.Placement.Kind.Should().Be(PlacementKind.ExpansionSpine);
+        upright.Placement.HeightMm.Should().BeLessThanOrEqualTo(Design.Limits.MaxHeightMm);
+        LayoutAssertions.AssertValid(layout, items);
+    }
+
     private static PlacementKind ToKind(BoxPose pose) =>
         pose switch
         {
@@ -460,6 +658,17 @@ public class FamilyLayoutTests
             .Where(entry => entry.Placement.Kind == PlacementKind.ExpansionLayer && entry.Placement.FamilyId == baseId)
             .OrderBy(entry => entry.Placement.YMm)
             .ToList();
+
+    private static List<(int Section, int Cubby, Placement Placement)> UprightsOf(
+        IReadOnlyList<(int Section, int Cubby, Placement Placement)> placed,
+        int baseId) =>
+        placed
+            .Where(entry => entry.Placement.Kind == PlacementKind.ExpansionSpine && entry.Placement.FamilyId == baseId)
+            .OrderBy(entry => entry.Placement.XMm)
+            .ToList();
+
+    private static CabinetItem Thin(CabinetItem expansion) =>
+        expansion with { Box = expansion.Box with { DepthMm = Math.Min(expansion.Box.DepthMm, MaxThinDepthMm) } };
 
     private static bool IsStanding(Placement placement) =>
         placement.Kind is PlacementKind.Cover or PlacementKind.Spine or PlacementKind.FlatBox;

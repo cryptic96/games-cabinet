@@ -12,10 +12,11 @@ public static class CubbyArrangement
     /// <summary>
     /// Orders the members by a stable hash of their game identifier salted with the cubby, so the order looks varied but
     /// changes only when the cubby's members change, and packs them from the left with no gap, bottom-aligned on the
-    /// cubby floor. A box facing out is as wide as its front and a spine is as wide as its depth. A base game with
-    /// expansions is followed immediately by a column of fixed width that holds its expansions as thin layers stacked up
-    /// from the floor, with a marker on top counting the ones that did not fit; the column is as wide with one expansion
-    /// as with many. Flat boxes lie with the spine out, as wide as the box is tall and as tall as it is deep, and gather
+    /// cubby floor. A box facing out is as wide as its front and a spine is as wide as its depth. A base game is followed
+    /// immediately by its thick expansions, which stand upright on the floor in collection order, and then by a column of
+    /// fixed width that holds its remaining expansions as thin layers stacked up from the floor, with a marker on top
+    /// counting the ones that did not fit; the column is as wide with one expansion as with many and exists only when
+    /// some expansion lies in it. Flat boxes lie with the spine out, as wide as the box is tall and as tall as it is deep, and gather
     /// into short piles of up to four that start on the cubby floor; a pile sits where its first box falls in the order
     /// and is as wide as its widest box. Inside a pile the widest box lies at the bottom and the thicker box lower among
     /// boxes of the same width, so no box overhangs the one beneath it. An expansion without an owned base game lies flat like a flat box but is never
@@ -164,8 +165,31 @@ public static class CubbyArrangement
     }
 
     /// <summary>
-    /// Places a box that faces out or stands as a spine, followed by the column of its expansions when it has any, and
-    /// returns the width used, or null when the box and its column do not fit.
+    /// The width a box takes standing: its front when it faces out, its depth when it stands as a spine. The engine
+    /// measures with this same value when it reserves room for a family, so the room reserved is the room drawn.
+    /// </summary>
+    internal static int StandingWidthMm(LayoutMember member)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+
+        return member.Pose == BoxPose.Cover ? member.Item.Box.WidthMm : member.Item.Box.DepthMm;
+    }
+
+    /// <summary>
+    /// The width an upright expansion is drawn at: its depth, but never less than the design's least upright width, so
+    /// its two lines of text stay readable.
+    /// </summary>
+    internal static int UprightWidthMm(SectionDesign design, CabinetItem expansion)
+    {
+        ArgumentNullException.ThrowIfNull(design);
+        ArgumentNullException.ThrowIfNull(expansion);
+
+        return Math.Max(expansion.Box.DepthMm, design.MinUprightExpansionWidthMm);
+    }
+
+    /// <summary>
+    /// Places a box that faces out or stands as a spine, followed by its upright expansions and then the column of its
+    /// stacked expansions when it has any, and returns the width used, or null when the box with all of them does not fit.
     /// </summary>
     private static int? PlaceStanding(
         SectionDesign design,
@@ -176,19 +200,20 @@ public static class CubbyArrangement
         List<Placement> placements)
     {
         var box = member.Item.Box;
-        var (kind, width) = member.Pose == BoxPose.Cover
-            ? (PlacementKind.Cover, box.WidthMm)
-            : (PlacementKind.Spine, box.DepthMm);
+        var kind = member.Pose == BoxPose.Cover ? PlacementKind.Cover : PlacementKind.Spine;
+        var width = StandingWidthMm(member);
+        var uprightsWidth = member.Uprights.Sum(upright => UprightWidthMm(design, upright));
         var columnWidth = member.Expansions.Count > 0 ? design.StackColumnWidthMm : 0;
+        var tallest = member.Uprights.Select(upright => upright.Box.HeightMm).Append(box.HeightMm).Max();
 
-        if (x + width + columnWidth > cubby.WidthMm || box.HeightMm > cubby.HeightMm)
+        if (x + width + uprightsWidth + columnWidth > cubby.WidthMm || tallest > cubby.HeightMm)
         {
             return null;
         }
 
         var placed = Place(member.Item, kind, x, 0, width, box.HeightMm, design);
 
-        if (member.Expansions.Count == 0)
+        if (!member.HasFamily)
         {
             placements.Add(member.BaseTitle is null ? placed : placed with { BaseTitle = member.BaseTitle });
 
@@ -196,14 +221,29 @@ public static class CubbyArrangement
         }
 
         placements.Add(placed with { FamilyId = member.Item.BggId });
-        PlaceStack(design, member, x + width, cubby, options, placements);
 
-        return width + columnWidth;
+        var next = x + width;
+
+        foreach (var upright in member.Uprights)
+        {
+            var uprightWidth = UprightWidthMm(design, upright);
+
+            placements.Add(Place(upright, PlacementKind.ExpansionSpine, next, 0, uprightWidth, upright.Box.HeightMm, design)
+                with { BaseTitle = member.Item.Title, FamilyId = member.Item.BggId });
+            next += uprightWidth;
+        }
+
+        if (member.Expansions.Count > 0)
+        {
+            PlaceStack(design, member, next, cubby, options, placements);
+        }
+
+        return width + uprightsWidth + columnWidth;
     }
 
     /// <summary>
     /// Places the layers of a family from the floor up in the column that starts at <paramref name="columnX"/>, then the
-    /// marker when some expansions do not fit. The layers touch each other and the base game's right edge.
+    /// marker when some expansions do not fit. The layers touch each other and the box on the column's left.
     /// </summary>
     private static void PlaceStack(
         SectionDesign design,
@@ -267,7 +307,7 @@ public static class CubbyArrangement
 
         return kind switch
         {
-            PlacementKind.Spine => SpineLabel.Shorten(item.Title, height / pitch),
+            PlacementKind.Spine or PlacementKind.ExpansionSpine => SpineLabel.Shorten(item.Title, height / pitch),
             PlacementKind.FlatBox or PlacementKind.OrphanExpansion => SpineLabel.Shorten(item.Title, width / pitch),
             _ => item.Title,
         };

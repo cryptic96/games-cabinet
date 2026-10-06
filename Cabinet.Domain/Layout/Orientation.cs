@@ -27,9 +27,10 @@ public enum SizeClass
 }
 
 /// <summary>
-/// Decides how each game stands. A decision depends only on that game, the settings and the design, never on the other
-/// games, so adding a game never changes how an existing game stands. The one exception is the few-games switch, which
-/// looks at how many games there are and is accepted as a single global rearrangement.
+/// Decides how each game is chosen to stand. A decision depends only on that game, the settings and the design, never on
+/// the other games, so adding a game never changes the pose it is chosen for. The one exception is the few-games switch,
+/// which looks at how many games there are and is accepted as a single global rearrangement. The engine may still lay a
+/// game flat when no cubby has room for it in the pose it was chosen for.
 /// </summary>
 public static class Orientation
 {
@@ -42,6 +43,12 @@ public static class Orientation
     /// <summary>A box at most this deep may lie flat whatever its size, in millimetres. A starting value for review.</summary>
     public const int FlatDepthLimitMm = 40;
 
+    /// <summary>An expansion at least this deep stands upright beside its base game instead of lying in the stack, in millimetres. A starting value for review.</summary>
+    public const int UprightExpansionMinDepthMm = 50;
+
+    /// <summary>The most expansions of one base game that stand upright beside it. A starting value for review.</summary>
+    public const int MaxUprightExpansions = 2;
+
     /// <summary>The chance, in basis points, that an eligible box lies flat instead of standing. A starting value for review.</summary>
     public const int FlatChanceBasisPoints = 5000;
 
@@ -51,6 +58,17 @@ public static class Orientation
     private const int MaxChanceBasisPoints = 9500;
     private const int BasisPoints = 10000;
     private const int BasisPointsPerPercent = 100;
+
+    /// <summary>
+    /// Whether an expansion is thick enough to stand upright beside its base game: its box is at least
+    /// <see cref="UprightExpansionMinDepthMm"/> deep. It is judged on the box as owned, before any scaling to the design.
+    /// </summary>
+    public static bool StandsUpright(CabinetItem expansion)
+    {
+        ArgumentNullException.ThrowIfNull(expansion);
+
+        return expansion.Box.DepthMm >= UprightExpansionMinDepthMm;
+    }
 
     /// <summary>The size class of a box from its standing height.</summary>
     public static SizeClass SizeClassOf(BoxDimensions box)

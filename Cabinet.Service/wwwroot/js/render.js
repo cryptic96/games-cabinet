@@ -45,9 +45,29 @@ function namesUnownedBase(placement) {
 }
 
 /**
- * Returns the accessible name and tooltip of a placement. A layer or an orphan names its base game, the marker says how
- * many expansions it stands for, and every other placement is named by its full title. An orphan without a base title
- * is named by its title alone.
+ * Tells whether the accessible name of a placement says which game it is an expansion for: a layer in a stack, an
+ * upright expansion beside its base game, and an expansion whose base game is not owned.
+ * @param {object} placement One placement from the layout.
+ * @returns {boolean}
+ */
+function namesBaseInName(placement) {
+  return placement.kind === 'expansionLayer' || placement.kind === 'expansionSpine' || namesUnownedBase(placement);
+}
+
+/**
+ * Tells whether a placement draws a second line naming the game it expands: an upright expansion beside its base game
+ * and an expansion whose base game is not owned. A layer has no room for a second line.
+ * @param {object} placement One placement from the layout.
+ * @returns {boolean}
+ */
+function hasBaseLine(placement) {
+  return placement.kind === 'expansionSpine' || namesUnownedBase(placement);
+}
+
+/**
+ * Returns the accessible name and tooltip of a placement. A layer, an upright expansion or an orphan names its base
+ * game, the marker says how many expansions it stands for, and every other placement is named by its full title. An
+ * orphan without a base title is named by its title alone.
  * @param {object} placement One placement from the layout.
  * @param {object} copy The visitor-facing strings.
  * @returns {string}
@@ -56,7 +76,7 @@ function accessibleName(placement, copy) {
   const title = textOrFallback(placement.title, copy.untitled);
   const baseTitle = textOrFallback(placement.baseTitle, copy.untitled);
 
-  if (placement.kind === 'expansionLayer' || namesUnownedBase(placement)) {
+  if (namesBaseInName(placement)) {
     return copy.layerName(title, baseTitle);
   }
 
@@ -68,13 +88,14 @@ function accessibleName(placement, copy) {
 }
 
 /**
- * Builds the second line of an orphan, naming the game it expands, or returns null when the placement has none.
+ * Builds the second line of an upright expansion or an orphan, naming the game it expands, or returns null when the
+ * placement has none.
  * @param {object} placement One placement from the layout.
  * @param {object} copy The visitor-facing strings.
  * @returns {HTMLSpanElement | null}
  */
 function buildSubLabel(placement, copy) {
-  if (!namesUnownedBase(placement)) {
+  if (!hasBaseLine(placement)) {
     return null;
   }
 

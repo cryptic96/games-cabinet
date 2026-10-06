@@ -36,7 +36,10 @@ public class LayoutEndpointTests
         sections[0].GetProperty("cubbies").GetArrayLength().Should().Be(SectionDesigns.Desktop.Cubbies.Count);
         placementCount.Should().Be(65, "every item is a placement, a layer or part of a marker's count");
         placements.Select(placement => placement.GetProperty("kind").GetString())
-            .Should().Contain(["expansionLayer", "moreMarker", "orphanExpansion"]);
+            .Should().Contain(["expansionLayer", "expansionSpine", "moreMarker", "orphanExpansion"]);
+        placements.Where(placement => placement.GetProperty("kind").GetString() == "expansionSpine")
+            .Select(placement => (placement.TryGetProperty("familyId", out var familyId), placement.TryGetProperty("baseTitle", out var baseTitle)))
+            .Should().OnlyContain(found => found.Item1 && found.Item2);
         placements.Where(placement => placement.GetProperty("kind").GetString() == "orphanExpansion")
             .Select(placement => placement.TryGetProperty("baseTitle", out var baseTitle) ? baseTitle.GetString() : null)
             .Should().OnlyContain(baseTitle => !string.IsNullOrEmpty(baseTitle));

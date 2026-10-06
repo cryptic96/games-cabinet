@@ -15,8 +15,14 @@ shaded wood.
 
 Games are placed into the cubbies by the server, not by the browser. The
 browser only draws the result. A game can face out as a box front (a cover),
-stand as a spine, or lie flat. Expansions stand in a narrow stack beside their
-base game, and a long stack ends in a "+N more" marker.
+stand as a spine, or lie flat. An expansion that is at least 50 millimetres
+deep stands upright right beside its base game, with a second line naming that
+game, up to two per base game and only while the family still fits the widest
+box a section holds. Thinner expansions, and thick ones that no longer fit,
+lie in a narrow stack beside the upright ones, and a long stack ends in a "+N
+more" marker. The base game reserves room for its upright expansions and its
+stack as soon as it is placed, so an expansion is never left without a place
+beside its game.
 
 Boxes lying flat are piled up to four high, with the widest box at the bottom
 and the thicker box lower among boxes of the same width, so no box overhangs
@@ -97,10 +103,13 @@ A few changes rearrange more than that, and these are accepted:
   came after it take new places.
 - Crossing the few-games threshold rearranges the cabinet once, because every
   box faced out below it and the normal mix applies from it.
-- The first expansion for a game that had none reserves its stack beside the
-  base game. That family may move, and later cubbies may shift to make room.
+- An expansion that makes its family wider may move that family, and later
+  cubbies may shift to make room, while every game ordered before the base game
+  keeps its cubby. That is the first expansion for a game, the first one that
+  lies in a game's stack, and a big one that stands upright. An expansion that
+  joins a stack its game already has changes only that game's cubby.
 - An expansion whose base game is added later moves from standing alone to
-  standing in the stack beside that base game.
+  standing beside that base game, upright or in its stack.
 - When one of the changes above shifts later cubbies, games in them may also
   change between standing the way they were chosen and lying flat, because that
   depends on the room left by the games before them.

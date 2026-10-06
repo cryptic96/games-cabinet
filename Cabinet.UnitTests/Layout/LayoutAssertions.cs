@@ -90,7 +90,7 @@ internal static class LayoutAssertions
     {
         var placed = PlacementsWithPosition(layout);
         var standing = placed
-            .Where(entry => entry.Placement.Kind is not (PlacementKind.ExpansionLayer or PlacementKind.MoreMarker))
+            .Where(entry => entry.Placement.Kind is not (PlacementKind.ExpansionLayer or PlacementKind.MoreMarker or PlacementKind.ExpansionSpine))
             .ToList();
         var topLevelIds = items
             .Where(item => item.Kind == ItemKind.Base || OwnedParentOf(item, items) is null)
@@ -103,18 +103,19 @@ internal static class LayoutAssertions
         foreach (var family in items.Where(item => item.Kind == ItemKind.Expansion && OwnedParentOf(item, items) is not null)
                      .GroupBy(item => OwnedParentOf(item, items)!.Value))
         {
-            AssertFamilyAccountedFor(family.Key, family.Select(item => item.BggId).ToList(), standing, placed);
+            AssertFamilyAccountedFor(layout, family.Key, family.Select(item => item.BggId).ToList(), standing, placed);
         }
 
-        placed.Where(entry => entry.Placement.Kind == PlacementKind.ExpansionLayer)
+        placed.Where(entry => entry.Placement.Kind is PlacementKind.ExpansionLayer or PlacementKind.ExpansionSpine)
             .Select(entry => entry.Placement.GameId)
-            .Should().OnlyHaveUniqueItems("no expansion layer appears twice");
+            .Should().OnlyHaveUniqueItems("no expansion is drawn twice, upright and as a layer");
         placed.Where(entry => entry.Placement.FamilyId is { } familyId
                 && !items.Any(item => item.BggId == familyId && item.Kind == ItemKind.Base))
             .Should().BeEmpty("a family always belongs to an owned base game");
     }
 
     private static void AssertFamilyAccountedFor(
+        CabinetLayout layout,
         int baseId,
         IReadOnlyList<int> expansionIds,
         List<(int Section, int Cubby, Placement Placement)> standing,
@@ -122,17 +123,42 @@ internal static class LayoutAssertions
     {
         var baseEntry = standing.Single(entry => entry.Placement.GameId == baseId);
         var members = placed.Where(entry => entry.Placement.FamilyId == baseId
-            && entry.Placement.Kind is PlacementKind.ExpansionLayer or PlacementKind.MoreMarker).ToList();
+            && entry.Placement.Kind is PlacementKind.ExpansionLayer or PlacementKind.MoreMarker or PlacementKind.ExpansionSpine).ToList();
         var layers = members.Where(entry => entry.Placement.Kind == PlacementKind.ExpansionLayer).ToList();
+        var uprights = members.Where(entry => entry.Placement.Kind == PlacementKind.ExpansionSpine)
+            .OrderBy(entry => entry.Placement.XMm).ToList();
         var markers = members.Where(entry => entry.Placement.Kind == PlacementKind.MoreMarker).ToList();
 
         members.Should().OnlyContain(
             entry => entry.Section == baseEntry.Section && entry.Cubby == baseEntry.Cubby,
-            "layers and the marker of family {0} stand in the cubby of their base game", baseId);
-        layers.Select(entry => entry.Placement.GameId).Should().OnlyContain(id => expansionIds.Contains(id));
+            "uprights, layers and the marker of family {0} stand in the cubby of their base game", baseId);
+        members.Select(entry => entry.Placement.GameId).Where(id => id != baseId).Should().OnlyContain(id => expansionIds.Contains(id));
         markers.Should().HaveCountLessThanOrEqualTo(1, "family {0} has at most one marker", baseId);
-        (layers.Count + markers.Sum(entry => entry.Placement.MoreCount ?? 0))
+        (layers.Count + uprights.Count + markers.Sum(entry => entry.Placement.MoreCount ?? 0))
             .Should().Be(expansionIds.Count, "family {0} counts each of its expansions once", baseId);
+        uprights.Should().HaveCountLessThanOrEqualTo(Orientation.MaxUprightExpansions, "family {0} has at most two uprights", baseId);
+
+        var edge = baseEntry.Placement.XMm + baseEntry.Placement.WidthMm;
+
+        foreach (var upright in uprights)
+        {
+            upright.Placement.XMm.Should().Be(edge, "uprights of family {0} touch the base game and each other", baseId);
+            upright.Placement.YMm.Should().Be(0, "uprights of family {0} stand on the cubby floor", baseId);
+            upright.Placement.BaseTitle.Should().NotBeNullOrEmpty("an upright names its base game");
+            edge += upright.Placement.WidthMm;
+        }
+
+        members.Where(entry => entry.Placement.Kind is PlacementKind.ExpansionLayer or PlacementKind.MoreMarker)
+            .Should().OnlyContain(entry => entry.Placement.XMm == edge, "the stack column of family {0} starts after the last upright", baseId);
+
+        if (SectionDesigns.TryGet(layout.Profile, out var design))
+        {
+            var columnWidth = members.Any(entry => entry.Placement.Kind != PlacementKind.ExpansionSpine) ? design.StackColumnWidthMm : 0;
+
+            (edge + columnWidth - baseEntry.Placement.XMm).Should().BeLessThanOrEqualTo(
+                design.Limits.MaxWidthMm, "family {0} stays within the widest box the design holds", baseId);
+            uprights.Should().OnlyContain(entry => entry.Placement.WidthMm >= design.MinUprightExpansionWidthMm);
+        }
     }
 
     private static void AssertSectionGeometry(LayoutSection section)
