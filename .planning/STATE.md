@@ -76,6 +76,9 @@ Recent decisions affecting current work:
 ### Pending Todos
 
 - [Phase 3] Add dev-only fake BGG host for the sync phase (minor, tooling): `.planning/todos/pending/2026-10-05-add-dev-only-fake-bgg-host-for-the-sync-phase.md`
+- [Phase 4] Box look polish for the box images phase (cosmetic, ui): `.planning/todos/pending/2026-10-06-box-look-polish-for-the-box-images-phase.md`
+- [Phase 5] Cabinet accessibility notes for the detail phase (minor, ui): `.planning/todos/pending/2026-10-06-cabinet-accessibility-notes-for-the-detail-phase.md`
+- [Phase 7] Phone cabinet density for the filters and locations phase (cosmetic, ui): `.planning/todos/pending/2026-10-06-phone-cabinet-density-for-the-filters-phase.md`
 - [Unscheduled] Selectable cabinet finishes and lit-cubbies toggle (minor, ui), needs discussion, possibly its own phase: `.planning/todos/pending/2026-10-06-selectable-cabinet-finishes-and-lit-cubbies-toggle.md`
 
 ### Blockers/Concerns

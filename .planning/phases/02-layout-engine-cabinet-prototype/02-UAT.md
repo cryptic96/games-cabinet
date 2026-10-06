@@ -3,23 +3,15 @@ status: testing
 phase: 02-layout-engine-cabinet-prototype
 source: [02-VERIFICATION.md]
 started: 2026-10-06T09:26:20Z
-updated: 2026-10-06T09:32:50Z
+updated: 2026-10-06T09:44:21Z
 ---
 
 ## Current Test
 
-number: 2
-name: Taste calls carried forward at approval
+number: 3
+name: Phone walk of the deployed prototype
 expected: |
-  Automated walk of the deployed build already passed (test 1). Decide, per item, whether to accept it as is or list it for a follow-up patch release. Reply "accept all", or name the ones to fix:
-  a) plinth arch reads as a soft shadow more than an arch
-  b) on phones a first section can keep empty rows when a big cover forces a second section
-  c) the fourth-line "…" is slightly cropped on the smallest phone covers
-  d) short upright expansions truncate both text lines
-  e) expansions 50 to 63 mm deep are drawn thicker than they are (readability minimum)
-  f) phone spines are wider than the real boxes (59 mm readability minimum)
-  g) the 400 sample takes 12 phone sections (about 17 screens of scrolling)
-  h) about 18 to 25 percent of boxes face out since big boxes may lie flat
+  On your own phone over your VPN (mobile data works, no need to be home), open the cabinet's internal address and step through 0, 1, 5, 12, 65, 400 and Edge cases. Footer shows Version 0.2.0 (887324c). The cabinet is narrower and taller, still looks like a cabinet, scrolls only vertically, spine text is readable in your hand, and tapping a box never hits its neighbour. The 400 sample is long but usable. (Automated: all tap and size checks already pass in an emulated phone; this confirms the real device and the route.)
 awaiting: user response
 
 ## Tests
@@ -36,7 +28,8 @@ evidence: |
 
 ### 2. Taste calls carried forward at approval
 expected: Each is accepted as is, or listed as a finding for a follow-up patch release: a) plinth arch reads as a shadow; b) phone first sections can keep empty rows; c) fourth-line ellipsis slightly cropped on the smallest phone covers; d) short upright expansions truncate both lines; e) expansions 50 to 63 mm deep look thicker than they are; f) phone spines are wider than real boxes; g) the 400 sample needs many phone sections; h) cover share is about 18 to 25 percent.
-result: [pending]
+result: skipped
+reason: "Deferred follow-up: owner chose to defer all eight taste calls to the later UI phases as mapped (box look items to Phase 4, phone density items to Phase 7)."
 
 ### 3. Phone walk of the deployed prototype
 expected: On your own phone over your VPN (mobile data works, no need to be home), open the cabinet's internal address and step through 0, 1, 5, 12, 65, 400 and Edge cases. Footer shows Version 0.2.0 (887324c). The cabinet is narrower and taller, still looks like a cabinet, scrolls only vertically, spine text is readable in your hand, and tapping a box never hits its neighbour. The 400 sample is long but usable. (Automated: all tap and size checks already pass in an emulated phone; this confirms the real device and the route.)
@@ -51,8 +44,20 @@ result: [pending]
 total: 4
 passed: 1
 issues: 0
-pending: 3
-skipped: 0
+pending: 2
+skipped: 1
 blocked: 0
 
 ## Gaps
+
+## Deferred Follow-Ups
+
+- test: 2
+  idea: "Box look taste calls (cropped ellipsis on tiny phone covers, truncated short upright expansions, expansions drawn thicker than they are, phone spines wider than real boxes, cover share, plinth arch) go to Phase 4: .planning/todos/pending/2026-10-06-box-look-polish-for-the-box-images-phase.md"
+  deferred_at: 2026-10-06
+- test: 2
+  idea: "Phone density taste calls (empty rows in earlier phone sections, long 400-game phone scroll) go to Phase 7: .planning/todos/pending/2026-10-06-phone-cabinet-density-for-the-filters-phase.md"
+  deferred_at: 2026-10-06
+- test: 2
+  idea: "Code review accessibility notes (marker accessible name, one tab stop per box) go to Phase 5: .planning/todos/pending/2026-10-06-cabinet-accessibility-notes-for-the-detail-phase.md"
+  deferred_at: 2026-10-06
