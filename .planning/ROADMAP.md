@@ -98,8 +98,8 @@ Plans:
 
   1. The owner opens the deployed prototype with synthetic collections and approves that it reads as a real wooden cubby cabinet: face-out covers mixed with spines, packed full in irregular cubbies rather than a uniform grid.
   2. The cabinet grows with the collection: synthetic collections of 0, 1, 5, about 65 and 400 games all render without overlap or overflow, and empty or near-empty collections look intentional (a minimum cabinet, boxes facing out when there are few).
-  3. The same collection always renders the same cabinet, and adding a game does not move any existing box (verified by automated tests).
-  4. Each expansion appears as a thin sideways spine with its name beside its base game; an expansion whose base game is absent stands alone, labelled with the game it expands; a base game with many expansions collapses the extras into a "+N more" stack that never overflows its shelf.
+  3. The same collection always renders the same cabinet, and adding a plain game, or an expansion to an existing stack, changes at most one cubby (verified by automated tests); the documented exceptions (switching out of the few-games look, a base game's first expansion, an expansion that widens its family) are tested as their own cases (D-09, D-19, D-23).
+  4. Each expansion appears with its name beside its base game: thick (big-box) expansions stand upright next to it and thin ones lie as thin sideways spines in a stack, thickest at the bottom (D-23, D-24); an expansion whose base game is absent stands alone, labelled with the game it expands; a base game with many expansions collapses the extras into a "+N more" stack that never overflows its shelf.
   5. On a phone-width screen the cabinet reflows into a narrower, taller cabinet that still looks like a cabinet, with spines readable and large enough to tap.
 
 **Plans:** 9/9 plans executed
