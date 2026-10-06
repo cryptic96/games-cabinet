@@ -80,7 +80,7 @@ Recent decisions affecting current work:
 
 ### Blockers/Concerns
 
-- [Phase 1]: Owner must register the BGG application (non-commercial) on day one; approval may take a week or more and gates Phase 3.
+- [Resolved 2026-10-06]: The BGG application (non-commercial) is approved and the owner has the API token, so Phase 3 is unblocked. The token goes only into the server env file (and `dotnet user-secrets` locally), never into the repository, logs or chat. Phase 3 also adds the linked "Powered by BGG" logo to every public page (SYNC-08), taken from BGG's official usage page.
 - [Phase 2]: Packing quality is subjective; the owner's visual review is the acceptance gate and may take several rounds.
 - [Phase 3]: Location spike outcome decides whether LOC-03 and LOC-04 are built in Phase 6. BGG throttle numbers are unpublished; treat all rates as unconfirmed.
 - [Phase 4]: Coverage and units of BGG version dimensions are unconfirmed; image resizing under BGG terms is ambiguous (downscale only, never crop, keep the credit).
