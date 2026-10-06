@@ -57,6 +57,19 @@ public static class SyntheticCollections
         ["400"] = 400,
     };
 
+    private static readonly (int Width, int Height, int Depth)[] OversizeFronts =
+    [
+        (430, 420, 70),
+        (520, 380, 90),
+        (610, 500, 60),
+        (380, 560, 110),
+        (700, 410, 80),
+        (450, 450, 140),
+    ];
+
+    private static readonly int[] ReviewOversizeBases = [3, 31];
+    private static readonly int[] LargeOversizeBases = [9, 60, 100, 150, 210, 270];
+
     private static readonly int[] ReviewBigFamilyExpansions = [12, 15, 19, 23, 24, 31, 38, 44, 52];
     private static readonly int[] ReviewSmallFamilyExpansions = [17, 33];
     private static readonly int[] ReviewOrphans = [8, 29, 50];
@@ -71,7 +84,8 @@ public static class SyntheticCollections
     /// Finds a named sample by exact, case-sensitive name; anything else finds nothing. The sample of sixty-five items is
     /// made like a real collection of that size: forty-nine base games and sixteen expansions, with one family of nine
     /// expansions, one of two, one of one, one expansion for two owned games and three expansions whose base game is not
-    /// owned. The sample of four hundred has about a fifth of its items as expansions in families of up to ten.
+    /// owned. The sample of four hundred has about a fifth of its items as expansions in families of up to ten. Both
+    /// carry a few base games whose boxes are larger than any section can hold, so the engine's scaling is exercised.
     /// </summary>
     public static bool TryGetSample(string? name, out IReadOnlyList<CabinetItem> items)
     {
@@ -94,7 +108,14 @@ public static class SyntheticCollections
                 _ => RandomRoles(generator, titles, 0),
             };
 
-            items = Assemble(generator, titles, count, roles);
+            var assembled = Assemble(generator, titles, count, roles);
+
+            items = name switch
+            {
+                ReviewSampleName => WithOversizeBoxes(assembled, ReviewOversizeBases),
+                LargeSampleName => WithOversizeBoxes(assembled, LargeOversizeBases),
+                _ => assembled,
+            };
 
             return true;
         }
@@ -254,6 +275,26 @@ public static class SyntheticCollections
         }
 
         return drafts.Select(draft => ToItem(draft, drafts)).ToList();
+    }
+
+    /// <summary>
+    /// Gives the base games at the listed positions, counting base games only from zero, oversize boxes taken in turn
+    /// from a fixed list. Nothing else about the items changes, so the counts and the composition stay the same.
+    /// </summary>
+    private static List<CabinetItem> WithOversizeBoxes(List<CabinetItem> items, int[] baseOrdinals)
+    {
+        var baseIndexes = Enumerable.Range(0, items.Count).Where(index => items[index].Kind == ItemKind.Base).ToList();
+        var result = new List<CabinetItem>(items);
+
+        for (var turn = 0; turn < baseOrdinals.Length; turn++)
+        {
+            var index = baseIndexes[baseOrdinals[turn]];
+            var (width, height, depth) = OversizeFronts[turn % OversizeFronts.Length];
+
+            result[index] = result[index] with { Box = new BoxDimensions(width, height, depth) };
+        }
+
+        return result;
     }
 
     private static CabinetItem ToItem(Draft draft, List<Draft> drafts)
