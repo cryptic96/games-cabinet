@@ -6,7 +6,7 @@ The collection comes straight from a BoardGameGeek "owned" collection. A server-
 
 ## Current state
 
-The site shows a cabinet prototype built on invented collections, with a row of links to switch between collection sizes from empty to several hundred games. The real BoardGameGeek collection is not connected yet. The release path from a version tag to an approved release to a running server, and back again through rollback, is proven separately and carries every change.
+The deployed site draws the synced collection and, until a collection has been synced, shows a message that the cabinet is being filled above an empty cabinet. When run locally in development it can also show invented collections, with a row of links to switch between collection sizes from empty to several hundred games. The release path from a version tag to an approved release to a running server, and back again through rollback, is proven separately and carries every change.
 
 ## How releases work
 

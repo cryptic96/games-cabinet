@@ -2,13 +2,24 @@
 @model Cabinet.Service.Pages.IndexModel
 <header>
     <h1>Games Cabinet</h1>
-    @if (Model.PrototypeEnabled)
+    @if (Model.ShowingSample)
     {
         <p class="status">Invented collection of @Model.ItemCount @(Model.ItemCount == 1 ? "item" : "items").</p>
-        <nav aria-label="Sample collection size">
+    }
+    @if (Model.PrototypeEnabled)
+    {
+        <nav aria-label="Collection to show">
+            @if (Model.ShowingSample)
+            {
+                <a href="/">Synced</a>
+            }
+            else
+            {
+                <a href="/" aria-current="page">Synced</a>
+            }
             @foreach (var name in Model.SampleNames)
             {
-                if (name == Model.SampleName)
+                if (Model.ShowingSample && name == Model.SampleName)
                 {
                     <a href="/?sample=@name" aria-current="page">@Model.LabelFor(name)</a>
                 }
@@ -21,19 +32,23 @@
     }
 </header>
 <main>
-    @if (Model.PrototypeEnabled)
+    @if (!Model.ShowingSample && !Model.HasSynced)
+    {
+        <div class="cabinet-message cabinet-filling">
+            <p class="cabinet-message-heading">The cabinet is being filled.</p>
+            <p>The games are being copied over from BoardGameGeek. Check back in a few minutes.</p>
+        </div>
+    }
+    @if (Model.ShowingSample)
     {
         <div id="cabinet" class="cabinet" data-sample="@Model.SampleName"></div>
-        <noscript><p class="cabinet-message">The cabinet needs JavaScript to be drawn. Please turn it on and reload.</p></noscript>
     }
     else
     {
-        <p class="cabinet-message">The cabinet is being built. Check back soon to browse the collection.</p>
+        <div id="cabinet" class="cabinet"></div>
     }
+    <noscript><p class="cabinet-message">The cabinet needs JavaScript to be drawn. Please turn it on and reload.</p></noscript>
 </main>
 @section Scripts {
-    @if (Model.PrototypeEnabled)
-    {
-        <script type="module" src="~/js/cabinet.js" asp-append-version="true"></script>
-    }
+    <script type="module" src="~/js/cabinet.js" asp-append-version="true"></script>
 }
