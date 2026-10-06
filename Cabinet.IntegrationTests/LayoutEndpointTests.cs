@@ -21,9 +21,12 @@ public class LayoutEndpointTests
         using var document = JsonDocument.Parse(body);
         var root = document.RootElement;
         var sections = root.GetProperty("sections");
-        var placementCount = sections.EnumerateArray()
+        var placements = sections.EnumerateArray()
             .SelectMany(section => section.GetProperty("cubbies").EnumerateArray())
-            .Sum(cubby => cubby.GetProperty("placements").GetArrayLength());
+            .SelectMany(cubby => cubby.GetProperty("placements").EnumerateArray())
+            .ToList();
+        var placementCount = placements.Sum(placement =>
+            placement.GetProperty("kind").GetString() == "moreMarker" ? placement.GetProperty("moreCount").GetInt32() : 1);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         response.Content.Headers.ContentType?.MediaType.Should().Be("application/json");
@@ -31,7 +34,12 @@ public class LayoutEndpointTests
         root.GetProperty("profile").GetString().Should().Be("desktop");
         sections.GetArrayLength().Should().BeGreaterThanOrEqualTo(1);
         sections[0].GetProperty("cubbies").GetArrayLength().Should().Be(SectionDesigns.Desktop.Cubbies.Count);
-        placementCount.Should().Be(65);
+        placementCount.Should().Be(65, "every item is a placement, a layer or part of a marker's count");
+        placements.Select(placement => placement.GetProperty("kind").GetString())
+            .Should().Contain(["expansionLayer", "moreMarker", "orphanExpansion"]);
+        placements.Where(placement => placement.GetProperty("kind").GetString() == "orphanExpansion")
+            .Select(placement => placement.TryGetProperty("baseTitle", out var baseTitle) ? baseTitle.GetString() : null)
+            .Should().OnlyContain(baseTitle => !string.IsNullOrEmpty(baseTitle));
     }
 
     [Fact]
