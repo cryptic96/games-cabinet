@@ -1,53 +1,39 @@
 @page
 @model Cabinet.Service.Pages.IndexModel
-@inject BuildInfo Build
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Games Cabinet</title>
-    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/css/cabinet.css" asp-append-version="true" />
-</head>
-<body>
-    <header>
-        <h1>Games Cabinet</h1>
-        @if (Model.PrototypeEnabled)
-        {
-            <p class="status">Invented collection of @Model.ItemCount @(Model.ItemCount == 1 ? "item" : "items").</p>
-            <nav aria-label="Sample collection size">
-                @foreach (var name in Model.SampleNames)
+<header>
+    <h1>Games Cabinet</h1>
+    @if (Model.PrototypeEnabled)
+    {
+        <p class="status">Invented collection of @Model.ItemCount @(Model.ItemCount == 1 ? "item" : "items").</p>
+        <nav aria-label="Sample collection size">
+            @foreach (var name in Model.SampleNames)
+            {
+                if (name == Model.SampleName)
                 {
-                    if (name == Model.SampleName)
-                    {
-                        <a href="/?sample=@name" aria-current="page">@Model.LabelFor(name)</a>
-                    }
-                    else
-                    {
-                        <a href="/?sample=@name">@Model.LabelFor(name)</a>
-                    }
+                    <a href="/?sample=@name" aria-current="page">@Model.LabelFor(name)</a>
                 }
-            </nav>
-        }
-    </header>
-    <main>
-        @if (Model.PrototypeEnabled)
-        {
-            <div id="cabinet" class="cabinet" data-sample="@Model.SampleName"></div>
-            <noscript><p class="cabinet-message">The cabinet needs JavaScript to be drawn. Please turn it on and reload.</p></noscript>
-        }
-        else
-        {
-            <p class="cabinet-message">The cabinet is being built. Check back soon to browse the collection.</p>
-        }
-    </main>
-    <footer>
-        <p class="version">Version @Build.Version (@Build.ShortCommit)</p>
-    </footer>
+                else
+                {
+                    <a href="/?sample=@name">@Model.LabelFor(name)</a>
+                }
+            }
+        </nav>
+    }
+</header>
+<main>
+    @if (Model.PrototypeEnabled)
+    {
+        <div id="cabinet" class="cabinet" data-sample="@Model.SampleName"></div>
+        <noscript><p class="cabinet-message">The cabinet needs JavaScript to be drawn. Please turn it on and reload.</p></noscript>
+    }
+    else
+    {
+        <p class="cabinet-message">The cabinet is being built. Check back soon to browse the collection.</p>
+    }
+</main>
+@section Scripts {
     @if (Model.PrototypeEnabled)
     {
         <script type="module" src="~/js/cabinet.js" asp-append-version="true"></script>
     }
-</body>
-</html>
+}
