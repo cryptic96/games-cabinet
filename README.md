@@ -6,7 +6,7 @@ The collection comes straight from a BoardGameGeek "owned" collection. A server-
 
 ## Current state
 
-The site is a hello page. It exists to prove the path a change takes from a version tag to an approved release to a running server, and back again through rollback, before any collection feature depends on it. The cabinet itself is not built yet.
+The site shows a cabinet prototype built on invented collections, with a row of links to switch between collection sizes from empty to several hundred games. The real BoardGameGeek collection is not connected yet. The release path from a version tag to an approved release to a running server, and back again through rollback, is proven separately and carries every change.
 
 ## How releases work
 
@@ -18,6 +18,7 @@ The details live in the guides:
 
 - [Releasing](docs/releasing.md): cutting, approving and publishing a release.
 - [Deploying](docs/deploy.md): how the server installs, verifies and rolls back releases.
+- [Cabinet layout](docs/cabinet-layout.md): how the cabinet is arranged, the settings that tune it and what stays put when the collection changes.
 - [Server setup](docs/lxc-setup.md): provisioning the container the site runs in.
 - [Repository settings](docs/github-repository-settings.md): the branch protection and release settings the pipeline relies on.
 

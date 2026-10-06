@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 2
-current_phase_name: Layout Engine & Cabinet Prototype
-status: planning
-stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-10-04T20:34:17.337Z"
-last_activity: 2026-10-04
-last_activity_desc: Phase 01 execution started
+current_phase: 02
+current_phase_name: layout-engine-cabinet-prototype
+status: executing
+stopped_at: Phase 2 UI-SPEC approved
+last_updated: "2026-10-06T08:33:23.644Z"
+last_activity: 2026-10-05
+last_activity_desc: Phase 02 execution started
 progress:
-  total_phases: 1
+  total_phases: 2
   completed_phases: 1
-  total_plans: 15
-  completed_plans: 15
+  total_plans: 24
+  completed_plans: 23
 ---
 
 # Project State
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-03)
 
 **Core value:** Anyone with the link sees an up-to-date, good-looking cabinet of exactly the games the owner owns on BGG, with no manual data entry in the app.
-**Current focus:** Phase 01 — repo-guardrails-walking-skeleton-deploy
+**Current focus:** Phase 02 — layout-engine-cabinet-prototype
 
 ## Current Position
 
-Phase: 2 — Layout Engine & Cabinet Prototype
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-10-04 - Completed quick task 261004-vqo: Make out-of-date provisioning visible on the server
+Phase: 02 (layout-engine-cabinet-prototype) — EXECUTING
+Plan: 8 of 8
+Status: Ready to execute
+Last activity: 2026-10-05 — Phase 02 execution started
 
 Progress: [██████████] 100%
 
@@ -75,7 +75,8 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+- [Phase 3] Add dev-only fake BGG host for the sync phase (minor, tooling): `.planning/todos/pending/2026-10-05-add-dev-only-fake-bgg-host-for-the-sync-phase.md`
+- [Unscheduled] Selectable cabinet finishes and lit-cubbies toggle (minor, ui), needs discussion, possibly its own phase: `.planning/todos/pending/2026-10-06-selectable-cabinet-finishes-and-lit-cubbies-toggle.md`
 
 ### Blockers/Concerns
 
@@ -102,6 +103,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-04T17:16:42.711Z
-Stopped at: Completed 01-01-PLAN.md
-Resume file: None
+Last session: 2026-10-05T16:07:52.748Z
+Stopped at: Phase 2 UI-SPEC approved
+Resume file: .planning/phases/02-layout-engine-cabinet-prototype/02-UI-SPEC.md

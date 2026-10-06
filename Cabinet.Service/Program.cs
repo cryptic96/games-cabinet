@@ -3,6 +3,7 @@ using System.Reflection;
 using Cabinet.Domain;
 using Cabinet.Repository.Images;
 using Cabinet.Service.Hosting;
+using Cabinet.Service.Layout;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
@@ -35,6 +36,7 @@ builder.Services.Configure<KestrelServerOptions>(options => options.AddServerHea
 builder.Services.AddHealthChecks();
 
 builder.Services.AddRazorPages();
+builder.Services.AddCabinetLayout(builder.Configuration);
 
 var buildInfo = BuildInfo.Parse(
     typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
@@ -62,6 +64,7 @@ var app = builder.Build();
 
 var opsPort = OpsEndpoint.FromConfiguration(app.Configuration);
 
+app.UseContentSecurityPolicy();
 app.UseForwardedHeaders();
 
 app.UseHealthChecks("/health", opsPort, new HealthCheckOptions
@@ -84,6 +87,7 @@ app.UseRouting();
 
 app.MapStaticAssets();
 app.MapRazorPages().WithStaticAssets();
+app.MapCabinetLayout();
 
 await app.RunAsync();
 

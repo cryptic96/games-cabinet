@@ -28,6 +28,9 @@ http:
           # Replace with the real VPN subnet.
           - "198.51.100.0/24"
 
+    # The application sends its own Content-Security-Policy with every
+    # response, so this middleware deliberately sets none: a second policy
+    # here would be combined with the application's and could block the page.
     cabinet-security-headers:
       headers:
         stsSeconds: 31536000

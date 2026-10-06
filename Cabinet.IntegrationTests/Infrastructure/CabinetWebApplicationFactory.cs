@@ -13,11 +13,28 @@ namespace Cabinet.IntegrationTests.Infrastructure;
 /// <summary>Boots the cabinet host on real Kestrel sockets so the public and ops listeners are genuinely separate.</summary>
 public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
 {
+    private readonly IReadOnlyDictionary<string, string?> _settings;
     private IHost? _realHost;
 
     /// <summary>Creates the factory and picks two free loopback ports so clients can be built before the host starts.</summary>
     public CabinetWebApplicationFactory()
+        : this(new Dictionary<string, string?>())
     {
+    }
+
+    /// <summary>
+    /// Creates the factory with extra configuration values applied before the host is built, so a test can turn the
+    /// prototype off or set an invalid value.
+    /// </summary>
+    /// <param name="settings">
+    /// Configuration keys and values added on top of the committed settings. They are applied as host settings because
+    /// the program reads some of them while it builds its services, before later configuration sources are added.
+    /// </param>
+    public CabinetWebApplicationFactory(IReadOnlyDictionary<string, string?> settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        _settings = settings;
         PublicPort = GetFreeLoopbackPort();
         OpsPort = GetFreeLoopbackPort();
 
@@ -49,6 +66,11 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
                 ["Kestrel:Endpoints:Ops:Url"] = $"http://127.0.0.1:{OpsPort}",
             });
         });
+
+        foreach (var (key, value) in _settings)
+        {
+            builder.UseSetting(key, value);
+        }
     }
 
     /// <inheritdoc />

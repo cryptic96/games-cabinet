@@ -102,7 +102,42 @@ Plans:
   4. Each expansion appears as a thin sideways spine with its name beside its base game; an expansion whose base game is absent stands alone, labelled with the game it expands; a base game with many expansions collapses the extras into a "+N more" stack that never overflows its shelf.
   5. On a phone-width screen the cabinet reflows into a narrower, taller cabinet that still looks like a cabinet, with spines readable and large enough to tap.
 
-**Plans**: TBD
+**Plans:** 8/9 plans executed
+
+Plans:
+**Wave 1**
+
+- [x] 02-01-PLAN.md — Tracer: invented 65-item collection drawn as spines in wooden cubbies end to end; determinism and append-stability harness
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 02-02-PLAN.md — Shelf mix: per-game covers by strategy, flat stacks, few-games switch, layout settings validated at startup
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 02-03-PLAN.md — Box look: contrast-checked palette, generated covers, readable shortened labels, and the owner's chosen classic furniture finish (grain, moulded top, planked backs, plinth) with a screenshot check
+- [x] 02-04-PLAN.md — Page and samples: sample switcher, load states, viewport profile, cached endpoint, prototype switch, layout guide
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [x] 02-05-PLAN.md — Expansion families: reserved stacks beside base games, "+N more", orphans, family stability and the first-expansion exception
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [x] 02-09-PLAN.md — Box poses: piles largest at the bottom, big boxes lie flat before a new section (server setting), thick expansions upright beside their base, stacks thickest at the bottom; before and after measurements and screenshots
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [x] 02-06-PLAN.md — Phone cabinet with derived tap floors, design validation and box limits, recorded golden layouts
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [x] 02-07-PLAN.md — Owner screenshot review rounds with geometry and strict-CSP checks, tuning until approved (owner-gated)
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [ ] 02-08-PLAN.md — Release through the existing pipeline and the owner's deployed check on desktop and phone (owner-gated)
+
 **UI hint**: yes
 
 ### Phase 3: BGG Access Spike, Real Sync & Snapshot
@@ -217,7 +252,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Repo, Guardrails & Walking-Skeleton Deploy | 15/15 | Complete    | 2026-10-04 |
-| 2. Layout Engine & Cabinet Prototype | 0/0 | Not started | - |
+| 2. Layout Engine & Cabinet Prototype | 8/9 | In Progress|  |
 | 3. BGG Access Spike, Real Sync & Snapshot | 0/0 | Not started | - |
 | 4. Enrichment, Box Images & Shape | 0/0 | Not started | - |
 | 5. Game Detail, Accessibility & Language | 0/0 | Not started | - |

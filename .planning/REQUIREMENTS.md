@@ -34,7 +34,7 @@ Requirements for the initial release. Each maps to a roadmap phase.
 
 ### Expansions
 
-- [ ] **EXP-01**: Each owned expansion appears as a thin sideways spine with its name, right beside its owned base game.
+- [ ] **EXP-01**: Each owned expansion appears with its name right beside its owned base game: thick (big-box) expansions stand upright as spines next to the base, thin ones lie as thin sideways spines in a stack beside it.
 - [ ] **EXP-02**: An owned expansion whose base game is not owned still appears, as its own spine, labelled with the game it expands.
 - [ ] **EXP-03**: A base game with many expansions collapses the extras into a "+N more" stack, so a family never overflows its shelf.
 - [ ] **EXP-04**: An expansion dims or lights up together with its base game when filters are applied.

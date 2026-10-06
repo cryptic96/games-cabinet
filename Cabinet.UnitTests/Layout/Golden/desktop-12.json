@@ -1,0 +1,296 @@
+{
+  "layoutVersion": 8,
+  "profile": "desktop",
+  "optionsFingerprint": "09a03be9acd0723f",
+  "palette": [
+    {
+      "background": "#8a2432",
+      "text": "#ffffff"
+    },
+    {
+      "background": "#1f5a3a",
+      "text": "#ffffff"
+    },
+    {
+      "background": "#23407a",
+      "text": "#ffffff"
+    },
+    {
+      "background": "#e0a82e",
+      "text": "#2a1a10"
+    },
+    {
+      "background": "#17766f",
+      "text": "#ffffff"
+    },
+    {
+      "background": "#6a2f7a",
+      "text": "#ffffff"
+    },
+    {
+      "background": "#b8481a",
+      "text": "#ffffff"
+    },
+    {
+      "background": "#8fbfe0",
+      "text": "#2a1a10"
+    },
+    {
+      "background": "#efe3c2",
+      "text": "#2a1a10"
+    },
+    {
+      "background": "#a3b88f",
+      "text": "#2a1a10"
+    },
+    {
+      "background": "#434f5e",
+      "text": "#ffffff"
+    },
+    {
+      "background": "#e09aa5",
+      "text": "#2a1a10"
+    }
+  ],
+  "sections": [
+    {
+      "index": 0,
+      "widthMm": 1200,
+      "heightMm": 1100,
+      "frameMm": 20,
+      "cubbies": [
+        {
+          "index": 0,
+          "xMm": 0,
+          "yMm": 0,
+          "widthMm": 380,
+          "heightMm": 360,
+          "placements": [
+            {
+              "gameId": 10132,
+              "kind": "spine",
+              "xMm": 0,
+              "yMm": 0,
+              "widthMm": 74,
+              "heightMm": 255,
+              "title": "Quaylo Tavfordwyn Heskwynquin: Orvquinford Kelford Orvvex",
+              "label": "Quaylo Tavfordwyn\u2026",
+              "toneIndex": 5,
+              "patternIndex": 0
+            },
+            {
+              "gameId": 10025,
+              "kind": "flatBox",
+              "xMm": 74,
+              "yMm": 0,
+              "widthMm": 183,
+              "heightMm": 34,
+              "title": "Pellvex Vossmere Tarnzel",
+              "label": "Pellvex Voss\u2026",
+              "toneIndex": 2,
+              "patternIndex": 1
+            },
+            {
+              "gameId": 10131,
+              "kind": "flatBox",
+              "xMm": 74,
+              "yMm": 34,
+              "widthMm": 139,
+              "heightMm": 34,
+              "title": "Drelfordsk Sulmont: Brindisra of",
+              "label": "Drelford\u2026",
+              "toneIndex": 1,
+              "patternIndex": 1
+            },
+            {
+              "gameId": 10000,
+              "kind": "spine",
+              "xMm": 257,
+              "yMm": 0,
+              "widthMm": 77,
+              "heightMm": 338,
+              "title": "Heskbar Zimwyn",
+              "label": "Heskbar Zimwyn",
+              "toneIndex": 10,
+              "patternIndex": 4
+            }
+          ]
+        },
+        {
+          "index": 1,
+          "xMm": 400,
+          "yMm": 0,
+          "widthMm": 220,
+          "heightMm": 360,
+          "placements": [
+            {
+              "gameId": 10116,
+              "kind": "cover",
+              "xMm": 0,
+              "yMm": 0,
+              "widthMm": 190,
+              "heightMm": 261,
+              "title": "Lumley Mormont",
+              "label": "Lumley Mormont",
+              "toneIndex": 0,
+              "patternIndex": 4
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "xMm": 640,
+          "yMm": 0,
+          "widthMm": 560,
+          "heightMm": 360,
+          "placements": [
+            {
+              "gameId": 10064,
+              "kind": "cover",
+              "xMm": 0,
+              "yMm": 0,
+              "widthMm": 267,
+              "heightMm": 267,
+              "title": "Zimdis Belnia Quaymontven",
+              "label": "Zimdis Belnia Quaymontven",
+              "toneIndex": 10,
+              "patternIndex": 1
+            },
+            {
+              "gameId": 10090,
+              "kind": "cover",
+              "xMm": 267,
+              "yMm": 0,
+              "widthMm": 275,
+              "heightMm": 275,
+              "title": "Morquinbar: the of",
+              "label": "Morquinbar: the of",
+              "toneIndex": 9,
+              "patternIndex": 1
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "xMm": 0,
+          "yMm": 380,
+          "widthMm": 260,
+          "heightMm": 300,
+          "placements": [
+            {
+              "gameId": 10147,
+              "kind": "cover",
+              "xMm": 0,
+              "yMm": 0,
+              "widthMm": 226,
+              "heightMm": 291,
+              "title": "Raxmere: Tarnbarthan Dreldis Lumlo Vossthan",
+              "label": "Raxmere: Tarnbarthan Dreldis Lumlo Vossthan",
+              "toneIndex": 7,
+              "patternIndex": 4
+            }
+          ]
+        },
+        {
+          "index": 4,
+          "xMm": 280,
+          "yMm": 380,
+          "widthMm": 340,
+          "heightMm": 300,
+          "placements": []
+        },
+        {
+          "index": 5,
+          "xMm": 640,
+          "yMm": 380,
+          "widthMm": 200,
+          "heightMm": 300,
+          "placements": []
+        },
+        {
+          "index": 6,
+          "xMm": 860,
+          "yMm": 380,
+          "widthMm": 340,
+          "heightMm": 300,
+          "placements": []
+        },
+        {
+          "index": 7,
+          "xMm": 0,
+          "yMm": 700,
+          "widthMm": 460,
+          "heightMm": 400,
+          "placements": [
+            {
+              "gameId": 10153,
+              "kind": "spine",
+              "xMm": 0,
+              "yMm": 0,
+              "widthMm": 90,
+              "heightMm": 373,
+              "title": "Tarntor Wendskra Yartor: and of Jormere Drelmeremont",
+              "label": "Tarntor Wendskra Yartor",
+              "toneIndex": 11,
+              "patternIndex": 2
+            },
+            {
+              "gameId": 10066,
+              "kind": "cover",
+              "xMm": 90,
+              "yMm": 0,
+              "widthMm": 329,
+              "heightMm": 366,
+              "title": "Pellthan Drelra",
+              "label": "Pellthan Drelra",
+              "toneIndex": 6,
+              "patternIndex": 3
+            }
+          ]
+        },
+        {
+          "index": 8,
+          "xMm": 480,
+          "yMm": 700,
+          "widthMm": 300,
+          "heightMm": 400,
+          "placements": [
+            {
+              "gameId": 10173,
+              "kind": "cover",
+              "xMm": 0,
+              "yMm": 0,
+              "widthMm": 251,
+              "heightMm": 314,
+              "title": "Cassquin Lumzelthan",
+              "label": "Cassquin Lumzelthan",
+              "toneIndex": 6,
+              "patternIndex": 1
+            }
+          ]
+        },
+        {
+          "index": 9,
+          "xMm": 800,
+          "yMm": 700,
+          "widthMm": 400,
+          "heightMm": 400,
+          "placements": [
+            {
+              "gameId": 10213,
+              "kind": "cover",
+              "xMm": 0,
+              "yMm": 0,
+              "widthMm": 306,
+              "heightMm": 356,
+              "title": "Quaythan Lummere Morra",
+              "label": "Quaythan Lummere Morra",
+              "toneIndex": 4,
+              "patternIndex": 4
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

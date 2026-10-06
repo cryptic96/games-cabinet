@@ -139,6 +139,11 @@ is deliberately made public; making it public means removing the allow-list
 middleware from the real file on the Traefik container, nothing in this
 repository.
 
+The route's security-headers middleware sets HSTS, nosniff, frame denial and
+the referrer policy. It sets no Content-Security-Policy on purpose: the
+application sends its own strict policy with every response, and a second
+policy added by the proxy would be enforced alongside it.
+
 The route's service URL must point at this container's own address on port
 5080. The two addresses run in opposite directions: the route names this
 container, while `CABINET_TRAEFIK_IP` in `provision.conf` names the Traefik
