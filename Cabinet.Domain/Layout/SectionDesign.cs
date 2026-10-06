@@ -70,6 +70,12 @@ public sealed record SectionDesign(string Name, int InteriorWidthMm, int FrameMm
     /// </summary>
     public int MinOrphanHeightMm { get; init; } = 80;
 
+    /// <summary>
+    /// The least width an upright expansion is drawn at, in millimetres, so its title and the line naming its base game
+    /// fit side by side at the smallest width the section is shown at.
+    /// </summary>
+    public int MinUprightExpansionWidthMm { get; init; } = 64;
+
     /// <summary>Interior height: the row heights plus one frame between each pair of rows.</summary>
     public int InteriorHeightMm => Rows.Sum(row => row.HeightMm) + (FrameMm * Math.Max(0, Rows.Count - 1));
 

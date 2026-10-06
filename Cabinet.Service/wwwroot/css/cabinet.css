@@ -144,8 +144,8 @@
   unicode-bidi: plaintext;
 }
 
-.placement[data-kind="spine"]::before,
-.placement[data-kind="spine"]::after {
+.placement:is([data-kind="spine"], [data-kind="expansionSpine"])::before,
+.placement:is([data-kind="spine"], [data-kind="expansionSpine"])::after {
   content: "";
   position: absolute;
   left: 15%;
@@ -154,15 +154,15 @@
   background: var(--rule);
 }
 
-.placement[data-kind="spine"]::before {
+.placement:is([data-kind="spine"], [data-kind="expansionSpine"])::before {
   top: calc(var(--rule-inset) / 2);
 }
 
-.placement[data-kind="spine"]::after {
+.placement:is([data-kind="spine"], [data-kind="expansionSpine"])::after {
   bottom: calc(var(--rule-inset) / 2);
 }
 
-.placement[data-kind="spine"] .placement-label {
+.placement:is([data-kind="spine"], [data-kind="expansionSpine"]) .placement-label {
   display: block;
   writing-mode: vertical-rl;
   font-weight: 600;
@@ -332,6 +332,27 @@
 .placement[data-kind="cover"] .placement-sub {
   flex: 0 0 auto;
   text-align: center;
+}
+
+/**
+ * An expansion standing upright beside its base game reads like a spine with a second line: the title is the right-hand
+ * vertical line and the line naming the base game stands to its left, both reading top to bottom on one row each and
+ * ending in an ellipsis when the spine is short. The box has no light or shade layer and no stacking order of its own.
+ */
+.placement[data-kind="expansionSpine"] {
+  flex-direction: row-reverse;
+}
+
+.placement[data-kind="expansionSpine"] .placement-label {
+  font-size: clamp(12px, calc(var(--w) * var(--u) * 0.25), 14px);
+  line-height: 1.2;
+}
+
+.placement[data-kind="expansionSpine"] .placement-sub {
+  flex: 0 0 auto;
+  writing-mode: vertical-rl;
+  max-width: none;
+  max-height: calc(100% - 2 * var(--rule-inset));
 }
 
 /**

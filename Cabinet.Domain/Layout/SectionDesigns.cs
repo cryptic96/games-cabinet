@@ -32,6 +32,7 @@ public static class SectionDesigns
         MaxLayerHeightMm = 70,
         MarkerHeightMm = 40,
         MinOrphanHeightMm = 80,
+        MinUprightExpansionWidthMm = 64,
     };
 
     /// <summary>Every design the engine can build for.</summary>

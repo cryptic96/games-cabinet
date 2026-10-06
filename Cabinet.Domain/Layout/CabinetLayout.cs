@@ -15,6 +15,9 @@ public enum PlacementKind
     /// <summary>One expansion lying in the stack beside its base game.</summary>
     ExpansionLayer,
 
+    /// <summary>An expansion standing upright beside its base game, with a second line naming that game.</summary>
+    ExpansionSpine,
+
     /// <summary>A marker on top of a stack counting the expansions that did not fit.</summary>
     MoreMarker,
 

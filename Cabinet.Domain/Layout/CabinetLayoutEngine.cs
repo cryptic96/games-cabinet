@@ -5,14 +5,15 @@ namespace Cabinet.Domain.Layout;
 /// options: nothing is remembered between calls, so the same collection always gives the same cabinet. How each game
 /// stands is decided from that game alone. Base games, and expansions whose base game is not owned, are taken in
 /// collection then game identifier order and each goes into the first cubby, in reading order section by section, that
-/// can still take it; a new section opens only when no existing cubby can. An owned expansion never takes a place of its
-/// own: it stands in a stack beside its base game, and the base game reserves the column for that stack in its cubby
-/// when it is placed, whether the expansion arrived before or after it.
+/// can still take it the way it was chosen; failing that a plain game may lie flat in the first cubby that can take it
+/// lying down; a new section opens only when neither fits. An owned expansion never takes a place of its own: a thick
+/// one stands upright right beside its base game and a thinner one lies in a stack beside it, and the base game reserves
+/// the room for both in its cubby when it is placed, whether the expansion arrived before or after it.
 /// </summary>
 public static class CabinetLayoutEngine
 {
     /// <summary>Bumped whenever the algorithm or a design changes on purpose, so a rearrangement is always a conscious change.</summary>
-    public const int LayoutVersion = 4;
+    public const int LayoutVersion = 5;
 
     private const int MinBoxSideMm = 10;
 
@@ -52,7 +53,7 @@ public static class CabinetLayoutEngine
 
         foreach (var member in members)
         {
-            if (!TryPlaceInExistingSection(sections, context, member))
+            if (!TryPlaceInExistingSection(sections, context, member) && !TryPlaceLyingFlat(sections, context, member, fewGames))
             {
                 sections.Add(NewSection(context.Cubbies.Count));
 
@@ -98,8 +99,54 @@ public static class CabinetLayoutEngine
         }
 
         var baseItem = item with { Box = Clamp(item.Box, limits, expansions.Count > 0) };
+        var plain = new LayoutMember(baseItem, pose);
+        var room = limits.MaxWidthMm - CubbyArrangement.StandingWidthMm(plain) - design.StackColumnWidthMm;
+        var (uprights, stacked) = SplitExpansions(expansions, design, limits, room);
 
-        return new LayoutMember(baseItem, pose, expansions, null);
+        return plain with { Expansions = stacked, Uprights = uprights };
+    }
+
+    /// <summary>
+    /// Splits the expansions of a family, in collection order, into those that stand upright beside the base game and
+    /// those that lie in its stack. A thick expansion stands upright while fewer than the allowed number stand and it still
+    /// fits the room left beside the base game, which always keeps the stack column's width free; the first thick one that
+    /// does not fit, and every expansion after it, lies in the stack, so a later arrival never displaces an earlier upright.
+    /// Every expansion is scaled to the design's limits like a plain box.
+    /// </summary>
+    private static (List<CabinetItem> Uprights, List<CabinetItem> Stacked) SplitExpansions(
+        IReadOnlyList<CabinetItem> expansions,
+        SectionDesign design,
+        BoxLimits limits,
+        int room)
+    {
+        var uprights = new List<CabinetItem>();
+        var stacked = new List<CabinetItem>();
+        var roomLeft = room;
+        var standingOpen = true;
+
+        foreach (var expansion in expansions)
+        {
+            var scaled = expansion with { Box = Clamp(expansion.Box, limits, hasFamily: false) };
+
+            if (standingOpen && Orientation.StandsUpright(expansion))
+            {
+                var width = CubbyArrangement.UprightWidthMm(design, scaled);
+
+                if (uprights.Count < Orientation.MaxUprightExpansions && width <= roomLeft)
+                {
+                    uprights.Add(scaled);
+                    roomLeft -= width;
+
+                    continue;
+                }
+
+                standingOpen = false;
+            }
+
+            stacked.Add(scaled);
+        }
+
+        return (uprights, stacked);
     }
 
     /// <summary>
@@ -164,6 +211,26 @@ public static class CabinetLayoutEngine
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Tries the member lying flat across the existing sections in reading order. Only a plain game that was chosen to face
+    /// out or stand is eligible, and only when the setting is on and the few-games look is off: a game with expansions
+    /// always stands and an expansion without an owned base game already lies flat.
+    /// </summary>
+    private static bool TryPlaceLyingFlat(
+        List<List<List<LayoutMember>>> sections,
+        BuildContext context,
+        LayoutMember member,
+        bool fewGames)
+    {
+        var eligible = context.Options.LieFlatBeforeNewSection
+            && !fewGames
+            && member.Pose != BoxPose.Flat
+            && !member.IsOrphanExpansion
+            && !member.HasFamily;
+
+        return eligible && TryPlaceInExistingSection(sections, context, member with { Pose = BoxPose.Flat });
     }
 
     private static bool TryPlaceInSection(

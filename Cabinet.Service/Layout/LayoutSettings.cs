@@ -13,10 +13,11 @@ public static class LayoutSettings
     private const string StrategyKey = "Layout:CoverStrategy";
     private const string StackMaxKey = "Layout:ExpansionStackMax";
     private const string ThresholdKey = "Layout:FewGamesThreshold";
+    private const string LieFlatKey = "Layout:LieFlatBeforeNewSection";
 
     /// <summary>
-    /// Reads the four Layout keys. A key that is absent takes the default; a key that is present but out of range, not a
-    /// whole number, or not a known strategy name throws.
+    /// Reads the five Layout keys. A key that is absent takes the default; a key that is present but out of range, not a
+    /// whole number, not a known strategy name, or not true or false where a switch is expected throws.
     /// </summary>
     /// <exception cref="InvalidOperationException">A value is invalid; the message names the full key.</exception>
     public static LayoutOptions FromConfiguration(IConfiguration configuration)
@@ -29,7 +30,25 @@ public static class LayoutSettings
             ReadWholeNumber(configuration, SharePercentKey, 0, 100, defaults.CoverSharePercent),
             ReadStrategy(configuration, defaults.CoverStrategy),
             ReadWholeNumber(configuration, StackMaxKey, 1, 20, defaults.ExpansionStackMax),
-            ReadWholeNumber(configuration, ThresholdKey, 0, 100, defaults.FewGamesThreshold));
+            ReadWholeNumber(configuration, ThresholdKey, 0, 100, defaults.FewGamesThreshold),
+            ReadSwitch(configuration, LieFlatKey, defaults.LieFlatBeforeNewSection));
+    }
+
+    private static bool ReadSwitch(IConfiguration configuration, string key, bool fallback)
+    {
+        var text = configuration[key];
+
+        if (text is null)
+        {
+            return fallback;
+        }
+
+        return text.Trim().ToLowerInvariant() switch
+        {
+            "true" => true,
+            "false" => false,
+            _ => throw new InvalidOperationException($"{key} must be true or false."),
+        };
     }
 
     private static int ReadWholeNumber(IConfiguration configuration, string key, int min, int max, int fallback)

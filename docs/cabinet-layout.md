@@ -15,8 +15,23 @@ shaded wood.
 
 Games are placed into the cubbies by the server, not by the browser. The
 browser only draws the result. A game can face out as a box front (a cover),
-stand as a spine, or lie flat. Expansions stand in a narrow stack beside their
-base game, and a long stack ends in a "+N more" marker.
+stand as a spine, or lie flat. An expansion that is at least 50 millimetres
+deep stands upright right beside its base game, with a second line naming that
+game, up to two per base game and only while the family still fits the widest
+box a section holds. Thinner expansions, and thick ones that no longer fit,
+lie in a narrow stack beside the upright ones, thickest at the bottom, and a
+long stack ends in a "+N more" marker. A stack shows the expansions that arrived
+first, as many as fit under the shelf above, so a new arrival in a full stack
+only raises the number in the marker. The base game reserves room for its upright expansions and its
+stack as soon as it is placed, so an expansion is never left without a place
+beside its game.
+
+Boxes lying flat are piled up to four high, with the widest box at the bottom
+and the thicker box lower among boxes of the same width, so no box overhangs
+the one beneath it. A big box is chosen to face out or stand, and it does so
+wherever a cubby has room for it. Only when no cubby of the existing sections
+has room for it standing does it lie flat, in the first cubby that can take it
+lying down, before a new section is added.
 
 When the collection outgrows one section, a new section is added beside the
 existing ones, and once a row is full further sections start a new row below.
@@ -39,6 +54,7 @@ two underscores.
 | `Layout:CoverStrategy` | `SizeWeighted` | `SizeWeighted`, `Random`, `OversizeOnly` | How the boxes that face out are chosen. `SizeWeighted` makes large boxes much more likely to face out. `Random` gives every box the same chance, decided from its game identifier alone. `OversizeOnly` faces out exactly the boxes too tall to stand upright in the design and ignores the share. |
 | `Layout:ExpansionStackMax` | 6 | 1 to 20 | The most expansions drawn in one stack before the rest are summed up as "+N more". |
 | `Layout:FewGamesThreshold` | 12 | 0 to 100 | Below this many top-level games, every box faces out, so a small collection fills the cabinet with covers instead of a few lonely spines. |
+| `Layout:LieFlatBeforeNewSection` | `true` | `true` or `false` | Lets a game that fits no existing cubby standing lie flat in the first cubby that can take it lying down, instead of opening a new section for it. Turning it off keeps every game standing the way it was chosen, but may add sections that are mostly empty. |
 | `Prototype:Enabled` | `true` in the committed settings | `true` or `false` | Shows the invented sample collections and their switcher. See "Invented collections" below. |
 
 ### Changing a setting on the server
@@ -48,6 +64,7 @@ Put the setting in `/etc/cabinet/cabinet.env`, one per line, for example:
 ```
 Layout__CoverSharePercent=30
 Layout__CoverStrategy=Random
+Layout__LieFlatBeforeNewSection=true
 Prototype__Enabled=false
 ```
 
@@ -58,7 +75,7 @@ sudo systemctl restart cabinet
 ```
 
 Every value is checked when the app starts. A value that is out of range, not
-a whole number, or not a known strategy name stops the app with a message
+a whole number, not a known strategy name, or not `true` or `false` where a switch is expected stops the app with a message
 that names the key, for example `Layout:CoverSharePercent must be a whole
 number between 0 and 100.` Read the message in the service journal:
 
@@ -79,7 +96,8 @@ every restart. Nothing is random in a way that changes between requests: every
 choice comes from the game's own identifier and the settings.
 
 Adding a game changes only the cubby it lands in. Neighbouring games keep
-their place, their orientation and their colour.
+their place, their orientation and their colour. A game lands lying flat when no
+cubby had room for it standing the way it was chosen.
 
 A few changes rearrange more than that, and these are accepted:
 
@@ -87,10 +105,16 @@ A few changes rearrange more than that, and these are accepted:
   came after it take new places.
 - Crossing the few-games threshold rearranges the cabinet once, because every
   box faced out below it and the normal mix applies from it.
-- The first expansion for a game that had none reserves its stack beside the
-  base game. That family may move, and later cubbies may shift to make room.
+- An expansion that makes its family wider may move that family, and later
+  cubbies may shift to make room, while every game ordered before the base game
+  keeps its cubby. That is the first expansion for a game, the first one that
+  lies in a game's stack, and a big one that stands upright. An expansion that
+  joins a stack its game already has changes only that game's cubby.
 - An expansion whose base game is added later moves from standing alone to
-  standing in the stack beside that base game.
+  standing beside that base game, upright or in its stack.
+- When one of the changes above shifts later cubbies, games in them may also
+  change between standing the way they were chosen and lying flat, because that
+  depends on the room left by the games before them.
 - Changing a layout setting changes the arrangement, since the settings are
   part of what decides it.
 
