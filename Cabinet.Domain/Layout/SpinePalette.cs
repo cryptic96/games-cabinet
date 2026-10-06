@@ -10,6 +10,18 @@ public static class SpinePalette
     /// <summary>The number of cover patterns the page can draw.</summary>
     public const int PatternCount = 6;
 
+    /// <summary>
+    /// The colour of the shade the cabinet furniture may lay across the boxes, as a hexadecimal colour. It is the shadow
+    /// the shelf above casts down onto the boxes standing beneath it.
+    /// </summary>
+    public const string ShadeColour = "#140a04";
+
+    /// <summary>
+    /// The strongest shade, as a percentage of <see cref="ShadeColour"/> mixed over a box, that the furniture may lay across
+    /// a box. Every tone and the marker chip keep readable text at this strength, so the page may use any lower value.
+    /// </summary>
+    public const int MaxShadePercent = 20;
+
     private const string LightText = "#ffffff";
     private const string DarkText = "#2a1a10";
 

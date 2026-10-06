@@ -36,6 +36,46 @@ public class SpinePaletteTests
 
     [Fact]
     [Trait("Category", "Layout")]
+    public void The_shade_colour_and_cap_are_fixed()
+    {
+        SpinePalette.ShadeColour.Should().Be("#140a04");
+        SpinePalette.MaxShadePercent.Should().Be(20);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void Every_tone_keeps_the_minimum_contrast_under_the_strongest_shade()
+    {
+        foreach (var tone in SpinePalette.Tones)
+        {
+            var background = Shaded(Rgb(tone.Background), SpinePalette.MaxShadePercent);
+            var text = Shaded(Rgb(tone.Text), SpinePalette.MaxShadePercent);
+
+            Contrast(background, text).Should().BeGreaterThanOrEqualTo(MinimumContrast, tone.Background);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void The_marker_chip_keeps_the_minimum_contrast_under_the_strongest_shade()
+    {
+        var background = Shaded(Rgb("#d9b98a"), SpinePalette.MaxShadePercent);
+        var text = Shaded(Rgb("#2a1a10"), SpinePalette.MaxShadePercent);
+
+        Contrast(background, text).Should().BeGreaterThanOrEqualTo(MinimumContrast);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_stronger_shade_would_push_the_rust_pair_below_the_minimum()
+    {
+        var rust = SpinePalette.Tones.Single(tone => tone.Background == "#b8481a");
+
+        Contrast(Shaded(Rgb(rust.Background), 30), Shaded(Rgb(rust.Text), 30)).Should().BeLessThan(MinimumContrast);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
     public void The_pattern_count_is_six()
     {
         SpinePalette.PatternCount.Should().Be(6);
@@ -107,6 +147,22 @@ public class SpinePaletteTests
     private static int[] Rgb(string hex) =>
         Enumerable.Range(0, ChannelCount).Select(channel => Convert.ToInt32(hex.Substring(1 + (channel * 2), 2), 16)).ToArray();
 
+    private static double[] Shaded(int[] colour, int percent)
+    {
+        var shade = Rgb(SpinePalette.ShadeColour);
+
+        return colour.Select((channel, index) => (channel * (100 - percent) / 100.0) + (shade[index] * percent / 100.0)).ToArray();
+    }
+
+    private static double Contrast(double[] first, double[] second)
+    {
+        var a = Luminance(first);
+        var b = Luminance(second);
+        var (lighter, darker) = a >= b ? (a, b) : (b, a);
+
+        return (lighter + 0.05) / (darker + 0.05);
+    }
+
     private static double Contrast(int[] first, int[] second)
     {
         var a = Luminance(first);
@@ -116,7 +172,9 @@ public class SpinePaletteTests
         return (lighter + 0.05) / (darker + 0.05);
     }
 
-    private static double Luminance(int[] rgb)
+    private static double Luminance(int[] rgb) => Luminance(rgb.Select(channel => (double)channel).ToArray());
+
+    private static double Luminance(double[] rgb)
     {
         var linear = rgb.Select(channel =>
         {

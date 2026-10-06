@@ -5,6 +5,10 @@
  * Every box takes its background and text colour from the layout's palette table through --bg and --fg. A face-out box
  * is a generated cover: the palette colour, a pattern chosen from the game's own hash and a solid title plate. That
  * generated cover is also what stands in whenever a game has no usable box art.
+ *
+ * The three decorative elements of every section and the two attributes on every cubby carry no meaning of their own.
+ * They exist only so the stylesheet can draw the furniture: the moulded top, the side boards, the plinth, a stable tone
+ * for each shelf and the end of each row.
  */
 
 /** The cover pattern names in the order of the pattern index the layout carries. */
@@ -83,21 +87,45 @@ function buildPlacement(placement, copy, palette) {
   return button;
 }
 
+/** The number of distinct shelf tones the stylesheet defines. */
+const BOARD_TONE_COUNT = 6;
+
 /**
  * Builds one cubby with its placements.
  * @param {object} cubby One cubby from the layout.
  * @param {object} copy The visitor-facing strings.
  * @param {object[]} palette The colour table of the layout.
+ * @param {object} section The section the cubby belongs to.
+ * @param {number[]} rowTops The distinct cubby tops of the section in ascending order.
  * @returns {HTMLDivElement}
  */
-function buildCubby(cubby, copy, palette) {
+function buildCubby(cubby, copy, palette, section, rowTops) {
   const element = document.createElement('div');
   element.className = 'cubby';
+  element.dataset.board = String((section.index * 2 + rowTops.indexOf(cubby.yMm)) % BOARD_TONE_COUNT);
+
+  if (cubby.xMm + cubby.widthMm === section.widthMm) {
+    element.dataset.rowEnd = 'true';
+  }
+
   setNumber(element, '--x', cubby.xMm);
   setNumber(element, '--y', cubby.yMm);
   setNumber(element, '--w', cubby.widthMm);
   setNumber(element, '--h', cubby.heightMm);
   element.append(...cubby.placements.map((placement) => buildPlacement(placement, copy, palette)));
+
+  return element;
+}
+
+/**
+ * Builds one empty decorative element that screen readers skip.
+ * @param {string} className The class the stylesheet draws it by.
+ * @returns {HTMLDivElement}
+ */
+function buildDecoration(className) {
+  const element = document.createElement('div');
+  element.className = className;
+  element.setAttribute('aria-hidden', 'true');
 
   return element;
 }
@@ -116,10 +144,17 @@ function buildSection(section, copy, palette) {
   setNumber(element, '--section-h', section.heightMm + 2 * section.frameMm);
   setNumber(element, '--frame', section.frameMm);
 
+  const rowTops = [...new Set(section.cubbies.map((cubby) => cubby.yMm))].sort((a, b) => a - b);
+
   const body = document.createElement('div');
   body.className = 'section-body';
-  body.append(...section.cubbies.map((cubby) => buildCubby(cubby, copy, palette)));
-  element.append(body);
+  body.append(...section.cubbies.map((cubby) => buildCubby(cubby, copy, palette, section, rowTops)));
+  element.append(
+    body,
+    buildDecoration('section-top'),
+    buildDecoration('section-trim'),
+    buildDecoration('section-base'),
+  );
 
   return element;
 }
