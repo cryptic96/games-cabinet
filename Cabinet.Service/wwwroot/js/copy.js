@@ -8,6 +8,9 @@ export const COPY = Object.freeze({
   retry: 'Try again',
   untitled: 'Untitled game',
 
+  /** Sub-label of an expansion whose base game is not known. */
+  expansionLabel: 'Expansion',
+
   /**
    * Sub-label of an expansion whose base game is not owned.
    * @param {string} base The base game title.
@@ -15,6 +18,15 @@ export const COPY = Object.freeze({
    */
   expansionFor(base) {
     return `Expansion for ${base}`;
+  },
+
+  /**
+   * Accessible name of an expansion whose base game is not known.
+   * @param {string} title The expansion title.
+   * @returns {string}
+   */
+  expansionName(title) {
+    return `${title}, expansion`;
   },
 
   /**
