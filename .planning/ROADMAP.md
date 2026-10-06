@@ -102,7 +102,7 @@ Plans:
   4. Each expansion appears as a thin sideways spine with its name beside its base game; an expansion whose base game is absent stands alone, labelled with the game it expands; a base game with many expansions collapses the extras into a "+N more" stack that never overflows its shelf.
   5. On a phone-width screen the cabinet reflows into a narrower, taller cabinet that still looks like a cabinet, with spines readable and large enough to tap.
 
-**Plans:** 5/8 plans executed
+**Plans:** 5/9 plans executed
 
 Plans:
 **Wave 1**
@@ -124,13 +124,17 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 02-06-PLAN.md — Phone cabinet with derived tap floors, design validation and box limits, recorded golden layouts
+- [ ] 02-09-PLAN.md — Box poses: piles largest at the bottom, big boxes lie flat before a new section (server setting), thick expansions upright beside their base, stacks thickest at the bottom; before and after measurements and screenshots
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 02-07-PLAN.md — Owner screenshot review rounds with geometry and strict-CSP checks, tuning until approved (owner-gated)
+- [ ] 02-06-PLAN.md — Phone cabinet with derived tap floors, design validation and box limits, recorded golden layouts
 
 **Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 02-07-PLAN.md — Owner screenshot review rounds with geometry and strict-CSP checks, tuning until approved (owner-gated)
+
+**Wave 8** *(blocked on Wave 7 completion)*
 
 - [ ] 02-08-PLAN.md — Release through the existing pipeline and the owner's deployed check on desktop and phone (owner-gated)
 

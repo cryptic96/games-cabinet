@@ -77,6 +77,9 @@ Filled in by the planner once task IDs exist. Requirement-to-test intent from re
 | 02-05 T1 (tracer) | EXP-01, EXP-03 | quick command + syntax check | Stacks beside bases, "+N more", stack height |
 | 02-05 T2 | EXP-02 | quick command | Orphans, multi-parent, few-games count |
 | 02-05 T3 | CAB-05, EXP-01, EXP-03 | quick command | Family append stability, first-expansion exception |
+| 02-09 T1 (tracer) | CAB-01, CAB-02, CAB-04, CAB-05 | quick command | Pile order and no overhang in `AssertValid`, lie flat before a new section, setting parse and fingerprint, before and after section counts |
+| 02-09 T2 | EXP-01, EXP-03, CAB-05 | quick command + integration project + syntax check | Upright expansions (threshold, cap, width room, adjacency), narrowed stack rule, widening exception |
+| 02-09 T3 | EXP-03, CAB-05 | `dotnet test --solution Cabinet.slnx` + syntax check | Stacks thickest first with arrival-chosen shown set; scratch screenshots and DOM checks at 1440 px for the 65 and 400 samples |
 | 02-06 T1 (tracer) | CAB-07 | quick command + integration project | Derived phone floors, phone endpoint |
 | 02-06 T2 | CAB-01, CAB-04 | quick command | Design validator, box clamp, worst-case family |
 | 02-06 T3 | CAB-05 | quick command | Goldens 0/1/5/12/65, 400 digest, version-bump guard |

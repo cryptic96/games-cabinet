@@ -16,6 +16,8 @@ created: 2026-10-05
 > **Repository rule reminder for executors.** This file may use requirement keys and decision IDs because it lives in the planning folder. Nothing copied from it into code, markup, strings, tests, docs or comments may contain them (see the project instructions). Copy strings below are written so they can be pasted as-is.
 >
 > **Amendment 2026-10-06 (D-20).** After reviewing the running tracer, the owner found the furniture plain and chose the **B classic** finish from mocked-up directions. New section "Furniture finish: B classic"; amended: Spacing exceptions (board thickness), Color (frame, interior, edge highlight, backdrop separation), Structure and scaling (section box, `--u`), Wood and cubbies, focus layering, Readability floors (side allowance in `uMin`), Screen readers, UI Considerations (two rows) and the Tuning Register. The owner's choice is the approval for this amendment; the original checker sign-off below covers the rest.
+>
+> **Amendment 2026-10-06 (D-21 to D-24).** After reviewing screenshots of the cabinet with expansion families, the owner changed how boxes stack: piles go largest at the bottom with no overhang, big boxes may lie flat instead of opening a mostly empty section, thick expansions stand upright beside their base game with a second line naming it, and expansion stacks go thickest at the bottom. Amended: In-cabinet text rules (expansion spine row), Placement kinds (flat box and expansion layer rows, new expansion spine row), Readability floors (upright expansion width), Mix the owner will judge, Copywriting Contract (expansion spine rows), UI Considerations (one row amended, two added) and the Tuning Register. Plan 02-09 builds it. The owner's decision is the approval for this amendment.
 
 ---
 
@@ -80,6 +82,7 @@ Weights are exactly **400 and 600**. The existing bold (700) heading and the `0.
 | Spine title | weight 600, line-height 1.2, `writing-mode: vertical-rl` on an **inner `<span>`** (never on the `<button>`), reads top to bottom. Size = `clamp(12px, 0.5 x rendered spine width, 16px)` (**STARTING VALUE** ratio 0.5 and 16px ceiling). One line, `overflow: hidden; text-overflow: ellipsis` |
 | Flat box and expansion layer label | weight 600, single horizontal line, ellipsis. Size = `clamp(12px, 0.5 x rendered height, 14px)` |
 | Orphan expansion box | two lines: title (weight 600, same rule as above) and sub-label "Expansion for {base game title}" (weight 400, 12px), each on one line with ellipsis; the title keeps priority when space is short |
+| Expansion spine (upright expansion, D-23) | two vertical lines side by side, both reading top to bottom on inner spans: the title as the right-hand line (weight 600, `clamp(12px, 0.25 x rendered width, 14px)`, **STARTING VALUE** ratio and ceiling) and the sub-label "Expansion for {base game title}" to its left (weight 400, 12px, the orphan sub-label style); line height 1.2; each one line with ellipsis, no longer than the spine height minus the rule insets |
 | Cover title | weight 600, centred, up to 4 lines (line clamp) inside the solid title plate. Size = `clamp(12px, 0.10 x rendered cover width, 22px)` (**STARTING VALUE**) |
 | "+N more" marker | weight 600, 12px, single line |
 | Truncation of spine labels | the engine shortens titles at the first `": "` or `" - "`, then at a character budget derived from the rendered spine height; CSS ellipsis is the backstop; the full title is always in `aria-label` and `title` |
@@ -283,8 +286,9 @@ All kinds are native `<button type="button">` elements with `position: absolute`
 |------|------|-----------------|
 | Cover (face-out, generated) | Full box front: palette background; a **pattern layer** over the whole face drawn in `color-mix(in srgb, var(--fg) 14%, transparent)` (**STARTING VALUE** 14%); a **solid title plate** (palette background, no pattern) spanning the full width at vertical centre, about 40% of cover height (**STARTING VALUE**), holding the title. The plate guarantees title contrast over any pattern. Pattern tile about 24 mm, chosen from six patterns by `data-pattern` (stripes, chevrons, dots, rings, diagonal, plain), from the game's own hash | Full title |
 | Spine (upright) | Palette background, title in the vertical inner span, two thin horizontal rules near the top and bottom edges in `color-mix(in srgb, var(--fg) 35%, transparent)` (decorative only, kept clear of the text) | Full title |
-| Flat box (lying, spine out) | Horizontal rectangle, palette background, single-line label at the left with ellipsis, same rule styling as the spine on its short ends | Full title |
-| Expansion layer (thin sideways spine) | Same visual language as a flat box, in the **fixed-width stack column** beside the base game, stacked upward from the cubby floor, base-aligned left; one layer per expansion, label horizontal on its thin edge | "{expansion title}, expansion for {base title}" |
+| Flat box (lying, spine out) | Horizontal rectangle, palette background, single-line label at the left with ellipsis, same rule styling as the spine on its short ends. **Piles (D-21, FIXED rule):** from the floor up each box is no wider than the one below (widest at the bottom; among equal widths the thicker lower; then the cubby's stable order); piles stay flush left and no box overhangs the one beneath it (tolerance 0). **Big boxes (D-22):** a box of any size may lie flat when no cubby of the existing sections has room for it the way it was chosen to stand, before a new section opens (server setting, default on) | Full title |
+| Expansion layer (thin sideways spine) | Same visual language as a flat box, in the **fixed-width stack column** beside the base game (after any upright expansions), stacked upward from the cubby floor, base-aligned left; one layer per thin expansion (and per thick one beyond the upright room), label horizontal on its thin edge. **Order (D-24):** the stack shows the earliest-arriving expansions that fit (the latest arrivals collapse into "+N more"), drawn thickest at the bottom, ties in collection order | "{expansion title}, expansion for {base title}" |
+| Expansion spine (upright expansion, D-23) | Same visual language as a spine (palette background, the two thin rules near the ends), standing on the cubby floor immediately right of its base game and before the stack column, at most two per family; title plus a second line naming the base game in the orphan sub-label style (see In-cabinet text rules). No light or shade layer of its own, no stacking order of its own; the furniture's shade over boxes falls on it like on any box | "{expansion title}, expansion for {base title}" |
 | "+N more" marker | Chip on top of the stack: `--wood-light` background, `--ink` text, weight 600, 12px, text "+{N} more", about 40 mm tall (**STARTING VALUE**); the only element in the cabinet that uses the accent | "{N} more expansions for {base title}" |
 | Orphan expansion box | Flat box with two lines: title and "Expansion for {base game title}"; minimum rendered height 36px | "{title}, expansion for {base title}" |
 
@@ -302,11 +306,12 @@ These floors are enforced in the engine (clamp on rendered millimetre sizes) and
 - Rule: minimum rendered spine width and minimum expansion layer height = `ceil(24 / uMin)` mm on phone, where `uMin = (320 - 2 x 8) / (phone interior width + 2 x frame + 2 x side allowance)` px per mm. That is the smallest supported viewport with 8px gutters, the frame included and, **amended (D-20)**, the furniture's FIXED 32 mm side allowance included, because the section box that the 304 px must hold is that much wider. With the starting phone section (640 mm interior), 20 mm frames and the allowance this is `304 / 744 = 0.409`, so **about 59 mm**. Before the furniture finish the figure was 54 mm (680 mm). The research figure of 52 mm assumed 12px gutters and no frame. Use the derived figure. Height reserved for the top, plinth and floor margin does not affect the floors, which depend on width only.
 - Desktop floor: about **34 mm** (a pointer user needs no 24px target; 34 mm is roughly 15px at the smallest desktop section of 592 px, now 1304 mm wide with the allowance, and still holds a 12px label). STARTING VALUE.
 - Orphan box minimum height: `ceil(36 / uMin)` mm per profile (about 80 mm desktop at 592 px over 1304 mm, about 89 mm phone with the starting values).
+- Upright expansion minimum width (D-23): `ceil(29 / uMin)` mm per profile, where 29 px holds two 12px lines at line height 1.2: **64 mm desktop** (typed as a STARTING VALUE until the phone slice derives both profiles) and about **71 mm phone**. A thick expansion thinner than this is drawn at the minimum, the same accepted readability trade as orphan boxes.
 - A small card game therefore shows visibly thicker than its real size on phone; this is the accepted readability trade.
 
 ### Mix the owner will judge (rendering side)
 
-The engine decides which game is a cover, spine or flat box; the renderer only draws what it receives. For review, the page must show on every sample: covers mixed with spines and flat stacks in irregular cubbies; a family with a flat expansion stack beside its base (base as spine or as cover); a family large enough to show "+N more"; orphan expansions; empty cubbies in the last section.
+The engine decides which game is a cover, spine or flat box; the renderer only draws what it receives. For review, the page must show on every sample: covers mixed with spines and flat stacks in irregular cubbies; a family with a flat expansion stack beside its base (base as spine or as cover); a family large enough to show "+N more"; orphan expansions; empty cubbies in the last section. Added with D-21 to D-24: piles that go widest at the bottom, at least one big box lying flat (desktop 65 and 400 samples), at least one thick expansion standing upright beside its base, and stacks drawn thickest at the bottom.
 
 ---
 
@@ -345,6 +350,8 @@ Plain, short, no jargon. All copy is English only in this phase; the language sw
 | "+N more" marker | `+{N} more` |
 | Stack layer accessible name | `{expansion title}, expansion for {base game title}` |
 | "+N more" accessible name | `{N} more expansions for {base game title}` (`1 more expansion for ...` when N is 1) |
+| Expansion spine accessible name (D-23) | `{expansion title}, expansion for {base game title}` (same string as a stack layer) |
+| Expansion spine second line (D-23) | `Expansion for {base game title}` (same string as the orphan sub-label; no new copy) |
 | Untitled fallback | `Untitled game` (label and accessible name when a title is missing or blank) |
 | Destructive confirmation | not applicable: no destructive actions in this phase |
 
@@ -363,7 +370,7 @@ Plain, short, no jargon. All copy is English only in this phase; the language sw
 
 ## UI Considerations
 
-Probed over 8 surfaces with confirmed element kinds: cabinet (list-collection), placement buttons (interactive-control, static-content), generated cover (media, static-content), expansion stack (list-collection), sample switcher (nav), status line (static-content), load states (interactive-control), footer (static-content). 35 applicable considerations: 24 resolved (explicit), 11 dismissed with reason. Plus 7 extra rows: 4 resolved (backstop, owner review) and 3 resolved (explicit; two of them added with the furniture finish, D-20). Copy for the empty, loading and error states is in the Copywriting Contract and is referenced, not repeated, here.
+Probed over 8 surfaces with confirmed element kinds: cabinet (list-collection), placement buttons (interactive-control, static-content), generated cover (media, static-content), expansion stack (list-collection), sample switcher (nav), status line (static-content), load states (interactive-control), footer (static-content). 35 applicable considerations: 24 resolved (explicit), 11 dismissed with reason. Plus 9 extra rows: 4 resolved (backstop, owner review) and 5 resolved (explicit; two of them added with the furniture finish, D-20, and two with the box poses, D-21 to D-24). Copy for the empty, loading and error states is in the Copywriting Contract and is referenced, not repeated, here.
 
 | Category | Element | Status | Verification | Resolution / Reason |
 |----------|---------|--------|--------------|---------------------|
@@ -387,7 +394,7 @@ Probed over 8 surfaces with confirmed element kinds: cabinet (list-collection), 
 | empty | expansion stack | resolved | explicit | A base game with no owned expansions has no stack column and occupies only its own width |
 | loading | expansion stack | dismissed | n/a | The stack is drawn in the same render pass as the rest of the cabinet |
 | error | expansion stack | dismissed | n/a | The stack has no separate request; the cabinet-level error state covers it |
-| populated | expansion stack | resolved | explicit | Each owned expansion with an owned base is a thin sideways layer in the fixed-width column to the right of its base, stacked upward from the cubby floor, with accessible name "{expansion title}, expansion for {base title}" |
+| populated | expansion stack | resolved | explicit | Each owned expansion with an owned base stands right beside it: a thin one as a sideways layer in the fixed-width column, stacked upward from the cubby floor thickest first; a thick one (at least 50 mm deep, at most two per family, within the design's widest box) upright between the base and the column, with a second line naming the base. Both carry the accessible name "{expansion title}, expansion for {base title}" (amended, D-23, D-24) |
 | partial | expansion stack | resolved | explicit | An expansion whose base game is not owned is drawn as its own orphan box with the sub-label "Expansion for {base game title}"; an expansion with several owned bases joins the lowest-id base |
 | overflow | expansion stack | resolved | explicit | Layers beyond the stack maximum or beyond the height under the shelf above collapse into the "+N more" marker; a unit test asserts the stack never exceeds the cubby height |
 | zero-one-many | expansion stack | resolved | explicit | Zero expansions: no column; one: a single layer; more than the maximum: the maximum or fewer layers plus "+N more", with "1 more expansion" in the accessible name when N is 1 |
@@ -408,6 +415,8 @@ Probed over 8 surfaces with confirmed element kinds: cabinet (list-collection), 
 | populated | dark palette tones against the dark cubby back | resolved | backstop | statement: box edges and contact shadows keep dark boxes distinguishable from the cubby back in owner review; verification: backstop |
 | zero-one-many | few-games look (1 to 11 items) | resolved | backstop | statement: the owner confirms in review round one that the minimum cabinet with few games looks intentional (scattered covers versus a compact arrangement); verification: backstop |
 | overflow | furniture finish (top, side trim, plinth, feet, floor shadow) | resolved | explicit | Each section reserves its full height, including the moulded top, plinth and floor margin, through its aspect ratio before rendering, and every furniture part and shadow ends inside the section box, so nothing shifts while loading and paint containment never cuts the top, the feet or the floor shadow |
+| populated | flat piles (D-21, D-22) | resolved | explicit | Every pile goes widest at the bottom, thicker lower among equal widths, and no box overhangs the one beneath it; a big box lies flat only when no cubby has room for it standing, before a new section opens, and piles with the other flat boxes under the same four-box maximum |
+| overflow | upright expansions (D-23) | resolved | explicit | Thick expansions stand upright only while the family (base, uprights and the stack column's room) stays within the widest box the design holds, and at most two per family; any further thick expansion lies in the stack, so a family never leaves its cubby or overflows its shelf |
 | populated | box labels under the furniture's light and shade | resolved | explicit | Every box label keeps a contrast of at least 4.5:1 with the furniture applied: no light layer falls across boxes, and the only shade over boxes is capped at alpha 0.20, unit-tested for every palette tone and the marker chip and re-measured per label in the browser |
 
 ---
@@ -424,6 +433,10 @@ Everything the owner may ask to change in a review round. All **STARTING VALUE**
 | Desktop section | 1200 mm interior, 1780 mm tall, five rows of irregular cubbies | engine section data |
 | Phone section | 640 mm interior, 1860 mm tall, six rows | engine section data |
 | Stack column width, layer height clamp, marker height | 190 mm, 40 to 70 mm, 40 mm | engine |
+| Upright expansion threshold and per-family maximum (D-23) | at least 50 mm deep; 2 per family | engine (`Orientation`) |
+| Upright expansion minimum width (D-23) | 64 mm desktop; about 71 mm phone (derived from the two-line target) | engine section data |
+| Big boxes lie flat before a new section opens (D-22) | on | server setting `Layout:LieFlatBeforeNewSection` |
+| Flat pile maximum | 4 boxes (applies to big boxes lying flat too) | engine (`CubbyArrangement`) |
 | Few-games threshold, cover share, stack maximum | 12 items, 25 percent, 6 layers | server settings |
 | Size-class weights for covers | 0.3 / 1.0 / 2.2 | engine |
 | Phone and desktop readability floors | about 59 mm and 34 mm (phone derived including the 32 mm side allowance) | engine |
@@ -443,7 +456,7 @@ Everything the owner may ask to change in a review round. All **STARTING VALUE**
 | Shade over boxes | alpha 0.20 (never above the cap), depth 20% of cubby height | CSS finish tokens |
 | Floor shadow, wall shadow, moulding shadow | 0.55 at the floor-shadow centre; faint, inside the margins | CSS |
 
-**FIXED (not for tuning):** contrast of at least 4.5:1 for all box text; 12px text floor inside the cabinet; 24px phone tap floor; 2 font weights; no inline styles or scripts; empty cubbies stay bare; accent reserved list; DOM order equals reading order; no pull-out or detail behaviour in this phase. Furniture finish (D-20): the 32 mm side allowance (it feeds the readability floors); the shade cap of alpha 0.20 in `rgb(20 10 4)` and no light layer across boxes; one light direction; only the four existing browns; finish values live in CSS only, over the three decorative elements and two cubby hooks, so the engine geometry and `LayoutVersion` never change for a finish tweak; everything painted stays inside the section box. Switching to another finish is not a tuning round (see the todo for selectable finishes).
+**FIXED (not for tuning):** piles never overhang (tolerance 0) and piles and stacks are ordered by size with the stable order as the tie-break (D-21, D-24); contrast of at least 4.5:1 for all box text; 12px text floor inside the cabinet; 24px phone tap floor; 2 font weights; no inline styles or scripts; empty cubbies stay bare; accent reserved list; DOM order equals reading order; no pull-out or detail behaviour in this phase. Furniture finish (D-20): the 32 mm side allowance (it feeds the readability floors); the shade cap of alpha 0.20 in `rgb(20 10 4)` and no light layer across boxes; one light direction; only the four existing browns; finish values live in CSS only, over the three decorative elements and two cubby hooks, so the engine geometry and `LayoutVersion` never change for a finish tweak; everything painted stays inside the section box. Switching to another finish is not a tuning round (see the todo for selectable finishes).
 
 ---
 
