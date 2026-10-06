@@ -12,7 +12,8 @@ internal static class LayoutAssertions
 {
     /// <summary>
     /// Asserts the layout is a valid cabinet for the items: each item stands exactly once, every placement is inside its
-    /// cubby, placements in a cubby may touch but never overlap, and cubbies sit inside their section without overlapping.
+    /// cubby, placements in a cubby may touch but never overlap, every pile of flat boxes goes widest at the bottom with
+    /// no box overhanging the one beneath it, and cubbies sit inside their section without overlapping.
     /// </summary>
     public static void AssertValid(CabinetLayout layout, IReadOnlyList<CabinetItem> items)
     {
@@ -143,6 +144,7 @@ internal static class LayoutAssertions
             (cubby.XMm + cubby.WidthMm).Should().BeLessThanOrEqualTo(section.WidthMm, "cubby {0} stays inside the section", cubby.Index);
             (cubby.YMm + cubby.HeightMm).Should().BeLessThanOrEqualTo(section.HeightMm, "cubby {0} stays inside the section", cubby.Index);
             AssertPlacementsInside(cubby);
+            AssertPilesGoWidestAtTheBottom(cubby);
         }
 
         AssertNoOverlap(
@@ -163,6 +165,36 @@ internal static class LayoutAssertions
         AssertNoOverlap(
             cubby.Placements.Select(placement => (placement.XMm, placement.YMm, placement.WidthMm, placement.HeightMm)).ToList(),
             $"placements of cubby {cubby.Index}");
+    }
+
+    private static void AssertPilesGoWidestAtTheBottom(LayoutCubby cubby)
+    {
+        var piles = cubby.Placements
+            .Where(placement => placement.Kind is PlacementKind.FlatBox or PlacementKind.OrphanExpansion)
+            .GroupBy(placement => placement.XMm);
+
+        foreach (var pile in piles)
+        {
+            var fromFloor = pile.OrderBy(placement => placement.YMm).ToList();
+
+            for (var index = 1; index < fromFloor.Count; index++)
+            {
+                var below = fromFloor[index - 1];
+                var above = fromFloor[index];
+
+                above.WidthMm.Should().BeLessThanOrEqualTo(
+                    below.WidthMm,
+                    "game {0} must not overhang game {1} in cubby {2}", above.GameId, below.GameId, cubby.Index);
+
+                if (above.WidthMm == below.WidthMm)
+                {
+                    above.HeightMm.Should().BeLessThanOrEqualTo(
+                        below.HeightMm,
+                        "of two boxes as wide as each other the thicker lies lower, game {0} over game {1} in cubby {2}",
+                        above.GameId, below.GameId, cubby.Index);
+                }
+            }
+        }
     }
 
     private static void AssertNoOverlap(IReadOnlyList<(int X, int Y, int Width, int Height)> rectangles, string what)

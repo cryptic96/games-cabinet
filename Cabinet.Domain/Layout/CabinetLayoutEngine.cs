@@ -5,14 +5,15 @@ namespace Cabinet.Domain.Layout;
 /// options: nothing is remembered between calls, so the same collection always gives the same cabinet. How each game
 /// stands is decided from that game alone. Base games, and expansions whose base game is not owned, are taken in
 /// collection then game identifier order and each goes into the first cubby, in reading order section by section, that
-/// can still take it; a new section opens only when no existing cubby can. An owned expansion never takes a place of its
+/// can still take it the way it was chosen; failing that a plain game may lie flat in the first cubby that can take it
+/// lying down; a new section opens only when neither fits. An owned expansion never takes a place of its
 /// own: it stands in a stack beside its base game, and the base game reserves the column for that stack in its cubby
 /// when it is placed, whether the expansion arrived before or after it.
 /// </summary>
 public static class CabinetLayoutEngine
 {
     /// <summary>Bumped whenever the algorithm or a design changes on purpose, so a rearrangement is always a conscious change.</summary>
-    public const int LayoutVersion = 4;
+    public const int LayoutVersion = 5;
 
     private const int MinBoxSideMm = 10;
 
@@ -52,7 +53,7 @@ public static class CabinetLayoutEngine
 
         foreach (var member in members)
         {
-            if (!TryPlaceInExistingSection(sections, context, member))
+            if (!TryPlaceInExistingSection(sections, context, member) && !TryPlaceLyingFlat(sections, context, member, fewGames))
             {
                 sections.Add(NewSection(context.Cubbies.Count));
 
@@ -164,6 +165,26 @@ public static class CabinetLayoutEngine
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Tries the member lying flat across the existing sections in reading order. Only a plain game that was chosen to face
+    /// out or stand is eligible, and only when the setting is on and the few-games look is off: a game with expansions
+    /// always stands and an expansion without an owned base game already lies flat.
+    /// </summary>
+    private static bool TryPlaceLyingFlat(
+        List<List<List<LayoutMember>>> sections,
+        BuildContext context,
+        LayoutMember member,
+        bool fewGames)
+    {
+        var eligible = context.Options.LieFlatBeforeNewSection
+            && !fewGames
+            && member.Pose != BoxPose.Flat
+            && !member.IsOrphanExpansion
+            && member.Expansions.Count == 0;
+
+        return eligible && TryPlaceInExistingSection(sections, context, member with { Pose = BoxPose.Flat });
     }
 
     private static bool TryPlaceInSection(

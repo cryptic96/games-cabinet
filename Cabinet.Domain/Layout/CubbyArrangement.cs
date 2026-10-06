@@ -16,8 +16,9 @@ public static class CubbyArrangement
     /// expansions is followed immediately by a column of fixed width that holds its expansions as thin layers stacked up
     /// from the floor, with a marker on top counting the ones that did not fit; the column is as wide with one expansion
     /// as with many. Flat boxes lie with the spine out, as wide as the box is tall and as tall as it is deep, and gather
-    /// into short stacks of up to four that start on the cubby floor; a stack sits where its first box falls in the order
-    /// and is as wide as its widest box. An expansion without an owned base game lies flat like a flat box but is never
+    /// into short piles of up to four that start on the cubby floor; a pile sits where its first box falls in the order
+    /// and is as wide as its widest box. Inside a pile the widest box lies at the bottom and the thicker box lower among
+    /// boxes of the same width, so no box overhangs the one beneath it. An expansion without an owned base game lies flat like a flat box but is never
     /// drawn lower than the design's orphan minimum. Returns null when the members are wider than the cubby or any member
     /// or stack is taller than it; a total width or height exactly equal to the cubby's still fits.
     /// </summary>
@@ -91,7 +92,9 @@ public static class CubbyArrangement
     /// <summary>
     /// Groups the flat members, in slot order, into columns: a box joins the current column while it holds fewer than
     /// <see cref="MaxFlatStackCount"/> boxes and the stack stays within the cubby height. Each column is keyed by the slot
-    /// index of its first box, which is where the column sits. Returns null when one flat box alone is taller than the cubby.
+    /// index of its first box, which is where the column sits. Which boxes share a column never depends on their size;
+    /// afterwards each column is ordered from the floor up by drawn length, then drawn thickness, both largest first, with
+    /// the slot order breaking the remaining ties. Returns null when one flat box alone is taller than the cubby.
     /// </summary>
     private static Dictionary<int, List<LayoutMember>>? BuildFlatColumns(
         SectionDesign design,
@@ -129,6 +132,14 @@ public static class CubbyArrangement
 
             columns[currentStart].Add(ordered[index]);
             currentHeight += height;
+        }
+
+        foreach (var start in columns.Keys.ToList())
+        {
+            columns[start] = columns[start]
+                .OrderByDescending(box => box.Item.Box.HeightMm)
+                .ThenByDescending(box => FlatHeight(design, box))
+                .ToList();
         }
 
         return columns;

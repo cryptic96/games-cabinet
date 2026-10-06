@@ -18,6 +18,13 @@ browser only draws the result. A game can face out as a box front (a cover),
 stand as a spine, or lie flat. Expansions stand in a narrow stack beside their
 base game, and a long stack ends in a "+N more" marker.
 
+Boxes lying flat are piled up to four high, with the widest box at the bottom
+and the thicker box lower among boxes of the same width, so no box overhangs
+the one beneath it. A big box is chosen to face out or stand, and it does so
+wherever a cubby has room for it. Only when no cubby of the existing sections
+has room for it standing does it lie flat, in the first cubby that can take it
+lying down, before a new section is added.
+
 When the collection outgrows one section, a new section is added beside the
 existing ones, and once a row is full further sections start a new row below.
 Existing sections are never redesigned to make room.
@@ -39,6 +46,7 @@ two underscores.
 | `Layout:CoverStrategy` | `SizeWeighted` | `SizeWeighted`, `Random`, `OversizeOnly` | How the boxes that face out are chosen. `SizeWeighted` makes large boxes much more likely to face out. `Random` gives every box the same chance, decided from its game identifier alone. `OversizeOnly` faces out exactly the boxes too tall to stand upright in the design and ignores the share. |
 | `Layout:ExpansionStackMax` | 6 | 1 to 20 | The most expansions drawn in one stack before the rest are summed up as "+N more". |
 | `Layout:FewGamesThreshold` | 12 | 0 to 100 | Below this many top-level games, every box faces out, so a small collection fills the cabinet with covers instead of a few lonely spines. |
+| `Layout:LieFlatBeforeNewSection` | `true` | `true` or `false` | Lets a game that fits no existing cubby standing lie flat in the first cubby that can take it lying down, instead of opening a new section for it. Turning it off keeps every game standing the way it was chosen, but may add sections that are mostly empty. |
 | `Prototype:Enabled` | `true` in the committed settings | `true` or `false` | Shows the invented sample collections and their switcher. See "Invented collections" below. |
 
 ### Changing a setting on the server
@@ -48,6 +56,7 @@ Put the setting in `/etc/cabinet/cabinet.env`, one per line, for example:
 ```
 Layout__CoverSharePercent=30
 Layout__CoverStrategy=Random
+Layout__LieFlatBeforeNewSection=true
 Prototype__Enabled=false
 ```
 
@@ -58,7 +67,7 @@ sudo systemctl restart cabinet
 ```
 
 Every value is checked when the app starts. A value that is out of range, not
-a whole number, or not a known strategy name stops the app with a message
+a whole number, not a known strategy name, or not `true` or `false` where a switch is expected stops the app with a message
 that names the key, for example `Layout:CoverSharePercent must be a whole
 number between 0 and 100.` Read the message in the service journal:
 
@@ -79,7 +88,8 @@ every restart. Nothing is random in a way that changes between requests: every
 choice comes from the game's own identifier and the settings.
 
 Adding a game changes only the cubby it lands in. Neighbouring games keep
-their place, their orientation and their colour.
+their place, their orientation and their colour. A game lands lying flat when no
+cubby had room for it standing the way it was chosen.
 
 A few changes rearrange more than that, and these are accepted:
 
@@ -91,6 +101,9 @@ A few changes rearrange more than that, and these are accepted:
   base game. That family may move, and later cubbies may shift to make room.
 - An expansion whose base game is added later moves from standing alone to
   standing in the stack beside that base game.
+- When one of the changes above shifts later cubbies, games in them may also
+  change between standing the way they were chosen and lying flat, because that
+  depends on the room left by the games before them.
 - Changing a layout setting changes the arrangement, since the settings are
   part of what decides it.
 

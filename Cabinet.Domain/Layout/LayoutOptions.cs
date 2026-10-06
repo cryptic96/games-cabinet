@@ -20,11 +20,16 @@ public enum CoverStrategy
 /// <param name="CoverStrategy">How the boxes that face out are chosen.</param>
 /// <param name="ExpansionStackMax">The most expansions drawn in one stack beside a game, from 1 to 20.</param>
 /// <param name="FewGamesThreshold">Below this many top-level games every box faces out, from 0 to 100.</param>
+/// <param name="LieFlatBeforeNewSection">
+/// Whether a game that fits no cubby of the existing sections the way it was chosen to stand may lie flat in the first
+/// cubby that can take it lying down, before a new section is opened. Turning it off may add sections.
+/// </param>
 public sealed record LayoutOptions(
     int CoverSharePercent,
     CoverStrategy CoverStrategy,
     int ExpansionStackMax,
-    int FewGamesThreshold)
+    int FewGamesThreshold,
+    bool LieFlatBeforeNewSection = true)
 {
     private const int MaxShare = 100;
     private const int MaxStack = 20;
@@ -32,9 +37,10 @@ public sealed record LayoutOptions(
     private const int StrategyShift = 8;
     private const int StackShift = 16;
     private const int ThresholdShift = 32;
+    private const int LieFlatShift = 40;
 
-    /// <summary>The committed starting values: a quarter of the boxes face out, size weighted, stacks of six, twelve games to leave the all-covers look.</summary>
-    public static LayoutOptions Default { get; } = new(25, CoverStrategy.SizeWeighted, 6, 12);
+    /// <summary>The committed starting values: a quarter of the boxes face out, size weighted, stacks of six, twelve games to leave the all-covers look, and a big box lies flat before a new section opens.</summary>
+    public static LayoutOptions Default { get; } = new(25, CoverStrategy.SizeWeighted, 6, 12, true);
 
     /// <summary>Sixteen lowercase hexadecimal digits that change whenever any setting changes.</summary>
     public string Fingerprint => StableHash.Hash(Pack(), StableHash.OptionsSalt).ToString("x16", CultureInfo.InvariantCulture);
@@ -61,5 +67,6 @@ public sealed record LayoutOptions(
         (long)CoverSharePercent
         | ((long)(int)CoverStrategy << StrategyShift)
         | ((long)ExpansionStackMax << StackShift)
-        | ((long)FewGamesThreshold << ThresholdShift);
+        | ((long)FewGamesThreshold << ThresholdShift)
+        | ((LieFlatBeforeNewSection ? 1L : 0L) << LieFlatShift);
 }

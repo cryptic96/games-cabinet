@@ -25,8 +25,11 @@ public class ShelfMixTests
 
         var layout = CabinetLayoutEngine.Build(items, Design, LayoutOptions.Default);
 
-        var covers = PlacementsOf(layout).Count(placement => placement.Kind == PlacementKind.Cover);
-        var percent = covers * 100.0 / items.Count;
+        var placements = PlacementsOf(layout).ToList();
+        var covers = placements.Count(placement => placement.Kind == PlacementKind.Cover);
+        var topLevel = placements.Count(placement => placement.Kind is PlacementKind.Cover or PlacementKind.Spine
+            or PlacementKind.FlatBox or PlacementKind.OrphanExpansion);
+        var percent = covers * 100.0 / topLevel;
         percent.Should().BeInRange(15, 35);
         LayoutAssertions.AssertValid(layout, items);
     }
@@ -35,7 +38,7 @@ public class ShelfMixTests
     [Trait("Category", "Layout")]
     public void Eleven_games_all_face_out_and_twelve_and_thirteen_follow_the_strategy()
     {
-        var options = LayoutOptions.Default;
+        var options = LayoutOptions.Default with { LieFlatBeforeNewSection = false };
 
         var eleven = SyntheticCollections.Random(5, 11);
         var elevenLayout = CabinetLayoutEngine.Build(eleven, Design, options);
@@ -82,7 +85,7 @@ public class ShelfMixTests
 
         foreach (var share in new[] { 0, 100 })
         {
-            var options = new LayoutOptions(share, CoverStrategy.OversizeOnly, 6, 12);
+            var options = new LayoutOptions(share, CoverStrategy.OversizeOnly, 6, 12, false);
             var layout = CabinetLayoutEngine.Build(items, Design, options);
 
             PlacementsOf(layout)
@@ -174,22 +177,165 @@ public class ShelfMixTests
 
     [Fact]
     [Trait("Category", "Layout")]
-    public void Flat_boxes_only_come_from_small_or_thin_games()
+    public void With_lying_flat_switched_off_flat_boxes_only_come_from_small_or_thin_games()
+    {
+        SyntheticCollections.TryGetSample("400", out var items);
+        var byId = items.ToDictionary(item => item.BggId);
+
+        var layout = CabinetLayoutEngine.Build(items, Design, LayoutOptions.Default with { LieFlatBeforeNewSection = false });
+
+        var flat = PlacementsOf(layout).Where(placement => placement.Kind == PlacementKind.FlatBox).ToList();
+        flat.Should().NotBeEmpty("a collection of four hundred has small and thin boxes");
+        flat.Should().OnlyContain(
+            placement => IsSmallOrThin(byId[placement.GameId].Box),
+            "with the setting off only small or thin games lie flat");
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void With_lying_flat_switched_on_a_big_box_lies_flat_instead_of_opening_a_section()
     {
         SyntheticCollections.TryGetSample("400", out var items);
         var byId = items.ToDictionary(item => item.BggId);
 
         var layout = CabinetLayoutEngine.Build(items, Design);
 
-        var flat = PlacementsOf(layout).Where(placement => placement.Kind == PlacementKind.FlatBox).ToList();
-        flat.Should().NotBeEmpty("a collection of four hundred has small and thin boxes");
+        PlacementsOf(layout)
+            .Where(placement => placement.Kind == PlacementKind.FlatBox)
+            .Should().Contain(
+                placement => !IsSmallOrThin(byId[placement.GameId].Box),
+                "a big box that fits no cubby standing lies flat");
+        LayoutAssertions.AssertValid(layout, items);
+    }
 
-        foreach (var placement in flat)
-        {
-            var box = byId[placement.GameId].Box;
-            (Orientation.SizeClassOf(box) == SizeClass.Small || box.DepthMm <= FlatDepthLimitMm)
-                .Should().BeTrue("game {0} is neither small nor thin", placement.GameId);
-        }
+    [Theory]
+    [InlineData("65")]
+    [InlineData("400")]
+    [Trait("Category", "Layout")]
+    public void Lying_flat_before_a_new_section_needs_fewer_sections_than_switching_it_off(string name)
+    {
+        SyntheticCollections.TryGetSample(name, out var items);
+
+        var on = CabinetLayoutEngine.Build(items, Design, LayoutOptions.Default);
+        var off = CabinetLayoutEngine.Build(items, Design, LayoutOptions.Default with { LieFlatBeforeNewSection = false });
+
+        on.Sections.Count.Should().BeLessThan(off.Sections.Count);
+        LayoutAssertions.AssertValid(on, items);
+        LayoutAssertions.AssertValid(off, items);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_pile_of_flat_boxes_goes_longest_first_and_thicker_first_among_equal_lengths()
+    {
+        var design = new SectionDesign("test", 1000, 10, [new ShelfRow(300, [1000])]);
+        var options = new LayoutOptions(0, CoverStrategy.SizeWeighted, 6, 0);
+        var sizes = new (int Length, int Thickness)[] { (150, 30), (190, 25), (170, 40), (190, 35) };
+        var ids = Enumerable.Range(1, 200)
+            .Where(id => Orientation.Decide(ItemOf(id, Box(150, 20)), options, design, false) == BoxPose.Flat)
+            .Take(sizes.Length)
+            .ToList();
+        var items = ids.Select((id, index) => ItemOf(id, new BoxDimensions(100, sizes[index].Length, sizes[index].Thickness))).ToList();
+
+        var layout = CabinetLayoutEngine.Build(items, design, options);
+
+        var pile = layout.Sections[0].Cubbies[0].Placements.OrderBy(placement => placement.YMm).ToList();
+        pile.Select(placement => (placement.WidthMm, placement.HeightMm))
+            .Should().Equal((190, 35), (190, 25), (170, 40), (150, 30));
+        pile.Select(placement => placement.XMm).Distinct().Should().ContainSingle("the four boxes form one pile");
+        LayoutAssertions.AssertValid(layout, items);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_big_box_lies_flat_in_a_short_cubby_when_no_cubby_has_room_for_it_standing()
+    {
+        var design = TallThenShortDesign();
+        var items = new[] { ItemOf(1, new BoxDimensions(290, 380, 40)), ItemOf(2, new BoxDimensions(280, 390, 80)) };
+
+        var layout = CabinetLayoutEngine.Build(items, design, EveryBoxFacesOut);
+
+        layout.Sections.Should().HaveCount(1);
+        layout.Sections[0].Cubbies[0].Placements.Should().ContainSingle().Which.Kind.Should().Be(PlacementKind.Cover);
+        var lying = layout.Sections[0].Cubbies[1].Placements.Should().ContainSingle().Subject;
+        lying.Kind.Should().Be(PlacementKind.FlatBox);
+        lying.GameId.Should().Be(2);
+        LayoutAssertions.AssertValid(layout, items);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void With_lying_flat_switched_off_the_same_big_box_faces_out_in_a_second_section()
+    {
+        var design = TallThenShortDesign();
+        var items = new[] { ItemOf(1, new BoxDimensions(290, 380, 40)), ItemOf(2, new BoxDimensions(280, 390, 80)) };
+
+        var layout = CabinetLayoutEngine.Build(items, design, EveryBoxFacesOut with { LieFlatBeforeNewSection = false });
+
+        layout.Sections.Should().HaveCount(2);
+        layout.Sections[1].Cubbies.SelectMany(cubby => cubby.Placements)
+            .Should().ContainSingle().Which.Kind.Should().Be(PlacementKind.Cover);
+        LayoutAssertions.AssertValid(layout, items);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_cover_stands_in_a_later_tall_cubby_rather_than_lying_flat_in_an_earlier_short_one()
+    {
+        var design = new SectionDesign("test", 450, 10, [new ShelfRow(150, [450]), new ShelfRow(400, [450])]);
+        var items = new[] { ItemOf(1, new BoxDimensions(290, 380, 40)) };
+
+        var layout = CabinetLayoutEngine.Build(items, design, EveryBoxFacesOut);
+
+        layout.Sections.Should().HaveCount(1);
+        layout.Sections[0].Cubbies[0].Placements.Should().BeEmpty();
+        layout.Sections[0].Cubbies[1].Placements.Should().ContainSingle().Which.Kind.Should().Be(PlacementKind.Cover);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void Appending_a_game_that_lies_flat_changes_only_the_short_cubby_it_lands_in()
+    {
+        var design = TallThenShortDesign();
+        var first = ItemOf(1, new BoxDimensions(290, 380, 40));
+        var second = ItemOf(2, new BoxDimensions(280, 390, 80));
+
+        var before = CabinetLayoutEngine.Build([first], design, EveryBoxFacesOut);
+        var after = CabinetLayoutEngine.Build([first, second], design, EveryBoxFacesOut);
+
+        LayoutAssertions.ChangedCubbies(before, after).Should().Equal([(0, 1)]);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_base_game_with_an_expansion_opens_a_new_section_instead_of_lying_flat()
+    {
+        var design = TallThenShortDesign();
+        var baseGame = ItemOf(2, new BoxDimensions(200, 380, 60));
+        var expansion = new CabinetItem(
+            3, 3, "Invented Expansion 3", ItemKind.Expansion, new BoxDimensions(100, 150, 30), [new BaseGameRef(2, baseGame.Title)]);
+        var items = new[] { ItemOf(1, new BoxDimensions(290, 380, 40)), baseGame, expansion };
+
+        var layout = CabinetLayoutEngine.Build(items, design, EveryBoxFacesOut);
+
+        layout.Sections.Should().HaveCount(2);
+        var placed = LayoutAssertions.PlacementsWithPosition(layout);
+        placed.Single(entry => entry.Placement.GameId == 2).Should().Match<(int Section, int Cubby, Placement Placement)>(
+            entry => entry.Section == 1 && entry.Placement.Kind == PlacementKind.Cover);
+        LayoutAssertions.AssertValid(layout, items);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void Eleven_big_covers_stay_covers_in_the_few_games_look_although_they_need_several_sections()
+    {
+        var items = Enumerable.Range(1, 11).Select(id => ItemOf(id, new BoxDimensions(300, 380, 60))).ToList();
+
+        var layout = CabinetLayoutEngine.Build(items, Design, LayoutOptions.Default);
+
+        layout.Sections.Count.Should().BeGreaterThan(1);
+        PlacementsOf(layout).Should().OnlyContain(placement => placement.Kind == PlacementKind.Cover);
+        LayoutAssertions.AssertValid(layout, items);
     }
 
     [Fact]
@@ -282,6 +428,14 @@ public class ShelfMixTests
             }
         }
     }
+
+    private static LayoutOptions EveryBoxFacesOut { get; } = new(100, CoverStrategy.Random, 6, 0);
+
+    private static SectionDesign TallThenShortDesign() =>
+        new("test", 450, 10, [new ShelfRow(400, [450]), new ShelfRow(150, [450])]);
+
+    private static bool IsSmallOrThin(BoxDimensions box) =>
+        Orientation.SizeClassOf(box) == SizeClass.Small || box.DepthMm <= FlatDepthLimitMm;
 
     private static IEnumerable<Placement> PlacementsOf(CabinetLayout layout) =>
         layout.Sections.SelectMany(section => section.Cubbies).SelectMany(cubby => cubby.Placements);
