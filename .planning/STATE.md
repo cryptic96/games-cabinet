@@ -6,14 +6,14 @@ current_phase: 03
 current_phase_name: BGG Access Spike, Real Sync & Snapshot
 status: executing
 stopped_at: Phase 3 UI-SPEC approved
-last_updated: "2026-10-06T16:39:22.800Z"
+last_updated: "2026-10-06T18:00:56.954Z"
 last_activity: 2026-10-06
 last_activity_desc: Phase 2 complete, transitioned to Phase 3
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 39
-  completed_plans: 24
+  completed_plans: 26
 ---
 
 # Project State
@@ -102,6 +102,7 @@ Recent decisions affecting current work:
 |---|-------------|------|--------|-----------|
 | 261004-vqo | Make out-of-date provisioning visible on the server (poll warning + selfcheck per-file check) | 2026-10-04 | fa25c8f | [261004-vqo-make-out-of-date-provisioning-visible-on](./quick/261004-vqo-make-out-of-date-provisioning-visible-on/) |
 | 2 | Move CI and release workflows to ubuntu-26.04 (actionlint label config added) | 2026-10-06 | 7d802a1 | — |
+| 3 | Fix flaky port race in integration tests (retry host start on fresh ports) | 2026-10-06 | 3376015 | — |
 
 ## Deferred Items
 
