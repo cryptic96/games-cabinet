@@ -295,6 +295,159 @@ public class FamilyLayoutTests
         }
     }
 
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void Orphan_expansions_in_the_sample_are_boxes_named_after_the_lowest_identifier_base_they_name()
+    {
+        SyntheticCollections.TryGetSample("65", out var items);
+        var orphans = items
+            .Where(item => item.Kind == ItemKind.Expansion && LayoutAssertions.OwnedParentOf(item, items) is null)
+            .ToList();
+        orphans.Should().HaveCount(3);
+
+        var layout = CabinetLayoutEngine.Build(items, Design);
+
+        var byId = LayoutAssertions.PlacementsWithPosition(layout)
+            .Where(entry => entry.Placement.Kind != PlacementKind.MoreMarker)
+            .ToDictionary(entry => entry.Placement.GameId, entry => entry.Placement);
+
+        foreach (var orphan in orphans)
+        {
+            var placement = byId[orphan.BggId];
+            placement.Kind.Should().Be(PlacementKind.OrphanExpansion);
+            placement.BaseTitle.Should().Be(orphan.ExpansionOf.OrderBy(reference => reference.BggId).First().Title);
+            placement.HeightMm.Should().BeGreaterThanOrEqualTo(Design.MinOrphanHeightMm);
+            placement.Title.Should().Be(orphan.Title);
+        }
+
+        orphans.Max(orphan => orphan.ExpansionOf[0].Title.Length).Should().BeGreaterThanOrEqualTo(58, "one orphan names a base game with a very long title");
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void An_expansion_that_names_no_base_game_is_an_orphan_box_without_a_base_title()
+    {
+        var items = SyntheticCollections.Random(3, 30);
+        var nameless = new CabinetItem(
+            items.Max(item => item.BggId) + 1,
+            items.Max(item => item.CollectionId) + 1,
+            "Invented Nameless Expansion",
+            ItemKind.Expansion,
+            new BoxDimensions(120, 200, 30),
+            []);
+
+        var layout = CabinetLayoutEngine.Build([.. items, nameless], Design);
+
+        var placement = LayoutAssertions.PlacementsWithPosition(layout).Single(entry => entry.Placement.GameId == nameless.BggId).Placement;
+        placement.Kind.Should().Be(PlacementKind.OrphanExpansion);
+        placement.BaseTitle.Should().BeNull();
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void An_expansion_that_names_another_expansion_or_itself_stands_alone_as_an_orphan()
+    {
+        var items = SyntheticCollections.Random(8, 30);
+        var first = SyntheticCollections.NextOrphanExpansion(items, 8);
+        var second = SyntheticCollections.NextOrphanExpansion([.. items, first], 9) with
+        {
+            ExpansionOf = [new BaseGameRef(first.BggId, first.Title)],
+        };
+        var selfish = SyntheticCollections.NextOrphanExpansion([.. items, first, second], 10);
+        selfish = selfish with { ExpansionOf = [new BaseGameRef(selfish.BggId, selfish.Title)] };
+        var all = new List<CabinetItem>([.. items, first, second, selfish]);
+
+        var layout = CabinetLayoutEngine.Build(all, Design);
+
+        var byId = LayoutAssertions.PlacementsWithPosition(layout).ToDictionary(entry => entry.Placement.GameId, entry => entry.Placement);
+        byId[second.BggId].Kind.Should().Be(PlacementKind.OrphanExpansion);
+        byId[second.BggId].BaseTitle.Should().Be(first.Title);
+        byId[selfish.BggId].Kind.Should().Be(PlacementKind.OrphanExpansion);
+        LayoutAssertions.AssertValid(layout, all);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void Expansions_stacked_beside_their_base_do_not_count_towards_the_few_games_threshold()
+    {
+        var items = new List<CabinetItem>(SyntheticCollections.Random(5, 11));
+
+        for (var step = 0; step < 5; step++)
+        {
+            items.Add(SyntheticCollections.NextExpansion(items, items[step].BggId, 100 + step));
+        }
+
+        var layout = CabinetLayoutEngine.Build(items, Design);
+
+        var standing = LayoutAssertions.PlacementsWithPosition(layout)
+            .Select(entry => entry.Placement)
+            .Where(placement => placement.Kind is not (PlacementKind.ExpansionLayer or PlacementKind.MoreMarker))
+            .ToList();
+        standing.Should().HaveCount(11).And.OnlyContain(placement => placement.Kind == PlacementKind.Cover);
+        LayoutAssertions.AssertValid(layout, items);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void Eleven_games_with_one_orphan_expansion_leave_the_few_games_look_and_follow_the_normal_mix()
+    {
+        var bases = SyntheticCollections.Random(5, 11);
+        var orphan = SyntheticCollections.NextOrphanExpansion(bases, 5);
+
+        var layout = CabinetLayoutEngine.Build([.. bases, orphan], Design);
+
+        var byId = LayoutAssertions.PlacementsWithPosition(layout).ToDictionary(entry => entry.Placement.GameId, entry => entry.Placement);
+        byId[orphan.BggId].Kind.Should().Be(PlacementKind.OrphanExpansion);
+
+        foreach (var item in bases)
+        {
+            byId[item.BggId].Kind.Should().Be(
+                ToKind(Orientation.Decide(item, LayoutOptions.Default, Design, fewGames: false)),
+                "game {0} follows the normal mix at twelve top-level games", item.BggId);
+        }
+
+        byId.Values.Should().Contain(placement => placement.Kind != PlacementKind.Cover);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void In_the_few_games_look_an_orphan_expansion_faces_out_and_keeps_the_base_title()
+    {
+        var bases = SyntheticCollections.Random(5, 4);
+        var orphan = SyntheticCollections.NextOrphanExpansion(bases, 5);
+
+        var layout = CabinetLayoutEngine.Build([.. bases, orphan], Design);
+
+        var placement = LayoutAssertions.PlacementsWithPosition(layout).Single(entry => entry.Placement.GameId == orphan.BggId).Placement;
+        placement.Kind.Should().Be(PlacementKind.Cover);
+        placement.BaseTitle.Should().Be(orphan.ExpansionOf[0].Title);
+        placement.Title.Should().Be(orphan.Title);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void Orphan_boxes_join_the_flat_stacks_and_never_drop_below_the_orphan_minimum()
+    {
+        var design = new SectionDesign("test", 620, 20, [new ShelfRow(400, [600])]);
+        var thin = new CabinetItem(1, 1, "Invented Thin Expansion", ItemKind.Expansion, new BoxDimensions(100, 200, 15), [new BaseGameRef(900, "Invented Absent Base")]);
+        var thick = new CabinetItem(2, 2, "Invented Thick Expansion", ItemKind.Expansion, new BoxDimensions(100, 200, 120), [new BaseGameRef(901, "Invented Other Base")]);
+
+        var layout = CabinetLayoutEngine.Build([thin, thick], design, SpinesOnly);
+
+        var boxes = layout.Sections[0].Cubbies[0].Placements.OrderBy(placement => placement.YMm).ToList();
+        boxes.Should().OnlyContain(placement => placement.Kind == PlacementKind.OrphanExpansion);
+        boxes.Select(box => box.XMm).Distinct().Should().ContainSingle("both lie in one stack");
+        boxes.Select(box => box.HeightMm).OrderBy(height => height).Should().Equal(design.MinOrphanHeightMm, 120);
+    }
+
+    private static PlacementKind ToKind(BoxPose pose) =>
+        pose switch
+        {
+            BoxPose.Cover => PlacementKind.Cover,
+            BoxPose.Flat => PlacementKind.FlatBox,
+            _ => PlacementKind.Spine,
+        };
+
     private static IEnumerable<IGrouping<int, CabinetItem>> FamiliesOf(IReadOnlyList<CabinetItem> items) =>
         items
             .Where(item => item.Kind == ItemKind.Expansion && LayoutAssertions.OwnedParentOf(item, items) is not null)

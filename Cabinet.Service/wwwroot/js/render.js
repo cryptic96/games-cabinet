@@ -35,8 +35,19 @@ function textOrFallback(text, fallback) {
 }
 
 /**
- * Returns the accessible name and tooltip of a placement. A layer names its base game, the marker says how many
- * expansions it stands for, and every other placement is named by its full title.
+ * Tells whether a placement is an expansion that names the base game it extends and that base game is not shown beside
+ * it: an orphan box, or an orphan facing out in a small collection.
+ * @param {object} placement One placement from the layout.
+ * @returns {boolean}
+ */
+function namesUnownedBase(placement) {
+  return placement.baseTitle !== undefined && (placement.kind === 'orphanExpansion' || placement.kind === 'cover');
+}
+
+/**
+ * Returns the accessible name and tooltip of a placement. A layer or an orphan names its base game, the marker says how
+ * many expansions it stands for, and every other placement is named by its full title. An orphan without a base title
+ * is named by its title alone.
  * @param {object} placement One placement from the layout.
  * @param {object} copy The visitor-facing strings.
  * @returns {string}
@@ -45,7 +56,7 @@ function accessibleName(placement, copy) {
   const title = textOrFallback(placement.title, copy.untitled);
   const baseTitle = textOrFallback(placement.baseTitle, copy.untitled);
 
-  if (placement.kind === 'expansionLayer') {
+  if (placement.kind === 'expansionLayer' || namesUnownedBase(placement)) {
     return copy.layerName(title, baseTitle);
   }
 
@@ -54,6 +65,25 @@ function accessibleName(placement, copy) {
   }
 
   return title;
+}
+
+/**
+ * Builds the second line of an orphan, naming the game it expands, or returns null when the placement has none.
+ * @param {object} placement One placement from the layout.
+ * @param {object} copy The visitor-facing strings.
+ * @returns {HTMLSpanElement | null}
+ */
+function buildSubLabel(placement, copy) {
+  if (!namesUnownedBase(placement)) {
+    return null;
+  }
+
+  const sub = document.createElement('span');
+  sub.className = 'placement-sub';
+  sub.setAttribute('dir', 'auto');
+  sub.textContent = copy.expansionFor(textOrFallback(placement.baseTitle, copy.untitled));
+
+  return sub;
 }
 
 /**
@@ -108,15 +138,18 @@ function buildPlacement(placement, copy, palette) {
   label.setAttribute('dir', 'auto');
   label.textContent = labelText(placement, copy);
 
+  const sub = buildSubLabel(placement, copy);
+  const lines = sub === null ? [label] : [label, sub];
+
   if (placement.kind === 'cover') {
     button.dataset.pattern = PATTERN_NAMES[placement.patternIndex] ?? 'plain';
 
     const plate = document.createElement('span');
     plate.className = 'cover-plate';
-    plate.append(label);
+    plate.append(...lines);
     button.append(plate);
   } else {
-    button.append(label);
+    button.append(...lines);
   }
 
   return button;

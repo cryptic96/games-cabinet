@@ -203,7 +203,7 @@ public class ShelfMixTests
         foreach (var cubby in layout.Sections.SelectMany(section => section.Cubbies))
         {
             var columns = cubby.Placements
-                .Where(placement => placement.Kind == PlacementKind.FlatBox)
+                .Where(placement => placement.Kind is PlacementKind.FlatBox or PlacementKind.OrphanExpansion)
                 .GroupBy(placement => placement.XMm);
 
             foreach (var column in columns)

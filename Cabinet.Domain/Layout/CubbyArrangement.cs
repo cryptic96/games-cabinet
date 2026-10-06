@@ -17,8 +17,9 @@ public static class CubbyArrangement
     /// from the floor, with a marker on top counting the ones that did not fit; the column is as wide with one expansion
     /// as with many. Flat boxes lie with the spine out, as wide as the box is tall and as tall as it is deep, and gather
     /// into short stacks of up to four that start on the cubby floor; a stack sits where its first box falls in the order
-    /// and is as wide as its widest box. Returns null when the members are wider than the cubby or any member or stack is
-    /// taller than it; a total width or height exactly equal to the cubby's still fits.
+    /// and is as wide as its widest box. An expansion without an owned base game lies flat like a flat box but is never
+    /// drawn lower than the design's orphan minimum. Returns null when the members are wider than the cubby or any member
+    /// or stack is taller than it; a total width or height exactly equal to the cubby's still fits.
     /// </summary>
     /// <param name="design">The section design the cubby belongs to.</param>
     /// <param name="cubby">The cubby to arrange.</param>
@@ -42,7 +43,7 @@ public static class CubbyArrangement
             .ThenBy(member => member.Item.CollectionId)
             .ThenBy(member => member.Item.BggId)
             .ToList();
-        var columns = BuildFlatColumns(ordered, cubby.HeightMm);
+        var columns = BuildFlatColumns(design, ordered, cubby.HeightMm);
 
         if (columns is null)
         {
@@ -92,7 +93,10 @@ public static class CubbyArrangement
     /// <see cref="MaxFlatStackCount"/> boxes and the stack stays within the cubby height. Each column is keyed by the slot
     /// index of its first box, which is where the column sits. Returns null when one flat box alone is taller than the cubby.
     /// </summary>
-    private static Dictionary<int, List<LayoutMember>>? BuildFlatColumns(List<LayoutMember> ordered, int cubbyHeightMm)
+    private static Dictionary<int, List<LayoutMember>>? BuildFlatColumns(
+        SectionDesign design,
+        List<LayoutMember> ordered,
+        int cubbyHeightMm)
     {
         var columns = new Dictionary<int, List<LayoutMember>>();
         var currentStart = -1;
@@ -105,7 +109,7 @@ public static class CubbyArrangement
                 continue;
             }
 
-            var height = ordered[index].Item.Box.DepthMm;
+            var height = FlatHeight(design, ordered[index]);
 
             if (height > cubbyHeightMm)
             {
@@ -130,16 +134,21 @@ public static class CubbyArrangement
         return columns;
     }
 
+    private static int FlatHeight(SectionDesign design, LayoutMember member) =>
+        member.IsOrphanExpansion ? Math.Max(member.Item.Box.DepthMm, design.MinOrphanHeightMm) : member.Item.Box.DepthMm;
+
     private static void PlaceColumn(SectionDesign design, List<LayoutMember> column, int x, List<Placement> placements)
     {
         var y = 0;
 
         foreach (var box in column)
         {
-            var depth = box.Item.Box.DepthMm;
+            var height = FlatHeight(design, box);
+            var kind = box.IsOrphanExpansion ? PlacementKind.OrphanExpansion : PlacementKind.FlatBox;
+            var placement = Place(box.Item, kind, x, y, box.Item.Box.HeightMm, height, design);
 
-            placements.Add(Place(box.Item, PlacementKind.FlatBox, x, y, box.Item.Box.HeightMm, depth, design));
-            y += depth;
+            placements.Add(box.IsOrphanExpansion ? placement with { BaseTitle = box.BaseTitle } : placement);
+            y += height;
         }
     }
 
@@ -170,7 +179,7 @@ public static class CubbyArrangement
 
         if (member.Expansions.Count == 0)
         {
-            placements.Add(placed);
+            placements.Add(member.BaseTitle is null ? placed : placed with { BaseTitle = member.BaseTitle });
 
             return width;
         }
@@ -248,7 +257,7 @@ public static class CubbyArrangement
         return kind switch
         {
             PlacementKind.Spine => SpineLabel.Shorten(item.Title, height / pitch),
-            PlacementKind.FlatBox => SpineLabel.Shorten(item.Title, width / pitch),
+            PlacementKind.FlatBox or PlacementKind.OrphanExpansion => SpineLabel.Shorten(item.Title, width / pitch),
             _ => item.Title,
         };
     }

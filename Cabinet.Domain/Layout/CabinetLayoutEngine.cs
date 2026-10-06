@@ -45,7 +45,7 @@ public static class CabinetLayoutEngine
         var fewGames = families.TopLevel.Count < options.FewGamesThreshold;
         var limits = design.Limits;
         var members = families.TopLevel
-            .Select(item => ToMember(item, families, options, design, limits, fewGames))
+            .Select(unit => ToMember(unit, families, options, design, limits, fewGames))
             .ToList();
         var context = new BuildContext(design, design.Cubbies, options);
         var sections = new List<List<List<LayoutMember>>> { NewSection(context.Cubbies.Count) };
@@ -72,13 +72,23 @@ public static class CabinetLayoutEngine
     }
 
     private static LayoutMember ToMember(
-        CabinetItem item,
+        TopLevelUnit unit,
         FamilyIndex families,
         LayoutOptions options,
         SectionDesign design,
         BoxLimits limits,
         bool fewGames)
     {
+        var item = unit.Item;
+
+        if (item.Kind == ItemKind.Expansion)
+        {
+            var orphanPose = fewGames ? BoxPose.Cover : BoxPose.Flat;
+            var orphanItem = item with { Box = Clamp(item.Box, limits, hasFamily: false) };
+
+            return new LayoutMember(orphanItem, orphanPose, [], unit.BaseTitle);
+        }
+
         var expansions = families.ExpansionsOf(item);
         var pose = Orientation.Decide(item, options, design, fewGames);
 
@@ -89,7 +99,7 @@ public static class CabinetLayoutEngine
 
         var baseItem = item with { Box = Clamp(item.Box, limits, expansions.Count > 0) };
 
-        return new LayoutMember(baseItem, pose, expansions);
+        return new LayoutMember(baseItem, pose, expansions, null);
     }
 
     /// <summary>
@@ -210,6 +220,8 @@ public static class CabinetLayoutEngine
             cubbies);
     }
 
+    private sealed record TopLevelUnit(CabinetItem Item, string? BaseTitle);
+
     private sealed record BuildContext(SectionDesign Design, IReadOnlyList<CubbyDesign> Cubbies, LayoutOptions Options)
     {
         public int OrderSalt(int sectionIndex, int cubbyIndex) =>
@@ -227,7 +239,7 @@ public static class CabinetLayoutEngine
         private readonly Dictionary<int, List<CabinetItem>> _expansionsByBase;
 
         private FamilyIndex(
-            List<CabinetItem> topLevel,
+            List<TopLevelUnit> topLevel,
             Dictionary<int, CabinetItem> firstBaseById,
             Dictionary<int, List<CabinetItem>> expansionsByBase)
         {
@@ -236,7 +248,7 @@ public static class CabinetLayoutEngine
             _expansionsByBase = expansionsByBase;
         }
 
-        public List<CabinetItem> TopLevel { get; }
+        public List<TopLevelUnit> TopLevel { get; }
 
         public static FamilyIndex Create(List<CabinetItem> ordered)
         {
@@ -247,14 +259,14 @@ public static class CabinetLayoutEngine
                 firstBaseById.TryAdd(item.BggId, item);
             }
 
-            var topLevel = new List<CabinetItem>();
+            var topLevel = new List<TopLevelUnit>();
             var expansionsByBase = new Dictionary<int, List<CabinetItem>>();
 
             foreach (var item in ordered)
             {
                 if (item.Kind == ItemKind.Base)
                 {
-                    topLevel.Add(item);
+                    topLevel.Add(new TopLevelUnit(item, null));
 
                     continue;
                 }
@@ -268,7 +280,8 @@ public static class CabinetLayoutEngine
 
                 if (parentId is null)
                 {
-                    topLevel.Add(item);
+                    var named = item.ExpansionOf.OrderBy(reference => reference.BggId).FirstOrDefault();
+                    topLevel.Add(new TopLevelUnit(item, named?.Title));
 
                     continue;
                 }

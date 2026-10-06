@@ -256,12 +256,12 @@
   overflow-wrap: anywhere;
 }
 
-.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"]) {
+.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"], [data-kind="orphanExpansion"]) {
   justify-content: flex-start;
 }
 
-.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"])::before,
-.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"])::after {
+.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"], [data-kind="orphanExpansion"])::before,
+.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"], [data-kind="orphanExpansion"])::after {
   content: "";
   position: absolute;
   top: 20%;
@@ -270,15 +270,15 @@
   background: var(--rule);
 }
 
-.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"])::before {
+.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"], [data-kind="orphanExpansion"])::before {
   left: calc(var(--rule-inset) / 2);
 }
 
-.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"])::after {
+.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"], [data-kind="orphanExpansion"])::after {
   right: calc(var(--rule-inset) / 2);
 }
 
-.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"]) .placement-label {
+.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"], [data-kind="orphanExpansion"]) .placement-label {
   display: block;
   min-width: 0;
   padding: 0 var(--rule-inset);
@@ -287,6 +287,51 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/**
+ * An expansion whose base game is not owned stands alone as a flat box with two lines: its title, which keeps priority
+ * when the room is short, and the game it expands. Each line stays on one row and ends in an ellipsis.
+ */
+.placement[data-kind="orphanExpansion"] {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: safe center;
+}
+
+.placement[data-kind="orphanExpansion"] .placement-label {
+  flex: 0 0 auto;
+  max-width: 100%;
+  line-height: 1.2;
+}
+
+.placement .placement-sub {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  unicode-bidi: plaintext;
+}
+
+.placement[data-kind="orphanExpansion"] .placement-sub {
+  flex: 0 1 auto;
+  padding: 0 var(--rule-inset);
+}
+
+.placement[data-kind="cover"] .cover-plate:has(.placement-sub) {
+  flex-direction: column;
+  gap: 2px;
+}
+
+.placement[data-kind="cover"] .placement-sub {
+  flex: 0 0 auto;
+  text-align: center;
 }
 
 /**
