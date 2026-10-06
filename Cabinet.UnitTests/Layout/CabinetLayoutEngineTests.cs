@@ -167,11 +167,41 @@ public class CabinetLayoutEngineTests
     public void A_game_that_fits_no_empty_section_is_rejected_instead_of_looping()
     {
         var design = new SectionDesign("test", 100, 10, [new ShelfRow(300, [100])]);
-        var tooTall = ItemOf(bggId: 1, collectionId: 1, depth: 50, height: 350);
+        var tooDeep = ItemOf(bggId: 1, collectionId: 1, depth: 140);
 
-        var act = () => CabinetLayoutEngine.Build([tooTall], design, SpinesOnly);
+        var act = () => CabinetLayoutEngine.Build([tooDeep], design, SpinesOnly);
 
         act.Should().Throw<InvalidOperationException>().WithMessage("*1*test*");
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_box_taller_than_every_cubby_is_scaled_down_to_fit_with_its_proportions_kept()
+    {
+        var design = new SectionDesign("test", 100, 10, [new ShelfRow(300, [100])]);
+        var tooTall = ItemOf(bggId: 1, collectionId: 1, depth: 50, height: 350);
+
+        var layout = CabinetLayoutEngine.Build([tooTall], design, SpinesOnly);
+
+        var placement = layout.Sections.Should().ContainSingle().Subject.Cubbies[0].Placements.Should().ContainSingle().Subject;
+        placement.HeightMm.Should().Be(300);
+        placement.WidthMm.Should().Be(50, "a spine is as wide as the box is deep, and the depth is not scaled");
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_cover_wider_than_the_cubby_is_scaled_down_by_its_width()
+    {
+        var design = new SectionDesign("test", 100, 10, [new ShelfRow(300, [100])]);
+        var wide = new CabinetItem(1, 1, "Invented Wide Title", ItemKind.Base, new BoxDimensions(400, 200, 50), []);
+        var options = new LayoutOptions(0, CoverStrategy.SizeWeighted, 6, 100);
+
+        var layout = CabinetLayoutEngine.Build([wide], design, options);
+
+        var placement = layout.Sections.Should().ContainSingle().Subject.Cubbies[0].Placements.Should().ContainSingle().Subject;
+        placement.Kind.Should().Be(PlacementKind.Cover);
+        placement.WidthMm.Should().Be(100);
+        placement.HeightMm.Should().Be(50, "the front keeps its proportions");
     }
 
     private static CabinetItem ItemOf(int bggId, long collectionId, int depth, int height = 250) =>

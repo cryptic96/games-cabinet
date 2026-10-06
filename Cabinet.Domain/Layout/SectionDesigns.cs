@@ -27,6 +27,11 @@ public static class SectionDesigns
     {
         MaxSpineHeightMm = 330,
         LabelCharPitchMm = 14,
+        StackColumnWidthMm = 190,
+        MinLayerHeightMm = 40,
+        MaxLayerHeightMm = 70,
+        MarkerHeightMm = 40,
+        MinOrphanHeightMm = 80,
     };
 
     /// <summary>Every design the engine can build for.</summary>

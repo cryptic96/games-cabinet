@@ -61,16 +61,77 @@ internal static class LayoutAssertions
     private static string Serialize(IReadOnlyList<Placement> placements) =>
         JsonSerializer.Serialize(placements, LayoutJson.Options);
 
-    private static void AssertEveryItemPlacedOnce(CabinetLayout layout, IReadOnlyList<CabinetItem> items)
+    /// <summary>
+    /// The owned base game an expansion stands beside: the one with the lowest game identifier among the base games it
+    /// names, or null when none of them is owned. Worked out here from the items alone so the tests check the engine
+    /// against an independent reading of the rule.
+    /// </summary>
+    public static int? OwnedParentOf(CabinetItem expansion, IReadOnlyList<CabinetItem> items)
     {
-        var placedIds = layout.Sections
-            .SelectMany(section => section.Cubbies)
-            .SelectMany(cubby => cubby.Placements)
-            .Select(placement => placement.GameId)
+        var ownedBases = items.Where(item => item.Kind == ItemKind.Base).Select(item => item.BggId).ToHashSet();
+
+        return expansion.ExpansionOf
+            .Select(reference => reference.BggId)
+            .Where(ownedBases.Contains)
             .Order()
+            .Select(id => (int?)id)
+            .FirstOrDefault();
+    }
+
+    /// <summary>Every placement of the layout with the section and cubby it stands in.</summary>
+    public static IReadOnlyList<(int Section, int Cubby, Placement Placement)> PlacementsWithPosition(CabinetLayout layout) =>
+        layout.Sections
+            .SelectMany(section => section.Cubbies.SelectMany(cubby =>
+                cubby.Placements.Select(placement => (section.Index, cubby.Index, placement))))
             .ToList();
 
-        placedIds.Should().Equal(items.Select(item => item.BggId).Order(), "every item stands exactly once");
+    private static void AssertEveryItemPlacedOnce(CabinetLayout layout, IReadOnlyList<CabinetItem> items)
+    {
+        var placed = PlacementsWithPosition(layout);
+        var standing = placed
+            .Where(entry => entry.Placement.Kind is not (PlacementKind.ExpansionLayer or PlacementKind.MoreMarker))
+            .ToList();
+        var topLevelIds = items
+            .Where(item => item.Kind == ItemKind.Base || OwnedParentOf(item, items) is null)
+            .Select(item => item.BggId)
+            .Order();
+
+        standing.Select(entry => entry.Placement.GameId).Order()
+            .Should().Equal(topLevelIds, "every base game and every expansion without an owned base game stands exactly once");
+
+        foreach (var family in items.Where(item => item.Kind == ItemKind.Expansion && OwnedParentOf(item, items) is not null)
+                     .GroupBy(item => OwnedParentOf(item, items)!.Value))
+        {
+            AssertFamilyAccountedFor(family.Key, family.Select(item => item.BggId).ToList(), standing, placed);
+        }
+
+        placed.Where(entry => entry.Placement.Kind == PlacementKind.ExpansionLayer)
+            .Select(entry => entry.Placement.GameId)
+            .Should().OnlyHaveUniqueItems("no expansion layer appears twice");
+        placed.Where(entry => entry.Placement.FamilyId is { } familyId
+                && !items.Any(item => item.BggId == familyId && item.Kind == ItemKind.Base))
+            .Should().BeEmpty("a family always belongs to an owned base game");
+    }
+
+    private static void AssertFamilyAccountedFor(
+        int baseId,
+        IReadOnlyList<int> expansionIds,
+        List<(int Section, int Cubby, Placement Placement)> standing,
+        IReadOnlyList<(int Section, int Cubby, Placement Placement)> placed)
+    {
+        var baseEntry = standing.Single(entry => entry.Placement.GameId == baseId);
+        var members = placed.Where(entry => entry.Placement.FamilyId == baseId
+            && entry.Placement.Kind is PlacementKind.ExpansionLayer or PlacementKind.MoreMarker).ToList();
+        var layers = members.Where(entry => entry.Placement.Kind == PlacementKind.ExpansionLayer).ToList();
+        var markers = members.Where(entry => entry.Placement.Kind == PlacementKind.MoreMarker).ToList();
+
+        members.Should().OnlyContain(
+            entry => entry.Section == baseEntry.Section && entry.Cubby == baseEntry.Cubby,
+            "layers and the marker of family {0} stand in the cubby of their base game", baseId);
+        layers.Select(entry => entry.Placement.GameId).Should().OnlyContain(id => expansionIds.Contains(id));
+        markers.Should().HaveCountLessThanOrEqualTo(1, "family {0} has at most one marker", baseId);
+        (layers.Count + markers.Sum(entry => entry.Placement.MoreCount ?? 0))
+            .Should().Be(expansionIds.Count, "family {0} counts each of its expansions once", baseId);
     }
 
     private static void AssertSectionGeometry(LayoutSection section)

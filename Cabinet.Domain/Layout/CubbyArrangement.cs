@@ -12,11 +12,13 @@ public static class CubbyArrangement
     /// <summary>
     /// Orders the members by a stable hash of their game identifier salted with the cubby, so the order looks varied but
     /// changes only when the cubby's members change, and packs them from the left with no gap, bottom-aligned on the
-    /// cubby floor. A box facing out is as wide as its front and a spine is as wide as its depth. Flat boxes lie with the
-    /// spine out, as wide as the box is tall and as tall as it is deep, and gather into short stacks of up to four that
-    /// start on the cubby floor; a stack sits where its first box falls in the order and is as wide as its widest box.
-    /// Returns null when the members are wider than the cubby or any member or stack is taller than it; a total width or
-    /// height exactly equal to the cubby's still fits.
+    /// cubby floor. A box facing out is as wide as its front and a spine is as wide as its depth. A base game with
+    /// expansions is followed immediately by a column of fixed width that holds its expansions as thin layers stacked up
+    /// from the floor, with a marker on top counting the ones that did not fit; the column is as wide with one expansion
+    /// as with many. Flat boxes lie with the spine out, as wide as the box is tall and as tall as it is deep, and gather
+    /// into short stacks of up to four that start on the cubby floor; a stack sits where its first box falls in the order
+    /// and is as wide as its widest box. Returns null when the members are wider than the cubby or any member or stack is
+    /// taller than it; a total width or height exactly equal to the cubby's still fits.
     /// </summary>
     /// <param name="design">The section design the cubby belongs to.</param>
     /// <param name="cubby">The cubby to arrange.</param>
@@ -72,15 +74,14 @@ public static class CubbyArrangement
                 continue;
             }
 
-            var placed = PlaceStanding(design, ordered[index], x, cubby);
+            var width = PlaceStanding(design, ordered[index], x, cubby, options, placements);
 
-            if (placed is null)
+            if (width is null)
             {
                 return null;
             }
 
-            placements.Add(placed);
-            x += placed.WidthMm;
+            x += width.Value;
         }
 
         return placements;
@@ -104,16 +105,16 @@ public static class CubbyArrangement
                 continue;
             }
 
-            var depth = ordered[index].Item.Box.DepthMm;
+            var height = ordered[index].Item.Box.DepthMm;
 
-            if (depth > cubbyHeightMm)
+            if (height > cubbyHeightMm)
             {
                 return null;
             }
 
             var opensColumn = currentStart < 0
                 || columns[currentStart].Count >= MaxFlatStackCount
-                || currentHeight + depth > cubbyHeightMm;
+                || currentHeight + height > cubbyHeightMm;
 
             if (opensColumn)
             {
@@ -123,7 +124,7 @@ public static class CubbyArrangement
             }
 
             columns[currentStart].Add(ordered[index]);
-            currentHeight += depth;
+            currentHeight += height;
         }
 
         return columns;
@@ -142,16 +143,102 @@ public static class CubbyArrangement
         }
     }
 
-    private static Placement? PlaceStanding(SectionDesign design, LayoutMember member, int x, CubbyDesign cubby)
+    /// <summary>
+    /// Places a box that faces out or stands as a spine, followed by the column of its expansions when it has any, and
+    /// returns the width used, or null when the box and its column do not fit.
+    /// </summary>
+    private static int? PlaceStanding(
+        SectionDesign design,
+        LayoutMember member,
+        int x,
+        CubbyDesign cubby,
+        LayoutOptions options,
+        List<Placement> placements)
     {
         var box = member.Item.Box;
         var (kind, width) = member.Pose == BoxPose.Cover
             ? (PlacementKind.Cover, box.WidthMm)
             : (PlacementKind.Spine, box.DepthMm);
+        var columnWidth = member.Expansions.Count > 0 ? design.StackColumnWidthMm : 0;
 
-        return x + width > cubby.WidthMm || box.HeightMm > cubby.HeightMm
-            ? null
-            : Place(member.Item, kind, x, 0, width, box.HeightMm, design);
+        if (x + width + columnWidth > cubby.WidthMm || box.HeightMm > cubby.HeightMm)
+        {
+            return null;
+        }
+
+        var placed = Place(member.Item, kind, x, 0, width, box.HeightMm, design);
+
+        if (member.Expansions.Count == 0)
+        {
+            placements.Add(placed);
+
+            return width;
+        }
+
+        placements.Add(placed with { FamilyId = member.Item.BggId });
+        PlaceStack(design, member, x + width, cubby, options, placements);
+
+        return width + columnWidth;
+    }
+
+    /// <summary>
+    /// Places the layers of a family from the floor up in the column that starts at <paramref name="columnX"/>, then the
+    /// marker when some expansions do not fit. The layers touch each other and the base game's right edge.
+    /// </summary>
+    private static void PlaceStack(
+        SectionDesign design,
+        LayoutMember member,
+        int columnX,
+        CubbyDesign cubby,
+        LayoutOptions options,
+        List<Placement> placements)
+    {
+        var baseItem = member.Item;
+        var heights = member.Expansions
+            .Select(expansion => Math.Clamp(expansion.Box.DepthMm, design.MinLayerHeightMm, design.MaxLayerHeightMm))
+            .ToList();
+        var stack = StackLayout.Layout(heights, cubby.HeightMm, design.MarkerHeightMm, options.ExpansionStackMax);
+        var pitch = Math.Max(1, design.LabelCharPitchMm);
+        var y = 0;
+
+        for (var index = 0; index < stack.Visible; index++)
+        {
+            var expansion = member.Expansions[index];
+
+            placements.Add(new Placement(
+                GameId: expansion.BggId,
+                Kind: PlacementKind.ExpansionLayer,
+                XMm: columnX,
+                YMm: y,
+                WidthMm: design.StackColumnWidthMm,
+                HeightMm: heights[index],
+                Title: expansion.Title,
+                Label: SpineLabel.Shorten(expansion.Title, design.StackColumnWidthMm / pitch),
+                BaseTitle: baseItem.Title,
+                ToneIndex: SpinePalette.ToneFor(expansion.BggId),
+                PatternIndex: SpinePalette.PatternFor(expansion.BggId),
+                FamilyId: baseItem.BggId,
+                MoreCount: null));
+            y += heights[index];
+        }
+
+        if (stack.Hidden > 0)
+        {
+            placements.Add(new Placement(
+                GameId: baseItem.BggId,
+                Kind: PlacementKind.MoreMarker,
+                XMm: columnX,
+                YMm: y,
+                WidthMm: design.StackColumnWidthMm,
+                HeightMm: design.MarkerHeightMm,
+                Title: baseItem.Title,
+                Label: string.Empty,
+                BaseTitle: baseItem.Title,
+                ToneIndex: SpinePalette.ToneFor(baseItem.BggId),
+                PatternIndex: SpinePalette.PatternFor(baseItem.BggId),
+                FamilyId: baseItem.BggId,
+                MoreCount: stack.Hidden));
+        }
     }
 
     private static string LabelFor(SectionDesign design, CabinetItem item, PlacementKind kind, int width, int height)

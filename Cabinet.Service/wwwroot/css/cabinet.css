@@ -256,12 +256,12 @@
   overflow-wrap: anywhere;
 }
 
-.placement[data-kind="flatBox"] {
+.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"]) {
   justify-content: flex-start;
 }
 
-.placement[data-kind="flatBox"]::before,
-.placement[data-kind="flatBox"]::after {
+.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"])::before,
+.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"])::after {
   content: "";
   position: absolute;
   top: 20%;
@@ -270,15 +270,15 @@
   background: var(--rule);
 }
 
-.placement[data-kind="flatBox"]::before {
+.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"])::before {
   left: calc(var(--rule-inset) / 2);
 }
 
-.placement[data-kind="flatBox"]::after {
+.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"])::after {
   right: calc(var(--rule-inset) / 2);
 }
 
-.placement[data-kind="flatBox"] .placement-label {
+.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"]) .placement-label {
   display: block;
   min-width: 0;
   padding: 0 var(--rule-inset);
@@ -287,6 +287,23 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/**
+ * The marker on top of a full stack is a chip in the accent colour and the only element inside the cabinet that uses
+ * it, so it reads at a glance as a count and not as another box.
+ */
+.placement[data-kind="moreMarker"] {
+  background: var(--wood-light);
+  color: var(--ink);
+  border-radius: 3px;
+}
+
+.placement[data-kind="moreMarker"] .placement-label {
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .placement:focus-visible {
