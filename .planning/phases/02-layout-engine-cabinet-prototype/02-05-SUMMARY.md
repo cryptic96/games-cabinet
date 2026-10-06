@@ -94,7 +94,7 @@ The samples were regenerated, so this is not like for like. The earlier observat
 
 - `dotnet test --solution Cabinet.slnx`: 272 passed, 0 failed (unit tests in the Layout category: 216 including the 200-seed loops, about 15 s). `bash build/lint.sh` passes (repo-rules, workflows, shell, secrets, script-tests). `node --check` passes on every script; the markup-string API grep finds nothing.
 - Browser (scratch Playwright, app on a private port, `default-src 'self'` injected, 1440 px): no console output, no failed request, no horizontal scroll; every orphan has a `.placement-sub` starting `Expansion for ` and a rendered height of 39.3 px (at least 36); layers 19.6 px tall at the least with 12 px labels; the marker is 12 px; `z-index` is `auto` on layers, markers and orphans.
-- Review screenshots (outside the repository): `/tmp/claude-1000/-mnt-Data-repos-games-cabinet/24b04b23-0b88-44c6-87df-78464803922b/scratchpad/02-05-shots/` holds `final65-1440-full.png`, `final65-1440-crop-stack.png`, `final65-1440-crop-marker.png`, `final65-1440-crop-orphan.png` (plus `crop-orphan2` and `crop-orphan3`), the same set for the 400 sample as `final400-*`, the two JSON reports, and the earlier per-task passes in `t1` and `t2`.
+- Review screenshots (outside the repository): `<scratch>/02-05-shots/` holds `final65-1440-full.png`, `final65-1440-crop-stack.png`, `final65-1440-crop-marker.png`, `final65-1440-crop-orphan.png` (plus `crop-orphan2` and `crop-orphan3`), the same set for the 400 sample as `final400-*`, the two JSON reports, and the earlier per-task passes in `t1` and `t2`.
 
 ## Critic notes (taste calls for the owner)
 
