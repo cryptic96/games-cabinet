@@ -66,13 +66,13 @@ public static class CubbyArrangement
                     return null;
                 }
 
-                PlaceColumn(column, x, placements);
+                PlaceColumn(design, column, x, placements);
                 x += columnWidth;
 
                 continue;
             }
 
-            var placed = PlaceStanding(ordered[index], x, cubby);
+            var placed = PlaceStanding(design, ordered[index], x, cubby);
 
             if (placed is null)
             {
@@ -129,7 +129,7 @@ public static class CubbyArrangement
         return columns;
     }
 
-    private static void PlaceColumn(List<LayoutMember> column, int x, List<Placement> placements)
+    private static void PlaceColumn(SectionDesign design, List<LayoutMember> column, int x, List<Placement> placements)
     {
         var y = 0;
 
@@ -137,12 +137,12 @@ public static class CubbyArrangement
         {
             var depth = box.Item.Box.DepthMm;
 
-            placements.Add(Place(box.Item, PlacementKind.FlatBox, x, y, box.Item.Box.HeightMm, depth));
+            placements.Add(Place(box.Item, PlacementKind.FlatBox, x, y, box.Item.Box.HeightMm, depth, design));
             y += depth;
         }
     }
 
-    private static Placement? PlaceStanding(LayoutMember member, int x, CubbyDesign cubby)
+    private static Placement? PlaceStanding(SectionDesign design, LayoutMember member, int x, CubbyDesign cubby)
     {
         var box = member.Item.Box;
         var (kind, width) = member.Pose == BoxPose.Cover
@@ -151,10 +151,22 @@ public static class CubbyArrangement
 
         return x + width > cubby.WidthMm || box.HeightMm > cubby.HeightMm
             ? null
-            : Place(member.Item, kind, x, 0, width, box.HeightMm);
+            : Place(member.Item, kind, x, 0, width, box.HeightMm, design);
     }
 
-    private static Placement Place(CabinetItem item, PlacementKind kind, int x, int y, int width, int height) =>
+    private static string LabelFor(SectionDesign design, CabinetItem item, PlacementKind kind, int width, int height)
+    {
+        var pitch = Math.Max(1, design.LabelCharPitchMm);
+
+        return kind switch
+        {
+            PlacementKind.Spine => SpineLabel.Shorten(item.Title, height / pitch),
+            PlacementKind.FlatBox => SpineLabel.Shorten(item.Title, width / pitch),
+            _ => item.Title,
+        };
+    }
+
+    private static Placement Place(CabinetItem item, PlacementKind kind, int x, int y, int width, int height, SectionDesign design) =>
         new(
             GameId: item.BggId,
             Kind: kind,
@@ -163,7 +175,7 @@ public static class CubbyArrangement
             WidthMm: width,
             HeightMm: height,
             Title: item.Title,
-            Label: item.Title,
+            Label: LabelFor(design, item, kind, width, height),
             BaseTitle: null,
             ToneIndex: SpinePalette.ToneFor(item.BggId),
             PatternIndex: SpinePalette.PatternFor(item.BggId),
