@@ -125,6 +125,59 @@ built from that version, the settings, the sample and the screen profile, so
 browsers revalidate cheaply and pick up a new arrangement as soon as any of
 those change.
 
+## Section designs and readability floors
+
+There are two section designs: a wide one for desktop screens and a narrow one
+for phones, with fewer cubbies across so the sections stack one below the
+other. A game may stand on a different shelf on a phone than on a desktop.
+
+Nothing the cabinet draws may be too small to read or tap. Each design states
+the narrowest width its section is ever drawn at, in screen pixels, and the
+engine turns a pixel target into millimetres of box with whole numbers,
+rounding up. The width it divides by is the section's outer width plus the
+space the stylesheet reserves beside the frame on each side, because that is
+what the drawn width stands for. The results are:
+
+- A spine, a flat box, an expansion layer and the "+N more" marker are at
+  least as wide or tall as a 24 pixel tap target at the narrowest phone, a
+  320 pixel screen with an 8 pixel gutter on each side. On desktop the floor is
+  a smaller starting value, because pointer users need no such target.
+- An expansion without an owned base game is tall enough for its two label
+  lines, and an upright expansion is wide enough for its two vertical lines.
+
+A thin box therefore looks a little thicker than it is. That is the accepted
+trade for staying readable. If the page's gutters or the section grid change,
+the narrowest width recorded in the design changes with them and the floors
+follow.
+
+Every design checks itself before the engine uses it. A row whose cubby widths
+and gaps do not fill the interior, a tall box that would not fit lying flat in
+the biggest cubby, a stack column that leaves no room for a base game, and
+floors taller than the shortest cubby are all reported by name, so a mistake
+in an edited design fails a test instead of the page. A box larger than the
+biggest cubby is scaled down to fit, keeping the proportions of its front, and
+is drawn at that size like any other box.
+
+## Recorded layouts
+
+The tests keep the full layout of the samples of 0, 1, 5, 12 and 65 games on
+both designs, and a digest of the layout of the 400-game sample. They live in
+`Cabinet.UnitTests/Layout/Golden/`, next to a record of the layout version they
+were made at. Any change to the arrangement or to a section design shows up as
+a difference from those files, in the tests and in review.
+
+An intended change needs two steps. Raise `CabinetLayoutEngine.LayoutVersion`,
+then record the layouts again from the repository root:
+
+```sh
+CABINET_UPDATE_GOLDENS=1 dotnet test --project Cabinet.UnitTests/Cabinet.UnitTests.csproj --filter-trait "Category=Layout"
+```
+
+The recording refuses to run while the layouts have changed and the version has
+not, so a rearrangement is always a conscious one. Look at the changed files
+before committing them. The switch is for local use only and is never set in
+the automated workflows.
+
 ## Invented collections
 
 While `Prototype:Enabled` is `true`, the page shows an invented collection

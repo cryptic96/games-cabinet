@@ -1,0 +1,265 @@
+{
+  "layoutVersion": 6,
+  "profile": "desktop",
+  "optionsFingerprint": "09a03be9acd0723f",
+  "palette": [
+    {
+      "background": "#8a2432",
+      "text": "#ffffff"
+    },
+    {
+      "background": "#1f5a3a",
+      "text": "#ffffff"
+    },
+    {
+      "background": "#23407a",
+      "text": "#ffffff"
+    },
+    {
+      "background": "#e0a82e",
+      "text": "#2a1a10"
+    },
+    {
+      "background": "#17766f",
+      "text": "#ffffff"
+    },
+    {
+      "background": "#6a2f7a",
+      "text": "#ffffff"
+    },
+    {
+      "background": "#b8481a",
+      "text": "#ffffff"
+    },
+    {
+      "background": "#8fbfe0",
+      "text": "#2a1a10"
+    },
+    {
+      "background": "#efe3c2",
+      "text": "#2a1a10"
+    },
+    {
+      "background": "#a3b88f",
+      "text": "#2a1a10"
+    },
+    {
+      "background": "#434f5e",
+      "text": "#ffffff"
+    },
+    {
+      "background": "#e09aa5",
+      "text": "#2a1a10"
+    }
+  ],
+  "sections": [
+    {
+      "index": 0,
+      "widthMm": 1200,
+      "heightMm": 1730,
+      "frameMm": 20,
+      "cubbies": [
+        {
+          "index": 0,
+          "xMm": 0,
+          "yMm": 0,
+          "widthMm": 380,
+          "heightMm": 360,
+          "placements": [
+            {
+              "gameId": 10000,
+              "kind": "cover",
+              "xMm": 0,
+              "yMm": 0,
+              "widthMm": 159,
+              "heightMm": 215,
+              "title": "Yardis Tarnlo",
+              "label": "Yardis Tarnlo",
+              "toneIndex": 10,
+              "patternIndex": 4
+            },
+            {
+              "gameId": 10037,
+              "kind": "cover",
+              "xMm": 159,
+              "yMm": 0,
+              "widthMm": 118,
+              "heightMm": 165,
+              "title": "Raxthan Sulmontthan Vosslo",
+              "label": "Raxthan Sulmontthan Vosslo",
+              "toneIndex": 2,
+              "patternIndex": 2
+            }
+          ]
+        },
+        {
+          "index": 1,
+          "xMm": 400,
+          "yMm": 0,
+          "widthMm": 220,
+          "heightMm": 360,
+          "placements": [
+            {
+              "gameId": 10060,
+              "kind": "cover",
+              "xMm": 0,
+              "yMm": 0,
+              "widthMm": 190,
+              "heightMm": 222,
+              "title": "Zimmerebar Casssk",
+              "label": "Zimmerebar Casssk",
+              "toneIndex": 7,
+              "patternIndex": 2
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "xMm": 640,
+          "yMm": 0,
+          "widthMm": 560,
+          "heightMm": 360,
+          "placements": []
+        },
+        {
+          "index": 3,
+          "xMm": 0,
+          "yMm": 380,
+          "widthMm": 260,
+          "heightMm": 300,
+          "placements": []
+        },
+        {
+          "index": 4,
+          "xMm": 280,
+          "yMm": 380,
+          "widthMm": 340,
+          "heightMm": 300,
+          "placements": []
+        },
+        {
+          "index": 5,
+          "xMm": 640,
+          "yMm": 380,
+          "widthMm": 200,
+          "heightMm": 300,
+          "placements": []
+        },
+        {
+          "index": 6,
+          "xMm": 860,
+          "yMm": 380,
+          "widthMm": 340,
+          "heightMm": 300,
+          "placements": []
+        },
+        {
+          "index": 7,
+          "xMm": 0,
+          "yMm": 700,
+          "widthMm": 460,
+          "heightMm": 400,
+          "placements": [
+            {
+              "gameId": 10044,
+              "kind": "cover",
+              "xMm": 0,
+              "yMm": 0,
+              "widthMm": 291,
+              "heightMm": 374,
+              "title": "Quaywyn Sulven Ulmbar",
+              "label": "Quaywyn Sulven Ulmbar",
+              "toneIndex": 11,
+              "patternIndex": 4
+            }
+          ]
+        },
+        {
+          "index": 8,
+          "xMm": 480,
+          "yMm": 700,
+          "widthMm": 300,
+          "heightMm": 400,
+          "placements": []
+        },
+        {
+          "index": 9,
+          "xMm": 800,
+          "yMm": 700,
+          "widthMm": 400,
+          "heightMm": 400,
+          "placements": [
+            {
+              "gameId": 10100,
+              "kind": "cover",
+              "xMm": 0,
+              "yMm": 0,
+              "widthMm": 310,
+              "heightMm": 379,
+              "title": "Heskquin Cassnia Pellventhan: Vosswyn Drelmont",
+              "label": "Heskquin Cassnia Pellventhan: Vosswyn Drelmont",
+              "toneIndex": 1,
+              "patternIndex": 4
+            }
+          ]
+        },
+        {
+          "index": 10,
+          "xMm": 0,
+          "yMm": 1120,
+          "widthMm": 300,
+          "heightMm": 260,
+          "placements": []
+        },
+        {
+          "index": 11,
+          "xMm": 320,
+          "yMm": 1120,
+          "widthMm": 220,
+          "heightMm": 260,
+          "placements": []
+        },
+        {
+          "index": 12,
+          "xMm": 560,
+          "yMm": 1120,
+          "widthMm": 300,
+          "heightMm": 260,
+          "placements": []
+        },
+        {
+          "index": 13,
+          "xMm": 880,
+          "yMm": 1120,
+          "widthMm": 320,
+          "heightMm": 260,
+          "placements": []
+        },
+        {
+          "index": 14,
+          "xMm": 0,
+          "yMm": 1400,
+          "widthMm": 420,
+          "heightMm": 330,
+          "placements": []
+        },
+        {
+          "index": 15,
+          "xMm": 440,
+          "yMm": 1400,
+          "widthMm": 340,
+          "heightMm": 330,
+          "placements": []
+        },
+        {
+          "index": 16,
+          "xMm": 800,
+          "yMm": 1400,
+          "widthMm": 400,
+          "heightMm": 330,
+          "placements": []
+        }
+      ]
+    }
+  ]
+}

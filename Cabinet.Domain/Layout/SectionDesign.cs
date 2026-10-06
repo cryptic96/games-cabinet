@@ -76,6 +76,34 @@ public sealed record SectionDesign(string Name, int InteriorWidthMm, int FrameMm
     /// </summary>
     public int MinUprightExpansionWidthMm { get; init; } = 64;
 
+    /// <summary>
+    /// The space, in millimetres, that the stylesheet reserves beside the frame on each side of a section for the side
+    /// boards of the furniture. It must stay equal to the stylesheet's side allowance: the section is drawn across the
+    /// outer width plus this space on both sides, which is what the readability floors are measured against.
+    /// </summary>
+    public int FurnitureSideMm { get; init; } = DefaultFurnitureSideMm;
+
+    /// <summary>The side allowance the stylesheet reserves beside the frame, in millimetres.</summary>
+    public const int DefaultFurnitureSideMm = 32;
+
+    /// <summary>
+    /// The narrowest width, in screen pixels, that the whole section is ever drawn at. The readability floors of the
+    /// design are derived from it, so it changes together with the page's gutters and grid.
+    /// </summary>
+    public int SmallestRenderedWidthPx { get; init; } = 304;
+
+    /// <summary>
+    /// The least width of a spine, the least height of a flat box and of an expansion layer, and the least height of the
+    /// marker, in millimetres, so every box that can be tapped stays large enough to tap at the narrowest drawn width.
+    /// </summary>
+    public int MinBoxThicknessMm { get; init; } = 1;
+
+    /// <summary>The width of the whole section including both frames, in millimetres.</summary>
+    public int OuterWidthMm => InteriorWidthMm + (2 * FrameMm);
+
+    /// <summary>The width the section is drawn across: the outer width plus the furniture's side space on both sides.</summary>
+    public int RenderedWidthMm => OuterWidthMm + (2 * FurnitureSideMm);
+
     /// <summary>Interior height: the row heights plus one frame between each pair of rows.</summary>
     public int InteriorHeightMm => Rows.Sum(row => row.HeightMm) + (FrameMm * Math.Max(0, Rows.Count - 1));
 
@@ -95,6 +123,135 @@ public sealed record SectionDesign(string Name, int InteriorWidthMm, int FrameMm
             return anchor is null
                 ? new BoxLimits(0, 0, 0, MaxBoxDepthMm)
                 : new BoxLimits(anchor.WidthMm, anchor.HeightMm, Math.Max(0, anchor.WidthMm - StackColumnWidthMm), MaxBoxDepthMm);
+        }
+    }
+
+    /// <summary>
+    /// Checks the design and throws one exception that lists every problem found. A design that passes can hold every
+    /// box the engine ever draws: a row's cubbies fill the interior exactly, a box lying flat at its tallest fits the
+    /// anchor cubby, the deepest spine and the widest base game fit it together with the stack column, and the floors
+    /// and layer sizes are consistent, so no game can fail to find a place in an empty section.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The design has one or more problems.</exception>
+    public void Validate()
+    {
+        var problems = new List<string>();
+
+        CheckSizes(problems);
+        CheckRows(problems);
+
+        if (problems.Count == 0)
+        {
+            CheckBoxFit(problems);
+            CheckFloors(problems);
+        }
+
+        if (problems.Count > 0)
+        {
+            throw new InvalidOperationException($"The '{Name}' section design is not valid: {string.Join("; ", problems)}.");
+        }
+    }
+
+    private void CheckSizes(List<string> problems)
+    {
+        if (Rows.Count == 0)
+        {
+            problems.Add("it has no rows");
+        }
+
+        var sizes = new (string Name, int Value)[]
+        {
+            ("interior width", InteriorWidthMm),
+            ("frame", FrameMm),
+            ("stack column width", StackColumnWidthMm),
+            ("minimum layer height", MinLayerHeightMm),
+            ("maximum layer height", MaxLayerHeightMm),
+            ("marker height", MarkerHeightMm),
+            ("minimum orphan height", MinOrphanHeightMm),
+            ("minimum upright width", MinUprightExpansionWidthMm),
+            ("minimum box thickness", MinBoxThicknessMm),
+            ("label character pitch", LabelCharPitchMm),
+            ("smallest rendered width", SmallestRenderedWidthPx),
+        };
+
+        problems.AddRange(sizes.Where(size => size.Value <= 0).Select(size => $"the {size.Name} must be positive"));
+
+        if (FurnitureSideMm < 0)
+        {
+            problems.Add("the furniture side space must not be negative");
+        }
+    }
+
+    private void CheckRows(List<string> problems)
+    {
+        for (var index = 0; index < Rows.Count; index++)
+        {
+            var row = Rows[index];
+            var position = index + 1;
+
+            if (row.HeightMm <= 0 || row.CubbyWidthsMm.Count == 0 || row.CubbyWidthsMm.Any(width => width <= 0))
+            {
+                problems.Add($"row {position} needs a positive height and at least one cubby of positive width");
+
+                continue;
+            }
+
+            var used = row.CubbyWidthsMm.Sum() + (FrameMm * (row.CubbyWidthsMm.Count - 1));
+
+            if (used != InteriorWidthMm)
+            {
+                problems.Add($"row {position} is {used} mm wide with its gaps but the interior is {InteriorWidthMm} mm");
+            }
+        }
+    }
+
+    private void CheckBoxFit(List<string> problems)
+    {
+        var limits = Limits;
+
+        if (limits.MaxWidthMm < limits.MaxHeightMm)
+        {
+            problems.Add($"the anchor cubby is {limits.MaxWidthMm} mm wide, narrower than its {limits.MaxHeightMm} mm height, so a tall box lying flat does not fit");
+        }
+
+        if (limits.MaxFamilyBaseWidthMm < MinBoxThicknessMm)
+        {
+            problems.Add($"a base game with a stack column of {StackColumnWidthMm} mm has only {limits.MaxFamilyBaseWidthMm} mm left in the anchor cubby");
+        }
+
+        var deepestSpine = Math.Max(limits.MaxDepthMm, MinBoxThicknessMm);
+
+        if (deepestSpine + StackColumnWidthMm > limits.MaxWidthMm)
+        {
+            problems.Add($"the deepest spine of {deepestSpine} mm with the stack column does not fit the {limits.MaxWidthMm} mm anchor cubby");
+        }
+
+        var thickestFlat = Math.Max(Math.Max(limits.MaxDepthMm, MinOrphanHeightMm), MinBoxThicknessMm);
+
+        if (thickestFlat > limits.MaxHeightMm)
+        {
+            problems.Add($"the thickest flat box of {thickestFlat} mm is taller than the {limits.MaxHeightMm} mm anchor cubby");
+        }
+    }
+
+    private void CheckFloors(List<string> problems)
+    {
+        if (MinBoxThicknessMm > MaxLayerHeightMm)
+        {
+            problems.Add($"the minimum box thickness of {MinBoxThicknessMm} mm is above the maximum layer height of {MaxLayerHeightMm} mm");
+        }
+
+        if (MinLayerHeightMm > MaxLayerHeightMm)
+        {
+            problems.Add($"the minimum layer height of {MinLayerHeightMm} mm is above the maximum layer height of {MaxLayerHeightMm} mm");
+        }
+
+        var shortest = Cubbies.Min(cubby => cubby.HeightMm);
+        var tallestFloor = Math.Max(Math.Max(MinBoxThicknessMm, MarkerHeightMm), MinOrphanHeightMm);
+
+        if (tallestFloor > shortest)
+        {
+            problems.Add($"a floor or marker of {tallestFloor} mm is taller than the shortest cubby of {shortest} mm");
         }
     }
 
