@@ -100,7 +100,7 @@ public static class SyntheticBggCollection
         yield return Entry(5, "Distant Orchard: Wind Pack", true, true, 2012, Dimensions(0, 0, 0), null, baseObjectId: MissingBaseObjectId);
         yield return Entry(6, "港の灯台", false, true, 2007, Dimensions(4.5, 5.1, 1.2), null);
         yield return Entry(7, string.Empty, false, true, null, Dimensions(5.25, 7.0, 4.4), null);
-        yield return Entry(8, "Quiet Quarry", false, true, 2019, Dimensions(0, 0, 0), "Box 3");
+        yield return Entry(8, "Quiet Quarry", false, true, 2019, Dimensions(0, 0, 0), null);
         yield return Entry(9, "Ribbon Rally", false, true, 1987, null, null);
     }
 
