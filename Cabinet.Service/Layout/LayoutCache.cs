@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using Cabinet.Domain.Layout;
-using Cabinet.Domain.Samples;
+using Cabinet.Service.Prototype;
 
 namespace Cabinet.Service.Layout;
 
@@ -11,10 +11,12 @@ public sealed record CachedLayout(string Json, string ETag);
 
 /// <summary>
 /// Keeps every layout that has been asked for, built once per process. Callers only pass names from the fixed sample and
-/// profile allowlists, so the number of entries is bounded and a visitor cannot grow the cache.
+/// profile allowlists, so the number of entries is bounded and a visitor cannot grow the cache. A sample's items are only
+/// asked for when its layout is built, so a request answered from the cache costs no sample generation.
 /// </summary>
 /// <param name="options">The layout settings the cabinets are built with.</param>
-public sealed class LayoutCache(LayoutOptions options)
+/// <param name="catalog">The sample allowlist that supplies each sample's items.</param>
+public sealed class LayoutCache(LayoutOptions options, SampleCatalog catalog)
 {
     private readonly ConcurrentDictionary<(string Sample, string Design), Lazy<CachedLayout>> _entries = new();
 
@@ -31,11 +33,7 @@ public sealed class LayoutCache(LayoutOptions options)
 
     private CachedLayout Build(string sample, SectionDesign design)
     {
-        if (!SyntheticCollections.TryGetSample(sample, out var items))
-        {
-            throw new ArgumentException("The sample is not on the allowlist.", nameof(sample));
-        }
-
+        var items = catalog.ItemsOf(sample);
         var layout = CabinetLayoutEngine.Build(items, design, options);
         var eTag = $"\"{CabinetLayoutEngine.LayoutVersion}-{options.Fingerprint}-{sample}-{design.Name}\"";
 
