@@ -27,6 +27,7 @@ public enum PlacementKind
 
 /// <summary>One drawn item inside a cubby. Coordinates are millimetres from the cubby's left edge and floor.</summary>
 /// <param name="GameId">The game identifier, kept on every placement so later features can attach to it.</param>
+/// <param name="EntryId">The collection entry the drawn box belongs to; two copies of one game have different entries.</param>
 /// <param name="Kind">How the item is drawn.</param>
 /// <param name="XMm">Distance from the cubby's left edge to the left edge of the item.</param>
 /// <param name="YMm">Distance from the cubby floor to the bottom edge of the item.</param>
@@ -35,12 +36,14 @@ public enum PlacementKind
 /// <param name="Title">The full title, used for the accessible name.</param>
 /// <param name="Label">The text drawn on the item.</param>
 /// <param name="BaseTitle">The base game title for expansions; otherwise absent.</param>
+/// <param name="IsExpansion">True when the drawn box is an expansion, even when no base game is known; otherwise absent.</param>
 /// <param name="ToneIndex">Index into the colour table; stable per game.</param>
 /// <param name="PatternIndex">Index of the cover pattern; stable per game.</param>
 /// <param name="FamilyId">The base game identifier when the item belongs to a family; otherwise absent.</param>
 /// <param name="MoreCount">The hidden expansion count on a marker; otherwise absent.</param>
 public sealed record Placement(
     int GameId,
+    long EntryId,
     PlacementKind Kind,
     int XMm,
     int YMm,
@@ -49,6 +52,7 @@ public sealed record Placement(
     string Title,
     string Label,
     string? BaseTitle,
+    bool? IsExpansion,
     int ToneIndex,
     int PatternIndex,
     int? FamilyId,
