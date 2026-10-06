@@ -13,7 +13,7 @@ namespace Cabinet.Domain.Layout;
 public static class CabinetLayoutEngine
 {
     /// <summary>Bumped whenever the algorithm or a design changes on purpose, so a rearrangement is always a conscious change.</summary>
-    public const int LayoutVersion = 5;
+    public const int LayoutVersion = 6;
 
     private const int MinBoxSideMm = 10;
 
@@ -38,6 +38,7 @@ public static class CabinetLayoutEngine
         ArgumentNullException.ThrowIfNull(design);
         ArgumentNullException.ThrowIfNull(options);
         options.Validate();
+        design.Validate();
 
         var ordered = items.OrderBy(item => item.CollectionId).ThenBy(item => item.BggId).ToList();
         RejectDuplicates(ordered);
@@ -100,7 +101,7 @@ public static class CabinetLayoutEngine
 
         var baseItem = item with { Box = Clamp(item.Box, limits, expansions.Count > 0) };
         var plain = new LayoutMember(baseItem, pose);
-        var room = limits.MaxWidthMm - CubbyArrangement.StandingWidthMm(plain) - design.StackColumnWidthMm;
+        var room = limits.MaxWidthMm - CubbyArrangement.StandingWidthMm(design, plain) - design.StackColumnWidthMm;
         var (uprights, stacked) = SplitExpansions(expansions, design, limits, room);
 
         return plain with { Expansions = stacked, Uprights = uprights };

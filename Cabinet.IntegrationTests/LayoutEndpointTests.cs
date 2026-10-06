@@ -46,6 +46,26 @@ public class LayoutEndpointTests
     }
 
     [Fact]
+    public async Task Layout_for_the_phone_profile_is_the_narrow_design_with_more_sections_than_the_desktop()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        using var client = factory.CreatePublicClient();
+
+        using var response = await client.GetAsync("/cabinet/layout?sample=65&profile=phone", TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        var desktopBody = await client.GetStringAsync("/cabinet/layout?sample=65&profile=desktop", TestContext.Current.CancellationToken);
+        using var document = JsonDocument.Parse(body);
+        using var desktopDocument = JsonDocument.Parse(desktopBody);
+        var sections = document.RootElement.GetProperty("sections");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        document.RootElement.GetProperty("profile").GetString().Should().Be("phone");
+        sections[0].GetProperty("cubbies").GetArrayLength().Should().Be(14);
+        sections[0].GetProperty("widthMm").GetInt32().Should().Be(SectionDesigns.Phone.InteriorWidthMm);
+        sections.GetArrayLength().Should().BeGreaterThan(desktopDocument.RootElement.GetProperty("sections").GetArrayLength());
+    }
+
+    [Fact]
     public async Task Layout_for_the_empty_sample_is_one_section_of_bare_cubbies()
     {
         await using var factory = new CabinetWebApplicationFactory();

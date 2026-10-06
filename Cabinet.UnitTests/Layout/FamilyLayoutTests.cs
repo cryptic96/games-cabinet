@@ -296,7 +296,7 @@ public class FamilyLayoutTests
         var uprightOne = ExpansionOf(3, baseGame, depth: 200);
         var uprightTwo = ExpansionOf(4, baseGame, depth: 200);
         var thick = ExpansionOf(5, baseGame, depth: 200);
-        var design = new SectionDesign("test", 620, 20, [new ShelfRow(400, [600])]);
+        var design = new SectionDesign("test", 600, 20, [new ShelfRow(400, [600])]);
 
         var layout = CabinetLayoutEngine.Build([baseGame, thin, uprightOne, uprightTwo, thick], design, SpinesOnly);
 
@@ -313,7 +313,7 @@ public class FamilyLayoutTests
     [Trait("Category", "Layout")]
     public void A_base_game_without_expansions_takes_no_room_for_a_stack_column()
     {
-        var design = new SectionDesign("test", 620, 20, [new ShelfRow(300, [300, 300])]);
+        var design = new SectionDesign("test", 620, 20, [new ShelfRow(300, [300, 300])]) { StackColumnWidthMm = 140 };
         var first = BaseOf(1, depth: 100);
         var second = BaseOf(2, depth: 100);
 
@@ -332,7 +332,7 @@ public class FamilyLayoutTests
         var baseGame = BaseOf(1, depth: 60);
         var title = string.Concat(Enumerable.Repeat("Brin\U0001F3B2Orvä", 8));
         var expansion = ExpansionOf(2, baseGame, depth: 30) with { Title = title };
-        var design = new SectionDesign("test", 620, 20, [new ShelfRow(400, [600])]);
+        var design = new SectionDesign("test", 600, 20, [new ShelfRow(400, [600])]);
 
         var layout = CabinetLayoutEngine.Build([baseGame, expansion], design, SpinesOnly);
 
@@ -489,7 +489,7 @@ public class FamilyLayoutTests
     [Trait("Category", "Layout")]
     public void Orphan_boxes_join_the_flat_stacks_and_never_drop_below_the_orphan_minimum()
     {
-        var design = new SectionDesign("test", 620, 20, [new ShelfRow(400, [600])]);
+        var design = new SectionDesign("test", 600, 20, [new ShelfRow(400, [600])]);
         var thin = new CabinetItem(1, 1, "Invented Thin Expansion", ItemKind.Expansion, new BoxDimensions(100, 200, 15), [new BaseGameRef(900, "Invented Absent Base")]);
         var thick = new CabinetItem(2, 2, "Invented Thick Expansion", ItemKind.Expansion, new BoxDimensions(100, 200, 120), [new BaseGameRef(901, "Invented Other Base")]);
 
@@ -505,7 +505,7 @@ public class FamilyLayoutTests
     [Trait("Category", "Layout")]
     public void A_narrow_spine_base_shows_two_uprights_and_stacks_the_third_thick_and_the_thin_expansion()
     {
-        var design = new SectionDesign("test", 620, 20, [new ShelfRow(400, [600])]);
+        var design = new SectionDesign("test", 600, 20, [new ShelfRow(400, [600])]);
         var baseGame = BaseOf(1, depth: 40);
         var items = new[]
         {
@@ -533,7 +533,7 @@ public class FamilyLayoutTests
     [Trait("Category", "Layout")]
     public void A_cover_base_at_the_family_width_limit_stacks_a_thin_and_a_thick_expansion()
     {
-        var design = new SectionDesign("test", 620, 20, [new ShelfRow(400, [600])]);
+        var design = new SectionDesign("test", 600, 20, [new ShelfRow(400, [600])]);
         var baseGame = new CabinetItem(1, 1, "Invented Wide Base", ItemKind.Base, new BoxDimensions(design.Limits.MaxFamilyBaseWidthMm, 380, 60), []);
         var items = new[] { baseGame, ExpansionOf(2, baseGame, depth: 30), ExpansionOf(3, baseGame, depth: 70) };
 
@@ -569,7 +569,7 @@ public class FamilyLayoutTests
     [Trait("Category", "Layout")]
     public void A_family_with_only_uprights_has_no_layers_and_no_marker_and_takes_base_plus_upright_width()
     {
-        var design = new SectionDesign("test", 620, 20, [new ShelfRow(400, [600])]);
+        var design = new SectionDesign("test", 600, 20, [new ShelfRow(400, [600])]);
         var baseGame = BaseOf(1, depth: 40);
         var member = new LayoutMember(baseGame, BoxPose.Spine)
         {
@@ -590,7 +590,7 @@ public class FamilyLayoutTests
     [Trait("Category", "Layout")]
     public void An_upright_carries_its_family_its_base_title_a_label_cut_to_its_height_and_the_least_width()
     {
-        var design = new SectionDesign("test", 620, 20, [new ShelfRow(400, [600])]);
+        var design = new SectionDesign("test", 600, 20, [new ShelfRow(400, [600])]);
         var baseGame = BaseOf(1, depth: 40);
         var title = string.Concat(Enumerable.Repeat("Orvä Brin", 12));
         var expansion = ExpansionOf(2, baseGame, depth: 52) with { Title = title };

@@ -147,8 +147,12 @@ public static class CubbyArrangement
         return columns;
     }
 
-    private static int FlatHeight(SectionDesign design, LayoutMember member) =>
-        member.IsOrphanExpansion ? Math.Max(member.Item.Box.DepthMm, design.MinOrphanHeightMm) : member.Item.Box.DepthMm;
+    private static int FlatHeight(SectionDesign design, LayoutMember member)
+    {
+        var height = Math.Max(member.Item.Box.DepthMm, design.MinBoxThicknessMm);
+
+        return member.IsOrphanExpansion ? Math.Max(height, design.MinOrphanHeightMm) : height;
+    }
 
     private static void PlaceColumn(SectionDesign design, List<LayoutMember> column, int x, List<Placement> placements)
     {
@@ -166,26 +170,30 @@ public static class CubbyArrangement
     }
 
     /// <summary>
-    /// The width a box takes standing: its front when it faces out, its depth when it stands as a spine. The engine
-    /// measures with this same value when it reserves room for a family, so the room reserved is the room drawn.
+    /// The width a box takes standing: its front when it faces out, its depth when it stands as a spine, and a spine is
+    /// never narrower than the design's least box thickness. The engine measures with this same value when it reserves
+    /// room for a family, so the room reserved is the room drawn.
     /// </summary>
-    internal static int StandingWidthMm(LayoutMember member)
+    internal static int StandingWidthMm(SectionDesign design, LayoutMember member)
     {
+        ArgumentNullException.ThrowIfNull(design);
         ArgumentNullException.ThrowIfNull(member);
 
-        return member.Pose == BoxPose.Cover ? member.Item.Box.WidthMm : member.Item.Box.DepthMm;
+        return member.Pose == BoxPose.Cover
+            ? member.Item.Box.WidthMm
+            : Math.Max(member.Item.Box.DepthMm, design.MinBoxThicknessMm);
     }
 
     /// <summary>
     /// The width an upright expansion is drawn at: its depth, but never less than the design's least upright width, so
-    /// its two lines of text stay readable.
+    /// its two lines of text stay readable, nor less than its least box thickness.
     /// </summary>
     internal static int UprightWidthMm(SectionDesign design, CabinetItem expansion)
     {
         ArgumentNullException.ThrowIfNull(design);
         ArgumentNullException.ThrowIfNull(expansion);
 
-        return Math.Max(expansion.Box.DepthMm, design.MinUprightExpansionWidthMm);
+        return Math.Max(Math.Max(expansion.Box.DepthMm, design.MinUprightExpansionWidthMm), design.MinBoxThicknessMm);
     }
 
     /// <summary>
@@ -202,7 +210,7 @@ public static class CubbyArrangement
     {
         var box = member.Item.Box;
         var kind = member.Pose == BoxPose.Cover ? PlacementKind.Cover : PlacementKind.Spine;
-        var width = StandingWidthMm(member);
+        var width = StandingWidthMm(design, member);
         var uprightsWidth = member.Uprights.Sum(upright => UprightWidthMm(design, upright));
         var columnWidth = member.Expansions.Count > 0 ? design.StackColumnWidthMm : 0;
         var tallest = member.Uprights.Select(upright => upright.Box.HeightMm).Append(box.HeightMm).Max();
@@ -258,10 +266,12 @@ public static class CubbyArrangement
         List<Placement> placements)
     {
         var baseItem = member.Item;
+        var minLayerHeight = Math.Max(design.MinLayerHeightMm, design.MinBoxThicknessMm);
         var heights = member.Expansions
-            .Select(expansion => Math.Clamp(expansion.Box.DepthMm, design.MinLayerHeightMm, design.MaxLayerHeightMm))
+            .Select(expansion => Math.Clamp(expansion.Box.DepthMm, minLayerHeight, design.MaxLayerHeightMm))
             .ToList();
-        var stack = StackLayout.Layout(heights, cubby.HeightMm, design.MarkerHeightMm, options.ExpansionStackMax);
+        var markerHeight = Math.Max(design.MarkerHeightMm, design.MinBoxThicknessMm);
+        var stack = StackLayout.Layout(heights, cubby.HeightMm, markerHeight, options.ExpansionStackMax);
         var pitch = Math.Max(1, design.LabelCharPitchMm);
         var drawOrder = Enumerable.Range(0, stack.Visible)
             .OrderByDescending(index => heights[index])
@@ -298,7 +308,7 @@ public static class CubbyArrangement
                 XMm: columnX,
                 YMm: y,
                 WidthMm: design.StackColumnWidthMm,
-                HeightMm: design.MarkerHeightMm,
+                HeightMm: markerHeight,
                 Title: baseItem.Title,
                 Label: string.Empty,
                 BaseTitle: baseItem.Title,
