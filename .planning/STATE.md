@@ -90,6 +90,7 @@ Recent decisions affecting current work:
 ### Blockers/Concerns
 
 - [Resolved 2026-10-06]: The BGG application (non-commercial) is approved and the owner has the API token, so Phase 3 is unblocked. The token goes only into the server env file (and `dotnet user-secrets` locally), never into the repository, logs or chat. Phase 3 also adds the linked "Powered by BGG" logo to every public page (SYNC-08), taken from BGG's official usage page.
+- [Phase 3, 2026-10-06]: Plan 03-04 is paused after Task 1 (shared layout and footer credit link merged; the img points at a missing `powered-by-bgg.png`). The owner supplies the official logo later in the phase; resume Tasks 2-3 with a continuation agent, and the logo must land before 03-15 (release and owner check).
 - [Phase 3]: Location spike outcome decides whether LOC-03 and LOC-04 are built in Phase 6. BGG throttle numbers are unpublished; treat all rates as unconfirmed.
 - [Phase 4]: Coverage and units of BGG version dimensions are unconfirmed; image resizing under BGG terms is ambiguous (downscale only, never crop, keep the credit).
 - [Phase 8]: DNS, TLS and router port-forward are owner actions; the router stays LAN-only until the go-public checklist passes.
