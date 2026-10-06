@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 02
-current_phase_name: layout-engine-cabinet-prototype
-status: verifying
-stopped_at: Phase 2 UI-SPEC approved
-last_updated: "2026-10-06T09:21:07.545Z"
-last_activity: 2026-10-05
-last_activity_desc: Phase 02 execution started
+current_phase: 3
+current_phase_name: BGG Access Spike, Real Sync & Snapshot
+status: planning
+stopped_at: Phase 2 complete, ready to plan Phase 3
+last_updated: "2026-10-06T09:57:28.726Z"
+last_activity: 2026-10-06
+last_activity_desc: Phase 2 complete, transitioned to Phase 3
 progress:
   total_phases: 2
   completed_phases: 2
@@ -20,17 +20,17 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-03)
+See: .planning/PROJECT.md (updated 2026-10-06)
 
 **Core value:** Anyone with the link sees an up-to-date, good-looking cabinet of exactly the games the owner owns on BGG, with no manual data entry in the app.
-**Current focus:** Phase 02 — layout-engine-cabinet-prototype
+**Current focus:** Phase 3 — BGG Access Spike, Real Sync & Snapshot
 
 ## Current Position
 
-Phase: 02 (layout-engine-cabinet-prototype) — EXECUTING
-Plan: 8 of 8
-Status: Phase complete — ready for verification
-Last activity: 2026-10-05 — Phase 02 execution started
+Phase: 3 — BGG Access Spike, Real Sync & Snapshot
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-10-06 — Phase 2 complete, transitioned to Phase 3
 
 Progress: [██████████] 100%
 
@@ -38,7 +38,7 @@ Progress: [██████████] 100%
 
 **Velocity:**
 
-- Total plans completed: 15
+- Total plans completed: 24
 - Average duration: - min
 - Total execution time: 0.0 hours
 
@@ -47,6 +47,7 @@ Progress: [██████████] 100%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01 | 15 | - | - |
+| 2 | 9 | - | - |
 
 **Recent Trend:**
 
@@ -72,6 +73,10 @@ Recent decisions affecting current work:
 - [Roadmap]: Mobile reflow (CAB-07) and expansion layout (EXP-01..03) are mapped to the layout phase because they are layout-engine outputs the owner must review early.
 - [Roadmap]: SEC-05 (token and username server-side only) is mapped to the sync phase where it is built; SEC-06 (resource caps) stays in hardening so caps are sized from real load.
 - [Phase ?]: Phase 01-01: history rewritten with replace-text only; backup mirror kept under XDG state until go-live scan passes
+- [Phase 2]: Cabinet look approved and shipped as v0.2.0 (classic wooden finish, piles widest-first, big boxes may lie flat, thick expansions upright, last section trimmed, layout version 8); owner walked the deployed build on desktop and phone.
+- [Phase 2]: Layout is a pure versioned function guarded by golden files; later visual changes are a version bump plus a release, with no stored state to migrate.
+- [Phase 2]: Remaining taste calls deferred as todos to Phases 4, 5 and 7; selectable finishes stay an unscheduled todo.
+- [Phase 2]: Front-end work in GSD agents uses the owner's personal senior-frontend skill via agent_skills (planner, executor, UI agents).
 
 ### Pending Todos
 
@@ -85,7 +90,6 @@ Recent decisions affecting current work:
 ### Blockers/Concerns
 
 - [Resolved 2026-10-06]: The BGG application (non-commercial) is approved and the owner has the API token, so Phase 3 is unblocked. The token goes only into the server env file (and `dotnet user-secrets` locally), never into the repository, logs or chat. Phase 3 also adds the linked "Powered by BGG" logo to every public page (SYNC-08), taken from BGG's official usage page.
-- [Phase 2]: Packing quality is subjective; the owner's visual review is the acceptance gate and may take several rounds.
 - [Phase 3]: Location spike outcome decides whether LOC-03 and LOC-04 are built in Phase 6. BGG throttle numbers are unpublished; treat all rates as unconfirmed.
 - [Phase 4]: Coverage and units of BGG version dimensions are unconfirmed; image resizing under BGG terms is ambiguous (downscale only, never crop, keep the credit).
 - [Phase 8]: DNS, TLS and router port-forward are owner actions; the router stays LAN-only until the go-public checklist passes.
@@ -107,6 +111,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-05T16:07:52.748Z
-Stopped at: Phase 2 UI-SPEC approved
-Resume file: .planning/phases/02-layout-engine-cabinet-prototype/02-UI-SPEC.md
+Last session: 2026-10-06T09:58:22Z
+Stopped at: Phase 2 complete, ready to plan Phase 3
+Resume file: None

@@ -16,7 +16,7 @@ Every phase is a vertical slice: it ends with something the owner can see or do 
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Repo, Guardrails & Walking-Skeleton Deploy** - Public repo with enforced guardrails and a hello page proven through release, deploy and rollback (completed 2026-10-04)
-- [ ] **Phase 2: Layout Engine & Cabinet Prototype** - Deterministic, natural-looking cabinet on synthetic data, approved visually by the owner
+- [x] **Phase 2: Layout Engine & Cabinet Prototype** - Deterministic, natural-looking cabinet on synthetic data, approved visually by the owner (completed 2026-10-06)
 - [ ] **Phase 3: BGG Access Spike, Real Sync & Snapshot** - The owner's real collection appears automatically in the deployed cabinet, resilient to BGG outages
 - [ ] **Phase 4: Enrichment, Box Images & Shape** - Real box art, art-coloured spines, true box proportions and full game details, all served from the site
 - [ ] **Phase 5: Game Detail, Accessibility & Language** - Pull-out animation, detail card, keyboard and screen-reader access, English and Dutch labels
@@ -102,7 +102,7 @@ Plans:
   4. Each expansion appears with its name beside its base game: thick (big-box) expansions stand upright next to it and thin ones lie as thin sideways spines in a stack, thickest at the bottom (D-23, D-24); an expansion whose base game is absent stands alone, labelled with the game it expands; a base game with many expansions collapses the extras into a "+N more" stack that never overflows its shelf.
   5. On a phone-width screen the cabinet reflows into a narrower, taller cabinet that still looks like a cabinet, with spines readable and large enough to tap.
 
-**Plans:** 9/9 plans executed
+**Plans:** 9/9 plans complete
 
 Plans:
 **Wave 1**
@@ -252,7 +252,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Repo, Guardrails & Walking-Skeleton Deploy | 15/15 | Complete    | 2026-10-04 |
-| 2. Layout Engine & Cabinet Prototype | 9/9 | In Progress|  |
+| 2. Layout Engine & Cabinet Prototype | 9/9 | Complete    | 2026-10-06 |
 | 3. BGG Access Spike, Real Sync & Snapshot | 0/0 | Not started | - |
 | 4. Enrichment, Box Images & Shape | 0/0 | Not started | - |
 | 5. Game Detail, Accessibility & Language | 0/0 | Not started | - |

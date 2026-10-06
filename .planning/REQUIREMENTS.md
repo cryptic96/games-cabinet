@@ -24,19 +24,19 @@ Requirements for the initial release. Each maps to a roadmap phase.
 
 ### Cabinet
 
-- [ ] **CAB-01**: Visitors see every owned game in a cabinet drawn to fit the collection. Shelves and cubbies grow with it, from an empty collection to several hundred games. The design target is the current collection: about 65 owned items, expansions included.
-- [ ] **CAB-02**: Boxes appear as a mix of face-out covers and spines, like a real game shelf.
+- [x] **CAB-01**: Visitors see every owned game in a cabinet drawn to fit the collection. Shelves and cubbies grow with it, from an empty collection to several hundred games. The design target is the current collection: about 65 owned items, expansions included.
+- [x] **CAB-02**: Boxes appear as a mix of face-out covers and spines, like a real game shelf.
 - [ ] **CAB-03**: Each spine shows the game's title legibly, in a colour taken from its box art, with readable text contrast. Plain backgrounds around product shots are ignored when picking the colour.
-- [ ] **CAB-04**: Boxes are packed to look natural and full, sized by box shape (see IMG-03), in irregular cubbies like the inspiration photo rather than a uniform grid.
-- [ ] **CAB-05**: The layout is stable: the same collection always renders the same cabinet, and adding a game does not reshuffle existing boxes.
-- [ ] **CAB-06**: Small or empty collections look intentional. There is always a minimum cabinet, and boxes face out when there are only a few.
-- [ ] **CAB-07**: On phones, the cabinet reflows into a narrower, taller cabinet that still looks like a cabinet, with readable and tappable spines.
+- [x] **CAB-04**: Boxes are packed to look natural and full, sized by box shape (see IMG-03), in irregular cubbies like the inspiration photo rather than a uniform grid.
+- [x] **CAB-05**: The layout is stable: the same collection always renders the same cabinet, and adding a game does not reshuffle existing boxes.
+- [x] **CAB-06**: Small or empty collections look intentional. There is always a minimum cabinet, and boxes face out when there are only a few.
+- [x] **CAB-07**: On phones, the cabinet reflows into a narrower, taller cabinet that still looks like a cabinet, with readable and tappable spines.
 
 ### Expansions
 
-- [ ] **EXP-01**: Each owned expansion appears with its name right beside its owned base game: thick (big-box) expansions stand upright as spines next to the base, thin ones lie as thin sideways spines in a stack beside it.
-- [ ] **EXP-02**: An owned expansion whose base game is not owned still appears, as its own spine, labelled with the game it expands.
-- [ ] **EXP-03**: A base game with many expansions collapses the extras into a "+N more" stack, so a family never overflows its shelf.
+- [x] **EXP-01**: Each owned expansion appears with its name right beside its owned base game: thick (big-box) expansions stand upright as spines next to the base, thin ones lie as thin sideways spines in a stack beside it.
+- [x] **EXP-02**: An owned expansion whose base game is not owned still appears, as its own spine, labelled with the game it expands.
+- [x] **EXP-03**: A base game with many expansions collapses the extras into a "+N more" stack, so a family never overflows its shelf.
 - [ ] **EXP-04**: An expansion dims or lights up together with its base game when filters are applied.
 
 ### Game Detail
@@ -180,16 +180,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SYNC-06 | Phase 4 | Pending |
 | SYNC-07 | Phase 4 | Pending |
 | SYNC-08 | Phase 3 | Pending |
-| CAB-01 | Phase 2 | Pending |
-| CAB-02 | Phase 2 | Pending |
+| CAB-01 | Phase 2 | Complete |
+| CAB-02 | Phase 2 | Complete |
 | CAB-03 | Phase 4 | Pending |
-| CAB-04 | Phase 2 | Pending |
-| CAB-05 | Phase 2 | Pending |
-| CAB-06 | Phase 2 | Pending |
-| CAB-07 | Phase 2 | Pending |
-| EXP-01 | Phase 2 | Pending |
-| EXP-02 | Phase 2 | Pending |
-| EXP-03 | Phase 2 | Pending |
+| CAB-04 | Phase 2 | Complete |
+| CAB-05 | Phase 2 | Complete |
+| CAB-06 | Phase 2 | Complete |
+| CAB-07 | Phase 2 | Complete |
+| EXP-01 | Phase 2 | Complete |
+| EXP-02 | Phase 2 | Complete |
+| EXP-03 | Phase 2 | Complete |
 | EXP-04 | Phase 7 | Pending |
 | DET-01 | Phase 5 | Pending |
 | DET-02 | Phase 5 | Pending |

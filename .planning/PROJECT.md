@@ -15,15 +15,17 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 - ✓ Runs in its own new LXC on the Proxmox host, created and provisioned from documented scripts — Phase 1
 - ✓ Releases follow the ing-dashboard model: semver tag → attested draft → owner approval in the `deploy` environment → server timer pulls, verifies offline, installs, health-checks and rolls back automatically. No self-hosted runner — Phase 1 (rollback rehearsed for real)
 - ✓ Public GitHub repository with `main` protected, required PR checks and personal-data guardrails (hooks, full-history scan, secrets lint) — Phase 1
+- ✓ Cabinet is drawn dynamically from a deterministic layout engine: sections of irregular cubbies grow with the collection from an empty cabinet to several hundred games, and the same collection always gives the same cabinet — Phase 2 (v0.2.0, owner-approved on desktop and phone)
+- ✓ Boxes shown as a natural mix like a real shelf: face-out covers, upright spines and flat piles (widest at the bottom, big boxes lying flat before a new section opens), packed full in irregular cubbies — Phase 2 (generated covers until real box art arrives)
+- ✓ Expansions sit beside their base game: thick big-box expansions stand upright, thin ones lie in a stack thickest at the bottom, overflow collapses into "+N more", and expansions without an owned base are labelled with the game they expand — Phase 2
+- ✓ On phones the cabinet reflows into its own narrower, taller cabinet with readable, tappable spines — Phase 2
+- ✓ Empty and near-empty collections look intentional: a trimmed minimum cabinet of bare planked wood, and boxes face out when there are few — Phase 2
 
 ### Active
 
 - [ ] Owned collection syncs from BGG automatically (about hourly), with no manual game entry in the app
 - [ ] Manual "sync now" button, guarded by a global cooldown so nobody can use it to hammer BGG
-- [ ] Cabinet is drawn dynamically: shelves/cubbies grow with the collection, working from an empty collection up to several hundred games
-- [ ] Boxes shown as a mix, like a real shelf: some face-out with BGG box art, others as generated spines (title on a coloured strip, since BGG only provides front images)
-- [ ] Shelves are packed to look natural and full (by box size and shape), not in strict alphabetical order
-- [ ] Expansions appear as thin sideways spines with their name, right beside their base game
+- [ ] Face-out boxes show the real BGG box art and spines take their colour from it (the mix itself shipped in Phase 2 with generated covers)
 - [ ] Tapping a game pulls the box out of the shelf (animation) and opens a detail card: player count, play time, weight, storage location, expansions, BGG rating, designers, minimum age, mechanics, link to BGG
 - [ ] Each game shows its storage location to every visitor. Locations are read from BGG's private field if a token spike proves the app can read it; otherwise the owner manages them in home/VPN-only owner tools
 - [ ] Visitors can toggle between one big cabinet and one cabinet per storage location
@@ -31,8 +33,6 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 - [ ] Box proportions come from the owned version's real BGG dimensions when available
 - [ ] Site labels in English and Dutch (browser default, switchable)
 - [ ] Game-night filters: player count, play time, storage location, search by name (non-matching games dim on the shelf)
-- [ ] On phones the cabinet reflows into a narrower, taller cabinet that still looks like a cabinet
-- [ ] Empty or near-empty collections look intentional, not broken (the owner's BGG collection is still being filled in)
 - [ ] Before the site goes public: revoke or downgrade the development admin account (passwordless sudo) on the server, and drop the LAN/VPN allow-list from the route
 - [ ] Site is public and read-only with no accounts, reachable from the internet through the existing Traefik reverse proxy. Owner tools are reachable only from the home network or VPN
 
@@ -97,10 +97,10 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 | Game-night and sharing extras deferred to v2 | Keep v1 focused on the cabinet itself | — Pending |
 | Public, read-only site with no accounts | Anyone with the link can view; nothing editable to protect | — Pending |
 | Sync about hourly, plus a manual sync button with a global cooldown | Fresh enough after adding a game; can't be abused to hit BGG rate limits | — Pending |
-| Mix of face-out boxes and generated spines, packed to look good | Mirrors the inspiration photo; looks like a real cabinet | — Pending |
-| Expansions as sideways spines beside their base game | Owner's idea; keeps families together visually | — Pending |
+| Mix of face-out boxes and generated spines, packed to look good | Mirrors the inspiration photo; looks like a real cabinet | ✓ Good — approved after two screenshot review rounds and on the deployed v0.2.0 (Phase 2); flat piles and big boxes lying flat added at the owner's request |
+| Expansions as sideways spines beside their base game | Owner's idea; keeps families together visually | ✓ Revised — thick big-box expansions stand upright beside the base, thin ones stack thickest at the bottom (Phase 2, owner request after seeing the first families) |
 | Toggle between one cabinet and one cabinet per location | Supports both browsing and "where is it?" | — Pending |
-| On mobile, reflow to a narrow, tall cabinet | Keeps the cabinet look on phones instead of falling back to a list | — Pending |
+| On mobile, reflow to a narrow, tall cabinet | Keeps the cabinet look on phones instead of falling back to a list | ✓ Good — separate phone section design with derived readability minimums; owner walked it on a real phone (Phase 2) |
 | Tap shows a pull-out animation and a detail card | Delight plus the info friends need to pick a game | — Pending |
 | Owned games only | Wishlist, preordered and for-trade statuses are not wanted | — Pending |
 | Public internet exposure via existing Traefik | "Anyone with the link" must work from anywhere | — Pending |
@@ -109,6 +109,9 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 | Planning and build work on `milestone/v1-games-cabinet`; `main` protected | Same branching rules as ing-dashboard | ✓ Good — main ruleset enforced; merge commits for the milestone branch, squash for small PRs (Phase 1) |
 | Release workflow split into test, package and attest jobs; only attest can sign | Test code and test-only packages must not run inside the provenance boundary | ✓ Good (Phase 1 code review) |
 | Owner's handle and first-name commit author display name are public | The handle is the repository owner, licence holder and release signer; emails stay noreply | ✓ Accepted (Phase 1 UAT) |
+| Layout is a pure, versioned function of the collection, guarded by recorded golden layouts | Same collection, same cabinet; any engine change is a deliberate version bump, and nothing stored depends on the layout | ✓ Good — eight layout versions during Phase 2 with no stored state to migrate |
+| Cabinet furniture uses the "classic" wooden finish, built as CSS on finish-neutral hooks | Owner picked it from mocked-up directions; other finishes and a lit-cubbies toggle stay possible as CSS swaps | ✓ Good (Phase 2); selectable finishes captured as a todo |
+| The app sends its own strict Content-Security-Policy | The proxy sets none, so the policy travels with the app and is tested | ✓ Good (Phase 2 code review) |
 
 ## Evolution
 
@@ -128,4 +131,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-04 after Phase 1 (repo guardrails, walking skeleton, deploy)*
+*Last updated: 2026-10-06 after Phase 2 (layout engine and cabinet prototype)*
