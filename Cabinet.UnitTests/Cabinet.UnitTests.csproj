@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Cabinet.Domain\Cabinet.Domain.csproj" />
+    <ProjectReference Include="..\Cabinet.FakeBgg\Cabinet.FakeBgg.csproj" />
     <ProjectReference Include="..\Cabinet.Repository\Cabinet.Repository.csproj" />
     <ProjectReference Include="..\Cabinet.Service\Cabinet.Service.csproj" />
   </ItemGroup>

@@ -17,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Cabinet.FakeBgg\Cabinet.FakeBgg.csproj" />
     <ProjectReference Include="..\Cabinet.Service\Cabinet.Service.csproj" />
   </ItemGroup>
 

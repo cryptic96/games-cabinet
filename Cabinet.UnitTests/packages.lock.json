@@ -162,6 +162,9 @@
       "cabinet.domain": {
         "type": "Project"
       },
+      "cabinet.fakebgg": {
+        "type": "Project"
+      },
       "cabinet.repository": {
         "type": "Project",
         "dependencies": {
