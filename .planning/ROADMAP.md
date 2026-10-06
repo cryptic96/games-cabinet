@@ -115,7 +115,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 02-03-PLAN.md — Box look: contrast-checked palette, generated covers, wood finish, readable shortened labels
+- [ ] 02-03-PLAN.md — Box look: contrast-checked palette, generated covers, readable shortened labels, and the owner's chosen classic furniture finish (grain, moulded top, planked backs, plinth) with a screenshot check
 - [ ] 02-04-PLAN.md — Page and samples: sample switcher, load states, viewport profile, cached endpoint, prototype switch, layout guide
 
 **Wave 4** *(blocked on Wave 3 completion)*

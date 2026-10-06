@@ -62,6 +62,9 @@ Not in this phase, though the engine and renderer must leave room for them:
 ### Review loop
 - **D-18:** **Screenshots between rounds, deployed release for the final check.** Between rounds Claude iterates locally and sends the owner screenshots at desktop and phone widths for each synthetic sample (0, 1, 5, about 65, 400). Once the owner likes them, a release is tagged, approved and pulled onto the LXC. The owner then checks the real thing from a desktop browser and a phone over the LAN-only route. Approval of that deployed version closes the phase.
 
+### Furniture finish
+- **D-20 (added 2026-10-06 after the owner reviewed the running tracer; refines the look in D-04, not its rule):** **The cabinet furniture uses the "B classic" finish.** The owner found the furniture itself plain (not the games) and picked B classic from several mocked-up directions. B classic keeps exactly today's browns (`--wood-dark` backdrop, `--wood-mid` frame and shelves, `--ink` back panels, `--wood-edge` highlights) but builds them like a traditional piece of furniture: grain along every board (shelves horizontal, uprights vertical, CSS gradients only), a lit front edge and a slightly different stable tone per shelf, a moulded top that overhangs the sides, side boards that read thicker than the shelves (about 12 mm of trim outside the 20 mm frame; the engine geometry does not change), a back of vertical tongue-and-groove planks so empty cubbies show bare planked wood instead of black (still no props, text or icons, per D-04), and a plinth with a shallow arch between two feet over a soft floor shadow. The concrete values, the contrast cap for shade over boxes and the clipping rules are in the UI contract ("Furniture finish: B classic"); plan 02-03 builds it. — **Reversibility:** reversible — the finish is one CSS block over finish-neutral hooks (three decorative elements per section, a row-end flag and a shelf tone index on cubbies); no engine geometry, layout version or stored state depends on it. Making the finish selectable, with "lit cubbies" as a separate toggle, is captured as a todo (`.planning/todos/pending/2026-10-06-selectable-cabinet-finishes-and-lit-cubbies-toggle.md`) and is not part of this phase.
+
 ### Claude's Discretion
 - **Section designs:** exact dimensions, shelf heights, divider positions and number of cubbies for the desktop and phone sections, and how irregular they are. Aim for the inspiration photo: big cubbies for big face-out boxes, smaller ones for spines and stacks.
 - **Few-games threshold:** the exact number and the minimum cabinet size (e.g. one section).
@@ -141,6 +144,8 @@ Not in this phase, though the engine and renderer must leave room for them:
 ## Deferred Ideas
 
 None. Discussion stayed within phase scope. A visitor-facing control for the cover mix was mentioned as an option and not chosen. Decorations in empty cubbies were offered and not chosen; they remain a possible review-round tweak.
+
+- **Selectable cabinet finishes and a "lit cubbies" toggle** (added 2026-10-06 with D-20): the other mocked-up finishes, who chooses (visitor or owner), per-finish wall colours and a cubby-depth axis. Captured in `.planning/todos/pending/2026-10-06-selectable-cabinet-finishes-and-lit-cubbies-toggle.md`; not planned in this phase. Only B classic ships now, built so a later finish is a CSS-only swap.
 
 </deferred>
 

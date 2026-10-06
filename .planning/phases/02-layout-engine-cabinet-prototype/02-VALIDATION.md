@@ -70,6 +70,7 @@ Filled in by the planner once task IDs exist. Requirement-to-test intent from re
 | 02-02 T3 | CAB-02, CAB-04, CAB-06 | quick command | Share band, boundaries 11/12/13, flat stacks, independence |
 | 02-03 T1 (tracer) | CAB-02, CAB-04 | quick command + syntax check | Palette contrast >= 4.5:1, tone/pattern independence |
 | 02-03 T2 | CAB-02 | quick command | Label shortening in text elements |
+| 02-03 T3 | CAB-01, CAB-04 | quick command + syntax check | Classic furniture finish (D-20): palette and marker-chip contrast under the shade cap; scratch screenshots at 1440 and 390 px checking reserved height, unclipped top, plinth and floor shadow, per-label contrast with the shade, focus ring above furniture, no console or policy errors, no horizontal scroll |
 | 02-04 T1 (tracer) | CAB-01, CAB-06 | integration project | Sample switcher, unknown sample not echoed, prototype off |
 | 02-04 T2 | CAB-07 | integration project + syntax check | ETag/304, no style attributes or inline scripts, profile by media query |
 | 02-04 T3 | CAB-01 | docs grep + `build/lint.sh repo-rules` | Settings and stability guide |

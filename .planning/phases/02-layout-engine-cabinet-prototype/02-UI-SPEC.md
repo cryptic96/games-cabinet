@@ -14,6 +14,8 @@ created: 2026-10-05
 > **Reading guide.** The phase acceptance gate is the owner's subjective visual review over several rounds. Every value tagged **STARTING VALUE** is a first guess meant to be tuned in review rounds; changing one is expected and is not a contract violation as long as the fixed rules (tagged **FIXED**) still hold. The consolidated list is in "Tuning Register".
 >
 > **Repository rule reminder for executors.** This file may use requirement keys and decision IDs because it lives in the planning folder. Nothing copied from it into code, markup, strings, tests, docs or comments may contain them (see the project instructions). Copy strings below are written so they can be pasted as-is.
+>
+> **Amendment 2026-10-06 (D-20).** After reviewing the running tracer, the owner found the furniture plain and chose the **B classic** finish from mocked-up directions. New section "Furniture finish: B classic"; amended: Spacing exceptions (board thickness), Color (frame, interior, edge highlight, backdrop separation), Structure and scaling (section box, `--u`), Wood and cubbies, focus layering, Readability floors (side allowance in `uMin`), Screen readers, UI Considerations (two rows) and the Tuning Register. The owner's choice is the approval for this amendment; the original checker sign-off below covers the rest.
 
 ---
 
@@ -48,7 +50,7 @@ Applies to **page chrome** (header, sample switcher, footer, gaps between cabine
 
 **Exceptions (all intentional):**
 
-- **Cabinet geometry is not on this scale.** Everything inside a section (frame, shelves, dividers, boxes, stacks) is measured in millimetres and scaled by one factor `--u` (px per mm, from container query units). **FIXED:** frame thickness and shelf/divider thickness are equal, **STARTING VALUE** 20 mm.
+- **Cabinet geometry is not on this scale.** Everything inside a section (frame, shelves, dividers, boxes, stacks) is measured in millimetres and scaled by one factor `--u` (px per mm, from container query units). **FIXED:** the engine's frame thickness and shelf/divider thickness are equal, **STARTING VALUE** 20 mm. **Amended (D-20):** they no longer all *read* equal. The furniture finish adds side trim outside the frame, so the outer side boards read about 32 mm against 20 mm shelves, and it adds a moulded top and a plinth. These parts are drawn in the section's reserved margins (see "Furniture finish: B classic") and never change the engine geometry.
 - **Tap-target floors (FIXED):** every interactive element is at least 24 px in both rendered dimensions on phone (spine width, expansion layer height); sample links and the retry button are at least 44px tall (`min-height: 44px`).
 - **36px minimum rendered height** for an orphan expansion box, so its two label lines fit (see "Placement kinds").
 - Page gutters: 8px phone (`max-width: 40rem` profile), 24px otherwise. The 8px phone gutter is deliberate so the phone cabinet is as wide as possible; the engine's phone minimum sizes are derived from it (see "Readability floors").
@@ -92,9 +94,9 @@ Weights are exactly **400 and 600**. The existing bold (700) heading and the `0.
 | Role | Value | Usage |
 |------|-------|-------|
 | Dominant (60%) | `#3b2416` (`--wood-dark`) | Page backdrop (flat, no gradient) |
-| Secondary (30%) | `#6b4226` (`--wood-mid`) | Cabinet frame, shelves and dividers (the 20 mm bands around and between cubbies) |
-| Interior | `#2a1a10` (`--ink`) | Back panel of every cubby (the "shaded wood"); also text colour on light surfaces (accent chips, light palette tones) |
-| Edge highlight | `#8c5d38` (new `--wood-edge`) | 1px lit edge along the top of the frame and along each cubby floor, for depth |
+| Secondary (30%) | `#6b4226` (`--wood-mid`) | Cabinet frame, shelves, dividers, side boards, top and plinth. Shelves vary by at most ±6% per shelf and the plinth is darker (in shadow); see "Furniture finish: B classic" |
+| Interior | `#2a1a10` (`--ink`) | Base colour of the planked back panel of every cubby (the "shaded wood"); also text colour on light surfaces (accent chips, light palette tones) |
+| Edge highlight | `#8c5d38` (new `--wood-edge`) | 1px lit front edge along the top of every shelf and of the bottom board, and the lit arrises of the moulded top and the left side board, for depth |
 | Wall text | `#efe3c2` (new `--wall-text`) | Heading, status line, footer, sample links, messages on the backdrop (contrast about 11:1 on `#3b2416`) |
 | Accent (10%) | `#d9b98a` (`--wood-light`) | Reserved list below |
 | Destructive | not applicable | No destructive actions exist in this phase; no destructive colour is introduced |
@@ -106,7 +108,7 @@ Weights are exactly **400 and 600**. The existing bold (700) heading and the `0.
 3. The **keyboard focus ring** on any focusable element (2px solid, 2px offset)
 4. The **"Try again" button** background in the load-error state (text `--ink`)
 
-Accent is never used on game boxes, frame, headings or the footer. Contrast checks: accent on `#3b2416` 7.8:1, `--ink` on accent 9.0:1, accent on `--ink` 9.0:1. Backdrop to frame contrast is low (about 1.7:1) by design; the frame must separate from the backdrop through its 1px `--wood-edge` highlight and an outer shadow (`0 8px 24px rgb(0 0 0 / 0.45)` on the section, **STARTING VALUE**), not through a lighter colour.
+Accent is never used on game boxes, frame, headings or the footer. Contrast checks: accent on `#3b2416` 7.8:1, `--ink` on accent 9.0:1, accent on `--ink` 9.0:1. Backdrop to frame contrast is low (about 1.7:1) by design; the furniture must separate from the backdrop through its silhouette and light, not through a lighter colour: the lit arrises of the moulded top and the left side board, the darker plinth, the floor shadow under the feet and a faint wall shadow to the right of the right side board (all **STARTING VALUE**, see "Furniture finish: B classic"). **Amended (D-20):** this replaces the earlier outer shadow on the section box, because the section box now includes transparent margins.
 
 ### Placeholder box palette (generated boxes, not part of the 60/30/10 split)
 
@@ -139,18 +141,139 @@ Tone choice per game comes from the game's own stable hash (never from neighbour
 
 - Page order: `header` (title, status line, sample switcher when enabled), `main` (the cabinet), `footer`.
 - `main` is a CSS grid of **sections**: `display: grid; justify-content: center; gap: 24px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 32rem), 40rem));` (**STARTING VALUE** track bounds 32rem and 40rem). A single section never stretches to the screen width; further sections line up beside it, then wrap into a new row (wall of cabinets). Visitors scroll vertically only; no horizontal scroll at any width from 320px.
-- Each section is a **size container** (`container-type: inline-size`) with `aspect-ratio` from its millimetre dimensions (outer size = interior size plus 2 x frame), so its height is reserved before rendering (no layout shift). Each section carries `content-visibility: auto` for off-screen cost.
-- The scale factor `--u` (px per mm) is defined on a **child** of the container as `calc(100cqw / var(--section-w))` (a `cq` unit does not resolve against the element that declares the container). Every placement is positioned with `left: calc(var(--x) * var(--u))`, `bottom: calc(var(--y) * var(--u))`, `width`/`height` the same way, all absolute inside its cubby (cubby-local millimetres, y measured from the cubby floor).
+- Each section is a **size container** (`container-type: inline-size`) with `aspect-ratio` from its millimetre dimensions, so its height is reserved before rendering (no layout shift). Each section carries `content-visibility: auto` for off-screen cost. **Amended (D-20):** the section box is the engine's outer size (interior plus 2 x frame) plus the furniture's reserved space: 2 x the side allowance in width, and the moulding, plinth and floor margin in height (see "Furniture finish: B classic"). The aspect ratio uses these totals.
+- The scale factor `--u` (px per mm) is defined on the **direct children** of the container as `calc(100cqw / (var(--section-w) + 2 * var(--side-allowance)))` (a `cq` unit does not resolve against the element that declares the container, so `--u` is never used on `.section` itself). Every placement is positioned with `left: calc(var(--x) * var(--u))`, `bottom: calc(var(--y) * var(--u))`, `width`/`height` the same way, all absolute inside its cubby (cubby-local millimetres, y measured from the cubby floor).
 - DOM order equals reading order: sections, cubbies top to bottom and left to right, placements left to right. This is the future keyboard and screen-reader order; do not reorder it for visual effect.
 - Profiles: the phone section design at `(max-width: 40rem)` and the desktop section design otherwise (**STARTING VALUE** breakpoint). When the media query flips, fetch and re-render; nothing else listens to resize. Tablet portrait and landscape phones fall in the desktop profile, one section wide; acceptable.
 - Sections at the phone profile are one per row, full width minus the 8px gutter.
 
 ### Wood and cubbies (FIXED structure, STARTING VALUE finish)
 
-- A section is a frame in `--wood-mid`: outer border 20 mm on all four sides, shelves and dividers 20 mm, a 1px `--wood-edge` highlight on the top edge.
-- Every cubby of every section is drawn, empty or not: a rectangle filled `--ink` with **one** inset shadow (`inset 0 6mm 10mm rgb(0 0 0 / 0.5)` expressed in `--u`; STARTING VALUE) and a 1px `--wood-edge` line along its floor. Empty cubbies are bare shaded wood: **no props, no placeholder text, no icons, no hint copy**, in the minimum cabinet and in the unused part of the last section.
+- The engine frame is `--wood-mid`, 20 mm on all four sides, with 20 mm shelves and dividers (FIXED geometry). **Amended (D-20):** the finish draws the frame as furniture. Side boards read thicker through trim outside the frame, a moulded top sits above and a plinth below. See "Furniture finish: B classic".
+- Every cubby of every section is drawn, empty or not. **Amended (D-20):** it shows the planked back, the shadow cast by the board above and the lit front edge of the board below, as specified in "Furniture finish: B classic". This replaces the earlier flat `--ink` fill with one inset shadow and a floor line. Empty cubbies are bare shaded wood (the planked back): **no props, no placeholder text, no icons, no hint copy**, in the minimum cabinet and in the unused part of the last section.
 - No per-box `filter`, `backdrop-filter`, `will-change` or 3D transform; no `opacity` or `filter` on section wrappers (dimming arrives later per element). The wood is gradients and flat colours only; no bitmap texture, no `feTurbulence`.
 - Boxes stand on the cubby floor and are bottom-aligned. Each box has a 1px light inset edge (`rgb(255 255 255 / 0.2)`) on its top and left and a faint contact shadow beneath, so dark tones stay visible against `--ink`.
+
+### Furniture finish: B classic (D-20, added 2026-10-06)
+
+The owner chose this direction from mockups of several furniture finishes. The mockup files are gone, so this section is the design input. It keeps exactly today's browns and builds them like a traditional piece of furniture. Plan 02-03 builds it.
+
+**Why the tracer furniture looked plain (cue list; every rule below answers one of these):**
+
+1. No visible board thickness: no lit front edge, no darker underside.
+2. No grain, and every board the same colour.
+3. Cubbies have no depth: no shadow cast by the shelf above, and the back panel is a flat fill.
+4. No furniture parts: no top, no plinth or feet, nothing touching the floor.
+5. Empty cubbies read as black holes rather than bare wood.
+
+**Light (FIXED):** one soft light from above and slightly left. Top and left arrises are lit; undersides and right-hand edges are darker; shadows fall down and slightly right. Shadows use tinted darks (`rgb(20 10 4 / a)` or `rgb(10 5 2 / a)`), never pure black.
+
+**Tones (FIXED):** only the existing browns: `--wood-dark` (backdrop, unchanged and flat), `--wood-mid` (all boards), `--ink` (back planks) and `--wood-edge` (lit edges). Variants are made with `color-mix(in oklch, <token>, white|black N%)`. Board variation is at most ±6%, and the plinth may go to 22% darker because it sits in shadow. No new hue.
+
+**Section box and reserved space.** The finish values are CSS custom properties (unitless millimetres) declared once on `.cabinet`. The engine, the layout JSON and `LayoutVersion` do not change.
+
+| Token | Meaning | Value | Tag |
+|-------|---------|-------|-----|
+| `--side-allowance` | Space reserved inside the section box beside the engine frame, on each side | 32 | **FIXED** (the readability floors depend on it; changing it means re-deriving them in the same change) |
+| `--side-trim` | Trim added outside the frame; part of each side board | 12 | STARTING VALUE |
+| `--overhang` | How far the moulded top reaches past the side boards | 14 | STARTING VALUE; `--side-trim` + `--overhang` at most 28, so at least 4 mm stays free for the moulding's edge shadow |
+| `--top-height` | Moulding height above the frame's top band | 34 | STARTING VALUE |
+| `--base-height` | Plinth height below the frame's bottom board | 80 | STARTING VALUE |
+| `--floor-margin` | Margin below the plinth that holds the floor shadow | 24 | STARTING VALUE |
+| `--foot-width` | Width of each of the two feet at the plinth ends | 70 | STARTING VALUE |
+| `--arch-rise` | Height of the arch opening at its centre, between the feet | 30 | STARTING VALUE |
+| `--plank-width` | Width of each back plank | 110 | STARTING VALUE |
+| `--shade-rgb`, `--shade-alpha`, `--shade-depth` | Shade over boxes: colour, alpha at its darkest point, fade-out depth | `20 10 4`, 0.20, 20% of cubby height | colour and cap **FIXED**; alpha may only go lower; depth STARTING VALUE |
+
+Geometry (**FIXED** structure):
+
+- Section box width = `--section-w` + 2 x `--side-allowance`.
+- Section box height = `--top-height` + `--section-h` + `--base-height` + `--floor-margin`.
+- `--section-w` and `--section-h` are the engine's outer size (interior plus 2 x frame), set by the renderer as today.
+- `aspect-ratio` on `.section` uses these totals, so the full height, including the top, plinth and floor shadow, is reserved before anything renders. Nothing shifts while loading.
+- `--u` = `100cqw / (--section-w + 2 x --side-allowance)`, declared on the direct children of `.section` and never used on `.section` itself.
+- `.section-body` keeps everything inside it unchanged: the engine frame, the cubbies and the placements. It is placed at `(--side-allowance, --top-height)` with size `--section-w` x `--section-h`.
+- `.section` itself becomes transparent. Its old background moves to the body, and its old outer shadow is replaced by the furniture shadows below.
+
+**Room for paint (FIXED):**
+
+- `.section` keeps `content-visibility: auto`, which clips all painting at the section box, so everything the finish draws must end inside that box:
+  - above the moulding: nothing;
+  - sideways: up to 20 mm beyond the side boards, and at least 4 mm stays free beyond the moulding;
+  - below the plinth: the floor margin.
+- Every shadow is sized in millimetres (`calc(n * var(--u))`), so its offset plus blur plus spread fits those margins at every width.
+- A shadow that ends in a straight hard line is a defect.
+
+**Furniture parts and where each is painted (FIXED structure; looks are STARTING VALUES):**
+
+| Part | Painted by | Look |
+|------|------------|------|
+| Uprights (dividers between cubbies) | `.section-body` background | `--wood-mid` with vertical grain; a 1px lit arris on each upright's left edge, drawn as a 1px outer shadow on the right of the cubby to its left |
+| Side boards | `.section-trim::before` (left) and `::after` (right); each is `--side-trim` + frame wide and runs the full body height | `--wood-mid` with vertical grain; they read about 32 mm thick against 20 mm shelves; the left board has a 1px lit outer arris; the right board is slightly darker and casts a faint wall shadow to the right, inside the margin |
+| Shelves and the bottom board | `.cubby::before`: the board directly under each cubby. It is frame high and cubby width plus frame wide, or cubby width only on `data-row-end` cubbies, whose right neighbour is the side board | horizontal grain; tone per shelf from `data-board`; a 1px `--wood-edge` lit front edge along its top; a darker underside along its bottom |
+| Top rail and moulded top | `.section-top` (the moulding above the body, overhanging) and `.section-top::before` (the top rail over the frame's top band, between the side boards) | horizontal grain. The moulding's profile is suggested by 3 or 4 horizontal bands: a lit arris, a fillet, cove shading from dark to light, and a bead with a highlight. A 1px dark line where it meets the rail; a small cast shadow onto the rail and the side boards; corner radius at most 2px |
+| Back panel | `.cubby` background | `--ink` base with vertical tongue-and-groove planks `--plank-width` wide. Each groove is a 1 mm dark line `rgb(0 0 0 / 0.45)` with a 1px lit lip `rgb(255 235 210 / 0.08)`; alternate planks are lifted by `rgb(255 235 210 / 0.04)`; faint vertical grain. The board above casts a shadow `rgb(10 5 2 / 0.55)` that fades to transparent at 24% of cubby height. Side-wall shade `rgb(10 5 2 / 0.30)` sits at each edge and fades out by 7% of cubby width. Planks and grain are positioned in section coordinates (offset by the cubby's x), so the back reads as one panel behind all cubbies |
+| Shade over boxes | `.cubby::after`: no content, `pointer-events: none`, z-index 1 | the shelf above's shadow falling across the boxes: `rgb(var(--shade-rgb) / var(--shade-alpha))` at the top, fading to transparent at `--shade-depth`. It is the only layer allowed above boxes (see Contrast) |
+| Plinth and feet | `.section-base`: flush with the side boards, `--base-height` high | `--wood-mid` 22% darker with horizontal grain; a 1px dark line along the top under the bottom board. Two feet `--foot-width` wide at the ends. Between them, a shallow elliptical arch rises `--arch-rise` at its centre. The opening reads as deep shade under the cabinet: darker than the backdrop, with a soft 1 to 2 mm edge. Never a flat backdrop-coloured hole or a hard black cut |
+| Floor shadow | `.section-base::after`, inside the floor margin | a wide, soft ellipse, `rgb(10 5 2 / 0.55)` at the centre and fading out, plus a tight dark contact line under each foot |
+
+**Grain (STARTING VALUE recipe; CSS gradients only, no bitmap texture, no SVG filter):**
+
+- Three repeating linear stripe layers with periods of 15, 23 and 37 mm. The periods do not divide into each other, so the pattern does not visibly repeat.
+- Line width `max(1px, calc(0.8 * var(--u)))`; dark grain `rgb(40 20 8 / 0.08)`, light grain `rgb(255 240 220 / 0.04)`.
+- One very flat repeating radial layer draws flat-sawn arches. Its horizontal position `--figure-x` varies per board.
+- One slow tone sweep runs along the board.
+- On shelves the stripes stack top to bottom, so the grain runs left to right. Uprights and side boards use the rotated recipe.
+- Keep it subtle: grain that is noticeable from across a room is too strong, so halve the alpha.
+- Small sections: inside `@container (max-width: 400px)` the finest stripe layer is dropped and the grain alpha is halved (STARTING VALUE threshold). A phone shows softer grain rather than aliasing or moiré.
+
+**Per-shelf tone (FIXED: stable, never random):**
+
+- The renderer sets `data-board` on every cubby: `(section index x 2 + shelf ordinal) mod 6`.
+- The shelf ordinal is the rank of the cubby's `yMm` among the distinct `yMm` values of its section (0 = top row). So all cubbies in a row share one board tone, and neighbouring shelves always differ.
+- The stylesheet maps the six values (STARTING VALUES), each with its own `--figure-x`:
+
+| `data-board` | Tone | `--figure-x` |
+|--------------|------|--------------|
+| 0 | `--wood-mid` | 18% |
+| 1 | +4% white | 64% |
+| 2 | 4% black | 37% |
+| 3 | +2% white | 82% |
+| 4 | 6% black | 9% |
+| 5 | +6% white | 51% |
+
+- Each shelf segment's grain is positioned in section coordinates, so a shelf reads as one continuous board across cubbies.
+
+**Renderer hooks (FIXED; finish-neutral, so a later finish replaces CSS only):**
+
+- Per section, after `.section-body`: `div.section-top`, `div.section-trim`, `div.section-base`. Each is `aria-hidden="true"`, holds no text and nothing focusable, and is created with `createElement` (never a style attribute). The DOM order of sections, cubbies and placements is unchanged.
+- Per cubby:
+  - `data-row-end` when `xMm + widthMm` equals the section's interior `widthMm` (the cubby touches the right side board);
+  - `data-board` as above.
+- No other renderer change. Every look decision lives in one finish block at the end of `cabinet.css`.
+
+**Layering (FIXED):**
+
+- z-index is used exactly twice: the `.cubby::after` shade is 1 and `.placement:focus-visible` is 2.
+- Everything else paints in tree order: the body and cubbies first, then the top, trim and base after the body.
+- So the keyboard focus ring always paints above the shade, the boards and the decorative parts. It is never clipped: cubbies and the body keep `overflow: visible`, and the ring sits well inside the section box.
+
+**Contrast with the furniture applied (FIXED):**
+
+- No light layer (highlight, sheen or glow) may fall across a box. Lit edges sit only on wood: shelf fronts, arrises, the moulding and the plinth.
+- The shade over boxes uses `rgb(20 10 4)` at an alpha of at most **0.20** at its darkest point (the cap).
+- A unit test composites every palette background and text colour under that colour at the cap, blending gamma-encoded sRGB channels as browsers do, and asserts at least 4.5:1 for each pair. It does the same for the "+N more" chip pair (`--ink` on `--wood-light`).
+- At the cap the tightest pair is Rust, at about 4.6:1. If the exact test finds any pair below 4.5:1, lower the cap in steps of 0.02 until every pair passes, then update this section.
+- `--shade-alpha` may be tuned only at or below the cap.
+- The in-browser check re-measures every label with the shade alpha at the label's top edge (02-03 Task 3).
+- Box edges (1px light inset top-left, contact shadow) are edges, not overlays across labels, and stay as specified above.
+
+**Performance (FIXED):**
+
+- Gradients and shadows sit on the few section and cubby containers and their pseudo-elements, never on individual boxes.
+- At most 6 background layers on any one surface.
+- None of these anywhere: `filter`, `backdrop-filter`, blur on many nodes, 3D transforms, `will-change`, or opacity on section wrappers.
+- No bitmap textures and no SVG `feTurbulence`.
 
 ### Placement kinds (look of each element)
 
@@ -169,16 +292,16 @@ All kinds are native `<button type="button">` elements with `position: absolute`
 
 - **Click and tap do nothing yet.** Placements are buttons so the semantic structure and tap targets already exist. Do not add pull-out, detail card, selection state, roving tabindex or keyboard shortcuts; those arrive with the interaction work. Use `cursor: default` so the page does not promise an action it does not have.
 - **Hover (pointer devices only, `@media (hover: hover)`):** the hovered placement lifts 6 mm (`transform: translateY(calc(-6 * var(--u)))`, **STARTING VALUE**), transition 120ms ease-out, `transform` only. Disabled entirely under `prefers-reduced-motion: reduce`.
-- **Focus-visible (FIXED):** 2px solid `--wood-light` outline, 2px offset, on every focusable element (placements, sample links, retry button). Never `outline: none` without a replacement. Focus ring must not be clipped: cubbies and sections use `overflow: visible`.
+- **Focus-visible (FIXED):** 2px solid `--wood-light` outline, 2px offset, on every focusable element (placements, sample links, retry button). Never `outline: none` without a replacement. Focus ring must not be clipped: cubbies and sections use `overflow: visible`. **Amended (D-20):** the focused placement paints above every furniture layer (`z-index: 2`, above the shade over boxes at 1, the boards and the decorative top, trim and base), so the ring stays fully visible where it overlaps them.
 - **No pressed state change** beyond the browser default (no `:active` darkening); keep the surface calm while the owner is reviewing.
 
 ### Readability floors (FIXED rules, engine constants derived)
 
 These floors are enforced in the engine (clamp on rendered millimetre sizes) and asserted by a unit test so no placement falls below them. Derive the numbers; do not copy them blindly.
 
-- Rule: minimum rendered spine width and minimum expansion layer height = `ceil(24 / uMin)` mm on phone, where `uMin = (320 - 2 x 8) / (phone interior width + 2 x frame)` px per mm (smallest supported viewport, 8px gutters, frame included). With the starting phone section (640 mm interior) and 20 mm frames this is `304 / 680 = 0.447`, so **about 54 mm**. The research figure of 52 mm assumed 12px gutters and no frame; use the derived figure.
-- Desktop floor: about **34 mm** (a pointer user needs no 24px target; 34 mm is roughly 17px at the smallest desktop track and still holds a 12px label). STARTING VALUE.
-- Orphan box minimum height: `ceil(36 / uMin)` mm per profile (about 70 mm desktop, about 81 mm phone with the starting values).
+- Rule: minimum rendered spine width and minimum expansion layer height = `ceil(24 / uMin)` mm on phone, where `uMin = (320 - 2 x 8) / (phone interior width + 2 x frame + 2 x side allowance)` px per mm. That is the smallest supported viewport with 8px gutters, the frame included and, **amended (D-20)**, the furniture's FIXED 32 mm side allowance included, because the section box that the 304 px must hold is that much wider. With the starting phone section (640 mm interior), 20 mm frames and the allowance this is `304 / 744 = 0.409`, so **about 59 mm**. Before the furniture finish the figure was 54 mm (680 mm). The research figure of 52 mm assumed 12px gutters and no frame. Use the derived figure. Height reserved for the top, plinth and floor margin does not affect the floors, which depend on width only.
+- Desktop floor: about **34 mm** (a pointer user needs no 24px target; 34 mm is roughly 15px at the smallest desktop section of 592 px, now 1304 mm wide with the allowance, and still holds a 12px label). STARTING VALUE.
+- Orphan box minimum height: `ceil(36 / uMin)` mm per profile (about 80 mm desktop at 592 px over 1304 mm, about 89 mm phone with the starting values).
 - A small card game therefore shows visibly thicker than its real size on phone; this is the accepted readability trade.
 
 ### Mix the owner will judge (rendering side)
@@ -231,7 +354,7 @@ Plain, short, no jargon. All copy is English only in this phase; the language sw
 
 - **Motion:** only the hover lift above (120ms, transform). No page transitions, no entrance animation, no pull-out. `prefers-reduced-motion: reduce` removes the lift.
 - **Keyboard:** natural tab order over links, retry button and placement buttons (DOM order). No custom keyboard model now. Every focusable element shows the focus ring.
-- **Screen readers:** `<h1>`, `<nav aria-label>`, `<main>`, `<footer>` landmarks; every placement has the accessible name from the table above; decorative rules and patterns are CSS only (no extra elements, no `alt` text needed because there are no images).
+- **Screen readers:** `<h1>`, `<nav aria-label>`, `<main>`, `<footer>` landmarks; every placement has the accessible name from the table above; decorative rules, patterns and wood are CSS only, and the furniture adds exactly three `aria-hidden="true"` decorative elements per section (top, trim, base) with no text and nothing focusable (amended, D-20); no `alt` text is needed because there are no images.
 - **Colour is never the only carrier of meaning:** the "+N more" chip also has text; the current sample link also has weight and `aria-current`.
 - **Strict CSP (FIXED):** an integration test fails if the served HTML contains `style=` attributes or inline script bodies. JavaScript comments follow the repo rule (`/** ... */` doc blocks only, no `//` anywhere including regexes and strings).
 - **Hooks reserved for later work (do not build now):** `data-game-id` and `data-family-id` on every placement, DOM order = reading order, one element per placement (no wrapper that would block per-element dimming), no opacity or filter on section wrappers, no layout change on interaction.
@@ -240,7 +363,7 @@ Plain, short, no jargon. All copy is English only in this phase; the language sw
 
 ## UI Considerations
 
-Probed over 8 surfaces with confirmed element kinds: cabinet (list-collection), placement buttons (interactive-control, static-content), generated cover (media, static-content), expansion stack (list-collection), sample switcher (nav), status line (static-content), load states (interactive-control), footer (static-content). 35 applicable considerations: 24 resolved (explicit), 11 dismissed with reason. Plus 5 extra rows: 4 resolved (backstop, owner review) and 1 resolved (explicit). Copy for the empty, loading and error states is in the Copywriting Contract and is referenced, not repeated, here.
+Probed over 8 surfaces with confirmed element kinds: cabinet (list-collection), placement buttons (interactive-control, static-content), generated cover (media, static-content), expansion stack (list-collection), sample switcher (nav), status line (static-content), load states (interactive-control), footer (static-content). 35 applicable considerations: 24 resolved (explicit), 11 dismissed with reason. Plus 7 extra rows: 4 resolved (backstop, owner review) and 3 resolved (explicit; two of them added with the furniture finish, D-20). Copy for the empty, loading and error states is in the Copywriting Contract and is referenced, not repeated, here.
 
 | Category | Element | Status | Verification | Resolution / Reason |
 |----------|---------|--------|--------------|---------------------|
@@ -284,6 +407,8 @@ Probed over 8 surfaces with confirmed element kinds: cabinet (list-collection), 
 | overflow | very wide viewports (1920 and 2560px) | resolved | backstop | statement: section track bounds and sections per row look right in the screenshot rounds at 1280, 1440, 1920 and 2560px; verification: backstop |
 | populated | dark palette tones against the dark cubby back | resolved | backstop | statement: box edges and contact shadows keep dark boxes distinguishable from the cubby back in owner review; verification: backstop |
 | zero-one-many | few-games look (1 to 11 items) | resolved | backstop | statement: the owner confirms in review round one that the minimum cabinet with few games looks intentional (scattered covers versus a compact arrangement); verification: backstop |
+| overflow | furniture finish (top, side trim, plinth, feet, floor shadow) | resolved | explicit | Each section reserves its full height, including the moulded top, plinth and floor margin, through its aspect ratio before rendering, and every furniture part and shadow ends inside the section box, so nothing shifts while loading and paint containment never cuts the top, the feet or the floor shadow |
+| populated | box labels under the furniture's light and shade | resolved | explicit | Every box label keeps a contrast of at least 4.5:1 with the furniture applied: no light layer falls across boxes, and the only shade over boxes is capped at alpha 0.20, unit-tested for every palette tone and the marker chip and re-measured per label in the browser |
 
 ---
 
@@ -295,21 +420,30 @@ Everything the owner may ask to change in a review round. All **STARTING VALUE**
 |------|----------------|----------------|
 | Section grid track | `minmax(min(100%, 32rem), 40rem)`, gap 24px | CSS |
 | Phone breakpoint | `max-width: 40rem` | JS media query |
-| Frame, shelf and divider thickness | 20 mm | CSS and section data |
+| Frame, shelf and divider thickness | 20 mm (engine; the side boards read thicker through the side trim below) | CSS and section data |
 | Desktop section | 1200 mm interior, 1780 mm tall, five rows of irregular cubbies | engine section data |
 | Phone section | 640 mm interior, 1860 mm tall, six rows | engine section data |
 | Stack column width, layer height clamp, marker height | 190 mm, 40 to 70 mm, 40 mm | engine |
 | Few-games threshold, cover share, stack maximum | 12 items, 25 percent, 6 layers | server settings |
 | Size-class weights for covers | 0.3 / 1.0 / 2.2 | engine |
-| Phone and desktop readability floors | about 54 mm and 34 mm (derived) | engine |
+| Phone and desktop readability floors | about 59 mm and 34 mm (phone derived including the 32 mm side allowance) | engine |
 | Palette hues | table above | engine palette |
 | Cover pattern strength and tile | 14% of text colour, 24 mm tile | CSS |
 | Cover title plate height | about 40% of cover height | CSS |
 | Text scaling ratios and ceilings | 0.5 (spine and layers), 0.10 (cover), 16, 14, 22px ceilings | CSS |
 | Hover lift | 6 mm, 120ms | CSS |
-| Cubby inset shadow, section outer shadow | see Wood and cubbies and Color | CSS |
+| Furniture side trim and top overhang | 12 mm and 14 mm (their sum at most 28 mm) | CSS finish tokens on `.cabinet` |
+| Moulding height, plinth height, floor margin | 34 mm, 80 mm, 24 mm (all reserved in the section aspect ratio) | CSS finish tokens |
+| Feet width and arch rise | 70 mm, 30 mm | CSS finish tokens |
+| Moulding profile bands, plinth tone | 3 to 4 bands; plinth 22% darker than `--wood-mid` | CSS |
+| Grain | periods 15, 23, 37 mm; line `max(1px, 0.8 mm)`; dark 0.08, light 0.04 alpha; finest layer dropped and alpha halved in sections under 400px | CSS |
+| Per-shelf tones and figure offsets | 0, +4, -4, +2, -6, +6 percent; 18, 64, 37, 82, 9, 51 percent | CSS (`data-board` rules) |
+| Back planks | 110 mm wide, groove 0.45 dark with a 0.08 lit lip, alternate planks +0.04 | CSS finish token and rules |
+| Back cast shadow and side-wall shade | 0.55 fading out by 24% of cubby height; 0.30 fading out by 7% of cubby width | CSS |
+| Shade over boxes | alpha 0.20 (never above the cap), depth 20% of cubby height | CSS finish tokens |
+| Floor shadow, wall shadow, moulding shadow | 0.55 at the floor-shadow centre; faint, inside the margins | CSS |
 
-**FIXED (not for tuning):** contrast of at least 4.5:1 for all box text; 12px text floor inside the cabinet; 24px phone tap floor; 2 font weights; no inline styles or scripts; empty cubbies stay bare; accent reserved list; DOM order equals reading order; no pull-out or detail behaviour in this phase.
+**FIXED (not for tuning):** contrast of at least 4.5:1 for all box text; 12px text floor inside the cabinet; 24px phone tap floor; 2 font weights; no inline styles or scripts; empty cubbies stay bare; accent reserved list; DOM order equals reading order; no pull-out or detail behaviour in this phase. Furniture finish (D-20): the 32 mm side allowance (it feeds the readability floors); the shade cap of alpha 0.20 in `rgb(20 10 4)` and no light layer across boxes; one light direction; only the four existing browns; finish values live in CSS only, over the three decorative elements and two cubby hooks, so the engine geometry and `LayoutVersion` never change for a finish tweak; everything painted stays inside the section box. Switching to another finish is not a tuning round (see the todo for selectable finishes).
 
 ---
 
