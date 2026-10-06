@@ -190,6 +190,19 @@ public partial class CabinetPageTests
         start.Should().Throw<Exception>().Which.ToString().Should().Contain("Prototype:Enabled must be true or false.");
     }
 
+    [Fact]
+    public async Task Every_script_element_has_a_source_and_no_import_map_exists()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        using var client = factory.CreatePublicClient();
+
+        var html = await client.GetStringAsync("/", TestContext.Current.CancellationToken);
+
+        ScriptWithoutSource().IsMatch(html).Should().BeFalse("every script is an external file");
+        html.Should().NotContain("importmap");
+        ScriptElement().Matches(html).Should().NotBeEmpty();
+    }
+
     [GeneratedRegex("<a href=\"/\\?sample=(?<name>[^\"]+)\"")]
     private static partial Regex SampleLink();
 
@@ -207,4 +220,10 @@ public partial class CabinetPageTests
 
     [GeneratedRegex("<script(?![^>]*\\ssrc=)[^>]*>\\s*\\S", RegexOptions.IgnoreCase)]
     private static partial Regex InlineScriptBody();
+
+    [GeneratedRegex("<script(?![^>]*\\ssrc=)", RegexOptions.IgnoreCase)]
+    private static partial Regex ScriptWithoutSource();
+
+    [GeneratedRegex("<script\\b", RegexOptions.IgnoreCase)]
+    private static partial Regex ScriptElement();
 }
