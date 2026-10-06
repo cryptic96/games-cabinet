@@ -3,15 +3,15 @@ status: testing
 phase: 02-layout-engine-cabinet-prototype
 source: [02-VERIFICATION.md]
 started: 2026-10-06T09:26:20Z
-updated: 2026-10-06T09:44:21Z
+updated: 2026-10-06T09:53:06Z
 ---
 
 ## Current Test
 
-number: 3
-name: Phone walk of the deployed prototype
+number: 4
+name: Desktop walk of the deployed prototype
 expected: |
-  On your own phone over your VPN (mobile data works, no need to be home), open the cabinet's internal address and step through 0, 1, 5, 12, 65, 400 and Edge cases. Footer shows Version 0.2.0 (887324c). The cabinet is narrower and taller, still looks like a cabinet, scrolls only vertically, spine text is readable in your hand, and tapping a box never hits its neighbour. The 400 sample is long but usable. (Automated: all tap and size checks already pass in an emulated phone; this confirms the real device and the route.)
+  At home (or on the VPN), open the internal address in a desktop browser and step through the same samples. Footer shows Version 0.2.0 (887324c), the page loads through the reverse-proxy route, and it looks like the round-2 screenshots you approved: covers, spines and flat piles in irregular cubbies, families with "+N more", upright thick expansions, labelled orphans, bare planked wood in unused cubbies, 400 in centred columns. (Automated: the served assets and layouts are byte-identical to the approved build.)
 awaiting: user response
 
 ## Tests
@@ -33,7 +33,7 @@ reason: "Deferred follow-up: owner chose to defer all eight taste calls to the l
 
 ### 3. Phone walk of the deployed prototype
 expected: On your own phone over your VPN (mobile data works, no need to be home), open the cabinet's internal address and step through 0, 1, 5, 12, 65, 400 and Edge cases. Footer shows Version 0.2.0 (887324c). The cabinet is narrower and taller, still looks like a cabinet, scrolls only vertically, spine text is readable in your hand, and tapping a box never hits its neighbour. The 400 sample is long but usable. (Automated: all tap and size checks already pass in an emulated phone; this confirms the real device and the route.)
-result: [pending]
+result: pass
 
 ### 4. Desktop walk of the deployed prototype
 expected: At home (or on the VPN), open the internal address in a desktop browser and step through the same samples. Footer shows Version 0.2.0 (887324c), the page loads through the reverse-proxy route, and it looks like the round-2 screenshots you approved: covers, spines and flat piles in irregular cubbies, families with "+N more", upright thick expansions, labelled orphans, bare planked wood in unused cubbies, 400 in centred columns. (Automated: the served assets and layouts are byte-identical to the approved build.)
@@ -42,9 +42,9 @@ result: [pending]
 ## Summary
 
 total: 4
-passed: 1
+passed: 2
 issues: 0
-pending: 2
+pending: 1
 skipped: 1
 blocked: 0
 
