@@ -21,6 +21,7 @@ public class ContentSecurityPolicyTests
     [InlineData("/cabinet/layout?sample=65&profile=desktop", HttpStatusCode.OK)]
     [InlineData("/cabinet/layout?sample=65&profile=phone", HttpStatusCode.OK)]
     [InlineData("/js/render.js", HttpStatusCode.OK)]
+    [InlineData("/img/powered-by-bgg.svg", HttpStatusCode.OK)]
     [InlineData("/cabinet/layout?profile=tablet", HttpStatusCode.NotFound)]
     [InlineData("/no-such-page", HttpStatusCode.NotFound)]
     public async Task Every_public_response_carries_the_strict_policy(string path, HttpStatusCode status)
