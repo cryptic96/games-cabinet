@@ -64,6 +64,7 @@ var app = builder.Build();
 
 var opsPort = OpsEndpoint.FromConfiguration(app.Configuration);
 
+app.UseContentSecurityPolicy();
 app.UseForwardedHeaders();
 
 app.UseHealthChecks("/health", opsPort, new HealthCheckOptions
