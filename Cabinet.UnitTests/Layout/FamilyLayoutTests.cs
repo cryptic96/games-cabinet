@@ -88,7 +88,7 @@ public class FamilyLayoutTests
     [Theory]
     [MemberData(nameof(LargeSamples))]
     [Trait("Category", "Layout")]
-    public void Layers_touch_each_other_from_the_floor_up_in_collection_order_and_stay_under_the_shelf_above(string name)
+    public void Layers_touch_from_the_floor_up_thickest_first_and_stay_under_the_shelf_above(string name)
     {
         SyntheticCollections.TryGetSample(name, out var items);
         var layout = CabinetLayoutEngine.Build(items, Design);
@@ -100,14 +100,19 @@ public class FamilyLayoutTests
             var cubbyHeight = layout.Sections[baseEntry.Section].Cubbies[baseEntry.Cubby].HeightMm;
             var layers = LayersOf(placed, family.Key);
             var uprightIds = UprightsOf(placed, family.Key).Select(entry => entry.Placement.GameId).ToHashSet();
-            var expected = family
+            var stacked = family
                 .Where(item => !uprightIds.Contains(item.BggId))
                 .OrderBy(item => item.CollectionId).ThenBy(item => item.BggId)
                 .Select(item => item.BggId)
-                .Take(layers.Count);
+                .ToList();
+            var shown = stacked.Take(layers.Count).ToList();
+            var expected = shown
+                .OrderByDescending(id => layers.Single(layer => layer.Placement.GameId == id).Placement.HeightMm)
+                .ThenBy(id => stacked.IndexOf(id));
             var top = 0;
 
-            layers.Select(layer => layer.Placement.GameId).Should().Equal(expected, "family {0} lists its layers in collection order", family.Key);
+            layers.Select(layer => layer.Placement.GameId).Should().Equal(
+                expected, "family {0} shows its earliest stacked expansions, thickest at the bottom", family.Key);
 
             foreach (var layer in layers)
             {
@@ -299,9 +304,9 @@ public class FamilyLayoutTests
         placements.Where(placement => placement.Kind == PlacementKind.ExpansionSpine).Select(placement => placement.GameId)
             .Should().Equal(3, 4);
         var layers = placements.Where(placement => placement.Kind == PlacementKind.ExpansionLayer).OrderBy(placement => placement.YMm).ToList();
-        layers.Select(layer => layer.GameId).Should().Equal(2, 5);
-        layers.Select(layer => layer.HeightMm).Should().Equal(design.MinLayerHeightMm, design.MaxLayerHeightMm);
-        layers.Select(layer => layer.YMm).Should().Equal(0, design.MinLayerHeightMm);
+        layers.Select(layer => layer.GameId).Should().Equal(5, 2);
+        layers.Select(layer => layer.HeightMm).Should().Equal(design.MaxLayerHeightMm, design.MinLayerHeightMm);
+        layers.Select(layer => layer.YMm).Should().Equal(0, design.MaxLayerHeightMm);
     }
 
     [Fact]

@@ -117,6 +117,26 @@ public class FamilyStabilityTests
 
     [Fact]
     [Trait("Category", "Layout")]
+    public void Appending_a_thicker_expansion_to_a_stack_with_room_lays_it_below_the_thinner_layers_and_changes_only_the_base_games_cubby()
+    {
+        var filler = SyntheticCollections.Random(5, 30);
+        var baseGame = new CabinetItem(
+            NextId(filler), NextCollectionId(filler), "Invented Stack Base", ItemKind.Base, new BoxDimensions(220, 300, 40), []);
+        var items = new List<CabinetItem>([.. filler, baseGame, ExpansionFor(baseGame, 1, 30), ExpansionFor(baseGame, 2, 30)]);
+        var next = ExpansionFor(baseGame, 3, ThinDepthMm);
+
+        var before = CabinetLayoutEngine.Build(items, Design, SpinesOnly);
+        var after = CabinetLayoutEngine.Build([.. items, next], Design, SpinesOnly);
+
+        LayersOf(before, baseGame.BggId).Select(entry => entry.Placement.GameId).Should().Equal(baseGame.BggId + 1, baseGame.BggId + 2);
+        LayersOf(after, baseGame.BggId).Select(entry => entry.Placement.GameId)
+            .Should().Equal(next.BggId, baseGame.BggId + 1, baseGame.BggId + 2);
+        LayoutAssertions.ChangedCubbies(before, after).Should().Equal([PositionOfBase(after, baseGame.BggId)]);
+        LayoutAssertions.AssertValid(after, [.. items, next]);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
     public void Appending_an_expansion_whose_base_game_is_not_owned_changes_at_most_one_cubby()
     {
         for (var seed = 1; seed <= Seeds; seed++)

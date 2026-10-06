@@ -19,8 +19,10 @@ stand as a spine, or lie flat. An expansion that is at least 50 millimetres
 deep stands upright right beside its base game, with a second line naming that
 game, up to two per base game and only while the family still fits the widest
 box a section holds. Thinner expansions, and thick ones that no longer fit,
-lie in a narrow stack beside the upright ones, and a long stack ends in a "+N
-more" marker. The base game reserves room for its upright expansions and its
+lie in a narrow stack beside the upright ones, thickest at the bottom, and a
+long stack ends in a "+N more" marker. A stack shows the expansions that arrived
+first, as many as fit under the shelf above, so a new arrival in a full stack
+only raises the number in the marker. The base game reserves room for its upright expansions and its
 stack as soon as it is placed, so an expansion is never left without a place
 beside its game.
 

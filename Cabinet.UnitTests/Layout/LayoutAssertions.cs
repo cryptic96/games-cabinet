@@ -103,7 +103,12 @@ internal static class LayoutAssertions
         foreach (var family in items.Where(item => item.Kind == ItemKind.Expansion && OwnedParentOf(item, items) is not null)
                      .GroupBy(item => OwnedParentOf(item, items)!.Value))
         {
-            AssertFamilyAccountedFor(layout, family.Key, family.Select(item => item.BggId).ToList(), standing, placed);
+            AssertFamilyAccountedFor(
+                layout,
+                family.Key,
+                family.OrderBy(item => item.CollectionId).ThenBy(item => item.BggId).Select(item => item.BggId).ToList(),
+                standing,
+                placed);
         }
 
         placed.Where(entry => entry.Placement.Kind is PlacementKind.ExpansionLayer or PlacementKind.ExpansionSpine)
@@ -151,6 +156,8 @@ internal static class LayoutAssertions
         members.Where(entry => entry.Placement.Kind is PlacementKind.ExpansionLayer or PlacementKind.MoreMarker)
             .Should().OnlyContain(entry => entry.Placement.XMm == edge, "the stack column of family {0} starts after the last upright", baseId);
 
+        AssertStackOrder(baseId, expansionIds, uprights.Select(entry => entry.Placement.GameId).ToList(), layers, markers);
+
         if (SectionDesigns.TryGet(layout.Profile, out var design))
         {
             var columnWidth = members.Any(entry => entry.Placement.Kind != PlacementKind.ExpansionSpine) ? design.StackColumnWidthMm : 0;
@@ -159,6 +166,35 @@ internal static class LayoutAssertions
                 design.Limits.MaxWidthMm, "family {0} stays within the widest box the design holds", baseId);
             uprights.Should().OnlyContain(entry => entry.Placement.WidthMm >= design.MinUprightExpansionWidthMm);
         }
+    }
+
+    private static void AssertStackOrder(
+        int baseId,
+        IReadOnlyList<int> expansionIdsInCollectionOrder,
+        IReadOnlyList<int> uprightIds,
+        IReadOnlyList<(int Section, int Cubby, Placement Placement)> layers,
+        IReadOnlyList<(int Section, int Cubby, Placement Placement)> markers)
+    {
+        var stacked = expansionIdsInCollectionOrder.Where(id => !uprightIds.Contains(id)).ToList();
+        var shown = stacked.Take(layers.Count).ToList();
+        var fromFloor = layers.OrderBy(entry => entry.Placement.YMm).Select(entry => entry.Placement).ToList();
+        var expectedOrder = shown
+            .OrderByDescending(id => fromFloor.Single(placement => placement.GameId == id).HeightMm)
+            .ThenBy(id => stacked.IndexOf(id))
+            .ToList();
+
+        fromFloor.Select(placement => placement.GameId).Should().Equal(
+            expectedOrder, "the layers of family {0} are the earliest stacked expansions, thickest at the bottom, ties in collection order", baseId);
+
+        var top = 0;
+
+        foreach (var layer in fromFloor)
+        {
+            layer.YMm.Should().Be(top, "layers of family {0} touch from the floor up", baseId);
+            top += layer.HeightMm;
+        }
+
+        markers.Should().OnlyContain(entry => entry.Placement.YMm == top, "the marker of family {0} sits on the top layer", baseId);
     }
 
     private static void AssertSectionGeometry(LayoutSection section)

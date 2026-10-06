@@ -14,14 +14,15 @@ public static class CubbyArrangement
     /// changes only when the cubby's members change, and packs them from the left with no gap, bottom-aligned on the
     /// cubby floor. A box facing out is as wide as its front and a spine is as wide as its depth. A base game is followed
     /// immediately by its thick expansions, which stand upright on the floor in collection order, and then by a column of
-    /// fixed width that holds its remaining expansions as thin layers stacked up from the floor, with a marker on top
-    /// counting the ones that did not fit; the column is as wide with one expansion as with many and exists only when
-    /// some expansion lies in it. Flat boxes lie with the spine out, as wide as the box is tall and as tall as it is deep, and gather
-    /// into short piles of up to four that start on the cubby floor; a pile sits where its first box falls in the order
-    /// and is as wide as its widest box. Inside a pile the widest box lies at the bottom and the thicker box lower among
-    /// boxes of the same width, so no box overhangs the one beneath it. An expansion without an owned base game lies flat like a flat box but is never
-    /// drawn lower than the design's orphan minimum. Returns null when the members are wider than the cubby or any member
-    /// or stack is taller than it; a total width or height exactly equal to the cubby's still fits.
+    /// fixed width that holds its remaining expansions as thin layers stacked up from the floor, thickest at the bottom,
+    /// with a marker on top counting the ones that did not fit; the column is as wide with one expansion as with many and
+    /// exists only when some expansion lies in it. Flat boxes lie with the spine out, as wide as the box is tall and as
+    /// tall as it is deep, and gather into short piles of up to four that start on the cubby floor; a pile sits where its
+    /// first box falls in the order and is as wide as its widest box. Inside a pile the widest box lies at the bottom and
+    /// the thicker box lower among boxes of the same width, so no box overhangs the one beneath it. An expansion without
+    /// an owned base game lies flat like a flat box but is never drawn lower than the design's orphan minimum. Returns
+    /// null when the members are wider than the cubby or any member or stack is taller than it; a total width or height
+    /// exactly equal to the cubby's still fits.
     /// </summary>
     /// <param name="design">The section design the cubby belongs to.</param>
     /// <param name="cubby">The cubby to arrange.</param>
@@ -243,7 +244,10 @@ public static class CubbyArrangement
 
     /// <summary>
     /// Places the layers of a family from the floor up in the column that starts at <paramref name="columnX"/>, then the
-    /// marker when some expansions do not fit. The layers touch each other and the box on the column's left.
+    /// marker when some expansions do not fit. The stack layout works on the expansions in collection order and decides how
+    /// many are shown, so the shown ones are always the earliest arrivals; they are drawn thickest at the bottom, equal
+    /// thicknesses in collection order. The layers touch each other and the box on the column's left, and the marker
+    /// sits on the top layer.
     /// </summary>
     private static void PlaceStack(
         SectionDesign design,
@@ -259,9 +263,13 @@ public static class CubbyArrangement
             .ToList();
         var stack = StackLayout.Layout(heights, cubby.HeightMm, design.MarkerHeightMm, options.ExpansionStackMax);
         var pitch = Math.Max(1, design.LabelCharPitchMm);
+        var drawOrder = Enumerable.Range(0, stack.Visible)
+            .OrderByDescending(index => heights[index])
+            .ThenBy(index => index)
+            .ToList();
         var y = 0;
 
-        for (var index = 0; index < stack.Visible; index++)
+        foreach (var index in drawOrder)
         {
             var expansion = member.Expansions[index];
 
