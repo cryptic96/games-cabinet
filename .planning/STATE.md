@@ -76,6 +76,7 @@ Recent decisions affecting current work:
 ### Pending Todos
 
 - [Phase 3] Add dev-only fake BGG host for the sync phase (minor, tooling): `.planning/todos/pending/2026-10-05-add-dev-only-fake-bgg-host-for-the-sync-phase.md`
+- [Unscheduled] Selectable cabinet finishes and lit-cubbies toggle (minor, ui), needs discussion, possibly its own phase: `.planning/todos/pending/2026-10-06-selectable-cabinet-finishes-and-lit-cubbies-toggle.md`
 
 ### Blockers/Concerns
 
