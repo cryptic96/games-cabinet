@@ -144,11 +144,59 @@ public partial class CabinetPageTests
         var html = await client.GetStringAsync("/?sample=65", TestContext.Current.CancellationToken);
         var hrefs = SampleLink().Matches(html).Select(match => match.Groups["name"].Value).ToList();
 
-        html.Should().Contain("<nav aria-label=\"Sample collection size\">");
+        html.Should().Contain("<nav aria-label=\"Collection to show\">");
+        html.Should().NotContain("Sample collection size");
         hrefs.Should().Equal(SyntheticCollections.SampleNames);
+        html.Should().Contain("<a href=\"/\">Synced</a>");
         html.Should().Contain("<a href=\"/?sample=65\" aria-current=\"page\">65</a>");
         CurrentLink().Matches(html).Should().ContainSingle();
         html.Should().Contain(">Edge cases</a>");
+    }
+
+    [Fact]
+    public async Task Synced_view_with_the_prototype_on_lists_synced_first_marks_it_current_and_shows_no_status_line()
+    {
+        await using var factory = new CabinetWebApplicationFactory(PrototypeOn);
+        using var client = factory.CreatePublicClient();
+
+        var html = await client.GetStringAsync("/", TestContext.Current.CancellationToken);
+        var navigation = html[html.IndexOf("<nav", StringComparison.Ordinal)..html.IndexOf("</nav>", StringComparison.Ordinal)];
+
+        html.Should().Contain("<nav aria-label=\"Collection to show\">");
+        navigation.Should().Contain("<a href=\"/\" aria-current=\"page\">Synced</a>");
+        CurrentLink().Matches(navigation).Should().ContainSingle();
+        navigation.IndexOf(">Synced</a>", StringComparison.Ordinal)
+            .Should().BeLessThan(navigation.IndexOf("?sample=", StringComparison.Ordinal));
+        html.Should().Contain("The cabinet is being filled.");
+        html.Should().NotContain("Invented collection");
+        html.Should().NotContain("data-sample");
+    }
+
+    [Fact]
+    public async Task Chosen_sample_moves_the_current_marker_off_synced()
+    {
+        await using var factory = new CabinetWebApplicationFactory(PrototypeOn);
+        using var client = factory.CreatePublicClient();
+
+        var html = await client.GetStringAsync("/?sample=12", TestContext.Current.CancellationToken);
+
+        html.Should().Contain("<a href=\"/\">Synced</a>");
+        html.Should().Contain("<a href=\"/?sample=12\" aria-current=\"page\">12</a>");
+        CurrentLink().Matches(html).Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Page_with_the_prototype_off_never_renders_the_switcher_for_any_sample_value()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        using var client = factory.CreatePublicClient();
+
+        var html = await client.GetStringAsync("/?sample=12", TestContext.Current.CancellationToken);
+
+        html.Should().NotContain("<nav");
+        html.Should().NotContain("Synced");
+        html.Should().NotContain("Collection to show");
+        html.Should().NotContain("sample");
     }
 
     [Fact]

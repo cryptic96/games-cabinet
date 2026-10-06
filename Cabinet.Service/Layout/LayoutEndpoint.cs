@@ -34,7 +34,7 @@ public static class LayoutEndpoint
 
         return services
             .AddSingleton(LayoutSettings.FromConfiguration(configuration))
-            .AddSingleton(SampleCatalog.FromConfiguration(configuration))
+            .AddSingleton(SampleCatalog.FromConfiguration(configuration, environment))
             .AddSingleton<LayoutCache>()
             .AddSingleton<CollectionStore>();
     }

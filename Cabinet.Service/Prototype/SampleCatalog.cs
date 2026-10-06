@@ -84,12 +84,17 @@ public sealed class SampleCatalog
     public int ItemCount(string name) => ItemsOf(name).Count;
 
     /// <summary>
-    /// Reads the switch from configuration. A missing key means off; true and false in any case are accepted.
+    /// Reads the switch from configuration. A missing key means off; true and false in any case are accepted. The value is
+    /// validated in every environment, but the production environment always gets a disabled catalog, so a stray setting
+    /// on the server can never show invented collections to visitors.
     /// </summary>
+    /// <param name="configuration">The configuration the switch is read from.</param>
+    /// <param name="environment">The hosting environment the app runs in.</param>
     /// <exception cref="InvalidOperationException">The value is present but is neither true nor false.</exception>
-    public static SampleCatalog FromConfiguration(IConfiguration configuration)
+    public static SampleCatalog FromConfiguration(IConfiguration configuration, IHostEnvironment environment)
     {
         ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(environment);
 
         var text = configuration[EnabledKey];
 
@@ -103,7 +108,7 @@ public sealed class SampleCatalog
             throw new InvalidOperationException($"{EnabledKey} must be true or false.");
         }
 
-        return new SampleCatalog(enabled);
+        return new SampleCatalog(enabled && !environment.IsProduction());
     }
 
     /// <summary>The text of a switcher link: the sample name, or a readable label for the edge-case sample.</summary>

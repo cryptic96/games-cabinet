@@ -8,7 +8,15 @@
     }
     @if (Model.PrototypeEnabled)
     {
-        <nav aria-label="Sample collection size">
+        <nav aria-label="Collection to show">
+            @if (Model.ShowingSample)
+            {
+                <a href="/">Synced</a>
+            }
+            else
+            {
+                <a href="/" aria-current="page">Synced</a>
+            }
             @foreach (var name in Model.SampleNames)
             {
                 if (Model.ShowingSample && name == Model.SampleName)
