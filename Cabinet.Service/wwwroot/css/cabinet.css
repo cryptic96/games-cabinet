@@ -1,10 +1,39 @@
+/**
+ * Sections sit in rows that wrap: one column, two from 80rem and three from 118rem, each section at most 40rem wide and
+ * never under 37rem, the narrowest a desktop section is ever drawn. Every row is centred, so a lone section and a last
+ * row with fewer sections than columns sit in the middle, and the column count is the only thing that sets a section's
+ * width, so the last section is as wide as the others. The row stops growing at three full columns, so a very wide
+ * screen gets margins instead of a fourth column. Sections start at the top of their row, so a shorter last section
+ * lines up with its neighbours.
+ */
 .cabinet {
-  display: grid;
+  --column-gap: 24px;
+  --section-basis: min(40rem, 100%);
+  display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  gap: 24px;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 32rem), 40rem));
+  align-items: flex-start;
+  gap: var(--column-gap);
   justify-self: stretch;
   width: 100%;
+  max-width: 123rem;
+  margin-inline: auto;
+}
+
+.cabinet > .cabinet-message {
+  flex: 1 1 100%;
+}
+
+@media (min-width: 80rem) {
+  .cabinet {
+    --section-basis: min(40rem, calc((100% - var(--column-gap)) / 2));
+  }
+}
+
+@media (min-width: 118rem) {
+  .cabinet {
+    --section-basis: min(40rem, calc((100% - 2 * var(--column-gap)) / 3));
+  }
 }
 
 /**
@@ -19,8 +48,8 @@
     calc(var(--section-w) + 2 * var(--side-allowance))
     / calc(var(--top-height) + var(--section-h) + var(--base-height) + var(--floor-margin));
   content-visibility: auto;
-  width: 100%;
-  align-self: start;
+  flex: 0 0 var(--section-basis);
+  align-self: flex-start;
 }
 
 .section > * {
