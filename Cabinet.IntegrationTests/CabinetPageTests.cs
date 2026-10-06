@@ -9,6 +9,8 @@ namespace Cabinet.IntegrationTests;
 /// <summary>Verifies the page mounts the cabinet, links served fingerprinted assets and stays free of inline styles and scripts.</summary>
 public partial class CabinetPageTests
 {
+    private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
+
     [Fact]
     public async Task Page_has_the_cabinet_mount()
     {
@@ -85,24 +87,61 @@ public partial class CabinetPageTests
     }
 
     [Fact]
-    public async Task Default_page_shows_the_sixty_five_item_sample_with_its_status_line()
+    public async Task Default_page_shows_the_being_filled_message_above_the_bare_cabinet_mount()
     {
         await using var factory = new CabinetWebApplicationFactory();
         using var client = factory.CreatePublicClient();
 
-        var html = await client.GetStringAsync("/", TestContext.Current.CancellationToken);
+        using var response = await client.GetAsync("/", TestContext.Current.CancellationToken);
+        var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        html.Should().Contain("The cabinet is being filled.");
+        html.Should().Contain("The games are being copied over from BoardGameGeek. Check back in a few minutes.");
+        html.Should().Contain("class=\"cabinet-message cabinet-filling\"");
+        html.IndexOf("cabinet-filling", StringComparison.Ordinal).Should().BeLessThan(html.IndexOf("id=\"cabinet\"", StringComparison.Ordinal));
+        html.Should().MatchRegex("<div id=\"cabinet\" class=\"cabinet\"></div>");
+        html.Should().NotContain("data-sample");
+        html.Should().Contain("type=\"module\"");
+        html.Should().NotContain("<nav");
+        html.Should().NotContain("The cabinet is being built");
+        html.Should().NotContain("Invented collection");
+    }
+
+    [Fact]
+    public async Task Default_page_ignores_the_sample_parameter_entirely()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        using var client = factory.CreatePublicClient();
+
+        var html = await client.GetStringAsync("/?sample=65", TestContext.Current.CancellationToken);
+
+        html.Should().Contain("The cabinet is being filled.");
+        html.Should().NotContain("data-sample");
+        html.Should().NotContain("Invented collection");
+        html.Should().NotContain("<nav");
+    }
+
+    [Fact]
+    public async Task Sample_page_shows_the_sixty_five_item_sample_with_its_status_line_and_no_being_filled_message()
+    {
+        await using var factory = new CabinetWebApplicationFactory(PrototypeOn);
+        using var client = factory.CreatePublicClient();
+
+        var html = await client.GetStringAsync("/?sample=65", TestContext.Current.CancellationToken);
 
         html.Should().Contain("Invented collection of 65 items.");
         html.Should().Contain("data-sample=\"65\"");
+        html.Should().NotContain("The cabinet is being filled.");
     }
 
     [Fact]
     public async Task Page_lists_one_sample_link_per_catalog_name_and_marks_the_current_one()
     {
-        await using var factory = new CabinetWebApplicationFactory();
+        await using var factory = new CabinetWebApplicationFactory(PrototypeOn);
         using var client = factory.CreatePublicClient();
 
-        var html = await client.GetStringAsync("/", TestContext.Current.CancellationToken);
+        var html = await client.GetStringAsync("/?sample=65", TestContext.Current.CancellationToken);
         var hrefs = SampleLink().Matches(html).Select(match => match.Groups["name"].Value).ToList();
 
         html.Should().Contain("<nav aria-label=\"Sample collection size\">");
@@ -115,7 +154,7 @@ public partial class CabinetPageTests
     [Fact]
     public async Task Empty_sample_page_states_zero_items_and_carries_its_name()
     {
-        await using var factory = new CabinetWebApplicationFactory();
+        await using var factory = new CabinetWebApplicationFactory(PrototypeOn);
         using var client = factory.CreatePublicClient();
 
         var html = await client.GetStringAsync("/?sample=0", TestContext.Current.CancellationToken);
@@ -127,7 +166,7 @@ public partial class CabinetPageTests
     [Fact]
     public async Task Single_item_sample_page_uses_the_singular_status_line()
     {
-        await using var factory = new CabinetWebApplicationFactory();
+        await using var factory = new CabinetWebApplicationFactory(PrototypeOn);
         using var client = factory.CreatePublicClient();
 
         var html = await client.GetStringAsync("/?sample=1", TestContext.Current.CancellationToken);
@@ -137,9 +176,9 @@ public partial class CabinetPageTests
     }
 
     [Fact]
-    public async Task Unknown_sample_value_shows_the_default_and_is_never_echoed()
+    public async Task Unknown_sample_value_shows_the_synced_collection_and_is_never_echoed()
     {
-        await using var factory = new CabinetWebApplicationFactory();
+        await using var factory = new CabinetWebApplicationFactory(PrototypeOn);
         using var client = factory.CreatePublicClient();
         var hostile = Uri.EscapeDataString("<script>alert(1)</script>");
 
@@ -147,26 +186,24 @@ public partial class CabinetPageTests
         var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        html.Should().Contain("data-sample=\"65\"");
+        html.Should().NotContain("data-sample");
+        html.Should().Contain("The cabinet is being filled.");
         html.Should().NotContain("alert(1)");
         html.Should().NotContain("alert%281%29");
     }
 
     [Fact]
-    public async Task Page_with_the_prototype_off_shows_only_the_being_built_message()
+    public async Task Layout_endpoint_serves_the_synced_collection_when_the_prototype_is_off_whatever_sample_is_asked_for()
     {
-        await using var factory = new CabinetWebApplicationFactory(new Dictionary<string, string?> { ["Prototype:Enabled"] = "false" });
+        await using var factory = new CabinetWebApplicationFactory();
         using var client = factory.CreatePublicClient();
 
-        var html = await client.GetStringAsync("/?sample=12", TestContext.Current.CancellationToken);
-        using var layout = await client.GetAsync("/cabinet/layout?sample=65&profile=desktop", TestContext.Current.CancellationToken);
+        using var withSample = await client.GetAsync("/cabinet/layout?sample=65&profile=desktop", TestContext.Current.CancellationToken);
+        using var without = await client.GetAsync("/cabinet/layout?profile=desktop", TestContext.Current.CancellationToken);
 
-        html.Should().Contain("The cabinet is being built. Check back soon to browse the collection.");
-        html.Should().NotContain("<nav");
-        html.Should().NotContain("id=\"cabinet\"");
-        html.Should().NotContain("type=\"module\"");
-        html.Should().NotContain("Invented collection");
-        layout.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        withSample.StatusCode.Should().Be(HttpStatusCode.OK);
+        withSample.Headers.ETag.Should().Be(without.Headers.ETag);
+        withSample.Headers.ETag!.Tag.Should().EndWith("-collection-empty-desktop\"");
     }
 
     [Fact]

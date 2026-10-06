@@ -1,5 +1,5 @@
 /**
- * Entry point of the cabinet page: fetches the layout for the mount's sample and the viewport's profile, hands it to the
+ * Entry point of the cabinet page: fetches the layout for the viewport's profile (and the mount's sample when it carries one), hands it to the
  * renderer, and shows loading and error states. The profile follows one media query; nothing else listens to resize.
  */
 import { renderCabinet } from './render.js';
@@ -63,7 +63,8 @@ async function load() {
   showLoading();
 
   try {
-    const url = '/cabinet/layout?sample=' + encodeURIComponent(mount.dataset.sample) + '&profile=' + currentProfile();
+    const sample = mount.dataset.sample;
+    const url = '/cabinet/layout?profile=' + currentProfile() + (sample ? '&sample=' + encodeURIComponent(sample) : '');
     const response = await fetch(url);
 
     if (thisLoad !== latestLoad) {

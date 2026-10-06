@@ -7,17 +7,14 @@ namespace Cabinet.Service.Prototype;
 
 /// <summary>
 /// The one switch for the invented-collection scaffolding and the list of sample names a visitor may ask for. While
-/// it is disabled the page and the layout endpoint behave as if no sample exists; once the real collection is shown
-/// this folder can be removed together with the switch. Each sample is generated at most once per process, the first
-/// time something needs its items, so neither a page view nor a layout request pays for building it again.
+/// it is disabled the page and the layout endpoint behave as if no sample exists and always use the synced collection.
+/// Each sample is generated at most once per process, the first time something needs its items, so neither a page view
+/// nor a layout request pays for building it again.
 /// </summary>
 public sealed class SampleCatalog
 {
     /// <summary>The configuration key that turns the invented collections on or off.</summary>
     public const string EnabledKey = "Prototype:Enabled";
-
-    /// <summary>The sample shown when no valid sample is requested.</summary>
-    public const string DefaultName = "65";
 
     private readonly Func<string, IReadOnlyList<CabinetItem>> _generate;
     private readonly ConcurrentDictionary<string, Lazy<IReadOnlyList<CabinetItem>>> _items = new(StringComparer.Ordinal);
@@ -49,8 +46,23 @@ public sealed class SampleCatalog
     /// <summary>Whether the name is exactly one of the sample names; case and surrounding spaces matter.</summary>
     public bool IsKnown(string? name) => name is not null && Names.Contains(name, StringComparer.Ordinal);
 
-    /// <summary>The requested sample when it is known, otherwise the default sample. Unknown input is never returned.</summary>
-    public string Resolve(string? requested) => IsKnown(requested) ? requested! : DefaultName;
+    /// <summary>
+    /// Whether the request names a sample this catalog honours: the catalog must be enabled and the name exactly one of the
+    /// sample names. Anything else means the synced collection is shown, and unknown input is never handed back.
+    /// </summary>
+    /// <param name="requested">The sample value of the request.</param>
+    /// <param name="name">The sample name from the allowlist when honoured, otherwise empty.</param>
+    public bool TryResolve(string? requested, out string name)
+    {
+        if (Enabled && IsKnown(requested))
+        {
+            name = requested!;
+            return true;
+        }
+
+        name = string.Empty;
+        return false;
+    }
 
     /// <summary>
     /// The items of a known sample, generated on first use and kept for the life of the process. Only allowlisted names
@@ -67,8 +79,9 @@ public sealed class SampleCatalog
         return _items.GetOrAdd(name, key => new Lazy<IReadOnlyList<CabinetItem>>(() => _generate(key))).Value;
     }
 
-    /// <summary>The number of items in a known sample; an unknown name counts as the default sample.</summary>
-    public int ItemCount(string? name) => ItemsOf(Resolve(name)).Count;
+    /// <summary>The number of items in a known sample.</summary>
+    /// <exception cref="ArgumentException">The name is not on the sample allowlist.</exception>
+    public int ItemCount(string name) => ItemsOf(name).Count;
 
     /// <summary>
     /// Reads the switch from configuration. A missing key means off; true and false in any case are accepted.

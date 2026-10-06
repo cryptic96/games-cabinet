@@ -10,6 +10,8 @@ namespace Cabinet.IntegrationTests;
 /// </summary>
 public class ContentSecurityPolicyTests
 {
+    private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
+
     private const string ExpectedPolicy =
         "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'";
 
@@ -19,11 +21,11 @@ public class ContentSecurityPolicyTests
     [InlineData("/cabinet/layout?sample=65&profile=desktop", HttpStatusCode.OK)]
     [InlineData("/cabinet/layout?sample=65&profile=phone", HttpStatusCode.OK)]
     [InlineData("/js/render.js", HttpStatusCode.OK)]
-    [InlineData("/cabinet/layout?sample=64&profile=desktop", HttpStatusCode.NotFound)]
+    [InlineData("/cabinet/layout?profile=tablet", HttpStatusCode.NotFound)]
     [InlineData("/no-such-page", HttpStatusCode.NotFound)]
     public async Task Every_public_response_carries_the_strict_policy(string path, HttpStatusCode status)
     {
-        await using var factory = new CabinetWebApplicationFactory();
+        await using var factory = new CabinetWebApplicationFactory(PrototypeOn);
         using var client = factory.CreatePublicClient();
 
         using var response = await client.GetAsync(path, TestContext.Current.CancellationToken);
@@ -56,7 +58,7 @@ public class ContentSecurityPolicyTests
     [Fact]
     public async Task A_layout_revalidation_answered_not_modified_still_carries_the_policy()
     {
-        await using var factory = new CabinetWebApplicationFactory();
+        await using var factory = new CabinetWebApplicationFactory(PrototypeOn);
         using var client = factory.CreatePublicClient();
 
         using var first = await client.GetAsync("/cabinet/layout?sample=12&profile=desktop", TestContext.Current.CancellationToken);
@@ -71,7 +73,7 @@ public class ContentSecurityPolicyTests
     [Fact]
     public async Task The_page_with_the_prototype_off_carries_the_policy()
     {
-        await using var factory = new CabinetWebApplicationFactory(new Dictionary<string, string?> { ["Prototype:Enabled"] = "false" });
+        await using var factory = new CabinetWebApplicationFactory();
         using var client = factory.CreatePublicClient();
 
         using var response = await client.GetAsync("/", TestContext.Current.CancellationToken);

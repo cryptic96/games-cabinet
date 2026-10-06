@@ -36,7 +36,7 @@ builder.Services.Configure<KestrelServerOptions>(options => options.AddServerHea
 builder.Services.AddHealthChecks();
 
 builder.Services.AddRazorPages();
-builder.Services.AddCabinetLayout(builder.Configuration);
+builder.Services.AddCabinetLayout(builder.Configuration, builder.Environment);
 
 var buildInfo = BuildInfo.Parse(
     typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
