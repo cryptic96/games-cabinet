@@ -179,7 +179,7 @@ public partial class CabinetPageTests
 
         html.Should().Contain("<noscript>");
         html.Should().Contain("The cabinet needs JavaScript to be drawn. Please turn it on and reload.");
-        html.Should().MatchRegex("<footer>\\s*<p class=\"version\">Version [^<]+</p>\\s*</footer>");
+        html.Should().MatchRegex("<footer>\\s*<p class=\"version\">Version [^<]+</p>\\s*<a class=\"bgg-credit\"");
     }
 
     [Fact]

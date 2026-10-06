@@ -89,6 +89,18 @@ footer {
   font-size: 14px;
 }
 
+.bgg-credit {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.bgg-credit img {
+  height: 32px;
+  width: auto;
+  max-width: 100%;
+}
+
 main .cabinet-message {
   font-size: 16px;
   color: var(--wall-text);
