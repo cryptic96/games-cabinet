@@ -165,8 +165,8 @@ public static class CubbyArrangement
             Title: item.Title,
             Label: item.Title,
             BaseTitle: null,
-            ToneIndex: 0,
-            PatternIndex: 0,
+            ToneIndex: SpinePalette.ToneFor(item.BggId),
+            PatternIndex: SpinePalette.PatternFor(item.BggId),
             FamilyId: null,
             MoreCount: null);
 }

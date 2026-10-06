@@ -10,7 +10,7 @@ namespace Cabinet.Domain.Layout;
 public static class CabinetLayoutEngine
 {
     /// <summary>Bumped whenever the algorithm or a design changes on purpose, so a rearrangement is always a conscious change.</summary>
-    public const int LayoutVersion = 2;
+    public const int LayoutVersion = 3;
 
     /// <summary>Lays the items out with the default layout options; see the overload that takes options.</summary>
     public static CabinetLayout Build(IReadOnlyList<CabinetItem> items, SectionDesign design) =>
@@ -59,7 +59,7 @@ public static class CabinetLayoutEngine
             .Select((section, sectionIndex) => ToLayoutSection(sectionIndex, section, context))
             .ToList();
 
-        return new CabinetLayout(LayoutVersion, design.Name, options.Fingerprint, layoutSections);
+        return new CabinetLayout(LayoutVersion, design.Name, options.Fingerprint, SpinePalette.Tones, layoutSections);
     }
 
     private static void RejectDuplicates(List<CabinetItem> ordered)

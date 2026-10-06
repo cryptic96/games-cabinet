@@ -1,7 +1,14 @@
 /**
- * Draws a cabinet layout as DOM. Geometry reaches the page only through custom properties set on element styles and
- * text only through text content; the script makes no layout decisions.
+ * Draws a cabinet layout as DOM. Geometry and colours reach the page only through custom properties set on element
+ * styles and text only through text content; the script makes no layout decisions.
+ *
+ * Every box takes its background and text colour from the layout's palette table through --bg and --fg. A face-out box
+ * is a generated cover: the palette colour, a pattern chosen from the game's own hash and a solid title plate. That
+ * generated cover is also what stands in whenever a game has no usable box art.
  */
+
+/** The cover pattern names in the order of the pattern index the layout carries. */
+const PATTERN_NAMES = ['stripes', 'chevrons', 'dots', 'rings', 'diagonal', 'plain'];
 
 /**
  * Sets one custom property to a whole-number value.
@@ -27,9 +34,10 @@ function textOrFallback(text, fallback) {
  * Builds the button for one placement.
  * @param {object} placement One placement from the layout.
  * @param {object} copy The visitor-facing strings.
+ * @param {object[]} palette The colour table of the layout.
  * @returns {HTMLButtonElement}
  */
-function buildPlacement(placement, copy) {
+function buildPlacement(placement, copy, palette) {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'placement';
@@ -45,14 +53,32 @@ function buildPlacement(placement, copy) {
   setNumber(button, '--w', placement.widthMm);
   setNumber(button, '--h', placement.heightMm);
 
+  const tone = palette[placement.toneIndex];
+
+  if (tone !== undefined) {
+    button.style.setProperty('--bg', tone.background);
+    button.style.setProperty('--fg', tone.text);
+  }
+
   const title = textOrFallback(placement.title, copy.untitled);
   button.setAttribute('aria-label', title);
   button.title = title;
 
   const label = document.createElement('span');
   label.className = 'placement-label';
+  label.setAttribute('dir', 'auto');
   label.textContent = textOrFallback(placement.label, copy.untitled);
-  button.append(label);
+
+  if (placement.kind === 'cover') {
+    button.dataset.pattern = PATTERN_NAMES[placement.patternIndex] ?? 'plain';
+
+    const plate = document.createElement('span');
+    plate.className = 'cover-plate';
+    plate.append(label);
+    button.append(plate);
+  } else {
+    button.append(label);
+  }
 
   return button;
 }
@@ -61,16 +87,17 @@ function buildPlacement(placement, copy) {
  * Builds one cubby with its placements.
  * @param {object} cubby One cubby from the layout.
  * @param {object} copy The visitor-facing strings.
+ * @param {object[]} palette The colour table of the layout.
  * @returns {HTMLDivElement}
  */
-function buildCubby(cubby, copy) {
+function buildCubby(cubby, copy, palette) {
   const element = document.createElement('div');
   element.className = 'cubby';
   setNumber(element, '--x', cubby.xMm);
   setNumber(element, '--y', cubby.yMm);
   setNumber(element, '--w', cubby.widthMm);
   setNumber(element, '--h', cubby.heightMm);
-  element.append(...cubby.placements.map((placement) => buildPlacement(placement, copy)));
+  element.append(...cubby.placements.map((placement) => buildPlacement(placement, copy, palette)));
 
   return element;
 }
@@ -79,9 +106,10 @@ function buildCubby(cubby, copy) {
  * Builds one section with all of its cubbies.
  * @param {object} section One section from the layout.
  * @param {object} copy The visitor-facing strings.
+ * @param {object[]} palette The colour table of the layout.
  * @returns {HTMLDivElement}
  */
-function buildSection(section, copy) {
+function buildSection(section, copy, palette) {
   const element = document.createElement('div');
   element.className = 'section';
   setNumber(element, '--section-w', section.widthMm + 2 * section.frameMm);
@@ -90,7 +118,7 @@ function buildSection(section, copy) {
 
   const body = document.createElement('div');
   body.className = 'section-body';
-  body.append(...section.cubbies.map((cubby) => buildCubby(cubby, copy)));
+  body.append(...section.cubbies.map((cubby) => buildCubby(cubby, copy, palette)));
   element.append(body);
 
   return element;
@@ -103,5 +131,5 @@ function buildSection(section, copy) {
  * @param {object} copy The visitor-facing strings.
  */
 export function renderCabinet(mount, layout, copy) {
-  mount.replaceChildren(...layout.sections.map((section) => buildSection(section, copy)));
+  mount.replaceChildren(...layout.sections.map((section) => buildSection(section, copy, layout.palette ?? [])));
 }
