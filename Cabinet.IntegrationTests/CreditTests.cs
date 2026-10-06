@@ -72,6 +72,50 @@ public partial class CreditTests
         Credit().IsMatch(html).Should().BeTrue();
     }
 
+    [Fact]
+    public async Task The_logo_is_served_from_the_own_origin_as_an_image()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        using var client = factory.CreatePublicClient();
+
+        var html = await client.GetStringAsync("/", TestContext.Current.CancellationToken);
+        var logoUrl = LogoSource().Match(html).Groups["src"].Value;
+
+        logoUrl.Should().StartWith("/img/powered-by-bgg.");
+        using var response = await client.GetAsync(logoUrl, TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType?.MediaType.Should().StartWith("image/");
+        body.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public async Task The_logo_reserves_its_space_with_intrinsic_dimensions()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        using var client = factory.CreatePublicClient();
+
+        var html = await client.GetStringAsync("/", TestContext.Current.CancellationToken);
+
+        LogoSource().Match(html).Value.Should().MatchRegex("width=\"[0-9]+\" height=\"[0-9]+\"");
+    }
+
+    [Fact]
+    public async Task The_page_references_no_origin_other_than_its_own_apart_from_the_credit_link()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        using var client = factory.CreatePublicClient();
+
+        var html = await client.GetStringAsync("/", TestContext.Current.CancellationToken);
+        var references = Reference().Matches(html).Select(match => match.Groups["url"].Value)
+            .Where(url => url != "https://boardgamegeek.com")
+            .ToList();
+
+        references.Should().NotBeEmpty();
+        references.Should().OnlyContain(url => Regex.IsMatch(url, "^/(?!/)"));
+    }
+
     private static IReadOnlyList<string> PageRoutes(CabinetWebApplicationFactory factory) =>
         factory.Services.GetRequiredService<EndpointDataSource>().Endpoints
             .OfType<RouteEndpoint>()
@@ -88,4 +132,10 @@ public partial class CreditTests
 
     [GeneratedRegex("<a class=\"bgg-credit\" href=\"https://boardgamegeek\\.com\" rel=\"noopener\">\\s*<img [^>]*alt=\"Powered by BGG\"")]
     private static partial Regex Credit();
+
+    [GeneratedRegex("<img [^>]*?src=\"(?<src>[^\"?]+)[^\"]*\"[^>]*alt=\"Powered by BGG\"[^>]*>")]
+    private static partial Regex LogoSource();
+
+    [GeneratedRegex("\\s(?:src|href)=\"(?<url>[^\"]*)\"")]
+    private static partial Regex Reference();
 }
