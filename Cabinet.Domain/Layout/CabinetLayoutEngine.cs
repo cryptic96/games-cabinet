@@ -39,7 +39,9 @@ public static class CabinetLayoutEngine
     /// <exception cref="ArgumentNullException">An argument is null.</exception>
     /// <exception cref="ArgumentException">A collection and game identifier pair appears twice.</exception>
     /// <exception cref="ArgumentOutOfRangeException">A layout option is out of range.</exception>
-    /// <exception cref="InvalidOperationException">An item cannot fit even an empty section.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// An item cannot fit even an empty section, or a cubby that accepted its games cannot arrange them when it is drawn.
+    /// </exception>
     public static CabinetLayout Build(IReadOnlyList<CabinetItem> items, SectionDesign design, LayoutOptions options)
     {
         ArgumentNullException.ThrowIfNull(items);
@@ -271,6 +273,11 @@ public static class CabinetLayoutEngine
         return false;
     }
 
+    /// <summary>
+    /// Draws one section by arranging each of its shown cubbies again. Placement already arranged every cubby with the same
+    /// members and the same order salt, so an arrangement that fails here means an engine invariant broke; that throws
+    /// instead of drawing the cubby empty, so a game can never silently disappear from the cabinet.
+    /// </summary>
     private static LayoutSection ToLayoutSection(
         int sectionIndex,
         List<List<LayoutMember>> section,
@@ -290,7 +297,9 @@ public static class CabinetLayoutEngine
                     cubby,
                     entry.members,
                     context.Options,
-                    context.OrderSalt(sectionIndex, entry.cubbyIndex)) ?? [];
+                    context.OrderSalt(sectionIndex, entry.cubbyIndex))
+                    ?? throw new InvalidOperationException(
+                        $"Cubby {cubby.Index} of section {sectionIndex} of the '{context.Design.Name}' design accepted its games during placement but cannot arrange them.");
 
                 return new LayoutCubby(cubby.Index, cubby.XMm, cubby.YMm, cubby.WidthMm, cubby.HeightMm, placements);
             })
