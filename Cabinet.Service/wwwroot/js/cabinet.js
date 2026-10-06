@@ -1,19 +1,31 @@
 /**
- * Entry point of the cabinet page: fetches the layout for the mount's sample and hands it to the renderer.
+ * Entry point of the cabinet page: fetches the layout for the mount's sample and the viewport's profile, hands it to the
+ * renderer, and shows loading and error states. The profile follows one media query; nothing else listens to resize.
  */
 import { renderCabinet } from './render.js';
 import { COPY } from './copy.js';
 
 const mount = document.getElementById('cabinet');
+const phoneQuery = window.matchMedia('(max-width: 40rem)');
+
+let latestLoad = 0;
 
 /**
- * Replaces the mount's content with a single status line.
- * @param {string} text The message to show.
+ * Returns the profile name the layout endpoint expects for the current viewport.
+ * @returns {string}
  */
-function showMessage(text) {
+function currentProfile() {
+  return phoneQuery.matches ? 'phone' : 'desktop';
+}
+
+/**
+ * Replaces the mount's content with the loading line.
+ */
+function showLoading() {
   const message = document.createElement('p');
   message.className = 'cabinet-message';
-  message.textContent = text;
+  message.setAttribute('role', 'status');
+  message.textContent = COPY.loading;
   mount.replaceChildren(message);
 }
 
@@ -22,11 +34,10 @@ function showMessage(text) {
  */
 function showError() {
   const heading = document.createElement('p');
-  heading.className = 'cabinet-message';
+  heading.className = 'cabinet-message-heading';
   heading.textContent = COPY.errorHeading;
 
   const body = document.createElement('p');
-  body.className = 'cabinet-message';
   body.textContent = COPY.errorBody;
 
   const retry = document.createElement('button');
@@ -35,31 +46,50 @@ function showError() {
   retry.textContent = COPY.retry;
   retry.addEventListener('click', load);
 
-  mount.replaceChildren(heading, body, retry);
+  const message = document.createElement('div');
+  message.className = 'cabinet-message';
+  message.append(heading, body, retry);
+  mount.replaceChildren(message);
 }
 
 /**
- * Fetches and draws the cabinet, showing the loading line first and the error state on any failure.
+ * Fetches and draws the cabinet, showing the loading line first and the error state on any failure. A newer load
+ * supersedes an older one that is still in flight, so a slow earlier response never overwrites a later one.
  * @returns {Promise<void>}
  */
 async function load() {
-  showMessage(COPY.loading);
+  latestLoad += 1;
+  const thisLoad = latestLoad;
+  showLoading();
 
   try {
-    const url = '/cabinet/layout?sample=' + encodeURIComponent(mount.dataset.sample) + '&profile=desktop';
+    const url = '/cabinet/layout?sample=' + encodeURIComponent(mount.dataset.sample) + '&profile=' + currentProfile();
     const response = await fetch(url);
+
+    if (thisLoad !== latestLoad) {
+      return;
+    }
 
     if (!response.ok) {
       showError();
       return;
     }
 
-    renderCabinet(mount, await response.json(), COPY);
+    const layout = await response.json();
+
+    if (thisLoad !== latestLoad) {
+      return;
+    }
+
+    renderCabinet(mount, layout, COPY);
   } catch {
-    showError();
+    if (thisLoad === latestLoad) {
+      showError();
+    }
   }
 }
 
 if (mount !== null) {
+  phoneQuery.addEventListener('change', load);
   load();
 }

@@ -1,6 +1,7 @@
 using Cabinet.Domain.Layout;
 using Cabinet.Domain.Samples;
 using Cabinet.Service.Prototype;
+using Microsoft.Net.Http.Headers;
 
 namespace Cabinet.Service.Layout;
 
@@ -24,7 +25,8 @@ public static class LayoutEndpoint
 
         return services
             .AddSingleton(LayoutSettings.FromConfiguration(configuration))
-            .AddSingleton(SampleCatalog.FromConfiguration(configuration));
+            .AddSingleton(SampleCatalog.FromConfiguration(configuration))
+            .AddSingleton<LayoutCache>();
     }
 
     /// <summary>Maps the layout route; it answers 404 while the prototype is off and for unknown sample or profile names.</summary>
@@ -44,12 +46,24 @@ public static class LayoutEndpoint
                 return Results.NotFound();
             }
 
-            var options = context.RequestServices.GetRequiredService<LayoutOptions>();
-            var layout = CabinetLayoutEngine.Build(items, design, options);
+            var cached = context.RequestServices.GetRequiredService<LayoutCache>().Get(sample!, design);
 
-            return Results.Content(LayoutJson.Serialize(layout), "application/json");
+            context.Response.Headers.ETag = cached.ETag;
+            context.Response.Headers.CacheControl = "no-cache";
+
+            return MatchesIfNoneMatch(context.Request, cached.ETag)
+                ? Results.StatusCode(StatusCodes.Status304NotModified)
+                : Results.Content(cached.Json, "application/json");
         });
 
         return endpoints;
+    }
+
+    private static bool MatchesIfNoneMatch(HttpRequest request, string eTag)
+    {
+        var requested = request.GetTypedHeaders().IfNoneMatch;
+
+        return requested.Any(candidate =>
+            candidate.Equals(EntityTagHeaderValue.Any) || candidate.Compare(new EntityTagHeaderValue(eTag), useStrongComparison: false));
     }
 }
