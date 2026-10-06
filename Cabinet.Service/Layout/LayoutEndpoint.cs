@@ -1,5 +1,6 @@
 using Cabinet.Domain.Layout;
 using Cabinet.Domain.Samples;
+using Cabinet.Service.Prototype;
 
 namespace Cabinet.Service.Layout;
 
@@ -21,17 +22,24 @@ public static class LayoutEndpoint
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        return services.AddSingleton(LayoutSettings.FromConfiguration(configuration));
+        return services
+            .AddSingleton(LayoutSettings.FromConfiguration(configuration))
+            .AddSingleton(SampleCatalog.FromConfiguration(configuration));
     }
 
-    /// <summary>Maps the layout route; unknown sample or profile names answer 404.</summary>
+    /// <summary>Maps the layout route; it answers 404 while the prototype is off and for unknown sample or profile names.</summary>
     public static IEndpointRouteBuilder MapCabinetLayout(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
         endpoints.MapGet(Route, (string? sample, string? profile, HttpContext context) =>
         {
-            if (!SyntheticCollections.TryGetSample(sample, out var items) || !SectionDesigns.TryGet(profile, out var design))
+            var catalog = context.RequestServices.GetRequiredService<SampleCatalog>();
+
+            if (!catalog.Enabled
+                || !catalog.IsKnown(sample)
+                || !SyntheticCollections.TryGetSample(sample, out var items)
+                || !SectionDesigns.TryGet(profile, out var design))
             {
                 return Results.NotFound();
             }
