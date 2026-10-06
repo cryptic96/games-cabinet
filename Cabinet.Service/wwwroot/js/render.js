@@ -35,6 +35,71 @@ function textOrFallback(text, fallback) {
 }
 
 /**
+ * Tells whether a placement is an expansion that names the base game it extends and that base game is not shown beside
+ * it: an orphan box, or an orphan facing out in a small collection.
+ * @param {object} placement One placement from the layout.
+ * @returns {boolean}
+ */
+function namesUnownedBase(placement) {
+  return placement.baseTitle !== undefined && (placement.kind === 'orphanExpansion' || placement.kind === 'cover');
+}
+
+/**
+ * Returns the accessible name and tooltip of a placement. A layer or an orphan names its base game, the marker says how
+ * many expansions it stands for, and every other placement is named by its full title. An orphan without a base title
+ * is named by its title alone.
+ * @param {object} placement One placement from the layout.
+ * @param {object} copy The visitor-facing strings.
+ * @returns {string}
+ */
+function accessibleName(placement, copy) {
+  const title = textOrFallback(placement.title, copy.untitled);
+  const baseTitle = textOrFallback(placement.baseTitle, copy.untitled);
+
+  if (placement.kind === 'expansionLayer' || namesUnownedBase(placement)) {
+    return copy.layerName(title, baseTitle);
+  }
+
+  if (placement.kind === 'moreMarker') {
+    return copy.moreName(placement.moreCount, baseTitle);
+  }
+
+  return title;
+}
+
+/**
+ * Builds the second line of an orphan, naming the game it expands, or returns null when the placement has none.
+ * @param {object} placement One placement from the layout.
+ * @param {object} copy The visitor-facing strings.
+ * @returns {HTMLSpanElement | null}
+ */
+function buildSubLabel(placement, copy) {
+  if (!namesUnownedBase(placement)) {
+    return null;
+  }
+
+  const sub = document.createElement('span');
+  sub.className = 'placement-sub';
+  sub.setAttribute('dir', 'auto');
+  sub.textContent = copy.expansionFor(textOrFallback(placement.baseTitle, copy.untitled));
+
+  return sub;
+}
+
+/**
+ * Returns the text drawn on a placement. The marker shows its hidden count; the rest show the label the layout
+ * prepared, or the fallback when it is blank.
+ * @param {object} placement One placement from the layout.
+ * @param {object} copy The visitor-facing strings.
+ * @returns {string}
+ */
+function labelText(placement, copy) {
+  return placement.kind === 'moreMarker'
+    ? copy.moreLabel(placement.moreCount)
+    : textOrFallback(placement.label, copy.untitled);
+}
+
+/**
  * Builds the button for one placement.
  * @param {object} placement One placement from the layout.
  * @param {object} copy The visitor-facing strings.
@@ -59,29 +124,32 @@ function buildPlacement(placement, copy, palette) {
 
   const tone = palette[placement.toneIndex];
 
-  if (tone !== undefined) {
+  if (tone !== undefined && placement.kind !== 'moreMarker') {
     button.style.setProperty('--bg', tone.background);
     button.style.setProperty('--fg', tone.text);
   }
 
-  const title = textOrFallback(placement.title, copy.untitled);
-  button.setAttribute('aria-label', title);
-  button.title = title;
+  const name = accessibleName(placement, copy);
+  button.setAttribute('aria-label', name);
+  button.title = name;
 
   const label = document.createElement('span');
   label.className = 'placement-label';
   label.setAttribute('dir', 'auto');
-  label.textContent = textOrFallback(placement.label, copy.untitled);
+  label.textContent = labelText(placement, copy);
+
+  const sub = buildSubLabel(placement, copy);
+  const lines = sub === null ? [label] : [label, sub];
 
   if (placement.kind === 'cover') {
     button.dataset.pattern = PATTERN_NAMES[placement.patternIndex] ?? 'plain';
 
     const plate = document.createElement('span');
     plate.className = 'cover-plate';
-    plate.append(label);
+    plate.append(...lines);
     button.append(plate);
   } else {
-    button.append(label);
+    button.append(...lines);
   }
 
   return button;

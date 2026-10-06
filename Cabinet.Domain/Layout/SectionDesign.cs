@@ -14,6 +14,16 @@ public sealed record ShelfRow(int HeightMm, IReadOnlyList<int> CubbyWidthsMm);
 public sealed record CubbyDesign(int Index, int XMm, int YMm, int WidthMm, int HeightMm);
 
 /// <summary>
+/// The largest box a design can hold, derived from its biggest cubby. Items beyond these limits are scaled down on entry
+/// so every item always fits an empty section.
+/// </summary>
+/// <param name="MaxWidthMm">The widest front a box may have.</param>
+/// <param name="MaxHeightMm">The tallest front a box may have.</param>
+/// <param name="MaxFamilyBaseWidthMm">The widest front a base game may have when expansions stand beside it in a stack column.</param>
+/// <param name="MaxDepthMm">The deepest a box may be.</param>
+public sealed record BoxLimits(int MaxWidthMm, int MaxHeightMm, int MaxFamilyBaseWidthMm, int MaxDepthMm);
+
+/// <summary>
 /// The fixed furniture: a hand-designed section of irregular cubbies. Frame, shelf and divider thickness are all
 /// <see cref="FrameMm"/>, so a gap of that size separates neighbouring cubbies and rows.
 /// </summary>
@@ -36,8 +46,51 @@ public sealed record SectionDesign(string Name, int InteriorWidthMm, int FrameMm
     /// </summary>
     public int LabelCharPitchMm { get; init; } = 14;
 
+    /// <summary>The deepest a box may be, in millimetres, whatever the cubbies; deeper boxes are drawn at this depth.</summary>
+    public const int MaxBoxDepthMm = 150;
+
+    /// <summary>
+    /// Width of the column beside a base game that holds its expansions. It never depends on how many expansions there
+    /// are, so a growing stack cannot push the neighbours in its cubby.
+    /// </summary>
+    public int StackColumnWidthMm { get; init; } = 190;
+
+    /// <summary>The least height one expansion layer is drawn at, in millimetres.</summary>
+    public int MinLayerHeightMm { get; init; } = 40;
+
+    /// <summary>The most height one expansion layer is drawn at, in millimetres.</summary>
+    public int MaxLayerHeightMm { get; init; } = 70;
+
+    /// <summary>Height of the marker that counts the expansions that did not fit the stack, in millimetres.</summary>
+    public int MarkerHeightMm { get; init; } = 40;
+
+    /// <summary>
+    /// The least height an expansion box without an owned base game is drawn at, in millimetres, so its two label lines
+    /// stay readable at the smallest width the section is shown at.
+    /// </summary>
+    public int MinOrphanHeightMm { get; init; } = 80;
+
     /// <summary>Interior height: the row heights plus one frame between each pair of rows.</summary>
     public int InteriorHeightMm => Rows.Sum(row => row.HeightMm) + (FrameMm * Math.Max(0, Rows.Count - 1));
+
+    /// <summary>
+    /// The largest box the design can hold, taken from its anchor cubby: the tallest cubby, and among equally tall cubbies
+    /// the widest. A base game with a stack column beside it must leave room for the column.
+    /// </summary>
+    public BoxLimits Limits
+    {
+        get
+        {
+            var anchor = Cubbies
+                .OrderByDescending(cubby => cubby.HeightMm)
+                .ThenByDescending(cubby => cubby.WidthMm)
+                .FirstOrDefault();
+
+            return anchor is null
+                ? new BoxLimits(0, 0, 0, MaxBoxDepthMm)
+                : new BoxLimits(anchor.WidthMm, anchor.HeightMm, Math.Max(0, anchor.WidthMm - StackColumnWidthMm), MaxBoxDepthMm);
+        }
+    }
 
     /// <summary>Every cubby in reading order: rows top to bottom, cubbies left to right.</summary>
     public IReadOnlyList<CubbyDesign> Cubbies => BuildCubbies();

@@ -111,6 +111,118 @@ public class SyntheticCollectionsTests
 
     [Fact]
     [Trait("Category", "Layout")]
+    public void The_sample_of_sixty_five_holds_forty_nine_base_games_and_sixteen_expansions_in_the_shapes_the_cabinet_must_handle()
+    {
+        SyntheticCollections.TryGetSample("65", out var items);
+        var expansions = items.Where(item => item.Kind == ItemKind.Expansion).ToList();
+        var ownedIds = items.Where(item => item.Kind == ItemKind.Base).Select(item => item.BggId).ToHashSet();
+        var ownedParents = expansions.Select(expansion => expansion.ExpansionOf.Where(reference => ownedIds.Contains(reference.BggId)).ToList()).ToList();
+
+        items.Count(item => item.Kind == ItemKind.Base).Should().Be(49);
+        expansions.Should().HaveCount(16);
+        ownedParents.Count(parents => parents.Count == 0).Should().Be(3, "three expansions name a base game that is not owned");
+        ownedParents.Count(parents => parents.Count == 2).Should().Be(1, "one expansion extends two owned games");
+        expansions.Max(expansion => expansion.ExpansionOf.Max(reference => reference.Title.Length)).Should().BeGreaterThanOrEqualTo(58);
+
+        var familySizes = ownedParents
+            .Where(parents => parents.Count > 0)
+            .GroupBy(parents => parents.Min(reference => reference.BggId))
+            .Select(group => group.Count())
+            .Order()
+            .ToList();
+        familySizes.Max().Should().BeGreaterThanOrEqualTo(8);
+        familySizes.Should().Contain([1, 2, 9]);
+
+        expansions
+            .Where(expansion => ownedParents[expansions.IndexOf(expansion)].Count > 0)
+            .Should().Contain(expansion => expansion.CollectionId < items.Single(item => item.BggId == expansion.ExpansionOf.Min(reference => reference.BggId)).CollectionId, "one expansion comes before its base game");
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void The_sample_of_sixty_five_lays_out_every_shape_and_leaves_room_in_the_last_section()
+    {
+        SyntheticCollections.TryGetSample("65", out var items);
+
+        var layout = CabinetLayoutEngine.Build(items, SectionDesigns.Desktop);
+
+        var kinds = layout.Sections.SelectMany(section => section.Cubbies).SelectMany(cubby => cubby.Placements).Select(placement => placement.Kind).ToHashSet();
+        kinds.Should().Contain(Enum.GetValues<PlacementKind>(), "the review sample shows every kind of placement");
+        layout.Sections[^1].Cubbies.Should().Contain(cubby => cubby.Placements.Count == 0);
+        LayoutAssertions.AssertValid(layout, items);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void The_sample_of_four_hundred_has_about_a_fifth_expansions_in_families_of_up_to_ten_and_some_orphans()
+    {
+        SyntheticCollections.TryGetSample("400", out var items);
+        var expansions = items.Where(item => item.Kind == ItemKind.Expansion).ToList();
+
+        expansions.Count.Should().BeInRange(55, 90);
+        expansions.Count(expansion => LayoutAssertions.OwnedParentOf(expansion, items) is null).Should().BeInRange(5, 20);
+
+        var biggest = expansions
+            .Select(expansion => LayoutAssertions.OwnedParentOf(expansion, items))
+            .OfType<int>()
+            .GroupBy(id => id)
+            .Max(group => group.Count());
+        biggest.Should().BeInRange(6, 10);
+    }
+
+    [Theory]
+    [InlineData("65")]
+    [InlineData("400")]
+    [Trait("Category", "Layout")]
+    public void Base_game_titles_named_by_expansions_are_invented_digit_free_and_not_owned_when_absent(string name)
+    {
+        SyntheticCollections.TryGetSample(name, out var items);
+        var ownedTitles = items.Select(item => item.Title).ToHashSet();
+
+        var references = items.SelectMany(item => item.ExpansionOf).ToList();
+
+        references.Should().NotBeEmpty();
+        references.Should().OnlyContain(reference => !reference.Title.Any(char.IsAsciiDigit));
+
+        foreach (var reference in references.Where(reference => items.All(item => item.BggId != reference.BggId)))
+        {
+            ownedTitles.Should().NotContain(reference.Title, "a base game that is not owned has a title of its own");
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_random_collection_without_a_share_of_expansions_holds_base_games_only()
+    {
+        SyntheticCollections.Random(21, 100).Should().OnlyContain(item => item.Kind == ItemKind.Base && item.ExpansionOf.Count == 0);
+        SyntheticCollections.Random(21, 100, 20).Count(item => item.Kind == ItemKind.Expansion).Should().BeInRange(10, 30);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void The_next_expansion_and_the_next_orphan_sort_after_everything_and_have_unused_titles()
+    {
+        var items = SyntheticCollections.Random(5, 50, 20);
+        var parent = items.First(item => item.Kind == ItemKind.Base);
+
+        var expansion = SyntheticCollections.NextExpansion(items, parent.BggId, 5);
+        var orphan = SyntheticCollections.NextOrphanExpansion(items, 5);
+
+        foreach (var next in new[] { expansion, orphan })
+        {
+            next.Kind.Should().Be(ItemKind.Expansion);
+            next.BggId.Should().BeGreaterThan(items.Max(item => item.BggId));
+            next.CollectionId.Should().BeGreaterThan(items.Max(item => item.CollectionId));
+            items.Select(item => item.Title).Should().NotContain(next.Title);
+            next.Title.Any(char.IsAsciiDigit).Should().BeFalse();
+        }
+
+        expansion.ExpansionOf.Should().Equal(new BaseGameRef(parent.BggId, parent.Title));
+        items.Any(item => item.BggId == orphan.ExpansionOf[0].BggId).Should().BeFalse("the base game of an orphan is not owned");
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
     public void The_next_base_game_sorts_after_everything_and_has_an_unused_title()
     {
         var items = SyntheticCollections.Random(5, 50);
