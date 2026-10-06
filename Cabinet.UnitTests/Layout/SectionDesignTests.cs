@@ -203,6 +203,48 @@ public class SectionDesignTests
     }
 
     [Theory]
+    [MemberData(nameof(DesignNames))]
+    [Trait("Category", "Layout")]
+    public void A_wide_base_game_standing_as_a_spine_keeps_its_full_height_with_or_without_expansions(string name)
+    {
+        var design = DesignNamed(name);
+        var baseGame = BaseOf(300, 400, depth: 70);
+        var family = FamilyOf(baseGame, 3, ThinDepthMm);
+
+        var alone = SinglePlacement(CabinetLayoutEngine.Build([baseGame], design, AllSpines));
+        var withExpansions = CabinetLayoutEngine.Build(family, design, AllSpines);
+
+        LayoutAssertions.AssertValid(withExpansions, family);
+        var familyBase = withExpansions.Sections.SelectMany(section => section.Cubbies).SelectMany(cubby => cubby.Placements)
+            .Single(placement => placement.GameId == baseGame.BggId && placement.Kind == PlacementKind.Spine);
+        design.Limits.MaxFamilyBaseWidthMm.Should().BeLessThan(300, "the box is wider than a family base may be when it faces out");
+        alone.Kind.Should().Be(PlacementKind.Spine);
+        alone.HeightMm.Should().Be(400);
+        familyBase.HeightMm.Should().Be(400, "how wide the front is does not matter for a box that stands as a spine");
+        familyBase.WidthMm.Should().Be(alone.WidthMm);
+    }
+
+    [Theory]
+    [MemberData(nameof(DesignNames))]
+    [Trait("Category", "Layout")]
+    public void A_wide_base_game_facing_out_with_expansions_is_scaled_to_the_family_width_limit(string name)
+    {
+        var design = DesignNamed(name);
+        var limits = design.Limits;
+        var baseGame = BaseOf(300, 400, depth: 70);
+        var family = FamilyOf(baseGame, 3, ThinDepthMm);
+
+        var layout = CabinetLayoutEngine.Build(family, design, AllCovers);
+
+        LayoutAssertions.AssertValid(layout, family);
+        var familyBase = layout.Sections.SelectMany(section => section.Cubbies).SelectMany(cubby => cubby.Placements)
+            .Single(placement => placement.GameId == baseGame.BggId);
+        familyBase.Kind.Should().Be(PlacementKind.Cover);
+        familyBase.WidthMm.Should().Be(limits.MaxFamilyBaseWidthMm);
+        familyBase.HeightMm.Should().Be(400 * limits.MaxFamilyBaseWidthMm / 300);
+    }
+
+    [Theory]
     [InlineData("65", 2)]
     [InlineData("400", 6)]
     [Trait("Category", "Layout")]

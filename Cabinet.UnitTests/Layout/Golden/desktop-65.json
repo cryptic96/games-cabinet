@@ -1,5 +1,5 @@
 {
-  "layoutVersion": 7,
+  "layoutVersion": 8,
   "profile": "desktop",
   "optionsFingerprint": "09a03be9acd0723f",
   "palette": [
@@ -535,9 +535,9 @@
               "xMm": 47,
               "yMm": 0,
               "widthMm": 96,
-              "heightMm": 290,
+              "heightMm": 350,
               "title": "Quaywynley Orvthan Jorbar",
-              "label": "Quaywynley Orvthan\u2026",
+              "label": "Quaywynley Orvthan Jorbar",
               "toneIndex": 3,
               "patternIndex": 0,
               "familyId": 10208

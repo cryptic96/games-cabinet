@@ -180,7 +180,11 @@ the biggest cubby, a stack column that leaves no room for a base game, and
 floors taller than the shortest cubby are all reported by name, so a mistake
 in an edited design fails a test instead of the page. A box larger than the
 biggest cubby is scaled down to fit, keeping the proportions of its front, and
-is drawn at that size like any other box.
+is drawn at that size like any other box. A base game that faces out with its
+expansions beside it must also leave room for their stack, so a very wide
+front is scaled down a little further. A base game that stands as a spine is
+never scaled for that reason, because only its depth shows: it is drawn as tall
+as it would be without expansions.
 
 ## Recorded layouts
 

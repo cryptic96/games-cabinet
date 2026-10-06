@@ -160,7 +160,9 @@ public class PhoneProfileTests
 
         phone.Profile.Should().Be(SectionDesigns.PhoneName);
         phone.Sections.Count.Should().BeGreaterThan(desktop.Sections.Count);
-        phone.Sections.Should().OnlyContain(section => section.Cubbies.Count == Phone.Cubbies.Count);
+        phone.Sections.SkipLast(1).Should().OnlyContain(
+            section => section.Cubbies.Count == Phone.Cubbies.Count, "every section before the last is drawn whole");
+        phone.Sections[^1].Cubbies.Count.Should().BeInRange(1, Phone.Cubbies.Count, "the last section may be drawn short");
     }
 
     [Fact]

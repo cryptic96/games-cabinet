@@ -15,7 +15,7 @@ namespace Cabinet.Domain.Layout;
 public static class CabinetLayoutEngine
 {
     /// <summary>Bumped whenever the algorithm or a design changes on purpose, so a rearrangement is always a conscious change.</summary>
-    public const int LayoutVersion = 7;
+    public const int LayoutVersion = 8;
 
     /// <summary>
     /// The fewest shelf rows the last section is drawn with, so a nearly empty cabinet still reads as a piece of furniture.
@@ -96,7 +96,7 @@ public static class CabinetLayoutEngine
         if (item.Kind == ItemKind.Expansion)
         {
             var orphanPose = fewGames ? BoxPose.Cover : BoxPose.Flat;
-            var orphanItem = item with { Box = Clamp(item.Box, limits, hasFamily: false) };
+            var orphanItem = item with { Box = Clamp(item.Box, limits, facesOutBesideExpansions: false) };
 
             return new LayoutMember(orphanItem, orphanPose, [], unit.BaseTitle);
         }
@@ -109,7 +109,8 @@ public static class CabinetLayoutEngine
             pose = BoxPose.Spine;
         }
 
-        var baseItem = item with { Box = Clamp(item.Box, limits, expansions.Count > 0) };
+        var facesOutBesideExpansions = expansions.Count > 0 && pose == BoxPose.Cover;
+        var baseItem = item with { Box = Clamp(item.Box, limits, facesOutBesideExpansions) };
         var plain = new LayoutMember(baseItem, pose);
         var room = limits.MaxWidthMm - CubbyArrangement.StandingWidthMm(design, plain) - design.StackColumnWidthMm;
         var (uprights, stacked) = SplitExpansions(expansions, design, limits, room);
@@ -137,7 +138,7 @@ public static class CabinetLayoutEngine
 
         foreach (var expansion in expansions)
         {
-            var scaled = expansion with { Box = Clamp(expansion.Box, limits, hasFamily: false) };
+            var scaled = expansion with { Box = Clamp(expansion.Box, limits, facesOutBesideExpansions: false) };
 
             if (standingOpen && Orientation.StandsUpright(expansion))
             {
@@ -162,11 +163,13 @@ public static class CabinetLayoutEngine
 
     /// <summary>
     /// Scales a box down to the design's limits with whole numbers only: width and height shrink together, keeping their
-    /// proportions, until the front fits; depth is capped on its own; no side ends up under the least size.
+    /// proportions, until the front fits; depth is capped on its own; no side ends up under the least size. The narrower
+    /// family width applies only to a base game that faces out beside a stack column, because a box standing as a spine
+    /// shows its depth, not its front, so its front width must not shorten it.
     /// </summary>
-    private static BoxDimensions Clamp(BoxDimensions box, BoxLimits limits, bool hasFamily)
+    private static BoxDimensions Clamp(BoxDimensions box, BoxLimits limits, bool facesOutBesideExpansions)
     {
-        var maxWidth = Math.Max(MinBoxSideMm, hasFamily ? limits.MaxFamilyBaseWidthMm : limits.MaxWidthMm);
+        var maxWidth = Math.Max(MinBoxSideMm, facesOutBesideExpansions ? limits.MaxFamilyBaseWidthMm : limits.MaxWidthMm);
         var maxHeight = Math.Max(MinBoxSideMm, limits.MaxHeightMm);
         var width = Math.Max(MinBoxSideMm, box.WidthMm);
         var height = Math.Max(MinBoxSideMm, box.HeightMm);
