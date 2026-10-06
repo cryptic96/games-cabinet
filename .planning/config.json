@@ -81,7 +81,13 @@
   },
   "project_code": null,
   "phase_naming": "sequential",
-  "agent_skills": {},
+  "agent_skills": {
+    "gsd-executor": "global:senior-frontend",
+    "gsd-planner": "global:senior-frontend",
+    "gsd-ui-researcher": "global:senior-frontend",
+    "gsd-ui-checker": "global:senior-frontend",
+    "gsd-ui-auditor": "global:senior-frontend"
+  },
   "claude_md_path": "./.claude/CLAUDE.md",
   "plan_review": {
     "source_grounding": true,
