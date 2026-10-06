@@ -31,12 +31,13 @@ public class CabinetLayoutEngineTests
 
     [Fact]
     [Trait("Category", "Layout")]
-    public void An_empty_collection_gives_one_section_with_every_cubby_and_no_placements()
+    public void An_empty_collection_gives_one_section_of_the_minimum_rows_and_no_placements()
     {
         var layout = CabinetLayoutEngine.Build([], SectionDesigns.Desktop);
+        var firstRows = SectionDesigns.Desktop.Rows.Take(CabinetLayoutEngine.MinTrimmedRows).Sum(row => row.CubbyWidthsMm.Count);
 
         layout.Sections.Should().ContainSingle();
-        layout.Sections[0].Cubbies.Should().HaveCount(SectionDesigns.Desktop.Cubbies.Count);
+        layout.Sections[0].Cubbies.Should().HaveCount(firstRows);
         layout.Sections[0].Cubbies.Should().OnlyContain(cubby => cubby.Placements.Count == 0);
     }
 

@@ -1,5 +1,5 @@
 {
-  "layoutVersion": 6,
+  "layoutVersion": 7,
   "profile": "phone",
   "optionsFingerprint": "09a03be9acd0723f",
   "palette": [
@@ -56,7 +56,7 @@
     {
       "index": 0,
       "widthMm": 640,
-      "heightMm": 2060,
+      "heightMm": 680,
       "frameMm": 20,
       "cubbies": [
         {
@@ -109,78 +109,6 @@
           "xMm": 440,
           "yMm": 380,
           "widthMm": 200,
-          "heightMm": 300,
-          "placements": []
-        },
-        {
-          "index": 5,
-          "xMm": 0,
-          "yMm": 700,
-          "widthMm": 420,
-          "heightMm": 400,
-          "placements": []
-        },
-        {
-          "index": 6,
-          "xMm": 440,
-          "yMm": 700,
-          "widthMm": 200,
-          "heightMm": 400,
-          "placements": []
-        },
-        {
-          "index": 7,
-          "xMm": 0,
-          "yMm": 1120,
-          "widthMm": 150,
-          "heightMm": 260,
-          "placements": []
-        },
-        {
-          "index": 8,
-          "xMm": 170,
-          "yMm": 1120,
-          "widthMm": 230,
-          "heightMm": 260,
-          "placements": []
-        },
-        {
-          "index": 9,
-          "xMm": 420,
-          "yMm": 1120,
-          "widthMm": 220,
-          "heightMm": 260,
-          "placements": []
-        },
-        {
-          "index": 10,
-          "xMm": 0,
-          "yMm": 1400,
-          "widthMm": 310,
-          "heightMm": 340,
-          "placements": []
-        },
-        {
-          "index": 11,
-          "xMm": 330,
-          "yMm": 1400,
-          "widthMm": 310,
-          "heightMm": 340,
-          "placements": []
-        },
-        {
-          "index": 12,
-          "xMm": 0,
-          "yMm": 1760,
-          "widthMm": 200,
-          "heightMm": 300,
-          "placements": []
-        },
-        {
-          "index": 13,
-          "xMm": 220,
-          "yMm": 1760,
-          "widthMm": 420,
           "heightMm": 300,
           "placements": []
         }

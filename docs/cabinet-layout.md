@@ -10,7 +10,8 @@ server's own where they differ.
 The cabinet is built from fixed, hand-designed sections. Each section is a
 wooden frame holding rows of cubbies of different widths and heights, like a
 real shelf unit that was assembled by hand rather than cut on a grid. Every
-cubby is drawn, whether or not anything stands in it. An empty cubby is bare
+cubby of a section is drawn, whether or not anything stands in it, except below
+the last section's last used shelf row (see below). An empty cubby is bare
 shaded wood.
 
 Games are placed into the cubbies by the server, not by the browser. The
@@ -37,10 +38,26 @@ When the collection outgrows one section, a new section is added beside the
 existing ones, and once a row is full further sections start a new row below.
 Existing sections are never redesigned to make room.
 
+Only the last section is drawn short. It stops at its last shelf row that holds
+a game, with a minimum of two rows, so a section that has just opened, or a
+whole cabinet with a few games, does not show a tall hollow stretch of empty
+shelves. The furniture follows: the moulded top, the side boards and the plinth
+are drawn around the rows that are shown, and the space the page reserves for
+the section is exactly that height. A cabinet with no games shows two rows of
+bare cubbies. Every section before the last is always drawn with all of its
+rows. Trimming only decides what is drawn: where games stand never depends on it.
+
 The page asks for the layout that matches the screen width. Wide screens get
 the desktop section design; phones get their own narrower design, so the
 cabinet stays a tall, narrow cabinet instead of a squashed wide one. The page
 asks again only when the screen crosses that width.
+
+On the page, sections sit in centred rows: one column up to 80rem wide screens
+(1280 pixels), two columns from there, and three from 118rem (1888 pixels),
+never more. A desktop section is drawn between 37rem and 40rem wide, so a lone
+section, or a last row with fewer sections than columns, sits in the middle. On
+phones the sections form a single column. Sections in a row start at the same
+height, so a shorter last section lines up with its neighbours.
 
 ## Settings
 
@@ -98,6 +115,13 @@ choice comes from the game's own identifier and the settings.
 Adding a game changes only the cubby it lands in. Neighbouring games keep
 their place, their orientation and their colour. A game lands lying flat when no
 cubby had room for it standing the way it was chosen.
+
+The one thing that also changes is how much of the last section is drawn. A game
+that lands in a row below the last section's last used row adds that row, and
+any empty rows above it, to the drawn section, so the section grows taller by
+whole rows and nothing that was already drawn moves. A game that opens a new
+section gives the section before it all of its rows and starts the new last
+section with two rows. Neither changes any game's place.
 
 A few changes rearrange more than that, and these are accepted:
 

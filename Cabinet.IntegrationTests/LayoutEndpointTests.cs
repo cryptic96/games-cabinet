@@ -77,7 +77,8 @@ public class LayoutEndpointTests
         var cubbies = sections[0].GetProperty("cubbies");
 
         sections.GetArrayLength().Should().Be(1);
-        cubbies.GetArrayLength().Should().Be(SectionDesigns.Desktop.Cubbies.Count);
+        cubbies.GetArrayLength().Should().Be(
+            SectionDesigns.Desktop.Rows.Take(CabinetLayoutEngine.MinTrimmedRows).Sum(row => row.CubbyWidthsMm.Count));
         cubbies.EnumerateArray().Should().OnlyContain(cubby => cubby.GetProperty("placements").GetArrayLength() == 0);
     }
 

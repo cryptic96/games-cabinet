@@ -1,5 +1,5 @@
 {
-  "layoutVersion": 6,
+  "layoutVersion": 7,
   "profile": "desktop",
   "optionsFingerprint": "09a03be9acd0723f",
   "palette": [
@@ -537,7 +537,7 @@
               "widthMm": 96,
               "heightMm": 290,
               "title": "Quaywynley Orvthan Jorbar",
-              "label": "Quaywynley Orvthan \u2026",
+              "label": "Quaywynley Orvthan\u2026",
               "toneIndex": 3,
               "patternIndex": 0,
               "familyId": 10208
@@ -917,7 +917,7 @@
     {
       "index": 1,
       "widthMm": 1200,
-      "heightMm": 1730,
+      "heightMm": 1100,
       "frameMm": 20,
       "cubbies": [
         {
@@ -1103,62 +1103,6 @@
               "patternIndex": 5
             }
           ]
-        },
-        {
-          "index": 10,
-          "xMm": 0,
-          "yMm": 1120,
-          "widthMm": 300,
-          "heightMm": 260,
-          "placements": []
-        },
-        {
-          "index": 11,
-          "xMm": 320,
-          "yMm": 1120,
-          "widthMm": 220,
-          "heightMm": 260,
-          "placements": []
-        },
-        {
-          "index": 12,
-          "xMm": 560,
-          "yMm": 1120,
-          "widthMm": 300,
-          "heightMm": 260,
-          "placements": []
-        },
-        {
-          "index": 13,
-          "xMm": 880,
-          "yMm": 1120,
-          "widthMm": 320,
-          "heightMm": 260,
-          "placements": []
-        },
-        {
-          "index": 14,
-          "xMm": 0,
-          "yMm": 1400,
-          "widthMm": 420,
-          "heightMm": 330,
-          "placements": []
-        },
-        {
-          "index": 15,
-          "xMm": 440,
-          "yMm": 1400,
-          "widthMm": 340,
-          "heightMm": 330,
-          "placements": []
-        },
-        {
-          "index": 16,
-          "xMm": 800,
-          "yMm": 1400,
-          "widthMm": 400,
-          "heightMm": 330,
-          "placements": []
         }
       ]
     }

@@ -1,5 +1,5 @@
 {
-  "layoutVersion": 6,
+  "layoutVersion": 7,
   "profile": "phone",
   "optionsFingerprint": "09a03be9acd0723f",
   "palette": [
@@ -221,7 +221,7 @@
               "widthMm": 184,
               "heightMm": 59,
               "title": "Brinford Quaymont Zimley: Yarthanford Vossthan and Cassnia",
-              "label": "Brinford \u2026",
+              "label": "Brinford\u2026",
               "toneIndex": 9,
               "patternIndex": 5
             },
@@ -246,7 +246,7 @@
               "widthMm": 150,
               "heightMm": 59,
               "title": "Kelven Beldis Vossdle: Vossley Heskthansk",
-              "label": "Kelven \u2026",
+              "label": "Kelven\u2026",
               "toneIndex": 10,
               "patternIndex": 1
             },
@@ -606,7 +606,7 @@
               "widthMm": 71,
               "heightMm": 157,
               "title": "Quayra Yarford: Raxven Wendquin",
-              "label": "Quayra \u2026",
+              "label": "Quayra\u2026",
               "baseTitle": "Quaywynley Orvthan Jorbar",
               "toneIndex": 7,
               "patternIndex": 5,
@@ -1126,7 +1126,7 @@
               "widthMm": 190,
               "heightMm": 59,
               "title": "Cassthan Wendmereley Ulmthan",
-              "label": "Cassthan \u2026",
+              "label": "Cassthan\u2026",
               "baseTitle": "Morvendle Noxtor Raxzel: Noxbarmont Hesklo Yarthan Heskvenzel",
               "toneIndex": 7,
               "patternIndex": 5,

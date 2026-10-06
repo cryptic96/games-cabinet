@@ -75,6 +75,38 @@ public class SpineLabelTests
     }
 
     [Theory]
+    [InlineData("Keeper of the Ash Accord", 14, "Keeper" + Ellipsis)]
+    [InlineData("Rise of the Dragon Court", 13, "Rise" + Ellipsis)]
+    [InlineData("Tides and Embers of Vell", 11, "Tides" + Ellipsis)]
+    [InlineData("Keeper of the Ash Accord", 18, "Keeper of the Ash" + Ellipsis)]
+    [Trait("Category", "Layout")]
+    public void A_shortened_label_never_ends_on_a_stop_word(string title, int budget, string expected)
+    {
+        SpineLabel.Shorten(title, budget).Should().Be(expected);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void Stop_words_are_trimmed_one_after_another_and_a_separator_left_behind_goes_too()
+    {
+        SpineLabel.Shorten("Wardens of the, Ash Accord", 17).Should().Be("Wardens" + Ellipsis);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_title_that_fits_keeps_its_last_stop_word()
+    {
+        SpineLabel.Shorten("Heart of the", 20).Should().Be("Heart of the");
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_title_made_only_of_stop_words_keeps_its_cut()
+    {
+        SpineLabel.Shorten("Of the And In", 8).Should().Be("Of the " + Ellipsis);
+    }
+
+    [Theory]
     [InlineData("")]
     [InlineData("   ")]
     [InlineData("\t \n")]

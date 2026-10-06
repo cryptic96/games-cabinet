@@ -8,12 +8,20 @@ namespace Cabinet.Domain.Layout;
 /// can still take it the way it was chosen; failing that a plain game may lie flat in the first cubby that can take it
 /// lying down; a new section opens only when neither fits. An owned expansion never takes a place of its own: a thick
 /// one stands upright right beside its base game and a thinner one lies in a stack beside it, and the base game reserves
-/// the room for both in its cubby when it is placed, whether the expansion arrived before or after it.
+/// the room for both in its cubby when it is placed, whether the expansion arrived before or after it. Every section
+/// is drawn whole except the last, which is drawn only down to its last used shelf row (at least
+/// <see cref="MinTrimmedRows"/> rows); that is a matter of drawing alone, so no placement depends on it.
 /// </summary>
 public static class CabinetLayoutEngine
 {
     /// <summary>Bumped whenever the algorithm or a design changes on purpose, so a rearrangement is always a conscious change.</summary>
-    public const int LayoutVersion = 6;
+    public const int LayoutVersion = 7;
+
+    /// <summary>
+    /// The fewest shelf rows the last section is drawn with, so a nearly empty cabinet still reads as a piece of furniture.
+    /// A design with fewer rows keeps all of them.
+    /// </summary>
+    public const int MinTrimmedRows = 2;
 
     private const int MinBoxSideMm = 10;
 
@@ -67,7 +75,7 @@ public static class CabinetLayoutEngine
         }
 
         var layoutSections = sections
-            .Select((section, sectionIndex) => ToLayoutSection(sectionIndex, section, context))
+            .Select((section, sectionIndex) => ToLayoutSection(sectionIndex, section, context, sectionIndex == sections.Count - 1))
             .ToList();
 
         return new CabinetLayout(LayoutVersion, design.Name, options.Fingerprint, SpinePalette.Tones, layoutSections);
@@ -263,18 +271,26 @@ public static class CabinetLayoutEngine
         return false;
     }
 
-    private static LayoutSection ToLayoutSection(int sectionIndex, List<List<LayoutMember>> section, BuildContext context)
+    private static LayoutSection ToLayoutSection(
+        int sectionIndex,
+        List<List<LayoutMember>> section,
+        BuildContext context,
+        bool trimUnusedRows)
     {
+        var rowCount = trimUnusedRows ? DrawnRowCount(section, context) : context.Design.Rows.Count;
+        var drawnBottom = context.Design.Rows.Take(rowCount).Sum(row => row.HeightMm) + (context.Design.FrameMm * (rowCount - 1));
         var cubbies = section
-            .Select((members, cubbyIndex) =>
+            .Select((members, cubbyIndex) => (members, cubbyIndex))
+            .Where(entry => context.Cubbies[entry.cubbyIndex].YMm < drawnBottom)
+            .Select(entry =>
             {
-                var cubby = context.Cubbies[cubbyIndex];
+                var cubby = context.Cubbies[entry.cubbyIndex];
                 var placements = CubbyArrangement.TryArrange(
                     context.Design,
                     cubby,
-                    members,
+                    entry.members,
                     context.Options,
-                    context.OrderSalt(sectionIndex, cubbyIndex)) ?? [];
+                    context.OrderSalt(sectionIndex, entry.cubbyIndex)) ?? [];
 
                 return new LayoutCubby(cubby.Index, cubby.XMm, cubby.YMm, cubby.WidthMm, cubby.HeightMm, placements);
             })
@@ -283,9 +299,27 @@ public static class CabinetLayoutEngine
         return new LayoutSection(
             sectionIndex,
             context.Design.InteriorWidthMm,
-            context.Design.InteriorHeightMm,
+            drawnBottom,
             context.Design.FrameMm,
             cubbies);
+    }
+
+    /// <summary>
+    /// The number of shelf rows the last section is drawn with: down to the lowest row that holds a game, and never fewer
+    /// than <see cref="MinTrimmedRows"/> or more than the design has.
+    /// </summary>
+    private static int DrawnRowCount(List<List<LayoutMember>> section, BuildContext context)
+    {
+        var lowestUsedTop = section
+            .Select((members, cubbyIndex) => (members, cubbyIndex))
+            .Where(entry => entry.members.Count > 0)
+            .Select(entry => context.Cubbies[entry.cubbyIndex].YMm)
+            .DefaultIfEmpty(-1)
+            .Max();
+        var rowTops = context.Cubbies.Select(cubby => cubby.YMm).Distinct().Order().ToList();
+        var usedRows = lowestUsedTop < 0 ? 0 : rowTops.IndexOf(lowestUsedTop) + 1;
+
+        return Math.Min(rowTops.Count, Math.Max(MinTrimmedRows, usedRows));
     }
 
     private sealed record TopLevelUnit(CabinetItem Item, string? BaseTitle);
