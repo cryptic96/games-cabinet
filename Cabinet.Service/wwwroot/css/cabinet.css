@@ -282,7 +282,10 @@
   line-height: 1.2;
   font-size: clamp(12px, calc(var(--w) * var(--u) * 0.10), 22px);
   overflow: hidden;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: manual;
+  text-overflow: ellipsis;
 }
 
 .placement:is([data-kind="flatBox"], [data-kind="expansionLayer"], [data-kind="orphanExpansion"]) {
