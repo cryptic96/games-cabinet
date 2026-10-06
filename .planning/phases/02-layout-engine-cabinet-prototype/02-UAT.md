@@ -3,35 +3,53 @@ status: testing
 phase: 02-layout-engine-cabinet-prototype
 source: [02-VERIFICATION.md]
 started: 2026-10-06T09:26:20Z
-updated: 2026-10-06T09:26:20Z
+updated: 2026-10-06T09:32:50Z
 ---
 
 ## Current Test
 
-number: 1
-name: Desktop walk of the deployed prototype
+number: 2
+name: Taste calls carried forward at approval
 expected: |
-  Open the deployed prototype on a desktop browser over the home network or VPN route and step through every sample link: 0, 1, 5, 12, 65, 400 and Edge cases. The footer shows version 0.2.0. Every sample reads as a real wooden cubby cabinet (classic furniture finish): covers mixed with spines and flat stacks in irregular cubbies, packed full, bare planked wood in unused cubbies. 0 shows an intentional minimum cabinet; 1, 5 and 12 show boxes facing out. The 65 sample has a family with a "+N more" marker, thick expansions upright beside their base and thin ones stacked, and orphan expansions labelled "Expansion for <base>". The 400 sample grows into several sections that wrap into centred rows. Nothing overlaps or overflows.
+  Automated walk of the deployed build already passed (test 1). Decide, per item, whether to accept it as is or list it for a follow-up patch release. Reply "accept all", or name the ones to fix:
+  a) plinth arch reads as a soft shadow more than an arch
+  b) on phones a first section can keep empty rows when a big cover forces a second section
+  c) the fourth-line "…" is slightly cropped on the smallest phone covers
+  d) short upright expansions truncate both text lines
+  e) expansions 50 to 63 mm deep are drawn thicker than they are (readability minimum)
+  f) phone spines are wider than the real boxes (59 mm readability minimum)
+  g) the 400 sample takes 12 phone sections (about 17 screens of scrolling)
+  h) about 18 to 25 percent of boxes face out since big boxes may lie flat
 awaiting: user response
 
 ## Tests
 
-### 1. Desktop walk of the deployed prototype
-expected: Footer shows 0.2.0; every sample (0, 1, 5, 12, 65, 400, Edge cases) reads as a real wooden cubby cabinet with covers, spines and flat stacks in irregular cubbies; minimum cabinet for 0; few games face out; families with "+N more", upright thick expansions and stacked thin ones; labelled orphan expansions; 400 wraps into centred rows; nothing overlaps or overflows.
+### 1. Automated walk of the deployed build
+expected: The deployed v0.2.0 serves exactly the reviewed build and passes every geometry, readability, policy and tap check at desktop and phone widths.
+result: pass
+source: automated
+evidence: |
+  Deployed container (read over SSH, firewall and sshd hardening left untouched): health Healthy 0.2.0 at 887324c; page footer "Version 0.2.0 (887324c)"; strict Content-Security-Policy header present (default-src 'self', no unsafe-inline or unsafe-eval).
+  Byte-identity: the 3 fingerprinted assets, the 2 imported scripts and the layout JSON of all 7 samples x 2 profiles (19 responses) hash identically on the container and on a local run of the same commit, so the deployed pages render exactly like the local ones.
+  Full browser review on that build: 27 pages (samples 0, 1, 5, 12, 65, 400, edge at 1440, 390, 320, plus 1280, 1920, 2560 for 65 and 400), 0 failing: no overlap, placements inside cubbies and sections, no horizontal scroll, phone boxes at least 24 px, text at least 12 px, no console error or CSP violation, furniture unclipped, label contrast at least 5.28:1 under the shade, piles never wider going up, last section trimmed, lone section centred, column counts and widths, no broken cover words.
+  Emulated touch phone (375 px, touch points 5): phone layout requested; sample 65: 63 of 63 boxes receive a tap at their centre, none under 24 px; sample 400: 390 of 390, smallest box 28.5 px, 12 sections, no horizontal scroll.
+
+### 2. Taste calls carried forward at approval
+expected: Each is accepted as is, or listed as a finding for a follow-up patch release: a) plinth arch reads as a shadow; b) phone first sections can keep empty rows; c) fourth-line ellipsis slightly cropped on the smallest phone covers; d) short upright expansions truncate both lines; e) expansions 50 to 63 mm deep look thicker than they are; f) phone spines are wider than real boxes; g) the 400 sample needs many phone sections; h) cover share is about 18 to 25 percent.
 result: [pending]
 
-### 2. Phone walk of the deployed prototype
-expected: On the owner's phone over the same route, the cabinet is narrower and taller, still looks like a cabinet, scrolls only vertically, spine text is readable, and every box can be tapped without hitting its neighbour. The 400 sample needs many sections but stays usable.
+### 3. Phone walk of the deployed prototype
+expected: On your own phone over your VPN (mobile data works, no need to be home), open the cabinet's internal address and step through 0, 1, 5, 12, 65, 400 and Edge cases. Footer shows Version 0.2.0 (887324c). The cabinet is narrower and taller, still looks like a cabinet, scrolls only vertically, spine text is readable in your hand, and tapping a box never hits its neighbour. The 400 sample is long but usable. (Automated: all tap and size checks already pass in an emulated phone; this confirms the real device and the route.)
 result: [pending]
 
-### 3. Open taste calls carried forward at approval
-expected: Each is accepted as is, or listed as a finding for a follow-up patch release: plinth arch reads as a shadow; phone first sections can keep empty rows; fourth-line ellipsis slightly cropped on the smallest phone covers; short upright expansions truncate both lines; expansions 50 to 63 mm deep look thicker than they are; phone spines are wider than real boxes; the 400 sample needs many phone sections; cover share is about 18 to 25 percent.
+### 4. Desktop walk of the deployed prototype
+expected: At home (or on the VPN), open the internal address in a desktop browser and step through the same samples. Footer shows Version 0.2.0 (887324c), the page loads through the reverse-proxy route, and it looks like the round-2 screenshots you approved: covers, spines and flat piles in irregular cubbies, families with "+N more", upright thick expansions, labelled orphans, bare planked wood in unused cubbies, 400 in centred columns. (Automated: the served assets and layouts are byte-identical to the approved build.)
 result: [pending]
 
 ## Summary
 
-total: 3
-passed: 0
+total: 4
+passed: 1
 issues: 0
 pending: 3
 skipped: 0
