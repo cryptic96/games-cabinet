@@ -52,6 +52,13 @@ the desktop section design; phones get their own narrower design, so the
 cabinet stays a tall, narrow cabinet instead of a squashed wide one. The page
 asks again only when the screen crosses that width.
 
+On the page, sections sit in centred rows: one column up to 80rem wide screens
+(1280 pixels), two columns from there, and three from 118rem (1888 pixels),
+never more. A desktop section is drawn between 37rem and 40rem wide, so a lone
+section, or a last row with fewer sections than columns, sits in the middle. On
+phones the sections form a single column. Sections in a row start at the same
+height, so a shorter last section lines up with its neighbours.
+
 ## Settings
 
 The layout is tuned with server settings. Visitors have no controls for any of
