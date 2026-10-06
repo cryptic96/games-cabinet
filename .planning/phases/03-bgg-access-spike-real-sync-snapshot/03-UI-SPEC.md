@@ -302,7 +302,7 @@ English only; all strings live in the existing single strings module (`copy.js`)
 |---------|------|
 | Primary CTA | `Sync now` |
 | Relative time, under a minute | `Synced just now` |
-| Relative time | `Synced 1 minute ago`, `Synced 12 minutes ago`, `Synced 1 hour ago`, `Synced 3 hours ago`, `Synced yesterday`, `Synced 3 days ago` (rule: under 60 s "just now"; under 60 min whole minutes; under 48 h whole hours rounded down; beyond that whole days; a time in the future clamps to "just now"). Build with `Intl.RelativeTimeFormat('en', { numeric: 'auto' })` |
+| Relative time | `Synced 1 minute ago`, `Synced 12 minutes ago`, `Synced 1 hour ago`, `Synced 3 hours ago`, `Synced yesterday`, `Synced 3 days ago` (rule: under 60 s "just now"; under 60 min whole minutes; under 24 h whole hours rounded down; from 24 h whole days, so 24 to 47 h reads "yesterday" (owner decision); a time in the future clamps to "just now"). Build with `Intl.RelativeTimeFormat('en', { numeric: 'auto' })` |
 | Never synced | `Not synced yet` |
 | Button, idle | `Sync now` |
 | Button, running | `Syncing...` |

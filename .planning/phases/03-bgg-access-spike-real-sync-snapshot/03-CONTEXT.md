@@ -77,6 +77,12 @@ Not in this phase:
 - No ads, donations or affiliate links. The site's JSON stays same-origin, undocumented, with no CORS headers and no bulk raw dump.
 - BGG text is untrusted: render with `textContent`, never as markup.
 
+### Decided at planning (2026-10-06, after research)
+- **D-21:** **Every sync start opens the 10-minute window**, including the hourly and start-up runs; inside the window only manual presses are refused. So a visitor can never trigger a second BGG call right after the hourly one. Refines D-05.
+- **D-22:** **Relative time uses whole hours under 24 hours, then days** with `Intl.RelativeTimeFormat('en', { numeric: 'auto' })`, so 24 to 47 hours reads "Synced yesterday" and later "Synced 3 days ago". The shared seconds-to-text case table encodes this. Fixes the UI-SPEC rule that could not produce "yesterday".
+- **D-23:** **The page's pure JS logic is tested with a dependency-free `node --test` file run in CI** (the Node binary GitHub runners already have; no npm, no packages, no toolchain in the repository). It covers relative time, the countdown and the stale decision.
+- **D-24:** **A genuinely emptied BGG collection needs a documented manual step** (delete the snapshot file on the server, restart). An empty result is never accepted automatically (D-11 unchanged). The step is written up in the operations docs without planning references.
+
 ### Claude's Discretion
 - Sync timing details: jitter size, whether to sync on start-up (only when the snapshot is older than the interval), 202 backoff and total cap, per-sync request budget, an interval floor in code.
 - Shape and file names of the snapshot and sync state, the schema version and what an older release does with a newer file (treat it as no snapshot and resync, never crash).
