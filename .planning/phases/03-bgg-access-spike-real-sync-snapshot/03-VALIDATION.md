@@ -60,6 +60,47 @@ Task IDs are filled in by the planner and executor; the requirement-level map be
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
+### Plan-task map (filled by the planner)
+
+| Task | Requirement(s) | Automated verify | Notes |
+|------|----------------|------------------|-------|
+| 03-01 T1 | LOC-02, SEC-05 | `bash build/tests/bgg-access-check-test.sh && build/lint.sh repo-rules && build/lint.sh shell` | shape-only self-test |
+| 03-01 T2 | LOC-02 | checkpoint (owner prerequisites + run approval) | blocking-human |
+| 03-02 T1 | LOC-02 | outcome headings present, no `http` or XML tags | live run over SSH |
+| 03-02 T2 | LOC-02 | checkpoint (owner sign-off) | one-way: public commit |
+| 03-02 T3 | LOC-02 | sign-off line present and outcome committed | |
+| 03-03 T1 | SYNC-01 | `dotnet test --project Cabinet.UnitTests/... --filter-class "*PlacementIdentityTests"` + `node --check` | |
+| 03-03 T2 | SYNC-01 | `dotnet test --project Cabinet.UnitTests/... --filter-trait "Category=Layout"` | goldens at version 9 |
+| 03-04 T1 | SYNC-08 | `dotnet test --project Cabinet.IntegrationTests/...` | every page renders the credit |
+| 03-04 T2 | SYNC-08 | checkpoint (owner supplies the official logo) | blocking-human |
+| 03-04 T3 | SYNC-08 | `dotnet test --project Cabinet.IntegrationTests/...` | human-check: legibility |
+| 03-05 T1 | SYNC-05 | `dotnet test --project Cabinet.IntegrationTests/...` | being-filled state |
+| 03-05 T2 | SYNC-05 | `Category=Configuration` unit + integration | prototype dev-only |
+| 03-06 T1 | SYNC-01, SEC-05 | `dotnet restore --locked-mode` + integration `Category=FakeBgg` | fake BGG |
+| 03-06 T2 | SYNC-01 | unit `Category=FakeBgg` + lint | scripted handler |
+| 03-07 T1 | SYNC-01, SYNC-02, SEC-05 | build + integration `Category=Sync` | tracer |
+| 03-07 T2 | SYNC-01 | unit `Snapshot`, `Bgg`; integration `Sync`; locked restore | restart, corrupt files |
+| 03-08 T1 | SYNC-02, SYNC-03 | integration `Category=Sync` | cooldown, status |
+| 03-08 T2 | SYNC-01 | unit + integration `Category=Sync` | scheduler |
+| 03-08 T3 | SYNC-02 | unit `Sync`, `Snapshot` + lint | edges |
+| 03-09 T1 | SYNC-01, LOC-02 | unit `Bgg`, `Snapshot`; integration `Sync` | fidelity |
+| 03-09 T2 | SEC-05 | unit `Bgg`, `Configuration`; integration `Secrets` | sentinel leaks |
+| 03-10 T1 | SYNC-04 | unit `Bgg`; integration `Sync` | failure classes |
+| 03-10 T2 | SYNC-04 | unit `Bgg` | 202 polling with fake clock |
+| 03-10 T3 | SYNC-04, SYNC-01 | unit + integration `Sync` + lint | shrink guard |
+| 03-11 T1 | SYNC-03, SYNC-04, SYNC-05 | `node --test build/tests/page-scripts.test.mjs` + unit/integration `Sync` + lint | status line |
+| 03-11 T2 | SYNC-03 | `node --test` + integration `Sync` | edges |
+| 03-12 T1 | SYNC-02, SYNC-05 | `node --check` + integration `Sync` + lint | press flow |
+| 03-12 T2 | SYNC-02 | `node --test build/tests/page-scripts.test.mjs` | copy and countdown edges |
+| 03-13 T1 | SYNC-03, SEC-05 | locked restore + integration `Category=Live` | hub |
+| 03-13 T2 | SEC-05 | integration `Live`, unit `Configuration`, full integration | no-invoke, cap |
+| 03-14 T1 | SYNC-03 | `node --test` + `node --check` + integration `Live` + lint | fallback path |
+| 03-14 T2 | SYNC-03 | checkpoint (owner approves downloads) | blocking-human |
+| 03-14 T3 | SYNC-03, SYNC-02 | unit `Configuration` + full integration + `build/lint.sh` | three-engine CSP, screenshots |
+| 03-15 T1 | all | draft release exists | PR, tag, attestation |
+| 03-15 T2 | all | checkpoint (owner publishes) | blocking-human |
+| 03-15 T3 | all | release verify + selfcheck + deployed status | human-check: real collection |
+
 ---
 
 ## Wave 0 Requirements

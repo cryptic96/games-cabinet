@@ -156,7 +156,51 @@ Plans:
   4. Before the first successful sync, visitors see an intentional "cabinet is being filled" state instead of an error, and every public page carries the linked "Powered by BGG" credit.
   5. The location spike has been run with the real token from the LXC and its outcome recorded: either BGG exposes the private inventory location and the synced data carries each game's location, or it does not and Phase 6 builds the owner location tools.
 
-**Plans**: TBD
+**Plans:** 15 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 03-01-PLAN.md — Shape-only BGG access check script and the owner's go-ahead (locations set, keys in the env file, run approved) (owner-gated)
+- [ ] 03-03-PLAN.md — Layout data for real games: entry id per copy, "Expansion" label without a known base, layout version 9
+- [ ] 03-04-PLAN.md — Shared page layout with the linked official "Powered by BGG" credit on every page (owner supplies the logo)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 03-02-PLAN.md — Access check run from the container, shape-only outcome signed off by the owner and committed (owner-gated)
+- [ ] 03-05-PLAN.md — Page reads the synced collection store; "being filled" state; invented samples only in local development
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 03-06-PLAN.md — Local fake BGG, synthetic BGG-shaped XML and a scripted transport for tests
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 03-07-PLAN.md — Tracer: sync now fetches the owned collection from BGG, stores it atomically and shows it in the cabinet
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 03-08-PLAN.md — Shared persisted cooldown, hourly and start-up runs, status endpoint
+- [ ] 03-09-PLAN.md — Faithful copies, expansions, box sizes and locations; token and username provably server-side
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 03-10-PLAN.md — Failure classification, polite 202 polling, empty and shrunken results held back
+- [ ] 03-11-PLAN.md — "Synced ... ago" status line, stale note, node --test checks in CI
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 03-12-PLAN.md — Sync now button, countdown, own-press notes and quiet in-place redraw
+- [ ] 03-13-PLAN.md — Broadcast-only SignalR hub with transport and connection limits
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [ ] 03-14-PLAN.md — Live page updates through the vendored official SignalR client, three-engine CSP checks and screenshots (owner approves downloads)
+
+**Wave 9** *(blocked on Wave 8 completion)*
+
+- [ ] 03-15-PLAN.md — Release and the owner's check of the real collection in the deployed cabinet (owner-gated)
+
 **UI hint**: yes
 
 ### Phase 4: Enrichment, Box Images & Shape
