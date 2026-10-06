@@ -102,7 +102,7 @@ Plans:
   4. Each expansion appears as a thin sideways spine with its name beside its base game; an expansion whose base game is absent stands alone, labelled with the game it expands; a base game with many expansions collapses the extras into a "+N more" stack that never overflows its shelf.
   5. On a phone-width screen the cabinet reflows into a narrower, taller cabinet that still looks like a cabinet, with spines readable and large enough to tap.
 
-**Plans:** 5/9 plans executed
+**Plans:** 6/9 plans executed
 
 Plans:
 **Wave 1**
@@ -124,7 +124,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 02-09-PLAN.md — Box poses: piles largest at the bottom, big boxes lie flat before a new section (server setting), thick expansions upright beside their base, stacks thickest at the bottom; before and after measurements and screenshots
+- [x] 02-09-PLAN.md — Box poses: piles largest at the bottom, big boxes lie flat before a new section (server setting), thick expansions upright beside their base, stacks thickest at the bottom; before and after measurements and screenshots
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
@@ -252,7 +252,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Repo, Guardrails & Walking-Skeleton Deploy | 15/15 | Complete    | 2026-10-04 |
-| 2. Layout Engine & Cabinet Prototype | 5/8 | In Progress|  |
+| 2. Layout Engine & Cabinet Prototype | 6/9 | In Progress|  |
 | 3. BGG Access Spike, Real Sync & Snapshot | 0/0 | Not started | - |
 | 4. Enrichment, Box Images & Shape | 0/0 | Not started | - |
 | 5. Game Detail, Accessibility & Language | 0/0 | Not started | - |
