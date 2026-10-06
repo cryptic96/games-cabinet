@@ -79,13 +79,20 @@ public sealed record LayoutSection(
     int FrameMm,
     IReadOnlyList<LayoutCubby> Cubbies);
 
+/// <summary>One entry of the colour table: the box background and the text colour that reads on it.</summary>
+/// <param name="Background">The background as a lowercase hexadecimal colour.</param>
+/// <param name="Text">The text colour as a lowercase hexadecimal colour.</param>
+public sealed record PaletteTone(string Background, string Text);
+
 /// <summary>The whole cabinet for one collection and one section design.</summary>
 /// <param name="LayoutVersion">Bumped whenever the algorithm or a design changes on purpose.</param>
 /// <param name="Profile">The name of the section design the layout was built for.</param>
 /// <param name="OptionsFingerprint">Identifies the layout settings the cabinet was built with, so a change of settings is visible.</param>
+/// <param name="Palette">The colour table that every placement's tone index points into.</param>
 /// <param name="Sections">The sections in order; there is always at least one.</param>
 public sealed record CabinetLayout(
     int LayoutVersion,
     string Profile,
     string OptionsFingerprint,
+    IReadOnlyList<PaletteTone> Palette,
     IReadOnlyList<LayoutSection> Sections);

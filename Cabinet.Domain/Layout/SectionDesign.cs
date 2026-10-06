@@ -29,6 +29,13 @@ public sealed record SectionDesign(string Name, int InteriorWidthMm, int FrameMm
     /// </summary>
     public int MaxSpineHeightMm { get; init; } = 330;
 
+    /// <summary>
+    /// Millimetres of box length that one label character takes at the smallest width the box is drawn at. Spine and flat
+    /// box labels are shortened to the box length divided by this, and the page's ellipsis stays as the backstop when the
+    /// estimate is generous.
+    /// </summary>
+    public int LabelCharPitchMm { get; init; } = 14;
+
     /// <summary>Interior height: the row heights plus one frame between each pair of rows.</summary>
     public int InteriorHeightMm => Rows.Sum(row => row.HeightMm) + (FrameMm * Math.Max(0, Rows.Count - 1));
 

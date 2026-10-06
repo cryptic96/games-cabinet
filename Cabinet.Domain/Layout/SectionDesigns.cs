@@ -26,6 +26,7 @@ public static class SectionDesigns
         ])
     {
         MaxSpineHeightMm = 330,
+        LabelCharPitchMm = 14,
     };
 
     /// <summary>Every design the engine can build for.</summary>
