@@ -1,18 +1,14 @@
 ---
-status: testing
+status: complete
 phase: 02-layout-engine-cabinet-prototype
 source: [02-VERIFICATION.md]
 started: 2026-10-06T09:26:20Z
-updated: 2026-10-06T09:53:06Z
+updated: 2026-10-06T09:53:56Z
 ---
 
 ## Current Test
 
-number: 4
-name: Desktop walk of the deployed prototype
-expected: |
-  At home (or on the VPN), open the internal address in a desktop browser and step through the same samples. Footer shows Version 0.2.0 (887324c), the page loads through the reverse-proxy route, and it looks like the round-2 screenshots you approved: covers, spines and flat piles in irregular cubbies, families with "+N more", upright thick expansions, labelled orphans, bare planked wood in unused cubbies, 400 in centred columns. (Automated: the served assets and layouts are byte-identical to the approved build.)
-awaiting: user response
+[testing complete]
 
 ## Tests
 
@@ -37,14 +33,14 @@ result: pass
 
 ### 4. Desktop walk of the deployed prototype
 expected: At home (or on the VPN), open the internal address in a desktop browser and step through the same samples. Footer shows Version 0.2.0 (887324c), the page loads through the reverse-proxy route, and it looks like the round-2 screenshots you approved: covers, spines and flat piles in irregular cubbies, families with "+N more", upright thick expansions, labelled orphans, bare planked wood in unused cubbies, 400 in centred columns. (Automated: the served assets and layouts are byte-identical to the approved build.)
-result: [pending]
+result: pass
 
 ## Summary
 
 total: 4
-passed: 2
+passed: 3
 issues: 0
-pending: 1
+pending: 0
 skipped: 1
 blocked: 0
 
