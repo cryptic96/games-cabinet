@@ -13,7 +13,7 @@ namespace Cabinet.Domain.Layout;
 public static class CabinetLayoutEngine
 {
     /// <summary>Bumped whenever the algorithm or a design changes on purpose, so a rearrangement is always a conscious change.</summary>
-    public const int LayoutVersion = 6;
+    public const int LayoutVersion = 7;
 
     private const int MinBoxSideMm = 10;
 
