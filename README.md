@@ -6,7 +6,7 @@ The collection comes straight from a BoardGameGeek "owned" collection. A server-
 
 ## Current state
 
-The deployed site draws the synced collection and, until a collection has been synced, shows a message that the cabinet is being filled above an empty cabinet. When run locally in development it can also show invented collections, with a row of links to switch between collection sizes from empty to several hundred games. The release path from a version tag to an approved release to a running server, and back again through rollback, is proven separately and carries every change.
+The deployed site shows the real BoardGameGeek owned collection, synced every hour and on demand by visitors, with a shared cooldown so the sync cannot be hammered. It keeps showing the last good collection when BoardGameGeek is unavailable, and until a first sync has finished it shows a message that the cabinet is being filled above an empty cabinet. Invented collections remain for local development and tests: run locally in development, the site can show a row of links to switch between collection sizes from empty to several hundred games. The release path from a version tag to an approved release to a running server, and back again through rollback, carries every change.
 
 ## How releases work
 
@@ -20,6 +20,9 @@ The details live in the guides:
 - [Deploying](docs/deploy.md): how the server installs, verifies and rolls back releases.
 - [Cabinet layout](docs/cabinet-layout.md): how the cabinet is arranged, the settings that tune it and what stays put when the collection changes.
 - [Server setup](docs/lxc-setup.md): provisioning the container the site runs in.
+- [BoardGameGeek sync](docs/bgg-sync.md): how the collection is synced, its settings and what happens when BoardGameGeek fails.
+- [BoardGameGeek access check](docs/bgg-access-check.md): checking that the server's access to BoardGameGeek works.
+- [Vendored assets](docs/vendored-assets.md): the third-party files shipped with the site and where they come from.
 - [Repository settings](docs/github-repository-settings.md): the branch protection and release settings the pipeline relies on.
 
 ## Developing
@@ -41,7 +44,7 @@ The checks run in pinned containers, so Docker with the Compose plugin is the on
 
 ## Data source and credit
 
-Collection data is provided by [BoardGameGeek](https://boardgamegeek.com) through its non-commercial XML API. This is a non-commercial hobby project with no ads, donations or affiliate links.
+Collection data is provided by [BoardGameGeek](https://boardgamegeek.com) through its non-commercial XML API, and every page carries the linked "Powered by BGG" logo. This is a non-commercial hobby project with no ads, donations or affiliate links.
 
 ## Licence
 
