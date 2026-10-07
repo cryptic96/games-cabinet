@@ -76,7 +76,7 @@ if [[ "${CABINET_PROVISION_LIB_ONLY:-0}" != "1" ]]; then
 
   provision_log "Installing base packages"
   DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-    ca-certificates curl gnupg jq unzip git nftables unattended-upgrades tzdata \
+    ca-certificates curl gnupg jq unzip git nftables unattended-upgrades tzdata fonts-dejavu-core \
     "$DOTNET_RUNTIME_PACKAGE"
 
   mapfile -t mta_packages < <(installed_mta_packages)
