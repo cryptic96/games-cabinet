@@ -90,6 +90,28 @@ public class SectionDesignTests
 
     [Fact]
     [Trait("Category", "Layout")]
+    public void A_design_whose_two_line_upright_width_is_below_its_minimum_upright_width_is_rejected()
+    {
+        var design = SectionDesigns.Desktop with { TwoLineUprightWidthMm = SectionDesigns.Desktop.MinUprightExpansionWidthMm - 1 };
+
+        var act = design.Validate;
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*two-line upright width*minimum upright width*");
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_design_whose_two_line_orphan_height_is_below_its_minimum_orphan_height_is_rejected()
+    {
+        var design = SectionDesigns.Phone with { TwoLineOrphanHeightMm = SectionDesigns.Phone.MinOrphanHeightMm - 1 };
+
+        var act = design.Validate;
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*two-line orphan height*minimum orphan height*");
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
     public void A_design_that_cannot_hold_the_deepest_spine_with_the_stack_column_is_rejected()
     {
         var design = new SectionDesign("test", 300, 20, [new ShelfRow(300, [300])]);

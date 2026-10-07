@@ -521,11 +521,11 @@ public class FamilyLayoutTests
         var placements = layout.Sections[0].Cubbies[0].Placements;
         var uprights = placements.Where(placement => placement.Kind == PlacementKind.ExpansionSpine).OrderBy(placement => placement.XMm).ToList();
         uprights.Select(placement => placement.GameId).Should().Equal(2, 3);
-        uprights.Select(placement => placement.XMm).Should().Equal(40, 40 + design.MinUprightExpansionWidthMm);
+        uprights.Select(placement => placement.XMm).Should().Equal(40, 40 + 60);
         placements.Where(placement => placement.Kind == PlacementKind.ExpansionLayer).Select(placement => placement.GameId)
             .Should().BeEquivalentTo([4, 5]);
         placements.Where(placement => placement.Kind == PlacementKind.ExpansionLayer)
-            .Should().OnlyContain(placement => placement.XMm == 40 + (2 * design.MinUprightExpansionWidthMm));
+            .Should().OnlyContain(placement => placement.XMm == 40 + (2 * 60));
         LayoutAssertions.AssertValid(layout, items);
     }
 
@@ -575,7 +575,7 @@ public class FamilyLayoutTests
         {
             Uprights = [ExpansionOf(2, baseGame, depth: 60), ExpansionOf(3, baseGame, depth: 60)],
         };
-        var width = 40 + (2 * design.MinUprightExpansionWidthMm);
+        var width = 40 + (2 * 60);
         var exactFit = new CubbyDesign(0, 0, 0, width, 400);
 
         var placements = CubbyArrangement.TryArrange(design, exactFit, [member], SpinesOnly, 0);
@@ -588,7 +588,7 @@ public class FamilyLayoutTests
 
     [Fact]
     [Trait("Category", "Layout")]
-    public void An_upright_carries_its_family_its_base_title_a_label_cut_to_its_height_and_the_least_width()
+    public void An_upright_carries_its_family_its_base_title_a_label_cut_to_its_height_and_its_real_width()
     {
         var design = new SectionDesign("test", 600, 20, [new ShelfRow(400, [600])]);
         var baseGame = BaseOf(1, depth: 40);
@@ -601,7 +601,7 @@ public class FamilyLayoutTests
         upright.FamilyId.Should().Be(1);
         upright.BaseTitle.Should().Be(baseGame.Title);
         upright.Title.Should().Be(title);
-        upright.WidthMm.Should().Be(design.MinUprightExpansionWidthMm, "a 52 mm deep box is drawn at the least upright width");
+        upright.WidthMm.Should().Be(52, "a 52 mm deep box is above the floor and is drawn at its real thickness");
         upright.HeightMm.Should().Be(expansion.Box.HeightMm);
         upright.YMm.Should().Be(0);
         upright.Label.Should().Be(SpineLabel.Shorten(title, expansion.Box.HeightMm / design.LabelCharPitchMm));

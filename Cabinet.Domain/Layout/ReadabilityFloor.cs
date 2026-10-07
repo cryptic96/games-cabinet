@@ -9,6 +9,12 @@ public static class ReadabilityFloor
     /// <summary>The least width or height, in screen pixels, of anything a visitor can tap.</summary>
     public const int TapTargetPx = 24;
 
+    /// <summary>
+    /// The height, in screen pixels, that one line of label text needs: one 12 pixel line at a line height of 1.2 takes
+    /// 14.4 pixels, rounded up.
+    /// </summary>
+    public const int OneLineLabelPx = 15;
+
     /// <summary>The height, in screen pixels, that two lines of label text need.</summary>
     public const int TwoLineLabelPx = 36;
 

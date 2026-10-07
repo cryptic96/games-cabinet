@@ -38,13 +38,15 @@ public static class SectionDesigns
         MaxSpineHeightMm = 330,
         LabelCharPitchMm = 14,
         StackColumnWidthMm = 190,
-        MinLayerHeightMm = 40,
+        MinLayerHeightMm = ReadabilityFloor.Millimetres(ReadabilityFloor.OneLineLabelPx, DesktopSmallestRenderedWidthPx, RenderedWidthMm(DesktopInteriorWidthMm)),
         MaxLayerHeightMm = 70,
         MarkerHeightMm = 40,
         SmallestRenderedWidthPx = DesktopSmallestRenderedWidthPx,
         MinBoxThicknessMm = DesktopMinBoxThicknessMm,
-        MinOrphanHeightMm = ReadabilityFloor.Millimetres(ReadabilityFloor.TwoLineLabelPx, DesktopSmallestRenderedWidthPx, RenderedWidthMm(DesktopInteriorWidthMm)),
-        MinUprightExpansionWidthMm = ReadabilityFloor.Millimetres(ReadabilityFloor.TwoLineSpinePx, DesktopSmallestRenderedWidthPx, RenderedWidthMm(DesktopInteriorWidthMm)),
+        MinOrphanHeightMm = ReadabilityFloor.Millimetres(ReadabilityFloor.OneLineLabelPx, DesktopSmallestRenderedWidthPx, RenderedWidthMm(DesktopInteriorWidthMm)),
+        MinUprightExpansionWidthMm = ReadabilityFloor.Millimetres(ReadabilityFloor.OneLineLabelPx, DesktopSmallestRenderedWidthPx, RenderedWidthMm(DesktopInteriorWidthMm)),
+        TwoLineOrphanHeightMm = ReadabilityFloor.Millimetres(ReadabilityFloor.TwoLineLabelPx, DesktopSmallestRenderedWidthPx, RenderedWidthMm(DesktopInteriorWidthMm)),
+        TwoLineUprightWidthMm = ReadabilityFloor.Millimetres(ReadabilityFloor.TwoLineSpinePx, DesktopSmallestRenderedWidthPx, RenderedWidthMm(DesktopInteriorWidthMm)),
     };
 
     /// <summary>
@@ -69,13 +71,15 @@ public static class SectionDesigns
         MaxSpineHeightMm = 340,
         LabelCharPitchMm = 18,
         StackColumnWidthMm = 190,
-        MinLayerHeightMm = 40,
+        MinLayerHeightMm = ReadabilityFloor.Millimetres(ReadabilityFloor.OneLineLabelPx, PhoneSmallestRenderedWidthPx, RenderedWidthMm(PhoneInteriorWidthMm)),
         MaxLayerHeightMm = 70,
         MarkerHeightMm = 40,
         SmallestRenderedWidthPx = PhoneSmallestRenderedWidthPx,
         MinBoxThicknessMm = ReadabilityFloor.Millimetres(ReadabilityFloor.TapTargetPx, PhoneSmallestRenderedWidthPx, RenderedWidthMm(PhoneInteriorWidthMm)),
-        MinOrphanHeightMm = ReadabilityFloor.Millimetres(ReadabilityFloor.TwoLineLabelPx, PhoneSmallestRenderedWidthPx, RenderedWidthMm(PhoneInteriorWidthMm)),
-        MinUprightExpansionWidthMm = ReadabilityFloor.Millimetres(ReadabilityFloor.TwoLineSpinePx, PhoneSmallestRenderedWidthPx, RenderedWidthMm(PhoneInteriorWidthMm)),
+        MinOrphanHeightMm = ReadabilityFloor.Millimetres(ReadabilityFloor.OneLineLabelPx, PhoneSmallestRenderedWidthPx, RenderedWidthMm(PhoneInteriorWidthMm)),
+        MinUprightExpansionWidthMm = ReadabilityFloor.Millimetres(ReadabilityFloor.OneLineLabelPx, PhoneSmallestRenderedWidthPx, RenderedWidthMm(PhoneInteriorWidthMm)),
+        TwoLineOrphanHeightMm = ReadabilityFloor.Millimetres(ReadabilityFloor.TwoLineLabelPx, PhoneSmallestRenderedWidthPx, RenderedWidthMm(PhoneInteriorWidthMm)),
+        TwoLineUprightWidthMm = ReadabilityFloor.Millimetres(ReadabilityFloor.TwoLineSpinePx, PhoneSmallestRenderedWidthPx, RenderedWidthMm(PhoneInteriorWidthMm)),
     };
 
     /// <summary>Every design the engine can build for.</summary>

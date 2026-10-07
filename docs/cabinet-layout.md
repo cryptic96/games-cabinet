@@ -163,15 +163,33 @@ what the drawn width stands for. The results are:
 
 - A spine, a flat box, an expansion layer and the "+N more" marker are at
   least as wide or tall as a 24 pixel tap target at the narrowest phone, a
-  320 pixel screen with an 8 pixel gutter on each side. On desktop the floor is
-  a smaller starting value, because pointer users need no such target.
-- An expansion without an owned base game is tall enough for its two label
-  lines, and an upright expansion is wide enough for its two vertical lines.
+  320 pixel screen with an 8 pixel gutter on each side. That is 59
+  millimetres on a phone. On desktop the floor is a smaller starting value of
+  34 millimetres, because pointer users need no such target.
+- Every box that shows a title is at least tall or wide enough for one line of
+  it, 15 pixels: 34 millimetres on desktop and 37 on a phone. The phone's tap
+  floor is the larger of the two, so it governs there. The same one-line floor
+  is the least height of an expansion layer, so a layer on desktop may be drawn
+  as low as 34 millimetres and is never drawn above 70.
 
-A thin box therefore looks a little thicker than it is. That is the accepted
-trade for staying readable. If the page's gutters or the section grid change,
-the narrowest width recorded in the design changes with them and the floors
-follow.
+A box is drawn at the larger of its real thickness and the floor of its design,
+so a thin box looks as thin as it is until it reaches the floor. Only below the
+floor does it look a little thicker than it is, which is the accepted trade for
+staying readable.
+
+An upright expansion and an expansion without an owned base game normally show
+two lines: their own title and the game they expand. The second line needs more
+room than the first, so each design also states the size from which it fits: an
+upright expansion drawn at least 64 millimetres wide on desktop or 71 on a
+phone, and an expansion box drawn at least 80 millimetres tall on desktop or 89
+on a phone. The layout says per placement whether the second line is shown, as
+`showBaseLine`, worked out from those millimetres so it never depends on the
+visitor's screen. Below the threshold the box shows its title alone in the same
+style as a spine or flat box, ending in an ellipsis when it is long, and its
+accessible name and tooltip still carry both the title and the base game. No
+other kind of placement carries the value. If the page's gutters or the section
+grid change, the narrowest width recorded in the design changes with them and
+the floors and thresholds follow.
 
 Every design checks itself before the engine uses it. A row whose cubby widths
 and gaps do not fill the interior, a tall box that would not fit lying flat in
@@ -191,7 +209,10 @@ The tests keep the full layout of the samples of 0, 1, 5, 12 and 65 games on
 both designs, and a digest of the layout of the 400-game sample. They live in
 `Cabinet.UnitTests/Layout/Golden/`, next to a record of the layout version they
 were made at. Any change to the arrangement or to a section design shows up as
-a difference from those files, in the tests and in review.
+a difference from those files, in the tests and in review. Thin boxes being
+drawn at their real thickness, down to the one-line floors, is why the recorded
+layouts changed from the version before: those boxes are narrower or lower than
+they were, and where that lets a later box fit earlier it moved too.
 
 An intended change needs two steps. Raise `CabinetLayoutEngine.LayoutVersion`,
 then record the layouts again from the repository root:
