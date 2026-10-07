@@ -218,7 +218,7 @@ Plans:
   4. Box proportions come from the owned version's real BGG dimensions when available, else from a flat cover's aspect ratio, else from a realistic default, and a 3D shot's outline is never used, so real boxes in the cabinet visibly differ in size and shape.
   5. Each spine takes its colour from its box art (ignoring plain backgrounds around product shots) and shows the title legibly with readable text contrast.
 
-**Plans:** 3/16 plans executed
+**Plans:** 7/16 plans executed
 
 Plans:
 **Wave 1**
@@ -229,10 +229,10 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 04-04-PLAN.md — Synthetic box art fixtures and the picture analysis (detector features, art and edge colours)
-- [ ] 04-05-PLAN.md — Art check run from the container, shape-only outcome signed off by the owner (owner-gated)
-- [ ] 04-06-PLAN.md — Game details from BGG, weekly refresh, and expansions beside their owned base games
-- [ ] 04-07-PLAN.md — Thin boxes at true thickness with one-line titles, cover line steps, plinth apron, "+N more" name; layout version 10
+- [x] 04-04-PLAN.md — Synthetic box art fixtures and the picture analysis (detector features, art and edge colours)
+- [x] 04-05-PLAN.md — Art check run from the container, shape-only outcome signed off by the owner (owner-gated)
+- [x] 04-06-PLAN.md — Game details from BGG, weekly refresh, and expansions beside their owned base games
+- [x] 04-07-PLAN.md — Thin boxes at true thickness with one-line titles, cover line steps, plinth apron, "+N more" name; layout version 10
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -339,7 +339,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 1. Repo, Guardrails & Walking-Skeleton Deploy | 15/15 | Complete    | 2026-10-04 |
 | 2. Layout Engine & Cabinet Prototype | 9/9 | Complete    | 2026-10-06 |
 | 3. BGG Access Spike, Real Sync & Snapshot | 15/15 | Complete    | 2026-10-07 |
-| 4. Enrichment, Box Images & Shape | 3/16 | In Progress|  |
+| 4. Enrichment, Box Images & Shape | 7/16 | In Progress|  |
 | 5. Game Detail, Accessibility & Language | 0/0 | Not started | - |
 | 6. Owner Tools & Persistence | 0/0 | Not started | - |
 | 7. Game-Night Filters & Location Cabinets | 0/0 | Not started | - |
