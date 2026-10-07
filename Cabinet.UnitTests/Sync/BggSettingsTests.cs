@@ -133,7 +133,7 @@ public class BggSettingsTests
     }
 
     private static SyncStartup Startup(TemporaryDirectory storage, BggOptions options, ILogger<SyncStartup> logger) =>
-        new(new StorageDirectory(storage.FullPath), new EmptyStore(), new CollectionStore(), options, logger);
+        new(new StorageDirectory(storage.FullPath), new EmptyStore(), new CollectionStore(), options, ArtRules.Default, logger);
 
     private static BggOptions Read(string environment, params (string Key, string? Value)[] values)
     {

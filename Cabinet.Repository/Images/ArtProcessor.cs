@@ -13,9 +13,10 @@ public sealed record EncodedArt(int Width, int Height, string Name, byte[] Bytes
 /// <summary>How a picture came out of processing.</summary>
 public abstract record ArtProcessing
 {
-    /// <summary>The picture was resized; the sizes are widest first.</summary>
+    /// <summary>The picture was resized and measured; the sizes are widest first.</summary>
     /// <param name="Variants">The encoded sizes.</param>
-    public sealed record Done(IReadOnlyList<EncodedArt> Variants) : ArtProcessing;
+    /// <param name="Facts">What the analysis learned about the picture.</param>
+    public sealed record Done(IReadOnlyList<EncodedArt> Variants, ArtFacts Facts) : ArtProcessing;
 
     /// <summary>The bytes could not be read as a picture.</summary>
     public sealed record Unreadable : ArtProcessing;
@@ -24,9 +25,10 @@ public abstract record ArtProcessing
     /// <param name="Reason">One category word that says which rule.</param>
     public sealed record Turned(string Reason) : ArtProcessing;
 
-    /// <summary>The picture was resized.</summary>
+    /// <summary>The picture was resized and measured.</summary>
     /// <param name="variants">The encoded sizes, widest first.</param>
-    public static ArtProcessing Processed(IReadOnlyList<EncodedArt> variants) => new Done(variants);
+    /// <param name="facts">What the analysis learned about the picture.</param>
+    public static ArtProcessing Processed(IReadOnlyList<EncodedArt> variants, ArtFacts facts) => new Done(variants, facts);
 
     /// <summary>The bytes could not be read as a picture.</summary>
     public static ArtProcessing Undecodable { get; } = new Unreadable();
@@ -37,14 +39,21 @@ public abstract record ArtProcessing
 }
 
 /// <summary>
-/// Turns downloaded bytes into the two small pictures the site serves. The picture is only ever scaled down, never
-/// cropped or recoloured; the original bytes are not kept. The pixel count is read from the file header and checked
+/// Turns downloaded bytes into the two small pictures the site serves and measures the picture once. The picture is only
+/// ever scaled down, never cropped or recoloured; the original bytes are not kept. The pixel count is read from the file header and checked
 /// before anything is decoded, and the decode itself is scaled so a large picture never fills memory.
 /// </summary>
 public static class ArtProcessor
 {
     /// <summary>The widths of the stored sizes, widest first.</summary>
     public static readonly IReadOnlyList<int> VariantWidths = [480, 240];
+
+    /// <summary>
+    /// The version of the measurements taken of a picture. It is raised whenever the analysis constants or the rule that
+    /// turns a colour into a background and text pair change, so every stored picture is processed again over the
+    /// following syncs.
+    /// </summary>
+    public const int AnalysisVersion = 1;
 
     private const int DecodeWidth = 960;
     private const int WebpQuality = 80;
@@ -78,7 +87,7 @@ public static class ArtProcessor
 
             using var decoded = Decode(codec);
 
-            return decoded is null ? ArtProcessing.Undecodable : ArtProcessing.Processed(Resize(decoded));
+            return decoded is null ? ArtProcessing.Undecodable : ArtProcessing.Processed(Resize(decoded), ArtAnalysis.Analyse(decoded));
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or IOException or NotSupportedException)
         {

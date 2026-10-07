@@ -68,6 +68,7 @@ public sealed record PlacementArt(string Url, int Width, int Height, ArtFit Fit,
 /// line naming the base game. Decided from millimetres, so it never depends on the visitor's screen; absent for every
 /// other placement.
 /// </param>
+/// <param name="Colour">The background and text colours taken from the game's picture; absent when the game has none and for the marker.</param>
 public sealed record Placement(
     int GameId,
     long EntryId,
@@ -85,7 +86,8 @@ public sealed record Placement(
     int? FamilyId,
     int? MoreCount,
     PlacementArt? Art = null,
-    bool? ShowBaseLine = null);
+    bool? ShowBaseLine = null,
+    PaletteTone? Colour = null);
 
 /// <summary>A compartment of a section. Position is measured from the top-left corner of the section interior.</summary>
 /// <param name="Index">The cubby's reading-order index within its section, counted from zero.</param>

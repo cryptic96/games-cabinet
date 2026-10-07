@@ -34,6 +34,7 @@ public sealed class SyncRunner
     private readonly ArtCache? _cache;
     private readonly ImageOptions? _images;
     private readonly EnrichmentSync? _enrichment;
+    private readonly ArtRules _artRules;
     private CollectionSnapshot? _stored;
 
     /// <summary>Creates the runner.</summary>
@@ -46,6 +47,7 @@ public sealed class SyncRunner
     /// <param name="cache">The stored pictures, pruned after the run; null leaves them alone.</param>
     /// <param name="images">The picture rules; the picture step needs them.</param>
     /// <param name="enrichment">Fetches the game details; null leaves the run without a details step.</param>
+    /// <param name="artRules">The rules that choose each game's picture; the defaults when null.</param>
     public SyncRunner(
         Func<ICollectionSource> sourceFactory,
         ISnapshotStore snapshots,
@@ -55,7 +57,8 @@ public sealed class SyncRunner
         ArtSync? art = null,
         ArtCache? cache = null,
         ImageOptions? images = null,
-        EnrichmentSync? enrichment = null)
+        EnrichmentSync? enrichment = null,
+        ArtRules? artRules = null)
     {
         ArgumentNullException.ThrowIfNull(sourceFactory);
         ArgumentNullException.ThrowIfNull(snapshots);
@@ -72,6 +75,7 @@ public sealed class SyncRunner
         _cache = cache;
         _images = images;
         _enrichment = enrichment;
+        _artRules = artRules ?? ArtRules.Default;
     }
 
     /// <summary>Fetches the collection and applies it when the guard accepts it and it changed, then fetches the box pictures that are due.</summary>
@@ -106,12 +110,13 @@ public sealed class SyncRunner
 
         var versionAtStart = _collection.Current.Version;
         var baseline = _stored ?? _collection.Current.Snapshot;
+        var games = StillOwnedGames(baseline, collection.Items);
         var snapshot = new CollectionSnapshot(
             CollectionSnapshot.CurrentSchemaVersion,
             _time.GetUtcNow(),
             collection.Items,
-            StillNamedImages(baseline, collection.Items),
-            StillOwnedGames(baseline, collection.Items));
+            StillNamedImages(baseline, collection.Items, games),
+            games);
 
         if (ContentChanged(baseline, snapshot))
         {
@@ -126,7 +131,10 @@ public sealed class SyncRunner
             SyncFailure.None);
     }
 
-    private static Dictionary<string, ImageRecord>? StillNamedImages(CollectionSnapshot? baseline, IReadOnlyList<SnapshotItem> items)
+    private static Dictionary<string, ImageRecord>? StillNamedImages(
+        CollectionSnapshot? baseline,
+        IReadOnlyList<SnapshotItem> items,
+        IReadOnlyDictionary<int, GameDetails>? games)
     {
         if (baseline?.Images is not { Count: > 0 } known)
         {
@@ -135,6 +143,7 @@ public sealed class SyncRunner
 
         var named = items
             .SelectMany(item => new[] { item.VersionImageUrl, item.ImageUrl })
+            .Concat((games ?? new Dictionary<int, GameDetails>()).Values.Select(details => details.MainImageUrl))
             .OfType<string>()
             .ToHashSet(StringComparer.Ordinal);
         var kept = known
@@ -184,14 +193,19 @@ public sealed class SyncRunner
         left.SourceUrl == right.SourceUrl
         && left.Status == right.Status
         && left.AttemptedAtUtc == right.AttemptedAtUtc
-        && (left.Files ?? []).SequenceEqual(right.Files ?? []);
+        && (left.Files ?? []).SequenceEqual(right.Files ?? [])
+        && left.Features == right.Features
+        && left.MainColour == right.MainColour
+        && left.Colour == right.Colour
+        && left.Edges == right.Edges
+        && left.AnalysisVersion == right.AnalysisVersion;
 
     private void Commit(CollectionSnapshot snapshot)
     {
         _snapshots.Save(snapshot);
         _stored = snapshot;
 
-        var next = CollectionState.FromSnapshot(snapshot);
+        var next = CollectionState.FromSnapshot(snapshot, _artRules);
 
         if (next.Version != _collection.Current.Version)
         {
@@ -302,7 +316,7 @@ public sealed class SyncRunner
         }
 
         _stored = stored;
-        _collection.Replace(CollectionState.FromSnapshot(stored));
+        _collection.Replace(CollectionState.FromSnapshot(stored, _artRules));
 
         return false;
     }

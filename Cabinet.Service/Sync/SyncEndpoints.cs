@@ -128,7 +128,8 @@ public static class SyncEndpoints
             provider.GetRequiredService<ArtSync>(),
             provider.GetRequiredService<ArtCache>(),
             provider.GetRequiredService<ImageOptions>(),
-            provider.GetRequiredService<EnrichmentSync>()));
+            provider.GetRequiredService<EnrichmentSync>(),
+            provider.GetRequiredService<ArtRules>()));
         services.AddSingleton<SyncCoordinator>();
         services.AddSingleton<SyncStatusService>();
         services.AddHostedService<SyncStartup>();

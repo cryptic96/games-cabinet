@@ -1243,7 +1243,10 @@ class FakeElement {
     this.dataset = {};
     this.attributes = new Map();
     this.properties = new Map();
-    this.style = { setProperty: (name, value) => this.properties.set(name, value) };
+    this.style = {
+      setProperty: (name, value) => this.properties.set(name, value),
+      removeProperty: (name) => this.properties.delete(name),
+    };
     this.children = [];
     this.parent = null;
     this.ownText = '';
