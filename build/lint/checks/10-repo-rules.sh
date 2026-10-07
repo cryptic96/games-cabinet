@@ -14,6 +14,7 @@ PLANNING_FILE_PATTERN='\b(PROJECT|REQUIREMENTS|ROADMAP|STATE|RESEARCH|CONTEXT|PL
 PLANNING_DIR_PATTERN='\.plannin[g]/'
 CLAUDE_DIR_PATTERN='\.claud[e]/'
 EXCLUDE_PATH_PATTERN="^${PLANNING_DIR_PATTERN}|^${CLAUDE_DIR_PATTERN}"
+VENDORED_JS_PATTERN='^Cabinet\.Service/wwwroot/lib/'
 
 # A // that is not part of a /// doc comment and does not follow a colon
 # (URLs such as https://) is a line comment, wherever it sits on the line.
@@ -54,6 +55,13 @@ assert_clean_cs_comments() {
     return 1
   fi
   return 0
+}
+
+# Drops vendored third-party scripts (paths under Cabinet.Service/wwwroot/lib/) from a list of
+# file names read on standard input. Only the JavaScript comment rule uses it: the planning
+# reference check still reads every tracked file, vendored ones included.
+filter_vendored_js() {
+  grep -vE "$VENDORED_JS_PATTERN" || true
 }
 
 assert_clean_js_comments() {
@@ -223,6 +231,21 @@ self_test() {
     failed=1
   fi
 
+  local kept
+  kept="$(printf '%s\n' 'Cabinet.Service/wwwroot/js/live.js' 'Cabinet.Service/wwwroot/lib/signalr/signalr.min.js' | filter_vendored_js)"
+  if [ "$kept" != "Cabinet.Service/wwwroot/js/live.js" ]; then
+    echo "self-test failed: the vendored path was not dropped from, or the normal path was not kept in, the JavaScript file list" >&2
+    failed=1
+  fi
+
+  local normal_js_list
+  printf '%s own line comment\nexport const a = 1;\n' "//" >"$tmp/Cabinet.Service-wwwroot-js-own.js"
+  normal_js_list="$(printf '%s\n' "$tmp/Cabinet.Service-wwwroot-js-own.js" | filter_vendored_js)"
+  if [ -z "$normal_js_list" ] || assert_clean_js_comments "$normal_js_list" >/dev/null 2>&1; then
+    echo "self-test failed: a // comment in a normal script path was not detected through the vendored-path filter" >&2
+    failed=1
+  fi
+
   mkdir -p "$tmp/workflows"
   printf 'jobs:\n  build:\n    runs-on: %s\n' "$RUNS_ON_ALLOWED" >"$tmp/workflows/good.yml"
   printf 'jobs:\n  build:\n    runs-on: self-hosted\n' >"$tmp/workflows/bad.yml"
@@ -280,7 +303,7 @@ echo "10-repo-rules self-tests passed"
 
 mapfile -t tracked_files < <(git ls-files | grep -vE "$EXCLUDE_PATH_PATTERN" || true)
 mapfile -t cs_files < <(git ls-files '*.cs' | grep -vE "$EXCLUDE_PATH_PATTERN" || true)
-mapfile -t js_files < <(git ls-files '*.js' '*.mjs' | grep -vE "$EXCLUDE_PATH_PATTERN" || true)
+mapfile -t js_files < <(git ls-files '*.js' '*.mjs' | grep -vE "$EXCLUDE_PATH_PATTERN" | filter_vendored_js || true)
 
 overall_ok=1
 

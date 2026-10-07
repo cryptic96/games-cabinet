@@ -21,6 +21,7 @@ public class ContentSecurityPolicyTests
     [InlineData("/cabinet/layout?sample=65&profile=desktop", HttpStatusCode.OK)]
     [InlineData("/cabinet/layout?sample=65&profile=phone", HttpStatusCode.OK)]
     [InlineData("/js/render.js", HttpStatusCode.OK)]
+    [InlineData("/lib/signalr/signalr.min.js", HttpStatusCode.OK)]
     [InlineData("/img/powered-by-bgg.svg", HttpStatusCode.OK)]
     [InlineData("/cabinet/status", HttpStatusCode.OK)]
     [InlineData("/cabinet/layout?profile=tablet", HttpStatusCode.NotFound)]
