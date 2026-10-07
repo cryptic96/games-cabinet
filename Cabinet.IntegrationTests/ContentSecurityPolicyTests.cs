@@ -22,6 +22,7 @@ public class ContentSecurityPolicyTests
     [InlineData("/cabinet/layout?sample=65&profile=phone", HttpStatusCode.OK)]
     [InlineData("/js/render.js", HttpStatusCode.OK)]
     [InlineData("/img/powered-by-bgg.svg", HttpStatusCode.OK)]
+    [InlineData("/cabinet/status", HttpStatusCode.OK)]
     [InlineData("/cabinet/layout?profile=tablet", HttpStatusCode.NotFound)]
     [InlineData("/no-such-page", HttpStatusCode.NotFound)]
     public async Task Every_public_response_carries_the_strict_policy(string path, HttpStatusCode status)
@@ -33,6 +34,22 @@ public class ContentSecurityPolicyTests
 
         response.StatusCode.Should().Be(status);
         PolicyOf(response).Should().Be(ExpectedPolicy);
+    }
+
+    [Fact]
+    public async Task The_live_negotiation_carries_the_strict_policy_and_no_cross_origin_permission()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        using var client = factory.CreatePublicClient();
+
+        using var response = await client.PostAsync(
+            "/cabinet/live/negotiate?negotiateVersion=1",
+            content: null,
+            TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        PolicyOf(response).Should().Be(ExpectedPolicy);
+        response.Headers.Contains("Access-Control-Allow-Origin").Should().BeFalse();
     }
 
     [Fact]
