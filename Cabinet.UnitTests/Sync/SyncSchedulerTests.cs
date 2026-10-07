@@ -48,7 +48,7 @@ public class SyncSchedulerTests
         using var scheduler = Scheduler(coordinator, clock, Options);
 
         await scheduler.StartAsync(TestContext.Current.CancellationToken);
-        await clock.WaitForTimersAsync(2, TestContext.Current.CancellationToken);
+        await clock.WaitForTimersAsync(1, TestContext.Current.CancellationToken);
         fake.Advance(TimeSpan.FromSeconds(9));
         coordinator.Requests.TryRead(out _).Should().BeFalse("the shortest wait is ten seconds");
 
@@ -58,6 +58,27 @@ public class SyncSchedulerTests
         coordinator.State.LastStartedUtc.Should().Be(Start + TimeSpan.FromSeconds(120));
         await scheduler.StopAsync(TestContext.Current.CancellationToken);
         coordinator.Requests.TryRead(out _).Should().BeFalse("only one start-up request is made");
+    }
+
+    [Fact]
+    public async Task The_interval_timer_is_armed_only_after_the_startup_delay_even_when_the_delay_outlasts_the_interval()
+    {
+        var fake = new FakeTimeProvider(Start);
+        var clock = new TimerCountingClock(fake);
+        var longJitter = Options with { Interval = SyncOptions.MinimumInterval, StartupJitterMax = TimeSpan.FromHours(1) };
+        var coordinator = Coordinator(fake, SyncState.Initial, longJitter);
+        using var scheduler = Scheduler(coordinator, clock, longJitter);
+
+        await scheduler.StartAsync(TestContext.Current.CancellationToken);
+        await clock.WaitForTimersAsync(1, TestContext.Current.CancellationToken);
+        await Task.Delay(QuietPeriod, TestContext.Current.CancellationToken);
+
+        clock.TimerCount.Should().Be(1, "only the start-up delay is pending, so no tick can be waiting beside it");
+
+        fake.Advance(TimeSpan.FromHours(1));
+        await WaitForRequestAsync(coordinator);
+        await clock.WaitForTimersAsync(2, TestContext.Current.CancellationToken);
+        await scheduler.StopAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -88,7 +109,7 @@ public class SyncSchedulerTests
         using var scheduler = Scheduler(coordinator, clock, Options);
 
         await scheduler.StartAsync(TestContext.Current.CancellationToken);
-        await clock.WaitForTimersAsync(2, TestContext.Current.CancellationToken);
+        await clock.WaitForTimersAsync(1, TestContext.Current.CancellationToken);
         fake.Advance(TimeSpan.FromSeconds(125));
 
         await WaitForRequestAsync(coordinator);

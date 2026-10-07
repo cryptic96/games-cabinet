@@ -5,7 +5,8 @@ namespace Cabinet.Service.Sync;
 /// <summary>
 /// Asks for a sync on its own: once shortly after a cold start when the collection is missing or stale, and then every
 /// interval. It asks the same way a visitor's button does, so a request that arrives while a run is in progress queues
-/// nothing, and it never starts a sync right after the last start, so a crash loop cannot hammer BGG.
+/// nothing, and it never starts a sync right after the last start, so a crash loop cannot hammer BGG. The interval timer
+/// is armed only after the start-up delay, so a long delay can never leave a tick pending beside the start-up request.
 /// </summary>
 /// <param name="coordinator">Accepts or refuses each request.</param>
 /// <param name="collection">Tells whether a collection has been synced yet.</param>
@@ -27,8 +28,6 @@ public sealed class SyncScheduler(
             return;
         }
 
-        using var timer = new PeriodicTimer(options.Interval, time);
-
         try
         {
             if (ShouldRunAtStartup())
@@ -36,6 +35,8 @@ public sealed class SyncScheduler(
                 await Task.Delay(StartupDelay(), time, stoppingToken);
                 Request(SyncTrigger.Startup);
             }
+
+            using var timer = new PeriodicTimer(options.Interval, time);
 
             while (await timer.WaitForNextTickAsync(stoppingToken))
             {
