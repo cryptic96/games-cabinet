@@ -191,6 +191,7 @@ public class LiveCapRefusalTests
                 services.AddSingleton<IRequestPacer>(new NoWaitPacer());
                 services.AddSingleton<TimeProvider>(SyncHarness.NewClock());
                 services.AddHttpClient<ICollectionSource, BggClient>().ConfigurePrimaryHttpMessageHandler(() => handler);
+                services.AddHttpClient<IEnrichmentSource, BggThingClient>().ConfigurePrimaryHttpMessageHandler(() => handler);
                 services.Configure<HubOptions>(hub => hub.AddFilter(attempts));
             });
 

@@ -13,7 +13,7 @@ public static class SnapshotMapper
     /// <summary>
     /// Maps every stored item to an item to draw, ordered by collection entry and then by game, so the same collection in
     /// any source order gives the same cabinet. An entry listed twice is one item, and it is the expansion; two entries for
-    /// the same game with different entry identifiers stay two items. Expansions carry no base game until one is paired.
+    /// the same game with different entry identifiers stay two items. An expansion carries the games its details say it expands, paired by <see cref="ExpansionPairing"/>; before its details arrive it carries none.
     /// </summary>
     /// <param name="snapshot">The stored collection.</param>
     public static IReadOnlyList<CabinetItem> ToCabinetItems(CollectionSnapshot snapshot)
@@ -21,6 +21,7 @@ public static class SnapshotMapper
         ArgumentNullException.ThrowIfNull(snapshot);
 
         var images = snapshot.Images ?? new Dictionary<string, ImageRecord>();
+        var pairing = ExpansionPairing.Pair(snapshot);
 
         return
         [
@@ -35,7 +36,7 @@ public static class SnapshotMapper
                     item.Title,
                     item.Kind,
                     BoxFromVersion.Map(item.Dimensions, item.Kind),
-                    [],
+                    pairing.TryGetValue(item.CollectionId, out var expansionOf) && item.Kind == ItemKind.Expansion ? expansionOf : [],
                     ArtOf(item, images))),
         ];
     }
@@ -51,7 +52,7 @@ public static class SnapshotMapper
 
         var lines = items.Select(item => string.Create(
             CultureInfo.InvariantCulture,
-            $"{item.CollectionId}|{item.BggId}|{item.Kind}|{item.Title}|{item.Box.WidthMm}|{item.Box.HeightMm}|{item.Box.DepthMm}|{VariantUrls(item.Art)}"));
+            $"{item.CollectionId}|{item.BggId}|{item.Kind}|{item.Title}|{item.Box.WidthMm}|{item.Box.HeightMm}|{item.Box.DepthMm}|{VariantUrls(item.Art)}|{ExpansionRefs(item.ExpansionOf)}"));
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', lines)));
 
         return Convert.ToHexStringLower(hash)[..VersionLength];
@@ -75,6 +76,9 @@ public static class SnapshotMapper
 
         return null;
     }
+
+    private static string ExpansionRefs(IReadOnlyList<BaseGameRef> references) =>
+        string.Join(';', references.Select(reference => string.Create(CultureInfo.InvariantCulture, $"{reference.BggId}:{reference.Title}")));
 
     private static string VariantUrls(ArtImage? art) =>
         art is null ? string.Empty : string.Join(',', art.Variants.Select(variant => variant.Url));

@@ -87,7 +87,7 @@ public class SyncPipelineTests
         second.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await second.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).Should().Contain("\"running\"");
         second.ShouldBeNoStore();
-        handler.Requests.Should().HaveCount(2);
+        handler.CollectionRequests().Should().HaveCount(2);
     }
 
     [Fact]
@@ -105,6 +105,7 @@ public class SyncPipelineTests
             var initial = await ReadLayout(client);
             using var press = await client.PostAsync(SyncEndpointRoute, content: null, TestContext.Current.CancellationToken);
             await SyncHarness.WaitUntil(async () => (await ReadLayout(client)).ETag != initial.ETag);
+            await SyncHarness.WaitForRunToEnd(client);
             (syncedETag, syncedTitles) = await ReadLayout(client);
         }
 
@@ -153,11 +154,12 @@ public class SyncPipelineTests
                 services.AddSingleton(Options());
                 services.AddSingleton<IRequestPacer>(new NoWaitPacer());
                 services.AddHttpClient<ICollectionSource, BggClient>().ConfigurePrimaryHttpMessageHandler(() => handler);
+                services.AddHttpClient<IEnrichmentSource, BggThingClient>().ConfigurePrimaryHttpMessageHandler(() => handler);
             });
 
     private static void AssertTwoCollectionCalls(ScriptedBggHandler handler)
     {
-        var requests = handler.Requests;
+        var requests = handler.CollectionRequests();
 
         requests.Should().HaveCount(2);
         requests.Should().OnlyContain(request =>

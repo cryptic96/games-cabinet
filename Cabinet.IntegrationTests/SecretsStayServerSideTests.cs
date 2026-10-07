@@ -53,7 +53,7 @@ public class SecretsStayServerSideTests
             responses.Add((await Get(client, LayoutPath)).Everything);
         }
 
-        good.Requests.Should().HaveCount(2);
+        good.CollectionRequests().Should().HaveCount(2);
         logs.Lines.Should().NotBeEmpty();
         logs.Lines.Should().OnlyContain(line => !line.Contains(Token, StringComparison.Ordinal) && !line.Contains(Username, StringComparison.Ordinal));
         responses.Should().OnlyContain(text => !text.Contains(Token, StringComparison.Ordinal) && !text.Contains(Username, StringComparison.Ordinal));
@@ -153,8 +153,8 @@ public class SecretsStayServerSideTests
         await WaitForLayoutChange(client, initial.ETag);
 
         press.StatusCode.Should().Be(HttpStatusCode.Accepted);
-        handler.Requests.Should().HaveCount(2);
-        handler.Requests.Should().OnlyContain(request => HttpUtility.ParseQueryString(request.Uri.Query)["username"] == Username);
+        handler.CollectionRequests().Should().HaveCount(2);
+        handler.CollectionRequests().Should().OnlyContain(request => HttpUtility.ParseQueryString(request.Uri.Query)["username"] == Username);
         handler.Requests.Select(request => request.Uri.ToString()).Should().OnlyContain(
             address => !address.Contains("other", StringComparison.Ordinal) && !address.Contains("visitor", StringComparison.Ordinal));
         handler.Requests.Should().OnlyContain(request => request.AuthorizationParameter == Token);
@@ -222,6 +222,7 @@ public class SecretsStayServerSideTests
                 services.AddSingleton<ILoggerProvider>(logs);
                 services.AddSingleton<IRequestPacer>(new NoWaitPacer());
                 services.AddHttpClient<ICollectionSource, BggClient>().ConfigurePrimaryHttpMessageHandler(() => handler);
+                services.AddHttpClient<IEnrichmentSource, BggThingClient>().ConfigurePrimaryHttpMessageHandler(() => handler);
             });
 
     private static async Task<string> PostSync(HttpClient client)

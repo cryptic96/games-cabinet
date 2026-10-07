@@ -26,7 +26,7 @@ public static class SyncEndpoints
 
     /// <summary>
     /// Validates the BGG and storage settings now, so a bad value stops the app at startup, and registers the BGG client and
-    /// its pacer, the snapshot store, the sync machinery and the hosted services that run it.
+    /// its pacer, the details client, the snapshot store, the sync machinery and the hosted services that run it.
     /// </summary>
     /// <param name="services">The service collection to add to.</param>
     /// <param name="configuration">The configuration the Bgg, Sync and Storage settings are read from.</param>
@@ -44,6 +44,7 @@ public static class SyncEndpoints
         BggSettings.FromConfiguration(configuration, environment, validationVersion);
         SyncSettings.FromConfiguration(configuration);
         ImageSettings.FromConfiguration(configuration, environment);
+        EnrichmentSettings.FromConfiguration(configuration);
 
         var storage = new StorageDirectory(StorageLocation.Resolve(configuration, environment));
 
@@ -94,6 +95,24 @@ public static class SyncEndpoints
             })
             .ConfigurePrimaryHttpMessageHandler(BggTransport.CreatePrimaryHandler);
 
+        services.AddSingleton(_ => EnrichmentSettings.FromConfiguration(configuration));
+
+        services
+            .AddHttpClient<IEnrichmentSource, BggThingClient>((provider, client) =>
+            {
+                var options = provider.GetRequiredService<BggOptions>();
+                client.BaseAddress = options.BaseUri;
+                client.Timeout = RequestTimeout;
+                client.MaxResponseContentBufferSize = ResponseBufferLimitBytes;
+            })
+            .ConfigurePrimaryHttpMessageHandler(BggTransport.CreatePrimaryHandler)
+            .AddHttpMessageHandler<BggAuthHandler>();
+
+        services.AddSingleton(provider => new EnrichmentSync(
+            provider.GetRequiredService<IEnrichmentSource>,
+            provider.GetRequiredService<EnrichmentOptions>(),
+            provider.GetRequiredService<TimeProvider>(),
+            provider.GetRequiredService<ILogger<EnrichmentSync>>()));
         services.AddSingleton(provider => new ArtSync(
             provider.GetRequiredService<IArtSource>,
             provider.GetRequiredService<ArtCache>(),
@@ -108,7 +127,8 @@ public static class SyncEndpoints
             provider.GetRequiredService<ILogger<SyncRunner>>(),
             provider.GetRequiredService<ArtSync>(),
             provider.GetRequiredService<ArtCache>(),
-            provider.GetRequiredService<ImageOptions>()));
+            provider.GetRequiredService<ImageOptions>(),
+            provider.GetRequiredService<EnrichmentSync>()));
         services.AddSingleton<SyncCoordinator>();
         services.AddSingleton<SyncStatusService>();
         services.AddHostedService<SyncStartup>();

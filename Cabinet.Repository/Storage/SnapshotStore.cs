@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Cabinet.Domain.Collection;
+using Cabinet.Domain.Layout;
 using Microsoft.Extensions.Logging;
 
 namespace Cabinet.Repository.Storage;
@@ -125,5 +126,7 @@ public sealed class SnapshotStore : ISnapshotStore
             [typeof(SnapshotItem)] = ["collectionId", "gameId", "title", "kind"],
             [typeof(ImageRecord)] = ["sourceUrl", "status", "attemptedAtUtc"],
             [typeof(ArtFile)] = ["width", "height", "name"],
+            [typeof(GameDetails)] = ["enrichedAtUtc", "designers", "mechanics", "expandsGames"],
+            [typeof(BaseGameRef)] = ["bggId", "title"],
         });
 }

@@ -36,6 +36,7 @@ public class OversizedAnswerTests
                 services.AddSingleton<IRequestPacer>(new NoWaitPacer());
                 services.AddSingleton<TimeProvider>(clock);
                 services.AddHttpClient<ICollectionSource, BggClient>().ConfigurePrimaryHttpMessageHandler(() => source.Handler);
+                services.AddHttpClient<IEnrichmentSource, BggThingClient>().ConfigurePrimaryHttpMessageHandler(() => source.Handler);
             });
         using var client = factory.CreatePublicClient();
         await SyncRounds.PressAndWait(client, clock, advance: false);
