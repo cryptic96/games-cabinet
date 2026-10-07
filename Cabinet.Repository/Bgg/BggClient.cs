@@ -8,30 +8,75 @@ namespace Cabinet.Repository.Bgg;
 
 /// <summary>
 /// Reads the owner's owned collection from the BGG XML API in two calls, because the unfiltered call labels expansions as
-/// base games: base games with expansions excluded, then expansions. Every call goes through the shared pacer. The client
+/// base games: base games with expansions excluded, then expansions. Every call goes through the shared pacer. A queued
+/// answer is polled on a slow, bounded schedule, and a whole sync never sends more than <see cref="MaxRequestsPerSync"/>
+/// requests. Whatever goes wrong ends the fetch with a failure category and never with a partial collection. The client
 /// never logs: a request address carries the username and an answer carries the owner's data.
 /// </summary>
-/// <param name="http">The client to send with; its base address is the API address and it never follows redirects.</param>
-/// <param name="options">The username, the contact address and the private-information switch.</param>
-/// <param name="pacer">Spaces the calls out.</param>
-public sealed class BggClient(HttpClient http, BggOptions options, IRequestPacer pacer) : ICollectionSource
+public sealed class BggClient : ICollectionSource
 {
+    /// <summary>The most requests one sync may send, however many of them are answered as queued.</summary>
+    public const int MaxRequestsPerSync = 16;
+
+    /// <summary>How long to wait before each poll of a queued answer; the schedule's length is the number of polls allowed.</summary>
+    public static readonly IReadOnlyList<TimeSpan> QueuedWaits =
+    [
+        TimeSpan.FromSeconds(5),
+        TimeSpan.FromSeconds(10),
+        TimeSpan.FromSeconds(20),
+        TimeSpan.FromSeconds(30),
+        TimeSpan.FromSeconds(30),
+        TimeSpan.FromSeconds(30),
+    ];
+
+    private readonly HttpClient _http;
+    private readonly BggOptions _options;
+    private readonly IRequestPacer _pacer;
+    private readonly TimeProvider _time;
+    private readonly IReadOnlyList<TimeSpan> _queuedWaits;
+
+    /// <summary>Creates the client.</summary>
+    /// <param name="http">The client to send with; its base address is the API address and it never follows redirects.</param>
+    /// <param name="options">The username, the contact address and the private-information switch.</param>
+    /// <param name="pacer">Spaces the calls out.</param>
+    /// <param name="time">The clock the waits between polls of a queued answer run on.</param>
+    /// <param name="queuedWaits">The waits before each poll of a queued answer; <see cref="QueuedWaits"/> when omitted.</param>
+    public BggClient(
+        HttpClient http,
+        BggOptions options,
+        IRequestPacer pacer,
+        TimeProvider time,
+        IReadOnlyList<TimeSpan>? queuedWaits = null)
+    {
+        ArgumentNullException.ThrowIfNull(http);
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(pacer);
+        ArgumentNullException.ThrowIfNull(time);
+
+        _http = http;
+        _options = options;
+        _pacer = pacer;
+        _time = time;
+        _queuedWaits = queuedWaits ?? QueuedWaits;
+    }
+
     /// <inheritdoc />
     public async Task<CollectionFetchResult> FetchOwnedAsync(CancellationToken cancellationToken)
     {
-        if (!options.IsConfigured)
+        if (!_options.IsConfigured)
         {
             return new CollectionFetchResult.Failed(SyncFailure.NotConfigured);
         }
 
-        var baseGames = await GetCollectionAsync("excludesubtype=boardgameexpansion", ItemKind.Base, cancellationToken);
+        var budget = new RequestBudget();
+        var baseGames = await GetCollectionAsync("excludesubtype=boardgameexpansion", ItemKind.Base, budget, cancellationToken);
 
         if (baseGames is not CollectionFetchResult.Fetched baseFetched)
         {
             return baseGames;
         }
 
-        var expansions = await GetCollectionAsync("subtype=boardgameexpansion", ItemKind.Expansion, cancellationToken);
+        var expansions = await GetCollectionAsync("subtype=boardgameexpansion", ItemKind.Expansion, budget, cancellationToken);
 
         return expansions is CollectionFetchResult.Fetched expansionFetched
             ? new CollectionFetchResult.Fetched(MergeByCollectionId(baseFetched.Items, expansionFetched.Items))
@@ -49,41 +94,94 @@ public sealed class BggClient(HttpClient http, BggOptions options, IRequestPacer
         return [.. baseGames.Where(item => !expansionIds.Contains(item.CollectionId)), .. expansions];
     }
 
-    private async Task<CollectionFetchResult> GetCollectionAsync(string subtypeFilter, ItemKind kind, CancellationToken cancellationToken)
+    private static CollectionFetchResult Failed(SyncFailure failure) => new CollectionFetchResult.Failed(failure);
+
+    private static bool IsXml(HttpResponseMessage response) =>
+        response.Content.Headers.ContentType?.MediaType is "text/xml" or "application/xml";
+
+    private async Task<CollectionFetchResult> GetCollectionAsync(
+        string subtypeFilter,
+        ItemKind kind,
+        RequestBudget budget,
+        CancellationToken cancellationToken)
     {
-        var privateInfo = options.IncludePrivateInfo ? "&showprivate=1" : string.Empty;
-        var relative = $"collection?username={Uri.EscapeDataString(options.Username!)}&own=1&{subtypeFilter}&version=1{privateInfo}";
+        var privateInfo = _options.IncludePrivateInfo ? "&showprivate=1" : string.Empty;
+        var relative = $"collection?username={Uri.EscapeDataString(_options.Username!)}&own=1&{subtypeFilter}&version=1{privateInfo}";
 
         try
         {
-            using var lease = await pacer.WaitTurnAsync(cancellationToken);
-            using var request = CreateRequest(relative);
-            using var response = await http.SendAsync(request, HttpCompletionOption.ResponseContentRead, cancellationToken);
-
-            if (response.StatusCode != HttpStatusCode.OK)
+            for (var poll = 0; ; poll++)
             {
-                return new CollectionFetchResult.Failed(SyncFailure.Unavailable);
+                if (!budget.TryTake())
+                {
+                    return Failed(SyncFailure.Queued);
+                }
+
+                if (await RequestOnceAsync(relative, kind, cancellationToken) is { } answer)
+                {
+                    return answer;
+                }
+
+                if (poll >= _queuedWaits.Count || budget.IsSpent)
+                {
+                    return Failed(SyncFailure.Queued);
+                }
+
+                await Task.Delay(_queuedWaits[poll], _time, cancellationToken);
             }
-
-            await using var body = await response.Content.ReadAsStreamAsync(cancellationToken);
-            var parsed = BggCollectionParser.Parse(body, kind, options.IncludePrivateInfo);
-
-            return parsed.TotalItems is { } total && total != parsed.Items.Count + parsed.SkippedItems
-                ? new CollectionFetchResult.Failed(SyncFailure.BadAnswer)
-                : new CollectionFetchResult.Fetched(parsed.Items);
         }
         catch (Exception exception) when (exception is BggAnswerException or XmlException)
         {
-            return new CollectionFetchResult.Failed(SyncFailure.BadAnswer);
+            return Failed(SyncFailure.BadAnswer);
         }
         catch (HttpRequestException)
         {
-            return new CollectionFetchResult.Failed(SyncFailure.Unavailable);
+            return Failed(SyncFailure.Unavailable);
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException)
         {
-            return new CollectionFetchResult.Failed(SyncFailure.Timeout);
+            return Failed(SyncFailure.Timeout);
         }
+    }
+
+    /// <summary>
+    /// Sends one request in its own turn and classifies the answer. It returns null when the answer is the queued one, so the
+    /// caller can wait and ask again; otherwise it returns the collection or the failure the answer amounts to. The turn ends
+    /// when this method returns, so a wait between polls is never held inside a turn.
+    /// </summary>
+    private async Task<CollectionFetchResult?> RequestOnceAsync(string relative, ItemKind kind, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        using var lease = await _pacer.WaitTurnAsync(cancellationToken);
+        using var request = CreateRequest(relative);
+        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseContentRead, cancellationToken);
+
+        switch (response.StatusCode)
+        {
+            case HttpStatusCode.Accepted:
+                return null;
+            case HttpStatusCode.OK:
+                break;
+            case HttpStatusCode.Unauthorized:
+                return Failed(SyncFailure.Unauthorized);
+            case HttpStatusCode.TooManyRequests or HttpStatusCode.ServiceUnavailable:
+                return Failed(SyncFailure.Throttled);
+            default:
+                return Failed(SyncFailure.Unavailable);
+        }
+
+        if (!IsXml(response))
+        {
+            return Failed(SyncFailure.BadAnswer);
+        }
+
+        await using var body = await response.Content.ReadAsStreamAsync(cancellationToken);
+        var parsed = BggCollectionParser.Parse(body, kind, _options.IncludePrivateInfo);
+
+        return parsed.TotalItems is { } total && total != parsed.Items.Count + parsed.SkippedItems
+            ? Failed(SyncFailure.BadAnswer)
+            : new CollectionFetchResult.Fetched(parsed.Items);
     }
 
     private HttpRequestMessage CreateRequest(string relative)
@@ -91,8 +189,28 @@ public sealed class BggClient(HttpClient http, BggOptions options, IRequestPacer
         var request = new HttpRequestMessage(HttpMethod.Get, relative);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/xml"));
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml"));
-        request.Headers.TryAddWithoutValidation("User-Agent", BggTransport.UserAgent(options));
+        request.Headers.TryAddWithoutValidation("User-Agent", BggTransport.UserAgent(_options));
 
         return request;
+    }
+
+    /// <summary>Counts the requests one sync has sent, shared by both of its calls.</summary>
+    private sealed class RequestBudget
+    {
+        private int _used;
+
+        public bool IsSpent => _used >= MaxRequestsPerSync;
+
+        public bool TryTake()
+        {
+            if (IsSpent)
+            {
+                return false;
+            }
+
+            _used++;
+
+            return true;
+        }
     }
 }
