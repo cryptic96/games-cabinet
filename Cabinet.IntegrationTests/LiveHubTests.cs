@@ -7,7 +7,9 @@ using Cabinet.FakeBgg.Testing;
 using Cabinet.IntegrationTests.Infrastructure;
 using Cabinet.Service.Live;
 using FluentAssertions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Connections;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
@@ -87,6 +89,26 @@ public class LiveHubTests
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         offered.Should().BeEquivalentTo(["WebSockets", "ServerSentEvents"]);
+    }
+
+    [Fact]
+    public async Task The_live_connection_options_keep_small_buffers_and_allow_only_the_two_streaming_transports()
+    {
+        await using var factory = SyncHarness.CreateFactory(new ScriptedBggHandler(), SyncHarness.NewClock());
+
+        var routes = factory.Services.GetRequiredService<EndpointDataSource>().Endpoints
+            .OfType<RouteEndpoint>()
+            .Where(endpoint => endpoint.RoutePattern.RawText?.StartsWith(LiveRoute, StringComparison.Ordinal) == true)
+            .ToList();
+        var options = routes
+            .Single(endpoint => endpoint.RoutePattern.RawText == $"{LiveRoute}/negotiate")
+            .Metadata.GetMetadata<HttpConnectionDispatcherOptions>();
+
+        routes.Select(endpoint => endpoint.RoutePattern.RawText).Should().BeEquivalentTo([LiveRoute, $"{LiveRoute}/negotiate"]);
+        options.Should().NotBeNull("the negotiation route carries the connection options the live route is mapped with");
+        options!.Transports.Should().Be(HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents);
+        options.ApplicationMaxBufferSize.Should().Be(4096);
+        options.TransportMaxBufferSize.Should().Be(8192);
     }
 
     [Fact]

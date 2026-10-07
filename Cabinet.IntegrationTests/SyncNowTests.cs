@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using Cabinet.FakeBgg;
@@ -126,6 +127,28 @@ public class SyncNowTests
         handler.Requests.Should().NotBeEmpty();
         handler.Requests.Should().OnlyContain(request =>
             request.Uri.Query.Contains("username=sentinel-user-name") && !request.Uri.Query.Contains("other-person"));
+    }
+
+    [Theory]
+    [InlineData(0, 600)]
+    [InlineData(10.4, 590)]
+    [InlineData(195, 405)]
+    [InlineData(599, 1)]
+    [InlineData(599.6, 1)]
+    public async Task A_refused_press_is_told_to_wait_the_remaining_time_in_whole_seconds_rounded_up(double secondsIntoWindow, int expectedSeconds)
+    {
+        var clock = SyncHarness.NewClock();
+        await using var factory = SyncHarness.CreateFactory(ScriptedBggHandler.ForCollection(SyntheticBggCollection.Create(3)), clock);
+        using var client = factory.CreatePublicClient();
+        using var first = await client.PostAsync(SyncHarness.SyncRoute, content: null, TestContext.Current.CancellationToken);
+        await SyncHarness.WaitForRunToEnd(client);
+
+        clock.Advance(TimeSpan.FromSeconds(secondsIntoWindow));
+        using var refused = await client.PostAsync(SyncHarness.SyncRoute, content: null, TestContext.Current.CancellationToken);
+
+        refused.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        refused.Headers.NonValidated["Retry-After"].ToString()
+            .Should().Be(expectedSeconds.ToString(CultureInfo.InvariantCulture), "the header carries the raw whole number of seconds");
     }
 
     private static async Task<JsonDocument> ReadBody(HttpResponseMessage response) =>

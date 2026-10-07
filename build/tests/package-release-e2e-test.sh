@@ -64,6 +64,14 @@ if grep -q '^deploy/tests/' <<<"$LISTING"; then
   fail "zip ships deploy/tests/, which must stay out of releases"
 fi
 
+if grep -q 'Cabinet\.FakeBgg' <<<"$LISTING"; then
+  fail "zip ships the fake BGG, which is for tests only"
+fi
+
+if grep -qE 'Cabinet\.(UnitTests|IntegrationTests)' <<<"$LISTING"; then
+  fail "zip ships test assemblies, which must stay out of releases"
+fi
+
 (cd "$OUTPUT" && sha256sum -c "cabinet-$VERSION.zip.sha256" >/dev/null) || fail "sha256 does not match the zip"
 
 MANIFEST="$(unzip -p "$ZIP" release-manifest.json | jq -c .)"

@@ -2,13 +2,18 @@ using Cabinet.Domain.Collection;
 using Cabinet.Service.Collection;
 using Cabinet.Service.Live;
 using Cabinet.Service.Sync;
+using System.Collections.Concurrent;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 
 namespace Cabinet.UnitTests.Sync;
 
-/// <summary>Proves a run that a service stop interrupts is not recorded as a failure, and a failed run still is.</summary>
+/// <summary>
+/// Proves a run that a service stop interrupts is not recorded as a failure, while a failed run, a run that is cancelled
+/// without a stop and a run that throws unexpectedly are recorded, and the worker goes on to the next request.
+/// </summary>
 [Trait("Category", "Sync")]
 public class SyncWorkerTests
 {
@@ -54,14 +59,64 @@ public class SyncWorkerTests
         await harness.Worker.StopAsync(TestContext.Current.CancellationToken);
     }
 
-    private static WorkerHarness Harness(InMemorySyncStateStore store, ICollectionSource source)
+    [Fact]
+    public async Task A_run_cancelled_without_a_service_stop_is_recorded_as_a_timeout_and_the_next_request_still_runs()
+    {
+        var store = new InMemorySyncStateStore();
+        var source = new ThrowingSource(() => new OperationCanceledException(new CancellationToken(canceled: true)));
+        using var harness = Harness(store, source);
+        await harness.Worker.StartAsync(TestContext.Current.CancellationToken);
+
+        harness.Coordinator.TryRequest(SyncTrigger.Manual).Should().BeOfType<SyncRequestResult.Started>();
+        await WaitForFinishAsync(harness.Coordinator);
+
+        store.Stored.LastResult.Should().Be(SyncResult.Failed);
+        store.Stored.LastFailure.Should().Be(SyncFailure.Timeout);
+        store.Stored.ConsecutiveFailures.Should().Be(1);
+
+        harness.Coordinator.TryRequest(SyncTrigger.Scheduled).Should().BeOfType<SyncRequestResult.Started>();
+        await WaitForFinishAsync(harness.Coordinator);
+
+        source.Calls.Should().Be(2);
+        store.Stored.ConsecutiveFailures.Should().Be(2);
+        await harness.Worker.StopAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task A_run_that_throws_unexpectedly_is_recorded_as_unavailable_logged_by_type_only_and_the_next_request_still_runs()
+    {
+        const string Secret = "sentinel-secret-message";
+        var store = new InMemorySyncStateStore();
+        var source = new ThrowingSource(() => new InvalidOperationException(Secret));
+        var logger = new RecordingLogger();
+        using var harness = Harness(store, source, logger);
+        await harness.Worker.StartAsync(TestContext.Current.CancellationToken);
+
+        harness.Coordinator.TryRequest(SyncTrigger.Manual).Should().BeOfType<SyncRequestResult.Started>();
+        await WaitForFinishAsync(harness.Coordinator);
+
+        store.Stored.LastResult.Should().Be(SyncResult.Failed);
+        store.Stored.LastFailure.Should().Be(SyncFailure.Unavailable);
+        var line = logger.Lines.Should().ContainSingle().Subject;
+        line.Level.Should().Be(LogLevel.Error);
+        line.Message.Should().Contain(nameof(InvalidOperationException)).And.NotContain(Secret);
+
+        harness.Coordinator.TryRequest(SyncTrigger.Scheduled).Should().BeOfType<SyncRequestResult.Started>();
+        await WaitForFinishAsync(harness.Coordinator);
+
+        source.Calls.Should().Be(2);
+        logger.Lines.Should().HaveCount(2).And.OnlyContain(line => !line.Message.Contains(Secret, StringComparison.Ordinal));
+        await harness.Worker.StopAsync(TestContext.Current.CancellationToken);
+    }
+
+    private static WorkerHarness Harness(InMemorySyncStateStore store, ICollectionSource source, ILogger<SyncWorker>? logger = null)
     {
         var clock = new FakeTimeProvider(Start);
         var coordinator = new SyncCoordinator(store, Options, clock);
         var collection = new CollectionStore();
         var runner = new SyncRunner(() => source, new NullSnapshotStore(), collection, clock, NullLogger<SyncRunner>.Instance);
         var status = new SyncStatusService(coordinator, collection, Options, clock);
-        var worker = new SyncWorker(coordinator, runner, status, new SilentNotifier(), NullLogger<SyncWorker>.Instance);
+        var worker = new SyncWorker(coordinator, runner, status, new SilentNotifier(), logger ?? NullLogger<SyncWorker>.Instance);
 
         return new WorkerHarness(coordinator, worker);
     }
@@ -117,5 +172,36 @@ public class SyncWorkerTests
     private sealed class SilentNotifier : ILiveNotifier
     {
         public Task PublishAsync(CabinetStatus status, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private sealed class ThrowingSource(Func<Exception> exception) : ICollectionSource
+    {
+        private int _calls;
+
+        public int Calls => Volatile.Read(ref _calls);
+
+        public Task<CollectionFetchResult> FetchOwnedAsync(CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _calls);
+
+            throw exception();
+        }
+    }
+
+    private sealed record LogLine(LogLevel Level, string Message);
+
+    private sealed class RecordingLogger : ILogger<SyncWorker>
+    {
+        private readonly ConcurrentQueue<LogLine> _lines = new();
+
+        public IReadOnlyList<LogLine> Lines => [.. _lines];
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            _lines.Enqueue(new LogLine(logLevel, exception is null ? formatter(state, exception) : $"{formatter(state, exception)} {exception}"));
     }
 }

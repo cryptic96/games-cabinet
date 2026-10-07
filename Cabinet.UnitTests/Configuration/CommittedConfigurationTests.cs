@@ -1,13 +1,23 @@
-using Cabinet.UnitTests.Infrastructure;
+using System.Net;
 using System.Text.Json;
+using Cabinet.UnitTests.Infrastructure;
 using FluentAssertions;
 
 namespace Cabinet.UnitTests.Configuration;
 
-/// <summary>Proves every committed appsettings file parses and never carries a non-empty secret-shaped value.</summary>
+/// <summary>
+/// Proves every committed appsettings file parses and never carries a non-empty secret-shaped value or a BGG account setting,
+/// and that the committed env file example holds placeholders only.
+/// </summary>
 public class CommittedConfigurationTests
 {
     private static readonly string[] SecretMarkers = ["password", "secret", "token", "apikey"];
+
+    private static readonly string[] AccountKeys = ["Bgg:Username", "Bgg:Token", "Bgg:ContactUrl"];
+
+    private static readonly string[] AccountVariables = ["Bgg__Username", "Bgg__Token", "Bgg__ContactUrl"];
+
+    private static readonly string[] DocumentationRanges = ["192.0.2.", "198.51.100.", "203.0.113."];
 
     [Fact]
     [Trait("Category", "Configuration")]
@@ -39,6 +49,92 @@ public class CommittedConfigurationTests
         CollectSecretViolations(document.RootElement, string.Empty, violations);
 
         violations.Should().ContainSingle().Which.Should().Be("Section:ApiToken");
+    }
+
+    [Fact]
+    [Trait("Category", "Configuration")]
+    public void No_committed_appsettings_file_sets_the_bgg_username_token_or_contact_address()
+    {
+        var appsettingsFiles = Directory.GetFiles(RepositoryPaths.ServiceDirectory(), "appsettings*.json", SearchOption.TopDirectoryOnly);
+
+        appsettingsFiles.Should().NotBeEmpty();
+
+        foreach (var path in appsettingsFiles)
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+
+            AccountViolations(document.RootElement).Should().BeEmpty($"{Path.GetFileName(path)} must leave the BGG account to the server env file");
+        }
+    }
+
+    [Fact]
+    public void Account_detection_flags_any_letter_case_and_ignores_empty_values()
+    {
+        using var document = JsonDocument.Parse("""{ "bgg": { "USERNAME": "example-person", "Token": "", "ContactUrl": null }, "Other": { "Username": "plain" } }""");
+
+        AccountViolations(document.RootElement).Should().ContainSingle().Which.Should().Be("bgg:USERNAME");
+    }
+
+    [Fact]
+    [Trait("Category", "Configuration")]
+    public void The_env_file_example_holds_only_placeholders_for_the_bgg_account_and_documentation_addresses()
+    {
+        var path = Path.Combine(Directory.GetParent(RepositoryPaths.ServiceDirectory())!.FullName, "deploy", "cabinet.env.example");
+        var assignments = File.ReadAllLines(path)
+            .Select(line => line.Trim())
+            .Where(line => line.Length > 0 && !line.StartsWith('#'))
+            .Select(line => line.Split('=', 2))
+            .Select(parts => (Name: parts[0].Trim(), Value: parts.Length > 1 ? parts[1].Trim() : string.Empty))
+            .ToList();
+
+        foreach (var variable in AccountVariables)
+        {
+            assignments.Count(assignment => assignment.Name == variable).Should().Be(1, $"{variable} appears once as a placeholder");
+        }
+
+        Value(assignments, "Bgg__Username").Should().StartWith("replace-with-");
+        Value(assignments, "Bgg__Token").Should().StartWith("replace-with-");
+        var contact = new Uri(Value(assignments, "Bgg__ContactUrl"));
+        contact.Scheme.Should().Be(Uri.UriSchemeHttps);
+        contact.Host.Should().Match(host => IsPlaceholderHost(host));
+        assignments.Where(assignment => IPAddress.TryParse(assignment.Value, out _))
+            .Should().OnlyContain(assignment => DocumentationRanges.Any(range => assignment.Value.StartsWith(range, StringComparison.Ordinal)));
+    }
+
+    private static string Value(IEnumerable<(string Name, string Value)> assignments, string name) =>
+        assignments.Single(assignment => assignment.Name == name).Value;
+
+    private static bool IsPlaceholderHost(string host) =>
+        host is "example.com" or "example.org"
+        || host.EndsWith(".example.com", StringComparison.Ordinal)
+        || host.EndsWith(".example.org", StringComparison.Ordinal);
+
+    private static List<string> AccountViolations(JsonElement root)
+    {
+        var violations = new List<string>();
+        CollectAccountViolations(root, string.Empty, violations);
+
+        return violations;
+    }
+
+    private static void CollectAccountViolations(JsonElement element, string path, List<string> violations)
+    {
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+
+        foreach (var property in element.EnumerateObject())
+        {
+            var propertyPath = path.Length == 0 ? property.Name : $"{path}:{property.Name}";
+
+            if (AccountKeys.Contains(propertyPath, StringComparer.OrdinalIgnoreCase) && HasNonEmptyValue(property.Value))
+            {
+                violations.Add(propertyPath);
+            }
+
+            CollectAccountViolations(property.Value, propertyPath, violations);
+        }
     }
 
     private static void CollectSecretViolations(JsonElement element, string path, List<string> violations)
