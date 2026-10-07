@@ -83,7 +83,7 @@ Updated: the prototype part is done (off by default, development-only, disabled 
 
 ## Open items
 
-- **Owner's final check (human-check of Task 3):** on desktop and phone over the home network or VPN, the cabinet shows the real owned collection by title with expansions labelled, the "Synced ... ago" line and the footer credit, no sample links; after marking one more game owned on BGG and pressing Sync now, the new game appears on both devices without a reload, and a second press shows the countdown. Recorded at the end-of-phase review.
+- **Owner's final check (human-check of Task 3): APPROVED 2026-10-07.** The owner saw the real collection on desktop and phone; after a sync on the desktop the phone page updated automatically; the countdown shows during the shared 10-minute window. The Safari check is left for after the window. Original check text: on desktop and phone over the home network or VPN, the cabinet shows the real owned collection by title with expansions labelled, the "Synced ... ago" line and the footer credit, no sample links; after marking one more game owned on BGG and pressing Sync now, the new game appears on both devices without a reload, and a second press shows the countdown. Recorded at the end-of-phase review.
 - WebKit/Safari strict-policy check with live updates (WebKit could not start in the scratch Playwright); the owner can check in Safari.
 - Confirm that the reverse proxy passes WebSocket upgrades on the real route (live updates fall back to status polling if not).
 
