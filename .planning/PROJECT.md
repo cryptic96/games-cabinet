@@ -20,14 +20,16 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 - ✓ Expansions sit beside their base game: thick big-box expansions stand upright, thin ones lie in a stack thickest at the bottom, overflow collapses into "+N more", and expansions without an owned base are labelled with the game they expand — Phase 2
 - ✓ On phones the cabinet reflows into its own narrower, taller cabinet with readable, tappable spines — Phase 2
 - ✓ Empty and near-empty collections look intentional: a trimmed minimum cabinet of bare planked wood, and boxes face out when there are few — Phase 2
+- ✓ Owned collection syncs from BGG automatically (hourly, plus a guarded start-up run), with no manual game entry in the app; the last good collection stays on screen when BGG fails, and empty or more-than-halved results are held back until confirmed — Phase 3 (v0.3.0, owner-approved on the deployed site)
+- ✓ Manual "sync now" button for every visitor, guarded by one shared, persisted 10-minute window; open pages update live when any sync changes the collection — Phase 3
+- ✓ Storage-location question answered by a one-time, shape-only access check: BGG's private location is not readable with the application token, so locations come from home/VPN-only owner tools — Phase 3
+- ✓ BGG token and username stay on the server; the "Powered by BGG" credit links back on every page — Phase 3
 
 ### Active
 
-- [ ] Owned collection syncs from BGG automatically (about hourly), with no manual game entry in the app
-- [ ] Manual "sync now" button, guarded by a global cooldown so nobody can use it to hammer BGG
 - [ ] Face-out boxes show the real BGG box art and spines take their colour from it (the mix itself shipped in Phase 2 with generated covers)
 - [ ] Tapping a game pulls the box out of the shelf (animation) and opens a detail card: player count, play time, weight, storage location, expansions, BGG rating, designers, minimum age, mechanics, link to BGG
-- [ ] Each game shows its storage location to every visitor. Locations are read from BGG's private field if a token spike proves the app can read it; otherwise the owner manages them in home/VPN-only owner tools
+- [ ] Each game shows its storage location to every visitor. The access check proved BGG's private field is not readable with the token, so the owner manages locations in home/VPN-only owner tools
 - [ ] Visitors can toggle between one big cabinet and one cabinet per storage location
 - [ ] Box images: the owned version's image if it is a flat cover, otherwise the base game's image (Dutch editions are often 3D perspective shots). The owner can override per game from home/VPN
 - [ ] Box proportions come from the owned version's real BGG dimensions when available
@@ -63,6 +65,8 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 - BGG changed XML API access in 2025 (application registration / token requirement). Research must confirm current access rules, rate limits and terms of use.
 - BGG only provides front box images. Spines have to be generated. Box dimensions may be available via BGG version data, which would drive face-out vs spine and realistic packing. Research needed.
 - **Storage location in BGG:** collection items carry private info, including an "inventory location" field. Reading it likely requires the owner's authenticated BGG session rather than an application token. Research needed. **Plan B is deliberately undecided** until research reports. Candidates: (a) a convention in the game's public BGG comment (e.g. "Location: …"), keeping the app database-free; (b) an in-app location editor reachable only from the home network/VPN, backed by a small database.
+
+**Location access check (Phase 3, measured):** the shape-only check run once from the container found no private info on any of the 65 items with the application token alone, so plan B (b) stands: home/VPN-only owner tools for locations. BGG version dimensions are in inches, and the collection must be fetched as two calls (base games, expansions) because the default call labels expansions as base games.
 
 **Plan B outcome (after research):** research found the private field is most likely not readable with an app token; it needs the owner's logged-in session, and possibly not even then. The owner rejected the public-comment convention. Decision: spike first; if the token can't read the field, build plan B (b), home/VPN-only owner tools for locations.
 
@@ -131,4 +135,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-06 after Phase 2 (layout engine and cabinet prototype)*
+*Last updated: 2026-10-07 after Phase 3 (BGG access check, real sync and snapshot; released as v0.3.0)*
