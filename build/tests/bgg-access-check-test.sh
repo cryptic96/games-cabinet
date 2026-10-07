@@ -179,6 +179,41 @@ SHORT_TOKEN_ENV="$WORK_DIR/short-token.env"
 write_env "$SHORT_TOKEN_ENV" "abc" "sentinel-user-name"
 expect_guard "a short token inside a longer word is still withheld" "$SHORT_TOKEN_ENV" "abcdef" 4
 
+echo "=== refused document forms ==="
+BODY_DRIVER='
+import importlib.util, sys
+
+script, encoding, kind = sys.argv[1], sys.argv[2], sys.argv[3]
+spec = importlib.util.spec_from_file_location("bgg_access_check", script)
+module = importlib.util.module_from_spec(spec)
+sys.modules["bgg_access_check"] = module
+spec.loader.exec_module(module)
+documents = {
+    "doctype": "<?xml version=\"1.0\"?><!DOCTYPE items [<!ENTITY invented \"x\">]><items>&invented;</items>",
+    "clean": "<?xml version=\"1.0\"?><items totalitems=\"0\"></items>",
+}
+print(module.classify_body(documents[kind].encode(encoding))[0])
+'
+
+expect_body_class() {
+  local name="$1" encoding="$2" kind="$3" expected="$4"
+  local status actual
+  status="$(status_of python3 -I -c "$BODY_DRIVER" "$SCRIPT" "$encoding" "$kind")"
+  actual="$(tr -d '[:space:]' <"$WORK_DIR/out.txt")"
+  if [ "$status" = "0" ] && [ "$actual" = "$expected" ]; then
+    pass "$name"
+  else
+    fail "$name (exit $status, class '$actual', expected '$expected')"
+  fi
+}
+
+for encoding in utf-16 utf-16-le utf-16-be utf-32 utf-32-le utf-32-be; do
+  expect_body_class "a doctype in $encoding is refused" "$encoding" doctype other
+  expect_body_class "a clean document in $encoding is refused" "$encoding" clean other
+done
+expect_body_class "a doctype in utf-8 is refused" utf-8 doctype other
+expect_body_class "a clean utf-8 document is read" utf-8 clean xml:items
+
 echo "=== standard library only ==="
 IMPORT_CHECK='
 import ast, sys

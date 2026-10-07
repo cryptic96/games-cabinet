@@ -71,13 +71,45 @@ The whole report is built as one piece of text first. Before it is printed it
 is scanned for the token, the username, the contact address, every title and
 every location value seen in any answer, the text `http` and the `<`
 character. If any of those is found, nothing is printed except a one-line
-notice and the check exits with code 4.
+notice, a one-line hint and the check exits with code 4.
+
+How the scan matches:
+
+- The token, the contact address and the fixed wrong token used by call I are
+  matched anywhere in the report, in any letter case, even inside a longer
+  word.
+- The username is matched in any letter case. A name of four or more
+  characters is matched anywhere, even inside a longer word. A shorter name is
+  matched only as a whole word, so a three-letter name does not withhold a
+  report just because it appears inside words such as `status`.
+- Titles and location values seen in answers are matched exactly; those under
+  four characters only as whole words.
+
+The hint line starts with `hint:` and lists the kinds of value the scan
+looks for (the token, the contact address, the username with its short-name
+rule, titles and locations seen in the answers) without repeating any of
+them, so a withheld run can be understood without printing what was found.
+
+Response bodies are classified before they are summarised. The check refuses
+to read a body that carries a document type declaration or an entity
+declaration, in any letter case, and counts it as "other" without parsing
+it. The refusal does not depend on how the text is encoded: a body that
+starts with a UTF-16 or UTF-32 byte-order mark, or that contains a NUL byte
+(which covers UTF-16 and UTF-32 without a mark), is refused before any
+parsing, and every other body is run through a strict parse that fails on
+the first document type or entity declaration it meets. A plain UTF-8
+document, with or without a byte-order mark, is read as usual.
 
 `python3 build/bgg-access-check.py --self-test` proves this on built-in
 invented answers that carry made-up titles, a made-up location and sentinel
 credentials: the counts are kept, the values are dropped, and the guard fires
-when a sentinel is deliberately put into the report. The same test runs in the
-repository's lint checks.
+when a sentinel is deliberately put into the report. It also feeds the
+classifier a document type declaration in UTF-16 and UTF-32 forms, with and
+without a byte-order mark, and in plain text, and checks they are refused
+while a clean UTF-8 document is still read. The same test runs in the
+repository's lint checks, together with an offline script test in
+`build/tests/bgg-access-check-test.sh` that repeats the guard and encoding
+cases through the real entry points without ever opening a connection.
 
 ## Exit codes
 
