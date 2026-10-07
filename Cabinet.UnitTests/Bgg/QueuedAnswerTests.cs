@@ -112,12 +112,12 @@ public class QueuedAnswerTests
         var clock = new FakeTimeProvider();
         var calls = 0;
         var handler = new ScriptedBggHandler(
-            _ => calls++ == 0 ? Queued() : ScriptedResponse.Empty(HttpStatusCode.TooManyRequests),
+            _ => calls++ == 0 ? Queued() : ScriptedResponse.Empty(HttpStatusCode.Unauthorized),
             clock);
 
         var result = await Drive(BggTestKit.Client(handler, clock).FetchOwnedAsync(TestContext.Current.CancellationToken), clock);
 
-        result.Should().BeOfType<CollectionFetchResult.Failed>().Which.Failure.Should().Be(SyncFailure.Throttled);
+        result.Should().BeOfType<CollectionFetchResult.Failed>().Which.Failure.Should().Be(SyncFailure.Unauthorized);
         handler.Requests.Should().HaveCount(2);
     }
 

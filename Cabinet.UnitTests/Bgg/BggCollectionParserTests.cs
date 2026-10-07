@@ -81,6 +81,36 @@ public class BggCollectionParserTests
         BggCollectionParser.CleanTitle("\u0001Left\u001fover\u0000").Should().Be("Leftover");
     }
 
+    [Theory]
+    [InlineData("\u007F")]
+    [InlineData("\u0080")]
+    [InlineData("\u0085")]
+    [InlineData("\u009F")]
+    [InlineData("\u2028")]
+    [InlineData("\u2029")]
+    [InlineData("\u202A")]
+    [InlineData("\u202B")]
+    [InlineData("\u202C")]
+    [InlineData("\u202D")]
+    [InlineData("\u202E")]
+    [InlineData("\u2066")]
+    [InlineData("\u2067")]
+    [InlineData("\u2068")]
+    [InlineData("\u2069")]
+    public void Extended_controls_separators_and_bidirectional_overrides_are_removed_from_a_title(string invisible)
+    {
+        BggCollectionParser.CleanTitle($"Left{invisible}over").Should().Be("Leftover");
+        BggCollectionParser.CleanTitle($"{invisible}Edge{invisible}").Should().Be("Edge");
+    }
+
+    [Fact]
+    public void Visible_text_and_the_neighbouring_format_characters_in_a_title_are_left_alone()
+    {
+        const string title = "Caf\u00E9 \u00A0Mix \u200E\u200F\u200D \u2030 \u2065x \u2070 \u0600 \U0001F3B2";
+
+        BggCollectionParser.CleanTitle(title).Should().Be(title);
+    }
+
     [Fact]
     public void A_cap_never_splits_a_surrogate_pair()
     {

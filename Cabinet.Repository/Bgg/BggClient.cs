@@ -3,16 +3,19 @@ using System.Net.Http.Headers;
 using System.Xml;
 using Cabinet.Domain.Collection;
 using Cabinet.Domain.Layout;
+using Microsoft.Extensions.Logging;
 
 namespace Cabinet.Repository.Bgg;
 
 /// <summary>
 /// Reads the owner's owned collection from the BGG XML API in two calls, because the unfiltered call labels expansions as
-/// base games: base games with expansions excluded, then expansions. Every call goes through the shared pacer. A queued
-/// answer is polled on a slow, bounded schedule, and a whole sync never sends more than <see cref="MaxRequestsPerSync"/>
-/// requests. Whatever goes wrong ends the fetch with a failure category and never with a partial collection; the one
-/// exception is the caller cancelling, which propagates so the caller can tell a stop from a slow answer. The client
-/// never logs: a request address carries the username and an answer carries the owner's data.
+/// base games with expansions excluded, then expansions. Every call goes through the shared pacer. A queued answer is
+/// polled on a slow, bounded schedule, a transient server error or throttle is retried once per call after a polite wait,
+/// and a whole sync never sends more than <see cref="MaxRequestsPerSync"/> requests, retries included. A refusal (401 or
+/// 403) is never retried. Whatever goes wrong ends the fetch with a failure category and never with a partial collection; the one
+/// exception is the caller cancelling, which propagates so the caller can tell a stop from a slow answer. A collection
+/// answer must declare its total, and the total must equal the entries read plus the entries left out for lacking an
+/// identifier. The client logs a count at most: a request address carries the username and an answer carries the owner's data.
 /// </summary>
 public sealed class BggClient : ICollectionSource
 {
@@ -30,11 +33,15 @@ public sealed class BggClient : ICollectionSource
         TimeSpan.FromSeconds(30),
     ];
 
+    /// <summary>The longest wait a transient answer may ask for and still be retried; a longer ask means the next scheduled sync is the retry.</summary>
+    public static readonly TimeSpan MaxRetryAfter = TimeSpan.FromSeconds(60);
+
     private readonly HttpClient _http;
     private readonly BggOptions _options;
     private readonly IRequestPacer _pacer;
     private readonly TimeProvider _time;
     private readonly IReadOnlyList<TimeSpan> _queuedWaits;
+    private readonly ILogger<BggClient>? _logger;
 
     /// <summary>Creates the client.</summary>
     /// <param name="http">The client to send with; its base address is the API address and it never follows redirects.</param>
@@ -42,12 +49,14 @@ public sealed class BggClient : ICollectionSource
     /// <param name="pacer">Spaces the calls out.</param>
     /// <param name="time">The clock the waits between polls of a queued answer run on.</param>
     /// <param name="queuedWaits">The waits before each poll of a queued answer; <see cref="QueuedWaits"/> when omitted.</param>
+    /// <param name="logger">Receives the number of entries left out of an answer, never a title or an identifier; optional.</param>
     public BggClient(
         HttpClient http,
         BggOptions options,
         IRequestPacer pacer,
         TimeProvider time,
-        IReadOnlyList<TimeSpan>? queuedWaits = null)
+        IReadOnlyList<TimeSpan>? queuedWaits = null,
+        ILogger<BggClient>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(http);
         ArgumentNullException.ThrowIfNull(options);
@@ -59,6 +68,7 @@ public sealed class BggClient : ICollectionSource
         _pacer = pacer;
         _time = time;
         _queuedWaits = queuedWaits ?? QueuedWaits;
+        _logger = logger;
     }
 
     /// <inheritdoc />
@@ -111,16 +121,33 @@ public sealed class BggClient : ICollectionSource
 
         try
         {
-            for (var poll = 0; ; poll++)
+            var retried = false;
+
+            for (var poll = 0; ; )
             {
                 if (!budget.TryTake())
                 {
                     return Failed(SyncFailure.Queued);
                 }
 
-                if (await RequestOnceAsync(relative, kind, cancellationToken) is { } answer)
+                var attempt = await RequestOnceAsync(relative, kind, cancellationToken);
+
+                if (attempt.Kind == AttemptKind.Finished)
                 {
-                    return answer;
+                    return attempt.Result!;
+                }
+
+                if (attempt.Kind == AttemptKind.Transient)
+                {
+                    if (retried || budget.IsSpent || RetryWaitFor(attempt.RetryAfter) is not { } retryWait)
+                    {
+                        return attempt.Result!;
+                    }
+
+                    retried = true;
+                    await DelayAsync(retryWait, cancellationToken);
+
+                    continue;
                 }
 
                 if (poll >= _queuedWaits.Count || budget.IsSpent)
@@ -128,7 +155,7 @@ public sealed class BggClient : ICollectionSource
                     return Failed(SyncFailure.Queued);
                 }
 
-                await Task.Delay(_queuedWaits[poll], _time, cancellationToken);
+                await Task.Delay(_queuedWaits[poll++], _time, cancellationToken);
             }
         }
         catch (Exception exception) when (exception is BggAnswerException or XmlException)
@@ -146,11 +173,11 @@ public sealed class BggClient : ICollectionSource
     }
 
     /// <summary>
-    /// Sends one request in its own turn and classifies the answer. It returns null when the answer is the queued one, so the
-    /// caller can wait and ask again; otherwise it returns the collection or the failure the answer amounts to. The turn ends
-    /// when this method returns, so a wait between polls is never held inside a turn.
+    /// Sends one request in its own turn and classifies the answer: queued, so the caller can wait and ask again; transient,
+    /// so the caller may retry once; or finished with the collection or the failure the answer amounts to. The turn ends
+    /// when this method returns, so a wait between requests is never held inside a turn.
     /// </summary>
-    private async Task<CollectionFetchResult?> RequestOnceAsync(string relative, ItemKind kind, CancellationToken cancellationToken)
+    private async Task<Attempt> RequestOnceAsync(string relative, ItemKind kind, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -161,28 +188,76 @@ public sealed class BggClient : ICollectionSource
         switch (response.StatusCode)
         {
             case HttpStatusCode.Accepted:
-                return null;
+                return new Attempt(AttemptKind.Queued, null, null);
             case HttpStatusCode.OK:
                 break;
             case HttpStatusCode.Unauthorized:
-                return Failed(SyncFailure.Unauthorized);
+                return Finished(Failed(SyncFailure.Unauthorized));
             case HttpStatusCode.TooManyRequests or HttpStatusCode.ServiceUnavailable:
-                return Failed(SyncFailure.Throttled);
+                return Transient(SyncFailure.Throttled, response);
+            case >= HttpStatusCode.InternalServerError:
+                return Transient(SyncFailure.Unavailable, response);
             default:
-                return Failed(SyncFailure.Unavailable);
+                return Finished(Failed(SyncFailure.Unavailable));
         }
 
         if (!IsXml(response))
         {
-            return Failed(SyncFailure.BadAnswer);
+            return Finished(Failed(SyncFailure.BadAnswer));
         }
 
         await using var body = await response.Content.ReadAsStreamAsync(cancellationToken);
         var parsed = BggCollectionParser.Parse(body, kind, _options.IncludePrivateInfo);
 
-        return parsed.TotalItems is { } total && total != parsed.Items.Count + parsed.SkippedItems
+        if (parsed.SkippedItems > 0)
+        {
+            _logger?.LogWarning("A BGG answer held {SkippedCount} owned entries without a usable identifier; they were left out.", parsed.SkippedItems);
+        }
+
+        return Finished(parsed.TotalItems is not { } total || total != parsed.Items.Count + parsed.SkippedItems
             ? Failed(SyncFailure.BadAnswer)
-            : new CollectionFetchResult.Fetched(parsed.Items);
+            : new CollectionFetchResult.Fetched(parsed.Items));
+    }
+
+    private static Attempt Finished(CollectionFetchResult result) => new(AttemptKind.Finished, result, null);
+
+    private Attempt Transient(SyncFailure failure, HttpResponseMessage response) =>
+        new(AttemptKind.Transient, Failed(failure), ReadRetryAfter(response));
+
+    private TimeSpan? ReadRetryAfter(HttpResponseMessage response) =>
+        response.Headers.RetryAfter switch
+        {
+            { Delta: { } delta } => delta,
+            { Date: { } date } => date - _time.GetUtcNow(),
+            _ => null,
+        };
+
+    /// <summary>
+    /// The wait before the one retry, on top of the pacer's own gap, or null when the answer asked for more than the cap and
+    /// the next scheduled sync is the retry. An answer that names no wait adds none, because the pacer already leaves at
+    /// least its gap after the failed request.
+    /// </summary>
+    private static TimeSpan? RetryWaitFor(TimeSpan? retryAfter)
+    {
+        if (retryAfter is not { } asked)
+        {
+            return TimeSpan.Zero;
+        }
+
+        if (asked > MaxRetryAfter)
+        {
+            return null;
+        }
+
+        return asked > TimeSpan.Zero ? asked : TimeSpan.Zero;
+    }
+
+    private async Task DelayAsync(TimeSpan wait, CancellationToken cancellationToken)
+    {
+        if (wait > TimeSpan.Zero)
+        {
+            await Task.Delay(wait, _time, cancellationToken);
+        }
     }
 
     private HttpRequestMessage CreateRequest(string relative)
@@ -194,6 +269,16 @@ public sealed class BggClient : ICollectionSource
 
         return request;
     }
+
+    private enum AttemptKind
+    {
+        Queued,
+        Transient,
+        Finished,
+    }
+
+    /// <summary>How one request was answered: the kind, the result when there is one, and the wait a transient answer asked for.</summary>
+    private readonly record struct Attempt(AttemptKind Kind, CollectionFetchResult? Result, TimeSpan? RetryAfter);
 
     /// <summary>Counts the requests one sync has sent, shared by both of its calls.</summary>
     private sealed class RequestBudget

@@ -42,32 +42,33 @@ public class BggFailureTests
     }
 
     [Theory]
-    [InlineData("unauthorized", SyncFailure.Unauthorized)]
-    [InlineData("too-many-requests", SyncFailure.Throttled)]
-    [InlineData("server-error", SyncFailure.Unavailable)]
-    [InlineData("errors-document", SyncFailure.BadAnswer)]
-    [InlineData("total-does-not-match", SyncFailure.BadAnswer)]
-    public async Task A_failure_in_the_expansion_call_fails_the_whole_fetch(string answer, SyncFailure expected)
+    [InlineData("unauthorized", SyncFailure.Unauthorized, 1)]
+    [InlineData("too-many-requests", SyncFailure.Throttled, 2)]
+    [InlineData("server-error", SyncFailure.Unavailable, 2)]
+    [InlineData("errors-document", SyncFailure.BadAnswer, 1)]
+    [InlineData("total-does-not-match", SyncFailure.BadAnswer, 1)]
+    public async Task A_failure_in_the_expansion_call_fails_the_whole_fetch(string answer, SyncFailure expected, int expansionRequests)
     {
         var handler = new ScriptedBggHandler(request => BggTestKit.IsBaseCall(request) ? BggTestKit.Good(Items, request) : Bad(answer));
 
         var result = await BggTestKit.Client(handler).FetchOwnedAsync(TestContext.Current.CancellationToken);
 
         result.Should().BeOfType<CollectionFetchResult.Failed>().Which.Failure.Should().Be(expected);
-        handler.Requests.Should().HaveCount(2);
+        handler.Requests.Should().HaveCount(1 + expansionRequests);
     }
 
     [Theory]
-    [InlineData("unauthorized")]
-    [InlineData("too-many-requests")]
-    [InlineData("service-unavailable")]
-    public async Task A_refusal_or_a_throttle_on_the_first_call_means_no_second_request(string answer)
+    [InlineData("unauthorized", 1)]
+    [InlineData("too-many-requests", 2)]
+    [InlineData("service-unavailable", 2)]
+    public async Task A_refusal_or_a_throttle_on_the_first_call_means_no_request_for_expansions(string answer, int baseRequests)
     {
         var handler = new ScriptedBggHandler(_ => Bad(answer));
 
         await BggTestKit.Client(handler).FetchOwnedAsync(TestContext.Current.CancellationToken);
 
-        handler.Requests.Should().ContainSingle();
+        handler.Requests.Should().HaveCount(baseRequests);
+        handler.Requests.Should().OnlyContain(request => request.Uri.Query.Contains("excludesubtype", StringComparison.Ordinal));
     }
 
     [Fact]
