@@ -1,4 +1,5 @@
 using Cabinet.Domain.Collection;
+using Cabinet.Repository.Images;
 using Cabinet.Service.Collection;
 
 namespace Cabinet.Service.Sync;
@@ -14,16 +15,25 @@ public sealed record SyncRunResult(SyncResult Result, SyncFailure Failure, HeldB
 /// shown one, store it and then show it. The stored copy is written first, so a restart never shows something older than
 /// what visitors saw. A collection the guard holds back is neither stored nor shown. When a stored collection exists but
 /// could not be read, each run tries to read it again first; while it still cannot be read, the run does not treat itself as
-/// the first sync, so a stored file is never replaced by an empty answer or by one answer that nothing confirms. It logs the failure category only,
+/// the first sync, so a stored file is never replaced by an empty answer or by one answer that nothing confirms. Once the
+/// collection is stored and shown, the run fetches the box pictures that are due, within a time limit of its own, and stores
+/// the records of how each went; a picture that goes wrong never fails the run. It logs the failure category only,
 /// never an address, an answer or a title.
 /// </summary>
 public sealed class SyncRunner
 {
+    /// <summary>How long after a run began it may still start a picture download.</summary>
+    public static readonly TimeSpan ExtrasDeadline = TimeSpan.FromMinutes(6);
+
     private readonly Func<ICollectionSource> _sourceFactory;
     private readonly ISnapshotStore _snapshots;
     private readonly CollectionStore _collection;
     private readonly TimeProvider _time;
     private readonly ILogger<SyncRunner> _logger;
+    private readonly ArtSync? _art;
+    private readonly ArtCache? _cache;
+    private readonly ImageOptions? _images;
+    private CollectionSnapshot? _stored;
 
     /// <summary>Creates the runner.</summary>
     /// <param name="sourceFactory">Creates the source for each run, so a pooled connection never outlives its handler's lifetime.</param>
@@ -31,12 +41,18 @@ public sealed class SyncRunner
     /// <param name="collection">Holds the collection visitors see.</param>
     /// <param name="time">The clock that stamps a captured collection.</param>
     /// <param name="logger">Receives the failure category.</param>
+    /// <param name="art">Fetches the box pictures; null leaves the run without a picture step.</param>
+    /// <param name="cache">The stored pictures, pruned after the run; null leaves them alone.</param>
+    /// <param name="images">The picture rules; the picture step needs them.</param>
     public SyncRunner(
         Func<ICollectionSource> sourceFactory,
         ISnapshotStore snapshots,
         CollectionStore collection,
         TimeProvider time,
-        ILogger<SyncRunner> logger)
+        ILogger<SyncRunner> logger,
+        ArtSync? art = null,
+        ArtCache? cache = null,
+        ImageOptions? images = null)
     {
         ArgumentNullException.ThrowIfNull(sourceFactory);
         ArgumentNullException.ThrowIfNull(snapshots);
@@ -49,13 +65,17 @@ public sealed class SyncRunner
         _collection = collection;
         _time = time;
         _logger = logger;
+        _art = art;
+        _cache = cache;
+        _images = images;
     }
 
-    /// <summary>Fetches the collection and applies it when the guard accepts it and it changed.</summary>
+    /// <summary>Fetches the collection and applies it when the guard accepts it and it changed, then fetches the box pictures that are due.</summary>
     /// <param name="previousHeldBack">The collection the previous sync set aside, or null when none is waiting for confirmation.</param>
     /// <param name="cancellationToken">Cancels the run.</param>
     public async Task<SyncRunResult> RunAsync(HeldBackRecord? previousHeldBack, CancellationToken cancellationToken)
     {
+        var started = _time.GetUtcNow();
         var fetched = await _sourceFactory().FetchOwnedAsync(cancellationToken);
 
         if (fetched is not CollectionFetchResult.Fetched collection)
@@ -80,18 +100,131 @@ public sealed class SyncRunner
                 new HeldBackRecord(held.Kind, held.Fingerprint, held.Count, _time.GetUtcNow()));
         }
 
-        var snapshot = new CollectionSnapshot(CollectionSnapshot.CurrentSchemaVersion, _time.GetUtcNow(), collection.Items);
-        var next = CollectionState.FromSnapshot(snapshot);
+        var versionAtStart = _collection.Current.Version;
+        var baseline = _stored ?? _collection.Current.Snapshot;
+        var snapshot = new CollectionSnapshot(
+            CollectionSnapshot.CurrentSchemaVersion,
+            _time.GetUtcNow(),
+            collection.Items,
+            StillNamedImages(baseline, collection.Items));
 
-        if (next.Version == _collection.Current.Version)
+        if (ContentChanged(baseline, snapshot))
         {
-            return new SyncRunResult(SyncResult.Unchanged, SyncFailure.None);
+            Commit(snapshot);
         }
 
-        _snapshots.Save(snapshot);
-        _collection.Replace(next);
+        await FetchPicturesAsync(snapshot, started + ExtrasDeadline, cancellationToken);
 
-        return new SyncRunResult(SyncResult.Changed, SyncFailure.None);
+        return new SyncRunResult(
+            _collection.Current.Version == versionAtStart ? SyncResult.Unchanged : SyncResult.Changed,
+            SyncFailure.None);
+    }
+
+    private static Dictionary<string, ImageRecord>? StillNamedImages(CollectionSnapshot? baseline, IReadOnlyList<SnapshotItem> items)
+    {
+        if (baseline?.Images is not { Count: > 0 } known)
+        {
+            return null;
+        }
+
+        var named = items
+            .SelectMany(item => new[] { item.VersionImageUrl, item.ImageUrl })
+            .OfType<string>()
+            .ToHashSet(StringComparer.Ordinal);
+        var kept = known
+            .Where(pair => named.Contains(pair.Key))
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+
+        return kept.Count == 0 ? null : kept;
+    }
+
+    private static bool ContentChanged(CollectionSnapshot? baseline, CollectionSnapshot next)
+    {
+        if (baseline is null || !baseline.Items.SequenceEqual(next.Items))
+        {
+            return true;
+        }
+
+        var before = baseline.Images ?? new Dictionary<string, ImageRecord>();
+        var after = next.Images ?? new Dictionary<string, ImageRecord>();
+
+        return before.Count != after.Count
+            || before.Any(pair => !after.TryGetValue(pair.Key, out var record) || !SameRecord(pair.Value, record));
+    }
+
+    private static bool SameRecord(ImageRecord left, ImageRecord right) =>
+        left.SourceUrl == right.SourceUrl
+        && left.Status == right.Status
+        && left.AttemptedAtUtc == right.AttemptedAtUtc
+        && (left.Files ?? []).SequenceEqual(right.Files ?? []);
+
+    private void Commit(CollectionSnapshot snapshot)
+    {
+        _snapshots.Save(snapshot);
+        _stored = snapshot;
+
+        var next = CollectionState.FromSnapshot(snapshot);
+
+        if (next.Version != _collection.Current.Version)
+        {
+            _collection.Replace(next);
+        }
+    }
+
+    private async Task FetchPicturesAsync(CollectionSnapshot snapshot, DateTimeOffset deadline, CancellationToken cancellationToken)
+    {
+        if (_art is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var result = await _art.RunAsync(
+                snapshot,
+                deadline,
+                stored =>
+                {
+                    Commit(stored);
+
+                    return Task.CompletedTask;
+                },
+                cancellationToken);
+
+            Prune(result.Snapshot);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logger.LogWarning("Box pictures stopped early: {ExceptionType}", exception.GetType().Name);
+        }
+    }
+
+    private void Prune(CollectionSnapshot snapshot)
+    {
+        if (_cache is null || _images is null)
+        {
+            return;
+        }
+
+        var referenced = (snapshot.Images ?? new Dictionary<string, ImageRecord>())
+            .Values
+            .SelectMany(record => record.Files ?? [])
+            .Select(file => file.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+        try
+        {
+            var deleted = _cache.Prune(referenced, _images.PruneGrace, _time.GetUtcNow());
+
+            if (deleted > 0)
+            {
+                _logger.LogInformation("Box pictures: {Deleted} unused files removed.", deleted);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning("Box pictures could not be cleaned up: {ExceptionType}", exception.GetType().Name);
+        }
     }
 
     private bool StoredCollectionStillUnreadable()
@@ -108,6 +241,7 @@ public sealed class SyncRunner
             return _snapshots.HasUnreadStoredCollection;
         }
 
+        _stored = stored;
         _collection.Replace(CollectionState.FromSnapshot(stored));
 
         return false;

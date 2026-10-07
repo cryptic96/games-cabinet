@@ -268,6 +268,65 @@ HTTP client logging at warning level and the sync never writes an address, an
 answer or a game title to the log. A failed sync logs only its category, such as
 unavailable or not configured.
 
+## Box art
+
+Face-out boxes show their real box picture. The pictures come from the
+collection answer itself: each owned entry names a picture of the version you
+own and a main picture of the game, and the version picture is used first. The
+sync adds no request to BGG for this, and a game whose pictures are missing or
+cannot be used simply keeps its generated cover.
+
+After the collection is stored and shown, the same run fetches the pictures that
+are due. The server downloads them by itself, never a visitor:
+
+- only over https, only from the hosts listed in `Images__AllowedHosts`, and
+  without the BGG token or any other credential;
+- at most one request at a time, with a pause between requests that is
+  independent of the pause the BGG API gets;
+- with a size limit on the download, a pixel limit that is checked from the file
+  header before anything is decoded, and a limit of three redirects, each target
+  checked against the host list again.
+
+Each picture is shrunk, never cropped or recoloured, into WebP files 480 and 240
+pixels wide (a smaller picture keeps its own width) and stored in the `art`
+directory beside the stored collection. A file's name carries a hash of its
+content, so the site serves it from its own address under `/art/` with a
+one-year, immutable cache, and a changed picture is a new address that the
+browser fetches fresh. The original download is not kept. A visitor's browser
+only ever asks the site itself for pictures; nothing a visitor sends can name an
+address to fetch, and there is no resizing address.
+
+A run downloads at most `Images__MaxDownloadsPerRun` pictures and starts none
+after six minutes have passed since the run began, so a large collection fills
+in over several runs and a slow host cannot hold a sync back. Games that are
+still waiting show their generated cover meanwhile. A picture that could not be
+fetched, was refused or could not be read is recorded and tried again only after
+`Images__RetryFailedAfterHours`. A second sync with an unchanged collection
+sends no picture request at all. A picture trouble never makes a sync fail and
+never holds the collection back.
+
+Files in the `art` directory that no stored record refers to any more are
+deleted after a successful run, but only once they are older than
+`Images__PruneGraceDays`, so a page that is still loading an old picture keeps
+working. The directory sits beside `snapshot.json` and is rebuilt by later
+syncs if it is lost.
+
+Optional settings for the env file:
+
+| Key | Default | Range | Meaning |
+| --- | --- | --- | --- |
+| `Images__AllowedHosts` | `cf.geekdo-images.com` | host names, comma separated | The only hosts pictures are downloaded from. A host must match in full. |
+| `Images__MaxMegabytes` | `12` | 1 to 50 | The largest picture download accepted. |
+| `Images__MaxMegapixels` | `36` | 1 to 100 | The most pixels, in millions, a picture may hold. |
+| `Images__DownloadGapMilliseconds` | `1000` | 500 to 60000 | The least time between two picture requests. |
+| `Images__MaxDownloadsPerRun` | `80` | 1 to 1000 | The most pictures one sync run downloads. |
+| `Images__RetryFailedAfterHours` | `24` | 1 to 720 | How long a failed picture waits before it is tried again. |
+| `Images__PruneGraceDays` | `7` | 1 to 365 | How long an unused file is kept before it is deleted. |
+
+In a settings file the same keys are written with a colon, for example
+`Images:MaxDownloadsPerRun`. An out-of-range or non-numeric value stops the app
+at start-up with a message naming the key.
+
 ## Where the data lives
 
 The synced collection is stored as `snapshot.json` in the service's state

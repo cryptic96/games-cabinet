@@ -52,6 +52,42 @@ public class RequestPacerTests
     }
 
     [Fact]
+    public async Task The_two_argument_constructor_keeps_the_five_second_floor()
+    {
+        var (fake, clock) = NewClock();
+        var pacer = new RequestPacer(TimeSpan.FromMilliseconds(600), clock);
+        (await pacer.WaitTurnAsync(TestContext.Current.CancellationToken)).Dispose();
+
+        var second = await RequestWhileDelayed(pacer, clock, TestContext.Current.CancellationToken);
+        fake.Advance(TimeSpan.FromSeconds(4));
+        second.IsCompleted.Should().BeFalse();
+        fake.Advance(TimeSpan.FromSeconds(1));
+
+        await FinishesPromptly(second);
+    }
+
+    [Fact]
+    public async Task The_three_argument_constructor_honours_its_own_floor_and_a_longer_gap()
+    {
+        var (fake, clock) = NewClock();
+        var raised = new RequestPacer(TimeSpan.FromMilliseconds(100), clock, TimeSpan.FromMilliseconds(500));
+        var longer = new RequestPacer(TimeSpan.FromMilliseconds(900), clock, TimeSpan.FromMilliseconds(500));
+        (await raised.WaitTurnAsync(TestContext.Current.CancellationToken)).Dispose();
+        (await longer.WaitTurnAsync(TestContext.Current.CancellationToken)).Dispose();
+
+        var secondRaised = await RequestWhileDelayed(raised, clock, TestContext.Current.CancellationToken);
+        var secondLonger = await RequestWhileDelayed(longer, clock, TestContext.Current.CancellationToken);
+        fake.Advance(TimeSpan.FromMilliseconds(499));
+        secondRaised.IsCompleted.Should().BeFalse();
+        fake.Advance(TimeSpan.FromMilliseconds(1));
+        await FinishesPromptly(secondRaised);
+        secondLonger.IsCompleted.Should().BeFalse();
+        fake.Advance(TimeSpan.FromMilliseconds(400));
+
+        await FinishesPromptly(secondLonger);
+    }
+
+    [Fact]
     public async Task The_gap_is_measured_from_the_end_of_the_previous_request_not_its_start()
     {
         var (fake, clock) = NewClock();

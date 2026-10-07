@@ -19,18 +19,19 @@ public sealed class CollectionState
     /// <param name="version">The identifier of the collection version; it changes whenever the collection does.</param>
     /// <param name="capturedAtUtc">When the collection was read from its source.</param>
     public CollectionState(IReadOnlyList<CabinetItem> items, string version, DateTimeOffset capturedAtUtc)
-        : this(items, version, (DateTimeOffset?)capturedAtUtc)
+        : this(items, version, (DateTimeOffset?)capturedAtUtc, null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
     }
 
-    private CollectionState(IReadOnlyList<CabinetItem> items, string? version, DateTimeOffset? capturedAtUtc)
+    private CollectionState(IReadOnlyList<CabinetItem> items, string? version, DateTimeOffset? capturedAtUtc, CollectionSnapshot? snapshot)
     {
         ArgumentNullException.ThrowIfNull(items);
 
         Items = items;
         Version = version;
         CapturedAtUtc = capturedAtUtc;
+        Snapshot = snapshot;
     }
 
     /// <summary>Creates the view of a stored collection: its items are mapped in a fixed order and its version is derived from them.</summary>
@@ -41,14 +42,17 @@ public sealed class CollectionState
 
         var items = SnapshotMapper.ToCabinetItems(snapshot);
 
-        return new CollectionState(items, SnapshotMapper.Version(items), snapshot.CapturedAtUtc);
+        return new CollectionState(items, SnapshotMapper.Version(items), snapshot.CapturedAtUtc, snapshot);
     }
 
     /// <summary>The view before any collection has been synced: no items and no version.</summary>
-    public static CollectionState Empty { get; } = new([], null, null);
+    public static CollectionState Empty { get; } = new([], null, null, null);
 
     /// <summary>The items to draw.</summary>
     public IReadOnlyList<CabinetItem> Items { get; }
+
+    /// <summary>The stored collection this view was made from, or null for a view that was not made from one.</summary>
+    public CollectionSnapshot? Snapshot { get; }
 
     /// <summary>The collection version, or null before the first sync.</summary>
     public string? Version { get; }

@@ -2,6 +2,7 @@ using System.Net;
 using System.Reflection;
 using Cabinet.Domain;
 using Cabinet.Repository.Images;
+using Cabinet.Service.Collection;
 using Cabinet.Service.Hosting;
 using Cabinet.Service.Layout;
 using Cabinet.Service.Live;
@@ -86,6 +87,8 @@ app.UseHealthChecks("/health", opsPort, new HealthCheckOptions
         });
     }
 });
+
+app.UseCabinetArt();
 
 app.UseRouting();
 

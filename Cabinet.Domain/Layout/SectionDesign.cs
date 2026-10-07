@@ -98,6 +98,12 @@ public sealed record SectionDesign(string Name, int InteriorWidthMm, int FrameMm
     /// </summary>
     public int MinBoxThicknessMm { get; init; } = 1;
 
+    /// <summary>
+    /// The widest, in screen pixels, that a section is ever drawn: 640 is the 40rem cap of a desktop section and also the
+    /// 40rem breakpoint where the phone layout stops growing. The stored picture sizes are chosen against it.
+    /// </summary>
+    public int LargestRenderedWidthPx { get; init; } = 640;
+
     /// <summary>The width of the whole section including both frames, in millimetres.</summary>
     public int OuterWidthMm => InteriorWidthMm + (2 * FrameMm);
 
@@ -172,6 +178,7 @@ public sealed record SectionDesign(string Name, int InteriorWidthMm, int FrameMm
             ("minimum box thickness", MinBoxThicknessMm),
             ("label character pitch", LabelCharPitchMm),
             ("smallest rendered width", SmallestRenderedWidthPx),
+            ("largest rendered width", LargestRenderedWidthPx),
         };
 
         problems.AddRange(sizes.Where(size => size.Value <= 0).Select(size => $"the {size.Name} must be positive"));

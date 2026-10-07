@@ -3,6 +3,7 @@ using System.Xml;
 using System.Xml.Linq;
 using Cabinet.Domain.Collection;
 using Cabinet.Domain.Layout;
+using Cabinet.Repository.Images;
 
 namespace Cabinet.Repository.Bgg;
 
@@ -107,7 +108,9 @@ public static class BggCollectionParser
             kind,
             ReadWholeNumber((string?)item.Element("yearpublished")),
             ReadDimensions(item),
-            includePrivateInfo ? ReadLocation(item) : null);
+            includePrivateInfo ? ReadLocation(item) : null,
+            ArtUrl.Canonical(item.Element("version") is { } version ? (version.Element("item") ?? version).Element("image")?.Value : null),
+            ArtUrl.Canonical(item.Element("image")?.Value));
     }
 
     private static VersionDimensions? ReadDimensions(XElement item)

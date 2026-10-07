@@ -123,5 +123,7 @@ public sealed class SnapshotStore : ISnapshotStore
         {
             [typeof(CollectionSnapshot)] = ["schemaVersion", "capturedAtUtc", "items"],
             [typeof(SnapshotItem)] = ["collectionId", "gameId", "title", "kind"],
+            [typeof(ImageRecord)] = ["sourceUrl", "status", "attemptedAtUtc"],
+            [typeof(ArtFile)] = ["width", "height", "name"],
         });
 }
