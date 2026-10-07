@@ -218,7 +218,48 @@ Plans:
   4. Box proportions come from the owned version's real BGG dimensions when available, else from a flat cover's aspect ratio, else from a realistic default, and a 3D shot's outline is never used, so real boxes in the cabinet visibly differ in size and shape.
   5. Each spine takes its colour from its box art (ignoring plain backgrounds around product shots) and shows the title legibly with readable text contrast.
 
-**Plans**: TBD
+**Plans:** 16 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 04-01-PLAN.md — Shape-only art check for version images, details and the image host, and the owner's go-ahead (owner-gated)
+- [ ] 04-02-PLAN.md — Tracer: real box art from the collection answer to face-out covers served from the site
+- [ ] 04-03-PLAN.md — Spine colour pair and image choice as tested pure functions
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 04-04-PLAN.md — Synthetic box art fixtures and the picture analysis (detector features, art and edge colours)
+- [ ] 04-05-PLAN.md — Art check run from the container, shape-only outcome signed off by the owner (owner-gated)
+- [ ] 04-06-PLAN.md — Game details from BGG, weekly refresh, and expansions beside their owned base games
+- [ ] 04-07-PLAN.md — Thin boxes at true thickness with one-line titles, cover line steps, plinth apron, "+N more" name; layout version 10
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 04-08-PLAN.md — Both candidate pictures, read-time choice and art-coloured spines with legible titles
+- [ ] 04-09-PLAN.md — Phone cabinet density measured and closed on realistic sizes
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 04-10-PLAN.md — True box proportions: real sizes, flat cover shape, stable estimates, verdict-free poses
+- [ ] 04-11-PLAN.md — Local fake image host with synthetic art and a Development-only origin
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 04-12-PLAN.md — Server-run review sheet and its font
+- [ ] 04-13-PLAN.md — Local screenshot review rounds with geometry, CSP and request checks (owner-gated)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 04-14-PLAN.md — Release for the server round; the real collection enriched and its art stored (owner-gated)
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 04-15-PLAN.md — The owner's review of the real collection: sheet, cover shares, tuning (owner-gated)
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [ ] 04-16-PLAN.md — Tuned defaults committed, final release and the owner's deployed check (owner-gated)
 
 ### Phase 5: Game Detail, Accessibility & Language
 
@@ -298,7 +339,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 1. Repo, Guardrails & Walking-Skeleton Deploy | 15/15 | Complete    | 2026-10-04 |
 | 2. Layout Engine & Cabinet Prototype | 9/9 | Complete    | 2026-10-06 |
 | 3. BGG Access Spike, Real Sync & Snapshot | 15/15 | Complete    | 2026-10-07 |
-| 4. Enrichment, Box Images & Shape | 0/0 | Not started | - |
+| 4. Enrichment, Box Images & Shape | 0/16 | Planned | - |
 | 5. Game Detail, Accessibility & Language | 0/0 | Not started | - |
 | 6. Owner Tools & Persistence | 0/0 | Not started | - |
 | 7. Game-Night Filters & Location Cabinets | 0/0 | Not started | - |

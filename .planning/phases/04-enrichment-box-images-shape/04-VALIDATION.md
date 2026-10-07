@@ -62,6 +62,29 @@ Filled in by the planner/executor per task. Requirement-to-test map (from RESEAR
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
+### Planned tasks (filled in by the planner)
+
+| Plan-Task | Requirement | Automated command (from the task's verify) |
+|-----------|-------------|---------------------------------------------|
+| 04-01-1 | SYNC-06, SYNC-07, IMG-01 | `bash build/tests/bgg-access-check-test.sh && python3 -I build/bgg-access-check.py --self-test` |
+| 04-02-1 | SYNC-07 | `dotnet test --project Cabinet.IntegrationTests/Cabinet.IntegrationTests.csproj --filter-class "*BoxArtTests"` + page scripts |
+| 04-02-2 | SYNC-07 | `--filter-trait "Category=Images"` |
+| 04-02-3 | SYNC-07 | `--filter-trait "Category=Images"` + `*BoxArtTests` + full solution |
+| 04-03-1..3 | CAB-03, IMG-01 | `*SpineColourTests`, `*ArtChoiceTests`, `Category=Layout`, `Category=Enrichment` |
+| 04-04-1..3 | IMG-01, CAB-03 | `*ArtAnalysisTests`, `Category=Images` |
+| 04-05-1, 3 | SYNC-06, SYNC-07, IMG-01 | outcome file exists and holds no address or image path; latest commit holds the outcome |
+| 04-06-1..3 | SYNC-06 | full integration project, `*EnrichmentTests`, `Category=Enrichment`, `Category=Snapshot` |
+| 04-07-1..3 | CAB-03, IMG-03 | `*ThinBoxTests`, `Category=Layout` (goldens), page scripts, `*ContentSecurityPolicyTests` |
+| 04-08-1..3 | IMG-01, CAB-03, SYNC-07 | `*ArtChoiceTests`, `Category=Enrichment`, `*ArtSettingsTests`, page scripts |
+| 04-09-1..2 | IMG-03 | `Category=Layout` (with `DensityTests`), `build/lint.sh repo-rules` |
+| 04-10-1..3 | IMG-03 | `*BoxShapeTests`, `*TrueProportionsTests`, `Category=Snapshot`, `PoseStabilityTests` via full solution |
+| 04-11-1..2 | SYNC-07, IMG-01 | `*LocalArtTests`, full solution |
+| 04-12-1..3 | IMG-01, IMG-03, CAB-03 | `*ReviewSheetTests`, `*ReviewSheetModelTests`, `*ReviewSheetCommandTests`, `build/lint.sh` |
+| 04-13-1, 3 | all | full solution, page scripts, lint (scratch geometry, CSP and request checks reported) |
+| 04-14-1, 3 | SYNC-06, SYNC-07 | draft check; published release verification, selfcheck, font present, no foreign host in the layout |
+| 04-15-1, 3 | IMG-01, IMG-03, CAB-03 | nothing from the round left in the repository or on the server; service healthy |
+| 04-16-1, 3 | all | full solution, page scripts, lint, draft; published release, selfcheck, drop-in removed, todos closed |
+
 ---
 
 ## Wave 0 Requirements
