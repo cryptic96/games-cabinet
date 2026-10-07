@@ -50,9 +50,11 @@ public static class SectionDesigns
     };
 
     /// <summary>
-    /// The narrow design: six shelf rows of irregular cubbies across 640 mm, so a phone shows fewer cubbies side by
-    /// side and the sections stack. Its floors are derived from the narrowest phone, a 320 pixel screen with a gutter of
-    /// 8 pixels on each side.
+    /// The narrow design: seven shelf rows of irregular cubbies across 640 mm, so a phone shows fewer cubbies side by
+    /// side and the sections stack. The rows are tuned to real box heights: most are tall enough for a standard box to
+    /// stand with air above it, only one is short, and the wide cubbies sit where a face-out box needs them, so earlier
+    /// sections stay full instead of leaving whole rows bare. Its floors are derived from the narrowest phone, a 320
+    /// pixel screen with a gutter of 8 pixels on each side.
     /// </summary>
     public static readonly SectionDesign Phone = new(
         PhoneName,
@@ -60,12 +62,13 @@ public static class SectionDesigns
         FrameMm: FrameMm,
         Rows:
         [
-            new ShelfRow(360, [300, 320]),
-            new ShelfRow(300, [200, 200, 200]),
-            new ShelfRow(400, [420, 200]),
-            new ShelfRow(260, [150, 230, 220]),
-            new ShelfRow(340, [310, 310]),
-            new ShelfRow(300, [200, 420]),
+            new ShelfRow(300, [270, 350]),
+            new ShelfRow(280, [260, 180, 160]),
+            new ShelfRow(380, [290, 330]),
+            new ShelfRow(340, [290, 330]),
+            new ShelfRow(340, [440, 180]),
+            new ShelfRow(420, [170, 450]),
+            new ShelfRow(380, [420, 200]),
         ])
     {
         MaxSpineHeightMm = 340,

@@ -1,5 +1,5 @@
 {
-  "layoutVersion": 10,
+  "layoutVersion": 11,
   "profile": "phone",
   "optionsFingerprint": "09a03be9acd0723f",
   "palette": [
@@ -56,15 +56,15 @@
     {
       "index": 0,
       "widthMm": 640,
-      "heightMm": 2060,
+      "heightMm": 2160,
       "frameMm": 20,
       "cubbies": [
         {
           "index": 0,
           "xMm": 0,
           "yMm": 0,
-          "widthMm": 300,
-          "heightMm": 360,
+          "widthMm": 270,
+          "heightMm": 300,
           "placements": [
             {
               "gameId": 10000,
@@ -78,28 +78,15 @@
               "label": "Yardis Tarnlo",
               "toneIndex": 10,
               "patternIndex": 4
-            },
-            {
-              "gameId": 10037,
-              "entryId": 500019,
-              "kind": "cover",
-              "xMm": 159,
-              "yMm": 0,
-              "widthMm": 118,
-              "heightMm": 165,
-              "title": "Raxthan Sulmontthan Vosslo",
-              "label": "Raxthan Sulmontthan Vosslo",
-              "toneIndex": 2,
-              "patternIndex": 2
             }
           ]
         },
         {
           "index": 1,
-          "xMm": 320,
+          "xMm": 290,
           "yMm": 0,
-          "widthMm": 320,
-          "heightMm": 360,
+          "widthMm": 350,
+          "heightMm": 300,
           "placements": [
             {
               "gameId": 10060,
@@ -113,39 +100,60 @@
               "label": "Zimmerebar Casssk",
               "toneIndex": 7,
               "patternIndex": 2
+            },
+            {
+              "gameId": 10037,
+              "entryId": 500019,
+              "kind": "cover",
+              "xMm": 190,
+              "yMm": 0,
+              "widthMm": 118,
+              "heightMm": 165,
+              "title": "Raxthan Sulmontthan Vosslo",
+              "label": "Raxthan Sulmontthan Vosslo",
+              "toneIndex": 2,
+              "patternIndex": 2
             }
           ]
         },
         {
           "index": 2,
           "xMm": 0,
-          "yMm": 380,
-          "widthMm": 200,
-          "heightMm": 300,
+          "yMm": 320,
+          "widthMm": 260,
+          "heightMm": 280,
           "placements": []
         },
         {
           "index": 3,
-          "xMm": 220,
-          "yMm": 380,
-          "widthMm": 200,
-          "heightMm": 300,
+          "xMm": 280,
+          "yMm": 320,
+          "widthMm": 180,
+          "heightMm": 280,
           "placements": []
         },
         {
           "index": 4,
-          "xMm": 440,
-          "yMm": 380,
-          "widthMm": 200,
-          "heightMm": 300,
+          "xMm": 480,
+          "yMm": 320,
+          "widthMm": 160,
+          "heightMm": 280,
           "placements": []
         },
         {
           "index": 5,
           "xMm": 0,
-          "yMm": 700,
-          "widthMm": 420,
-          "heightMm": 400,
+          "yMm": 620,
+          "widthMm": 290,
+          "heightMm": 380,
+          "placements": []
+        },
+        {
+          "index": 6,
+          "xMm": 310,
+          "yMm": 620,
+          "widthMm": 330,
+          "heightMm": 380,
           "placements": [
             {
               "gameId": 10044,
@@ -163,123 +171,51 @@
           ]
         },
         {
-          "index": 6,
-          "xMm": 440,
-          "yMm": 700,
-          "widthMm": 200,
-          "heightMm": 400,
-          "placements": []
-        },
-        {
           "index": 7,
           "xMm": 0,
-          "yMm": 1120,
-          "widthMm": 150,
-          "heightMm": 260,
+          "yMm": 1020,
+          "widthMm": 290,
+          "heightMm": 340,
           "placements": []
         },
         {
           "index": 8,
-          "xMm": 170,
-          "yMm": 1120,
-          "widthMm": 230,
-          "heightMm": 260,
+          "xMm": 310,
+          "yMm": 1020,
+          "widthMm": 330,
+          "heightMm": 340,
           "placements": []
         },
         {
           "index": 9,
-          "xMm": 420,
-          "yMm": 1120,
-          "widthMm": 220,
-          "heightMm": 260,
+          "xMm": 0,
+          "yMm": 1380,
+          "widthMm": 440,
+          "heightMm": 340,
           "placements": []
         },
         {
           "index": 10,
-          "xMm": 0,
-          "yMm": 1400,
-          "widthMm": 310,
+          "xMm": 460,
+          "yMm": 1380,
+          "widthMm": 180,
           "heightMm": 340,
           "placements": []
         },
         {
           "index": 11,
-          "xMm": 330,
-          "yMm": 1400,
-          "widthMm": 310,
-          "heightMm": 340,
+          "xMm": 0,
+          "yMm": 1740,
+          "widthMm": 170,
+          "heightMm": 420,
           "placements": []
         },
         {
           "index": 12,
-          "xMm": 0,
-          "yMm": 1760,
-          "widthMm": 200,
-          "heightMm": 300,
-          "placements": []
-        },
-        {
-          "index": 13,
-          "xMm": 220,
-          "yMm": 1760,
-          "widthMm": 420,
-          "heightMm": 300,
-          "placements": []
-        }
-      ]
-    },
-    {
-      "index": 1,
-      "widthMm": 640,
-      "heightMm": 1100,
-      "frameMm": 20,
-      "cubbies": [
-        {
-          "index": 0,
-          "xMm": 0,
-          "yMm": 0,
-          "widthMm": 300,
-          "heightMm": 360,
-          "placements": []
-        },
-        {
-          "index": 1,
-          "xMm": 320,
-          "yMm": 0,
-          "widthMm": 320,
-          "heightMm": 360,
-          "placements": []
-        },
-        {
-          "index": 2,
-          "xMm": 0,
-          "yMm": 380,
-          "widthMm": 200,
-          "heightMm": 300,
-          "placements": []
-        },
-        {
-          "index": 3,
-          "xMm": 220,
-          "yMm": 380,
-          "widthMm": 200,
-          "heightMm": 300,
-          "placements": []
-        },
-        {
-          "index": 4,
-          "xMm": 440,
-          "yMm": 380,
-          "widthMm": 200,
-          "heightMm": 300,
-          "placements": []
-        },
-        {
-          "index": 5,
-          "xMm": 0,
-          "yMm": 700,
-          "widthMm": 420,
-          "heightMm": 400,
+          "xMm": 190,
+          "yMm": 1740,
+          "widthMm": 450,
+          "heightMm": 420,
           "placements": [
             {
               "gameId": 10100,
@@ -295,14 +231,6 @@
               "patternIndex": 4
             }
           ]
-        },
-        {
-          "index": 6,
-          "xMm": 440,
-          "yMm": 700,
-          "widthMm": 200,
-          "heightMm": 400,
-          "placements": []
         }
       ]
     }
