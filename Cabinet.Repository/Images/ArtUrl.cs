@@ -6,6 +6,8 @@ public static class ArtUrl
     /// <summary>The longest address that is kept.</summary>
     public const int MaxLength = 2048;
 
+    private static readonly string ProtocolRelativePrefix = new('/', 2);
+
     /// <summary>
     /// Turns the text into the one canonical form an address is stored and compared in: the ends are trimmed, a leading
     /// double slash means https, and anything that is not an absolute http or https address of at most
@@ -21,7 +23,7 @@ public static class ArtUrl
             return null;
         }
 
-        var address = trimmed.StartsWith("//", StringComparison.Ordinal) ? $"https:{trimmed}" : trimmed;
+        var address = trimmed.StartsWith(ProtocolRelativePrefix, StringComparison.Ordinal) ? $"https:{trimmed}" : trimmed;
 
         if (address.Length > MaxLength
             || !Uri.TryCreate(address, UriKind.Absolute, out var uri)
