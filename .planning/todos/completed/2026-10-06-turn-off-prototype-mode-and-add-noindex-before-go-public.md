@@ -20,3 +20,7 @@ Part of the Phase 8 go-public checklist: set the prototype off in the committed 
 The prototype part is done: the committed default is `Prototype:Enabled` false, `appsettings.Development.json` turns it on for local development only, and the sample catalog is disabled in Production whatever the env file says (tests cover the page with the setting on and off). The deployed v0.3.0 serves only the synced collection.
 
 Only the robots noindex remains: add it to the shared layout (`Pages/Shared/_Layout.cshtml`) so every page carries it until the owner decides the site may be indexed, with a test on the served HTML.
+
+## Completed (2026-10-07)
+
+noindex shipped: the shared layout carries a robots noindex tag on every page, and an integration test checks every Razor page. Re-open this when the owner decides the site may be indexed.

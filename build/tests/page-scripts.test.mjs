@@ -173,13 +173,48 @@ test('a status older than one already taken is outdated, an equal or newer or un
   assert.equal(isOutdatedStatus(Number.NEGATIVE_INFINITY, { serverTimeUtc: '2030-01-15T12:00:00.000Z' }), false);
 });
 
-test('the reconnect delays are at once, 2 s, 10 s, 30 s and then every minute', () => {
-  assert.equal(reconnectDelayMs(0), 0);
-  assert.equal(reconnectDelayMs(1), 2000);
-  assert.equal(reconnectDelayMs(2), 10000);
-  assert.equal(reconnectDelayMs(3), 30000);
-  assert.equal(reconnectDelayMs(4), 60000);
-  assert.equal(reconnectDelayMs(50), 60000);
+test('the reconnect delays are a moment, 2 s, 10 s, 30 s and then every minute when the random source answers the middle', () => {
+  const middle = () => 0.5;
+
+  assert.equal(reconnectDelayMs(0, middle), 750);
+  assert.equal(reconnectDelayMs(1, middle), 2000);
+  assert.equal(reconnectDelayMs(2, middle), 10000);
+  assert.equal(reconnectDelayMs(3, middle), 30000);
+  assert.equal(reconnectDelayMs(4, middle), 60000);
+  assert.equal(reconnectDelayMs(50, middle), 60000);
+});
+
+test('every reconnect delay is spread by at most 20 percent, the first is spread over a second and is never zero, and none is negative', () => {
+  const lowest = () => 0;
+  const highest = () => 0.9999999;
+
+  assert.equal(reconnectDelayMs(0, lowest), 250);
+  assert.equal(reconnectDelayMs(0, highest), 1249);
+  assert.equal(reconnectDelayMs(1, lowest), 1600);
+  assert.equal(reconnectDelayMs(1, highest), 2400);
+  assert.equal(reconnectDelayMs(2, lowest), 8000);
+  assert.equal(reconnectDelayMs(3, highest), 36000);
+  assert.equal(reconnectDelayMs(4, lowest), 48000);
+  assert.equal(reconnectDelayMs(9, highest), 72000);
+
+  for (const unit of [-5, -0.1, Number.NaN, Number.POSITIVE_INFINITY, undefined, null, 0, 0.3, 1, 7]) {
+    for (const retry of [0, 1, 2, 3, 4, 5, 100]) {
+      const delay = reconnectDelayMs(retry, () => unit);
+
+      assert.ok(Number.isInteger(delay) && delay >= 250, `retry ${retry} with ${unit} gave ${delay}`);
+      assert.ok(delay <= 72000, `retry ${retry} with ${unit} gave ${delay}`);
+    }
+  }
+});
+
+test('the reconnect delay uses Math.random when no source is given and stays inside its bounds', () => {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const first = reconnectDelayMs(0);
+    const steady = reconnectDelayMs(4);
+
+    assert.ok(first >= 250 && first < 1250);
+    assert.ok(steady >= 48000 && steady <= 72000);
+  }
 });
 
 test('a press is followed while it is pending and before the deadline, and not otherwise', () => {
@@ -272,11 +307,11 @@ function createClock(repeatingIntervals = false) {
  * Starts the sync block against a hand-made page, a fake clock and the given fetch.
  * @param {object} setup fetchImpl builds the fetch from the clock; onCollectionChanged is passed through to the script; dataset
  *   adds to or replaces the first-paint attributes of the block; repeatingIntervals makes the clock's intervals really repeat.
- * @returns {{ clock: object, note: { textContent: string }, button: object, api: object, press: () => Promise<void>, attributeLog: string[][], setVisibility: (state: string) => void }} The running page.
+ * @returns {{ clock: object, note: { textContent: string, dataset: object }, staleNote: { hidden: boolean, textContent: string }, button: object, api: object, press: () => Promise<void>, attributeLog: string[][], setVisibility: (state: string) => void }} The running page.
  */
 function startPage({ fetchImpl, onCollectionChanged, dataset = {}, repeatingIntervals = false }) {
   const clock = createClock(repeatingIntervals);
-  const note = { textContent: '' };
+  const note = { textContent: '', dataset: {} };
   const attributes = new Map([['aria-disabled', 'false']]);
   const attributeLog = [];
   const handlers = {};
@@ -294,18 +329,22 @@ function startPage({ fetchImpl, onCollectionChanged, dataset = {}, repeatingInte
       handlers[type] = handler;
     },
   };
-  const elements = { '.sync-exact': { hidden: true, id: 'sync-exact' }, '.sync-stale': { hidden: true, textContent: '' }, '.sync-note': note };
+  const staleNote = { hidden: true, textContent: '' };
+  const elements = { '.sync-exact': { hidden: true, id: 'sync-exact' }, '.sync-stale': staleNote, '.sync-note': note };
   const root = {
     dataset: { serverTime: isoAt(0), running: 'false', staleAfter: '10800', snapshotVersion: 'v1', ...dataset },
     parentElement: { querySelector: (selector) => elements[selector] ?? null },
     querySelector: (selector) => (selector === '.sync-button' ? button : null),
+    prepend: () => undefined,
   };
+  const timeElement = {};
+  const timeButton = { setAttribute: () => undefined, append: () => undefined, addEventListener: () => undefined, querySelector: () => timeElement };
 
   globalThis.window = clock.timers;
   globalThis.document = {
     visibilityState: 'visible',
     addEventListener: (type, handler) => (documentHandlers[type] ??= []).push(handler),
-    createElement: () => ({}),
+    createElement: (tagName) => (tagName === 'time' ? timeElement : timeButton),
   };
   globalThis.fetch = fetchImpl(clock);
   Date.now = clock.now;
@@ -316,7 +355,7 @@ function startPage({ fetchImpl, onCollectionChanged, dataset = {}, repeatingInte
     (documentHandlers.visibilitychange ?? []).forEach((handler) => handler());
   };
 
-  return { clock, note, button, api, press: () => handlers.click(), attributeLog, setVisibility };
+  return { clock, note, staleNote, button, api, press: () => handlers.click(), attributeLog, setVisibility };
 }
 
 const realNow = Date.now;
@@ -552,6 +591,14 @@ function createFakeSignalR(clock, startSucceeds) {
       this.listeners.close.forEach((handler) => handler());
     }
 
+    /**
+     * The server turns the page away after the handshake: the connection ends with no permission to reconnect, so the page sees
+     * the close and nothing else (no reconnecting, no reconnected).
+     */
+    refuse() {
+      this.drop();
+    }
+
     reconnecting() {
       this.listeners.reconnecting.forEach((handler) => handler());
     }
@@ -593,11 +640,12 @@ function createFakeSignalR(clock, startSucceeds) {
 /**
  * Starts the live behaviour against a hand-made page: a fake clock with repeating intervals, a fake document whose visibility
  * the test sets, a fake browser client, and a status fetch the test answers.
- * @param {{ withClient?: boolean, startSucceeds?: (startNumber: number) => boolean, fetchStatus?: () => Promise<object | null> }} [setup]
- *   withClient puts the browser client on the page; startSucceeds decides each start; fetchStatus answers each status request.
+ * @param {{ withClient?: boolean, startSucceeds?: (startNumber: number) => boolean, fetchStatus?: () => Promise<object | null>, random?: () => number }} [setup]
+ *   withClient puts the browser client on the page; startSucceeds decides each start; fetchStatus answers each status request;
+ *   random is the source that spreads the reconnect waits, the middle of the range unless the test says otherwise.
  * @returns {object} The clock, what the script reported and asked for, and the levers for visibility and the network.
  */
-function startLivePage({ withClient = true, startSucceeds = () => true, fetchStatus = async () => null } = {}) {
+function startLivePage({ withClient = true, startSucceeds = () => true, fetchStatus = async () => null, random = () => 0.5 } = {}) {
   const clock = createClock(true);
   const fake = createFakeSignalR(clock, startSucceeds);
   const windowHandlers = {};
@@ -622,6 +670,7 @@ function startLivePage({ withClient = true, startSucceeds = () => true, fetchSta
   Date.now = clock.now;
 
   startLive({
+    random,
     applyStatus: (status) => applied.push(status),
     fetchStatus: () => {
       page.fetches += 1;
@@ -689,7 +738,7 @@ test('the live connection uses the live route and the reconnect schedule, report
 
     assert.equal(connections.length, 1);
     assert.equal(connections[0].url, '/cabinet/live');
-    assert.deepEqual([0, 1, 2, 3, 4, 20].map((previousRetryCount) => connections[0].reconnectDelay({ previousRetryCount })), [0, 2000, 10000, 30000, 60000, 60000]);
+    assert.deepEqual([0, 1, 2, 3, 4, 20].map((previousRetryCount) => connections[0].reconnectDelay({ previousRetryCount })), [750, 2000, 10000, 30000, 60000, 60000]);
     assert.equal(page.fetches, 1);
     assert.deepEqual(applied, [{ marker: 'fetched' }]);
 
@@ -742,34 +791,50 @@ test('while the connection is reconnecting the status is checked once a minute, 
   }
 });
 
-test('a connection that never starts is retried at once, then after 2 s, 10 s, 30 s and every minute without giving up', async () => {
+test('a connection that never starts is retried after a moment, then after about 2 s, 10 s, 30 s and every minute without giving up', async () => {
   const { clock, startTimes } = startLivePage({ startSucceeds: () => false });
 
   try {
     await clock.advance(170000);
 
-    assert.deepEqual(startTimes, [0, 0, 2000, 12000, 42000, 102000, 162000]);
+    assert.deepEqual(startTimes, [0, 750, 2750, 12750, 42750, 102750, 162750]);
   } finally {
     leaveLivePage();
   }
 });
 
-test('a connection that is closed again at once is retried more and more gently', async () => {
+test('the retry waits follow the random source the page was given, in the page loop and in the automatic reconnect', async () => {
+  const { clock, startTimes, connections } = startLivePage({ startSucceeds: () => false, random: () => 0 });
+
+  try {
+    await clock.advance(10000);
+
+    assert.deepEqual(startTimes, [0, 250, 1850, 9850]);
+    assert.deepEqual([0, 1, 2].map((previousRetryCount) => connections[0].reconnectDelay({ previousRetryCount })), [250, 1600, 8000]);
+  } finally {
+    leaveLivePage();
+  }
+});
+
+test('a page the server turns away after the handshake is retried more and more gently, never at once', async () => {
   const { clock, startTimes, connections } = startLivePage();
 
   try {
     await clock.advance(0);
-    connections[0].drop();
-    await clock.advance(0);
-    connections[0].drop();
-    await clock.advance(1999);
-    assert.deepEqual(startTimes, [0, 0]);
+    connections[0].refuse();
+    await clock.advance(749);
+    assert.deepEqual(startTimes, [0]);
 
     await clock.advance(1);
-    connections[0].drop();
+    connections[0].refuse();
+    await clock.advance(1999);
+    assert.deepEqual(startTimes, [0, 750]);
+
+    await clock.advance(1);
+    connections[0].refuse();
     await clock.advance(10000);
 
-    assert.deepEqual(startTimes, [0, 0, 2000, 12000]);
+    assert.deepEqual(startTimes, [0, 750, 2750, 12750]);
   } finally {
     leaveLivePage();
   }
@@ -781,13 +846,14 @@ test('a connection that stayed up for a minute starts the retry schedule over', 
   try {
     await clock.advance(0);
     connections[0].drop();
+    await clock.advance(750);
     await clock.advance(60000);
     connections[0].drop();
-    await clock.advance(0);
+    await clock.advance(750);
     connections[0].drop();
     await clock.advance(2000);
 
-    assert.deepEqual(startTimes, [0, 0, 60000, 62000]);
+    assert.deepEqual(startTimes, [0, 750, 61500, 63500]);
   } finally {
     leaveLivePage();
   }
@@ -958,6 +1024,153 @@ test('an own press whose result is held back ends with the held-back sentence an
 
       assert.equal(note.textContent, COPY.noteHeldBack);
       assert.notEqual(button.textContent, COPY.syncing);
+    },
+  );
+});
+
+test('the connection sentence goes away when the next status arrives, and only then', async () => {
+  await withPage(
+    {
+      fetchImpl: (clock) => async (url, init) => {
+        if (init?.method === 'POST') {
+          throw new TypeError('offline');
+        }
+
+        return answer(200, finished(clock.elapsed()));
+      },
+    },
+    async ({ clock, note, api, press }) => {
+      await press();
+      assert.equal(note.textContent, COPY.noteOffline);
+
+      await clock.advance(30 * SECONDS);
+      assert.equal(note.textContent, COPY.noteOffline);
+
+      api.applyStatus(finished(31 * SECONDS));
+      assert.equal(note.textContent, '');
+    },
+  );
+});
+
+test('a refused press that got a status back still ends with the connection sentence and a later status clears it', async () => {
+  const server = countingFetch((clock) => answer(500, { status: finished(clock.elapsed()) }));
+
+  await withPage({ fetchImpl: server.fetchImpl }, async ({ note, api, press }) => {
+    await press();
+    assert.equal(note.textContent, COPY.noteOffline);
+
+    api.applyStatus(finished(5 * SECONDS));
+    assert.equal(note.textContent, '');
+  });
+});
+
+test('a status arriving inside the window leaves the sentence about when to come back alone', async () => {
+  const server = countingFetch(() => answer(202, { outcome: 'started', status: running(0) }));
+
+  await withPage({ fetchImpl: server.fetchImpl, dataset: { cooldownEnds: isoAt(150 * SECONDS) } }, async ({ note, api, press }) => {
+    await press();
+    assert.equal(note.textContent, 'You can sync again in 3 minutes.');
+
+    api.applyStatus({ serverTimeUtc: isoAt(10 * SECONDS), running: false, cooldownEndsUtc: isoAt(150 * SECONDS), lastResult: 'changed' });
+    assert.equal(note.textContent, 'You can sync again in 3 minutes.');
+  });
+});
+
+test('the already-running sentence goes away when that sync ends, whether the window follows or not', async () => {
+  for (const cooldownEndsUtc of [isoAt(COOLDOWN_MS), null]) {
+    const server = countingFetch(() => answer(202, { outcome: 'started', status: running(0) }));
+
+    await withPage({ fetchImpl: server.fetchImpl, dataset: { running: 'true' } }, async ({ note, button, api, press }) => {
+      await press();
+      assert.equal(note.textContent, COPY.noteRunning);
+
+      api.applyStatus({ ...running(5 * SECONDS), cooldownEndsUtc });
+      assert.equal(note.textContent, COPY.noteRunning);
+
+      api.applyStatus({ ...finished(10 * SECONDS), cooldownEndsUtc });
+      assert.equal(note.textContent, '');
+      assert.notEqual(button.textContent, COPY.syncing);
+    });
+  }
+});
+
+test('a press that is waiting for its own outcome is not cleared by the sync ending, it gets its outcome sentence', async () => {
+  let server = running(0);
+
+  await withPage(
+    {
+      fetchImpl: (clock) => async (url, init) => {
+        if (init?.method === 'POST') {
+          return answer(202, { outcome: 'started', status: running(clock.elapsed()) });
+        }
+
+        return answer(200, { ...server, serverTimeUtc: isoAt(clock.elapsed()) });
+      },
+    },
+    async ({ clock, note, press }) => {
+      await press();
+      server = finished(0, 'unchanged');
+      await clock.advance(0);
+
+      assert.equal(note.textContent, COPY.noteUnchanged);
+    },
+  );
+});
+
+test('the own held-back sentence stays out of sight while the older-sync note says it, and shows again when that note goes', async () => {
+  let server = running(0);
+  const dataset = { lastSynced: isoAt(-60 * SECONDS), heldBack: 'true' };
+
+  await withPage(
+    {
+      dataset,
+      fetchImpl: (clock) => async (url, init) => {
+        if (init?.method === 'POST') {
+          return answer(202, { outcome: 'started', status: running(clock.elapsed()) });
+        }
+
+        return answer(200, { ...server, serverTimeUtc: isoAt(clock.elapsed()) });
+      },
+    },
+    async ({ clock, note, staleNote, api, press }) => {
+      assert.equal(staleNote.hidden, false);
+
+      await press();
+      server = finished(0, 'heldBack');
+      await clock.advance(0);
+
+      assert.equal(note.textContent, COPY.noteHeldBack);
+      assert.equal(note.dataset.covered, 'true');
+
+      api.applyStatus({ serverTimeUtc: isoAt(5 * SECONDS), heldBack: false });
+
+      assert.equal(staleNote.hidden, true);
+      assert.equal(note.textContent, COPY.noteHeldBack);
+      assert.equal(note.dataset.covered, undefined);
+    },
+  );
+});
+
+test('the own held-back sentence is shown as it is when there is no older-sync note to carry it', async () => {
+  let server = running(0);
+
+  await withPage(
+    {
+      fetchImpl: (clock) => async (url, init) => {
+        if (init?.method === 'POST') {
+          return answer(202, { outcome: 'started', status: running(clock.elapsed()) });
+        }
+
+        return answer(200, { ...server, serverTimeUtc: isoAt(clock.elapsed()) });
+      },
+    },
+    async ({ clock, note, press }) => {
+      await press();
+      server = finished(0, 'heldBack');
+      await clock.advance(0);
+
+      assert.equal(note.textContent, COPY.noteHeldBack);
+      assert.equal(note.dataset.covered, undefined);
     },
   );
 });
