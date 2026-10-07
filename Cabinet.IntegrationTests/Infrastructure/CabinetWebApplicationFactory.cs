@@ -92,7 +92,15 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
         _pickPorts = pickPorts;
         (PublicPort, OpsPort) = pickPorts();
 
-        StartOnFreePorts();
+        try
+        {
+            StartOnFreePorts();
+        }
+        catch
+        {
+            Dispose();
+            throw;
+        }
     }
 
     /// <summary>The loopback port the public listener uses for this instance.</summary>
@@ -175,20 +183,30 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
 
         _realHost = realHost;
 
-        var addresses = realHost.Services.GetRequiredService<IServer>()
-            .Features.Get<IServerAddressesFeature>();
-
-        testHost.Start();
-        WaitUntilApplicationStarted(testHost);
-        var testHostAddresses = testHost.Services.GetRequiredService<IServer>()
-            .Features.Get<IServerAddressesFeature>()!.Addresses;
-        testHostAddresses.Clear();
-        foreach (var address in addresses!.Addresses)
+        try
         {
-            testHostAddresses.Add(address);
-        }
+            var addresses = realHost.Services.GetRequiredService<IServer>()
+                .Features.Get<IServerAddressesFeature>();
 
-        return testHost;
+            testHost.Start();
+            WaitUntilApplicationStarted(testHost);
+            var testHostAddresses = testHost.Services.GetRequiredService<IServer>()
+                .Features.Get<IServerAddressesFeature>()!.Addresses;
+            testHostAddresses.Clear();
+            foreach (var address in addresses!.Addresses)
+            {
+                testHostAddresses.Add(address);
+            }
+
+            return testHost;
+        }
+        catch
+        {
+            _realHost = null;
+            realHost.Dispose();
+            testHost.Dispose();
+            throw;
+        }
     }
 
     /// <summary>
