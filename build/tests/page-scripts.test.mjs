@@ -1250,6 +1250,7 @@ class FakeElement {
     this.focusCalls = [];
     this.blurred = false;
     this.removed = false;
+    this.listeners = [];
   }
 
   get textContent() {
@@ -1294,8 +1295,8 @@ class FakeElement {
     this.attributes.delete(name);
   }
 
-  addEventListener() {
-    return undefined;
+  addEventListener(type, handler, options) {
+    this.listeners.push({ type, handler, options });
   }
 
   descendants() {
@@ -1466,6 +1467,148 @@ test('markup in a title is shown as text, never read as markup', () => {
   assert.equal(spine.getAttribute('aria-label'), title);
   assert.equal(label.textContent, title);
   assert.equal(label.children.length, 0);
+});
+
+const ART_URL = '/art/0123456789abcdef-240.webp';
+
+/**
+ * Builds the art of a cover placement the way the layout route states it.
+ * @param {object} [overrides] Fields that replace the valid defaults.
+ * @returns {object} The art.
+ */
+function artWith(overrides = {}) {
+  return { url: ART_URL, width: 240, height: 320, fit: 'width', ...overrides };
+}
+
+test('a cover with valid art is one image and nothing else, with the title kept in its name', () => {
+  const [cover] = drawPlacements([
+    { kind: 'cover', gameId: 8, entryId: 80, title: 'Invented Orchard', label: 'Invented Orchard', widthMm: 220, heightMm: 300, art: artWith() },
+  ]);
+  const [image] = cover.children;
+
+  assert.equal(cover.dataset.art, 'true');
+  assert.equal(cover.dataset.fit, 'width');
+  assert.equal(cover.dataset.pattern, undefined);
+  assert.equal(cover.children.length, 1);
+  assert.equal(cover.querySelector('.cover-plate'), null);
+  assert.equal(cover.querySelector('.placement-label'), null);
+  assert.equal(cover.textContent, '');
+  assert.equal(image.tagName, 'IMG');
+  assert.equal(image.className, 'cover-art');
+  assert.equal(image.src, ART_URL);
+  assert.equal(image.width, 240);
+  assert.equal(image.height, 320);
+  assert.equal(image.alt, '');
+  assert.equal(image.loading, 'lazy');
+  assert.equal(image.decoding, 'async');
+  assert.equal(image.draggable, false);
+  assert.equal(cover.getAttribute('aria-label'), 'Invented Orchard');
+  assert.equal(cover.title, 'Invented Orchard');
+});
+
+test('edge colours are set only when all four are valid colours', () => {
+  const edges = { top: '#112233', right: '#223344', bottom: '#334455', left: '#445566' };
+  const [good, partial, bad] = drawPlacements([
+    { kind: 'cover', gameId: 1, entryId: 1, title: 'A', label: 'A', art: artWith({ edges }) },
+    { kind: 'cover', gameId: 2, entryId: 2, title: 'B', label: 'B', art: artWith({ edges: { top: '#112233' } }) },
+    { kind: 'cover', gameId: 3, entryId: 3, title: 'C', label: 'C', art: artWith({ edges: { ...edges, left: 'red; background: url(x)' } }) },
+  ]);
+
+  assert.equal(good.properties.get('--edge-t'), '#112233');
+  assert.equal(good.properties.get('--edge-r'), '#223344');
+  assert.equal(good.properties.get('--edge-b'), '#334455');
+  assert.equal(good.properties.get('--edge-l'), '#445566');
+  assert.equal(partial.properties.has('--edge-t'), false);
+  assert.equal(bad.properties.has('--edge-l'), false);
+  assert.equal(bad.properties.has('--edge-t'), false);
+});
+
+test('a picture that fails to load is swapped for the generated cover, keeping the colours and saying nothing', () => {
+  const [cover] = drawPlacements([
+    { kind: 'cover', gameId: 8, entryId: 80, title: 'Invented Orchard', label: 'Invented Orchard', patternIndex: 2, art: artWith({ fit: 'height' }) },
+  ]);
+  const image = cover.children[0];
+  const failure = image.listeners.find((listener) => listener.type === 'error');
+
+  assert.ok(failure);
+  assert.deepEqual(failure.options, { once: true });
+  assert.equal(cover.properties.get('--bg'), '#6b4f3a');
+  assert.equal(cover.properties.get('--fg'), '#ffffff');
+
+  const previous = globalThis.document;
+  globalThis.document = cover.page;
+
+  try {
+    failure.handler();
+  } finally {
+    globalThis.document = previous;
+  }
+
+  assert.equal(image.removed, true);
+  assert.equal(cover.dataset.art, undefined);
+  assert.equal(cover.dataset.fit, undefined);
+  assert.equal(cover.dataset.pattern, 'dots');
+  assert.equal(cover.querySelector('.cover-art'), null);
+  assert.equal(cover.querySelector('.cover-plate').querySelector('.placement-label').textContent, 'Invented Orchard');
+  assert.equal(cover.properties.get('--bg'), '#6b4f3a');
+  assert.equal(cover.properties.get('--fg'), '#ffffff');
+  assert.equal(cover.getAttribute('aria-label'), 'Invented Orchard');
+});
+
+test('art that is not on the site, not a stored file name or not well formed is ignored and the generated cover is drawn', () => {
+  const invalid = [
+    artWith({ url: 'https://cf.example.org/a.webp' }),
+    artWith({ url: '/' + '/example.org/art/0123456789abcdef-240.webp' }),
+    artWith({ url: '/art/../snapshot.json' }),
+    artWith({ url: '/art/0123456789ABCDEF-240.webp' }),
+    artWith({ url: '/art/0123456789abcdef-240.png' }),
+    artWith({ url: 7 }),
+    artWith({ width: 0 }),
+    artWith({ width: 4097 }),
+    artWith({ height: 12.5 }),
+    artWith({ height: '320' }),
+    artWith({ fit: 'cover' }),
+    null,
+    'text',
+  ];
+  const buttons = drawPlacements(invalid.map((art, index) => (
+    { kind: 'cover', gameId: index + 1, entryId: index + 1, title: `Invented ${index}`, label: `Invented ${index}`, art }
+  )));
+
+  assert.equal(buttons.length, invalid.length);
+
+  for (const button of buttons) {
+    assert.equal(button.dataset.art, undefined);
+    assert.equal(button.querySelector('.cover-art'), null);
+    assert.notEqual(button.querySelector('.cover-plate'), null);
+    assert.equal(button.dataset.pattern, 'stripes');
+  }
+});
+
+test('only a cover ever draws a picture', () => {
+  const [spine] = drawPlacements([
+    { kind: 'spine', gameId: 1, entryId: 1, title: 'Invented Spine', label: 'Invented Spine', art: artWith() },
+  ]);
+
+  assert.equal(spine.dataset.art, undefined);
+  assert.equal(spine.querySelector('.cover-art'), null);
+});
+
+test('the page scripts never write a style attribute or an inline handler', () => {
+  for (const name of ['render.js', 'cabinet.js', 'sync.js', 'status.js', 'live.js', 'copy.js']) {
+    const source = readFileSync(new URL('../../Cabinet.Service/wwwroot/js/' + name, import.meta.url), 'utf8');
+
+    assert.doesNotMatch(source, /setAttribute\(\s*['"]style['"]/);
+    assert.doesNotMatch(source, /\.style\.cssText|\.style\s*=|innerHTML|insertAdjacentHTML|setAttribute\(\s*['"]on/);
+  }
+
+  const [cover] = drawPlacements([
+    { kind: 'cover', gameId: 8, entryId: 80, title: 'Invented Orchard', label: 'Invented Orchard', art: artWith({ edges: { top: '#112233', right: '#223344', bottom: '#334455', left: '#445566' } }) },
+  ]);
+
+  for (const node of [cover, ...cover.descendants()]) {
+    assert.equal(node.attributes.has('style'), false);
+  }
 });
 
 const CABINET_LAYOUT_ROUTE = '/cabinet/layout?profile=desktop';

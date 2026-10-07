@@ -45,7 +45,7 @@ public sealed class SnapshotStoreTests : IDisposable
 
         store.Load().Should().BeEquivalentTo(snapshot);
         var text = File.ReadAllText(SnapshotPath);
-        text.Should().Contain("\"schemaVersion\":1").And.Contain("\"kind\":\"expansion\"").And.Contain("\"collectionId\":7");
+        text.Should().Contain("\"schemaVersion\":2").And.Contain("\"kind\":\"expansion\"").And.Contain("\"collectionId\":7");
     }
 
     [Fact]
@@ -92,7 +92,7 @@ public sealed class SnapshotStoreTests : IDisposable
     [Fact]
     public void A_newer_schema_loads_as_no_snapshot_and_is_set_aside()
     {
-        File.WriteAllText(SnapshotPath, "{ \"schemaVersion\": 2, \"capturedAtUtc\": \"2026-01-01T00:00:00Z\", \"items\": [] }");
+        File.WriteAllText(SnapshotPath, "{ \"schemaVersion\": 3, \"capturedAtUtc\": \"2026-01-01T00:00:00Z\", \"items\": [] }");
 
         CreateStore().Load().Should().BeNull();
 

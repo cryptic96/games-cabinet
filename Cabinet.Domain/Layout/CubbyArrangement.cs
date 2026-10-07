@@ -335,6 +335,20 @@ public static class CubbyArrangement
         };
     }
 
+    /// <summary>
+    /// The picture a placement shows. Only a face-out cover with a stored picture has one; every other kind of placement
+    /// is drawn from colour alone and never asks for an image.
+    /// </summary>
+    private static PlacementArt? ArtFor(CabinetItem item, PlacementKind kind, int width, int height, SectionDesign design)
+    {
+        if (kind != PlacementKind.Cover || item.Art is null || ArtFitting.Pick(item.Art, width, design) is not { } variant)
+        {
+            return null;
+        }
+
+        return new PlacementArt(variant.Url, variant.Width, variant.Height, ArtFitting.Fit(width, height, variant.Width, variant.Height), item.Art.Edges);
+    }
+
     private static Placement Place(CabinetItem item, PlacementKind kind, int x, int y, int width, int height, SectionDesign design) =>
         new(
             GameId: item.BggId,
@@ -351,5 +365,6 @@ public static class CubbyArrangement
             ToneIndex: SpinePalette.ToneFor(item.BggId),
             PatternIndex: SpinePalette.PatternFor(item.BggId),
             FamilyId: null,
-            MoreCount: null);
+            MoreCount: null,
+            Art: ArtFor(item, kind, width, height, design));
 }

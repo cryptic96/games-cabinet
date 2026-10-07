@@ -3,6 +3,7 @@ using System.Text.Json;
 using Cabinet.Domain.Collection;
 using Cabinet.FakeBgg.Testing;
 using Cabinet.Repository.Bgg;
+using Cabinet.Repository.Images;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 
@@ -54,19 +55,28 @@ public static class SyncHarness
     /// <param name="handler">Answers the BGG calls.</param>
     /// <param name="clock">The clock the sync measures its windows on.</param>
     /// <param name="settings">Extra configuration values; null for none.</param>
+    /// <param name="imageHandler">Answers the picture requests; when null, picture requests use the real client, which refuses every address that is not on the allowed host list.</param>
     public static CabinetWebApplicationFactory CreateFactory(
         HttpMessageHandler handler,
         TimeProvider clock,
-        IReadOnlyDictionary<string, string?>? settings = null) =>
+        IReadOnlyDictionary<string, string?>? settings = null,
+        HttpMessageHandler? imageHandler = null) =>
         new(
             settings ?? new Dictionary<string, string?>(),
             services =>
             {
                 services.AddSingleton(Options());
                 services.AddSingleton<IRequestPacer>(new NoWaitPacer());
+                services.AddSingleton<IImagePacer>(new NoWaitPacer());
                 services.AddSingleton(clock);
                 services.AddHttpClient<ICollectionSource, BggClient>()
                     .ConfigurePrimaryHttpMessageHandler(() => handler);
+
+                if (imageHandler is not null)
+                {
+                    services.AddHttpClient<IArtSource, ImageDownloader>()
+                        .ConfigurePrimaryHttpMessageHandler(() => imageHandler);
+                }
             });
 
     /// <summary>Reads the status route.</summary>

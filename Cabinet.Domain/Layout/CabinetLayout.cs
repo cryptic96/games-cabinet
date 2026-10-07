@@ -25,6 +25,27 @@ public enum PlacementKind
     OrphanExpansion,
 }
 
+/// <summary>How a picture sits inside the box front it is drawn in; the picture is always shown whole.</summary>
+public enum ArtFit
+{
+    /// <summary>The picture fills the width and the box shows bars above and below it.</summary>
+    Width,
+
+    /// <summary>The picture fills the height and the box shows bars on both sides of it.</summary>
+    Height,
+
+    /// <summary>The picture and the box front have the same shape to within a hair, so no bars show.</summary>
+    Exact,
+}
+
+/// <summary>The picture a face-out cover shows.</summary>
+/// <param name="Url">The path on the site's own origin the file is served from.</param>
+/// <param name="Width">The width of the served file in pixels.</param>
+/// <param name="Height">The height of the served file in pixels.</param>
+/// <param name="Fit">How the picture sits inside the box front.</param>
+/// <param name="Edges">The colours along the picture's edges, or null when they are not known.</param>
+public sealed record PlacementArt(string Url, int Width, int Height, ArtFit Fit, ArtEdges? Edges = null);
+
 /// <summary>One drawn item inside a cubby. Coordinates are millimetres from the cubby's left edge and floor.</summary>
 /// <param name="GameId">The game identifier, kept on every placement so later features can attach to it.</param>
 /// <param name="EntryId">The collection entry the drawn box belongs to; two copies of one game have different entries.</param>
@@ -41,6 +62,7 @@ public enum PlacementKind
 /// <param name="PatternIndex">Index of the cover pattern; stable per game.</param>
 /// <param name="FamilyId">The base game identifier when the item belongs to a family; otherwise absent.</param>
 /// <param name="MoreCount">The hidden expansion count on a marker; otherwise absent.</param>
+/// <param name="Art">The picture of a face-out cover that has one; absent for every other placement.</param>
 public sealed record Placement(
     int GameId,
     long EntryId,
@@ -56,7 +78,8 @@ public sealed record Placement(
     int ToneIndex,
     int PatternIndex,
     int? FamilyId,
-    int? MoreCount);
+    int? MoreCount,
+    PlacementArt? Art = null);
 
 /// <summary>A compartment of a section. Position is measured from the top-left corner of the section interior.</summary>
 /// <param name="Index">The cubby's reading-order index within its section, counted from zero.</param>

@@ -2,6 +2,7 @@ using System.Globalization;
 using Cabinet.Domain;
 using Cabinet.Domain.Collection;
 using Cabinet.Repository.Bgg;
+using Cabinet.Repository.Images;
 using Cabinet.Repository.Storage;
 using Cabinet.Service.Collection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -42,6 +43,7 @@ public static class SyncEndpoints
         const string validationVersion = "0";
         BggSettings.FromConfiguration(configuration, environment, validationVersion);
         SyncSettings.FromConfiguration(configuration);
+        ImageSettings.FromConfiguration(configuration, environment);
 
         var storage = new StorageDirectory(StorageLocation.Resolve(configuration, environment));
 
@@ -65,6 +67,14 @@ public static class SyncEndpoints
             provider.GetRequiredService<TimeProvider>()));
         services.AddTransient<BggAuthHandler>();
 
+        services.AddSingleton(_ => ImageSettings.FromConfiguration(configuration, environment));
+        services.AddSingleton(provider => new ArtCache(provider.GetRequiredService<StorageDirectory>().Path));
+        services.AddSingleton(provider => provider.GetRequiredService<ImageOptions>().Policy);
+        services.AddSingleton(provider => provider.GetRequiredService<ImageOptions>().Limits);
+        services.AddSingleton<IImagePacer>(provider => new ImagePacer(
+            provider.GetRequiredService<ImageOptions>().DownloadGap,
+            provider.GetRequiredService<TimeProvider>()));
+
         services
             .AddHttpClient<ICollectionSource, BggClient>((provider, client) =>
             {
@@ -76,12 +86,29 @@ public static class SyncEndpoints
             .ConfigurePrimaryHttpMessageHandler(BggTransport.CreatePrimaryHandler)
             .AddHttpMessageHandler<BggAuthHandler>();
 
+        services
+            .AddHttpClient<IArtSource, ImageDownloader>((provider, client) =>
+            {
+                client.Timeout = RequestTimeout;
+                client.MaxResponseContentBufferSize = provider.GetRequiredService<ImageOptions>().MaxBytes + 1;
+            })
+            .ConfigurePrimaryHttpMessageHandler(BggTransport.CreatePrimaryHandler);
+
+        services.AddSingleton(provider => new ArtSync(
+            provider.GetRequiredService<IArtSource>,
+            provider.GetRequiredService<ArtCache>(),
+            provider.GetRequiredService<ImageOptions>(),
+            provider.GetRequiredService<TimeProvider>(),
+            provider.GetRequiredService<ILogger<ArtSync>>()));
         services.AddSingleton(provider => new SyncRunner(
             provider.GetRequiredService<ICollectionSource>,
             provider.GetRequiredService<ISnapshotStore>(),
             provider.GetRequiredService<CollectionStore>(),
             provider.GetRequiredService<TimeProvider>(),
-            provider.GetRequiredService<ILogger<SyncRunner>>()));
+            provider.GetRequiredService<ILogger<SyncRunner>>(),
+            provider.GetRequiredService<ArtSync>(),
+            provider.GetRequiredService<ArtCache>(),
+            provider.GetRequiredService<ImageOptions>()));
         services.AddSingleton<SyncCoordinator>();
         services.AddSingleton<SyncStatusService>();
         services.AddHostedService<SyncStartup>();

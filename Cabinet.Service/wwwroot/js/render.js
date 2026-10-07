@@ -14,6 +14,23 @@
 /** The cover pattern names in the order of the pattern index the layout carries. */
 const PATTERN_NAMES = ['stripes', 'chevrons', 'dots', 'rings', 'diagonal', 'plain'];
 
+/** The only address shape a box picture may have: a stored file on the site's own origin. */
+const ART_PATH = /^\/art\/[0-9a-f]{16}-[0-9]{1,4}\.webp$/;
+
+/** The fits the layout may state for a box picture. */
+const ART_FITS = ['width', 'height', 'exact'];
+
+/** A colour as the layout writes it: a hexadecimal triple. */
+const HEX_COLOUR = /^#[0-9a-fA-F]{6}$/;
+
+/** The custom properties the four edge colours of a picture are set on, as pairs of side name and property. */
+const EDGE_PROPERTIES = [
+  ['top', '--edge-t'],
+  ['right', '--edge-r'],
+  ['bottom', '--edge-b'],
+  ['left', '--edge-l'],
+];
+
 /**
  * Sets one custom property to a whole-number value.
  * @param {HTMLElement} element The element to style.
@@ -140,6 +157,109 @@ function labelText(placement, copy) {
 }
 
 /**
+ * Tells whether a value is a whole number from 1 to 4096, the sizes a stored picture can have.
+ * @param {unknown} value The value from the layout.
+ * @returns {boolean}
+ */
+function isPictureSize(value) {
+  return Number.isInteger(value) && value >= 1 && value <= 4096;
+}
+
+/**
+ * Returns the picture of a placement when the layout states a valid one, and null otherwise. The address must be a stored
+ * file on the site's own origin, the sizes whole numbers and the fit one of the three known fits; anything else is
+ * ignored, so a cover without a valid picture is drawn as a generated cover.
+ * @param {object} placement One placement from the layout.
+ * @returns {object | null}
+ */
+function artOf(placement) {
+  const art = placement.art;
+
+  if (placement.kind !== 'cover' || art === null || typeof art !== 'object') {
+    return null;
+  }
+
+  const valid = typeof art.url === 'string'
+    && ART_PATH.test(art.url)
+    && isPictureSize(art.width)
+    && isPictureSize(art.height)
+    && ART_FITS.includes(art.fit);
+
+  return valid ? art : null;
+}
+
+/**
+ * Sets the four edge colours of a picture on the button when the layout gives all four as valid colours.
+ * @param {HTMLElement} button The cover button.
+ * @param {object | undefined} edges The edge colours from the layout.
+ */
+function setEdgeColours(button, edges) {
+  if (edges === null || typeof edges !== 'object') {
+    return;
+  }
+
+  if (!EDGE_PROPERTIES.every(([side]) => typeof edges[side] === 'string' && HEX_COLOUR.test(edges[side]))) {
+    return;
+  }
+
+  for (const [side, property] of EDGE_PROPERTIES) {
+    button.style.setProperty(property, edges[side]);
+  }
+}
+
+/**
+ * Draws the generated cover into a button: the pattern chosen from the game's hash and a solid title plate holding the
+ * lines. It is the cover of every game without a usable picture and what stands in when a picture fails to load.
+ * @param {HTMLButtonElement} button The cover button.
+ * @param {object} placement One placement from the layout.
+ * @param {HTMLElement[]} lines The label lines to put on the plate.
+ */
+function drawGeneratedCover(button, placement, lines) {
+  button.dataset.pattern = PATTERN_NAMES[placement.patternIndex] ?? 'plain';
+
+  const plate = document.createElement('span');
+  plate.className = 'cover-plate';
+  plate.append(...lines);
+  button.append(plate);
+}
+
+/**
+ * Draws a box picture into a button: one image that is shown whole, with its stored size set so nothing moves while the
+ * file loads. When the browser cannot show the file the picture is taken away and the generated cover is drawn instead,
+ * silently, keeping the colours the button already has.
+ * @param {HTMLButtonElement} button The cover button.
+ * @param {object} placement One placement from the layout.
+ * @param {object} art The valid picture from the layout.
+ * @param {HTMLElement[]} lines The label lines the generated cover would hold.
+ */
+function drawArtCover(button, placement, art, lines) {
+  button.dataset.art = 'true';
+  button.dataset.fit = art.fit;
+  setEdgeColours(button, art.edges);
+
+  const image = document.createElement('img');
+  image.className = 'cover-art';
+  image.src = art.url;
+  image.width = art.width;
+  image.height = art.height;
+  image.alt = '';
+  image.loading = 'lazy';
+  image.decoding = 'async';
+  image.draggable = false;
+  image.addEventListener(
+    'error',
+    () => {
+      image.remove();
+      delete button.dataset.art;
+      delete button.dataset.fit;
+      drawGeneratedCover(button, placement, lines);
+    },
+    { once: true },
+  );
+  button.append(image);
+}
+
+/**
  * Builds the button for one placement.
  * @param {object} placement One placement from the layout.
  * @param {object} copy The visitor-facing strings.
@@ -182,13 +302,12 @@ function buildPlacement(placement, copy, palette) {
   const sub = buildSubLabel(placement, copy);
   const lines = sub === null ? [label] : [label, sub];
 
-  if (placement.kind === 'cover') {
-    button.dataset.pattern = PATTERN_NAMES[placement.patternIndex] ?? 'plain';
+  const art = artOf(placement);
 
-    const plate = document.createElement('span');
-    plate.className = 'cover-plate';
-    plate.append(...lines);
-    button.append(plate);
+  if (art !== null) {
+    drawArtCover(button, placement, art, lines);
+  } else if (placement.kind === 'cover') {
+    drawGeneratedCover(button, placement, lines);
   } else {
     button.append(...lines);
   }
