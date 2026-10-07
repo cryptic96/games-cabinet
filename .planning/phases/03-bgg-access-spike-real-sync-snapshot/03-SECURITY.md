@@ -209,11 +209,11 @@ Release, process and supply chain:
 
 ## Open Items (owner decisions)
 
-Resolved on 2026-10-07 after this audit (see "Post-audit fixes"): T-03-59, T-03-04, the accepted risks AR-03-01 to AR-03-04, `noindex`, the T-03-46 wording, the CI push trigger and the follow-up changes. Still open, all owner actions outside the repository's code:
+All resolved on 2026-10-07:
 
-1. **Release gates (observation 16):** turn off admin bypass on the `deploy` environment, and optionally add Claude Code permission rules (ask or deny) for merging pull requests, pushing `v*` tags and approving deployments. These are the owner's settings; no agent changes them.
-2. **Draft check before approval (observation 15):** approve `deploy` only after the workstation draft check has passed.
-3. **WebKit/Safari (T-03-58):** open the deployed page once in Safari to confirm live updates under the strict policy.
+1. **Release gates (observation 16):** the owner turned off administrator bypass on the `deploy` environment; `build/check-github-settings.sh` now fails if it is turned back on (`72ee6cb`, `49269ca`). The owner chose not to add Claude Code permission rules; the deploy approval stays the human gate.
+2. **Draft check before approval (observation 15):** from the next release on, the owner approves `deploy` only after the orchestrator reports that the workstation draft check passed.
+3. **WebKit/Safari (T-03-58):** the owner opened the deployed page in Safari and confirmed live updates work.
 
 ---
 
