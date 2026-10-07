@@ -21,6 +21,8 @@ public static class FakeBggProgram
 
         var app = FakeBggServer.Create(scenario, size, port);
         Console.WriteLine($"fake BGG listening on http://127.0.0.1:{port.ToString(CultureInfo.InvariantCulture)}/xmlapi2/ (scenario {scenario}, size {SyntheticBggCollection.Clamp(size).ToString(CultureInfo.InvariantCulture)})");
+        Console.WriteLine($"start the cabinet in Development with: Bgg__BaseUri=http://127.0.0.1:{port.ToString(CultureInfo.InvariantCulture)}/xmlapi2/");
+        Console.WriteLine($"and: Images__DevelopmentOrigin=http://127.0.0.1:{port.ToString(CultureInfo.InvariantCulture)}");
         await app.RunAsync();
         return 0;
     }

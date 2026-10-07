@@ -294,6 +294,78 @@ public class FakeBggServerTests
     private static int TotalItems(XDocument document) => int.Parse((string)document.Root!.Attribute("totalitems")!);
 
     /// <summary>A fake started on a free loopback port chosen by the system, so no port is picked and then lost to a race.</summary>
+    [Fact]
+    public async Task Collection_answers_point_every_picture_at_the_fakes_own_origin()
+    {
+        await using var fake = await RunningFake.Start(FakeBggScenario.Default, 65);
+
+        var document = await fake.GetXml(BaseGamesQuery);
+
+        var addresses = document.Descendants().Where(element => element.Name == "image" || element.Name == "thumbnail").Select(element => element.Value).ToList();
+        addresses.Should().NotBeEmpty().And.OnlyContain(address => address.StartsWith($"{fake.BaseAddress.GetLeftPart(UriPartial.Authority)}/fake-art/", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("100001-main.png", 600, 800)]
+    [InlineData("100002-main.png", 900, 800)]
+    [InlineData("900001-version.png", 600, 800)]
+    [InlineData("900008-version.png", 800, 800)]
+    public async Task The_art_route_answers_a_png_that_decodes_to_the_assigned_size(string file, int width, int height)
+    {
+        await using var fake = await RunningFake.Start(FakeBggScenario.Default, 65);
+
+        using var response = await fake.Client.GetAsync($"/fake-art/{file}", TestContext.Current.CancellationToken);
+        var bytes = await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType!.MediaType.Should().Be("image/png");
+        using var codec = SkiaSharp.SKCodec.Create(new SkiaSharp.SKMemoryStream(bytes));
+        codec.Should().NotBeNull();
+        codec!.Info.Width.Should().Be(width);
+        codec.Info.Height.Should().Be(height);
+    }
+
+    [Fact]
+    public async Task The_art_route_serves_bytes_no_decoder_reads_for_the_undecodable_case()
+    {
+        await using var fake = await RunningFake.Start(FakeBggScenario.Default, 65);
+
+        using var response = await fake.Client.GetAsync("/fake-art/100017-main.png", TestContext.Current.CancellationToken);
+        var bytes = await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType!.MediaType.Should().Be("image/png");
+        SkiaSharp.SKCodec.Create(new SkiaSharp.SKMemoryStream(bytes)).Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("100024-main.png")]
+    [InlineData("900018-version.png")]
+    [InlineData("100018-main.png")]
+    [InlineData("999999-main.png")]
+    [InlineData("not-a-picture.png")]
+    [InlineData("100001-main.jpg")]
+    [InlineData("100001.png")]
+    public async Task The_art_route_answers_not_found_for_the_not_found_case_and_for_unknown_names(string file)
+    {
+        await using var fake = await RunningFake.Start(FakeBggScenario.Default, 65);
+
+        using var response = await fake.Client.GetAsync($"/fake-art/{file}", TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task The_art_route_follows_the_failure_scenarios()
+    {
+        await using var fake = await RunningFake.Start(FakeBggScenario.Default, 65);
+        (await fake.Switch("throttle")).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var response = await fake.Client.GetAsync("/fake-art/100001-main.png", TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+    }
+
     private sealed class RunningFake : IAsyncDisposable
     {
         private readonly WebApplication _app;

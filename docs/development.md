@@ -92,7 +92,7 @@ Start it from the repository root:
 dotnet run --project Cabinet.FakeBgg -- --port 6190 --scenario normal --size 65
 ```
 
-It prints one line with its address, `http://127.0.0.1:6190/xmlapi2/`, and runs until you stop it. Point whatever should talk to BGG at that address instead of the real host.
+It prints its address, `http://127.0.0.1:6190/xmlapi2/`, and runs until you stop it. Point whatever should talk to BGG at that address instead of the real host.
 
 What it answers:
 
@@ -134,6 +134,25 @@ Things worth knowing:
 - It cannot tell you how the real service behaves. Rate limits, redirects and authentication are only as faithful as the shapes written down from real checks.
 
 Tests that need to script BGG's answers without a network use `ScriptedBggHandler` from the same project. It is an `HttpMessageHandler` that answers from a queue (status, content type, body, optional delay, extra headers) and records every request's address, authorization scheme and parameter, and User-Agent, so a test can prove where a token was and was not sent.
+
+### Local box art
+
+The fake also serves box pictures, so every case the picture rules handle can be seen on a developer machine without any real picture and without touching BGG or its image host. The pictures are invented and drawn in code; nothing recorded is ever served. Every picture address in the fake's collection and game answers points back at the fake itself, under `/fake-art/`.
+
+When it starts, the fake prints the two environment lines that point the cabinet at it:
+
+```
+Bgg__BaseUri=http://127.0.0.1:6190/xmlapi2/
+Images__DevelopmentOrigin=http://127.0.0.1:6190
+```
+
+Start the cabinet in the Development environment with both set. The first entries of the 65-entry collection are assigned pictures on purpose, so one run shows a flat cover that matches its box, a relatively wider and a narrower flat picture, a 3D box shot on white with a flat main picture, one on a grey gradient whose main picture is also a 3D shot, one on black with no main picture, a thick white frame, an all-white cover, a near-black cover, a mid-green cover, a very wide banner, a file that cannot be decoded and a picture that answers not found. The other entries cycle through the same kinds. Only games that face out show a picture, so to see every one of them at once also set `Layout__CoverStrategy=Random` and `Layout__CoverSharePercent=100`.
+
+Things worth knowing:
+
+- `Images__DevelopmentOrigin` is honoured only in the Development environment, and only as a plain `http` or `https` origin: no path, no query and no user information. Anywhere else it is ignored and the start-up log says so once, so a server settings file can never widen where pictures are fetched from. A value that is not a plain origin stops a Development start with a message naming the key.
+- Pictures are downloaded once and stored. To start again, stop the cabinet and delete the `art` folder inside the local state directory (`.cabinet-state` next to the service project, unless `Storage__Directory` says otherwise), then run a sync.
+- The fake's failure scenarios apply to the picture route as well, so `throttle` and `unavailable` also exercise how pictures cope with trouble.
 
 ## Using a BGG token locally
 

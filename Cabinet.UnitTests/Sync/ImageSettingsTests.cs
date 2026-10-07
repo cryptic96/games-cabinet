@@ -106,6 +106,60 @@ public sealed class ImageSettingsTests
         act.Should().Throw<InvalidOperationException>().WithMessage("Images:AllowedHosts must list at least one host name*");
     }
 
+    [Theory]
+    [InlineData("Production")]
+    [InlineData("Testing")]
+    [InlineData("Staging")]
+    public void Outside_development_a_configured_origin_is_ignored_and_reported(string environment)
+    {
+        var options = ImageSettings.FromConfiguration(Configure(("Images:DevelopmentOrigin", "http://127.0.0.1:6190")), new TestEnvironment(environment));
+
+        options.DevelopmentOrigin.Should().BeNull();
+        options.DevelopmentOriginIgnored.Should().BeTrue();
+        options.Policy.Allows(new Uri("http://127.0.0.1:6190/fake-art/1-main.png")).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("Production")]
+    [InlineData("Development")]
+    public void Without_an_origin_nothing_is_reported_as_ignored(string environment)
+    {
+        var options = ImageSettings.FromConfiguration(Configure(), new TestEnvironment(environment));
+
+        options.DevelopmentOrigin.Should().BeNull();
+        options.DevelopmentOriginIgnored.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("http://127.0.0.1:6190")]
+    [InlineData("http://127.0.0.1:6190/")]
+    [InlineData(" https://localhost:6191 ")]
+    public void In_development_an_http_or_https_origin_is_accepted_and_opens_only_that_origin(string value)
+    {
+        var options = ImageSettings.FromConfiguration(Configure(("Images:DevelopmentOrigin", value)), new TestEnvironment("Development"));
+
+        options.DevelopmentOrigin.Should().NotBeNull();
+        options.DevelopmentOriginIgnored.Should().BeFalse();
+        options.Policy.Allows(new Uri($"{options.DevelopmentOrigin!.GetLeftPart(UriPartial.Authority)}/fake-art/1-main.png")).Should().BeTrue();
+        options.Policy.Allows(new Uri("http://127.0.0.1:6999/fake-art/1-main.png")).Should().BeFalse();
+        options.Policy.Allows(new Uri("https://example.org/picture.png")).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("http://127.0.0.1:6190/path")]
+    [InlineData("http://127.0.0.1:6190/?query=1")]
+    [InlineData("http://127.0.0.1:6190/#fragment")]
+    [InlineData("ftp://127.0.0.1")]
+    [InlineData("http://user@127.0.0.1:6190")]
+    [InlineData("127.0.0.1:6190")]
+    [InlineData("/relative")]
+    public void In_development_a_value_that_is_not_a_plain_origin_is_refused_with_the_key_named(string value)
+    {
+        var act = () => ImageSettings.FromConfiguration(Configure(("Images:DevelopmentOrigin", value)), new TestEnvironment("Development"));
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("Images:DevelopmentOrigin must be*");
+    }
+
     private static IConfiguration Configure(params (string Key, string Value)[] values) =>
         new ConfigurationBuilder()
             .AddInMemoryCollection(values.ToDictionary(pair => pair.Key, pair => (string?)pair.Value))
