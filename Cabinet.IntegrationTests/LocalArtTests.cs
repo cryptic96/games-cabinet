@@ -22,6 +22,13 @@ public sealed class LocalArtTests
     private const int NotFoundPosition = 17;
     private const string LayoutPath = "/cabinet/layout?profile=desktop";
 
+    /// <summary>
+    /// How long the picture run may take. It downloads, analyses and resizes well over a hundred pictures over real loopback
+    /// HTTP, which a small shared build machine running the rest of the suite in parallel can take longer than the default
+    /// wait to finish.
+    /// </summary>
+    private static readonly TimeSpan PictureRunWait = TimeSpan.FromSeconds(90);
+
     [Fact]
     public async Task The_cabinet_fills_with_synthetic_art_served_by_the_fake_and_games_with_unusable_pictures_stay_bare()
     {
@@ -55,8 +62,10 @@ public sealed class LocalArtTests
             });
         using var client = factory.CreatePublicClient();
 
-        await SyncRounds.PressAndWait(client, clock, advance: false);
-        await SyncHarness.WaitUntil(async () => Placements(await ReadLayout(client)).Any(placement => ArtUrl(placement) is not null));
+        await SyncRounds.PressAndWait(client, clock, advance: false, timeout: PictureRunWait);
+        await SyncHarness.WaitUntil(
+            async () => Placements(await ReadLayout(client)).Any(placement => ArtUrl(placement) is not null),
+            PictureRunWait);
         using var layout = JsonDocument.Parse(await ReadLayout(client));
         var placements = Placements(layout).ToList();
         var covers = placements.Where(placement => placement.GetProperty("kind").GetString() == "cover").ToList();
