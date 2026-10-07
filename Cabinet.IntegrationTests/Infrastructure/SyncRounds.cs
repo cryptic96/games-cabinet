@@ -33,7 +33,13 @@ public static class SyncRounds
     /// Whether to keep moving the clock forward while the run is in progress, so a wait inside the run (such as the pause
     /// before a retry) passes without a real wait.
     /// </param>
-    public static async Task PressAndWait(HttpClient client, FakeTimeProvider clock, bool advance = true, bool moveClockWhileWaiting = false)
+    /// <param name="timeout">How long to wait for the run to end; null for the harness default.</param>
+    public static async Task PressAndWait(
+        HttpClient client,
+        FakeTimeProvider clock,
+        bool advance = true,
+        bool moveClockWhileWaiting = false,
+        TimeSpan? timeout = null)
     {
         if (advance)
         {
@@ -57,7 +63,7 @@ public static class SyncRounds
             }
 
             return ended;
-        });
+        }, timeout);
     }
 
     /// <summary>Reads what the desktop layout route serves now.</summary>

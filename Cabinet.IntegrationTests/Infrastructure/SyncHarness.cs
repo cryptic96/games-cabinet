@@ -102,19 +102,24 @@ public static class SyncHarness
             return !status.Running && status.LastResult is not null;
         });
 
+    /// <summary>How long a wait lasts when the test does not ask for longer.</summary>
+    public static TimeSpan DefaultWait { get; } = TimeSpan.FromSeconds(15);
+
     /// <summary>Polls a condition in real time, because the sync runs on its own thread.</summary>
     /// <param name="condition">Returns true once the wanted state is reached.</param>
-    public static async Task WaitUntil(Func<Task<bool>> condition)
+    /// <param name="timeout">How long to keep polling; null for <see cref="DefaultWait"/>.</param>
+    public static async Task WaitUntil(Func<Task<bool>> condition, TimeSpan? timeout = null)
     {
         ArgumentNullException.ThrowIfNull(condition);
 
-        var deadline = DateTime.UtcNow.AddSeconds(15);
+        var limit = timeout ?? DefaultWait;
+        var deadline = DateTime.UtcNow + limit;
 
         while (!await condition())
         {
             if (DateTime.UtcNow > deadline)
             {
-                throw new TimeoutException("The condition did not hold within fifteen seconds.");
+                throw new TimeoutException($"The condition did not hold within {limit.TotalSeconds} seconds.");
             }
 
             await Task.Delay(TimeSpan.FromMilliseconds(50), TestContext.Current.CancellationToken);
