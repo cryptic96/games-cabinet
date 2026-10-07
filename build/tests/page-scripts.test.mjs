@@ -272,11 +272,11 @@ function createClock(repeatingIntervals = false) {
  * Starts the sync block against a hand-made page, a fake clock and the given fetch.
  * @param {object} setup fetchImpl builds the fetch from the clock; onCollectionChanged is passed through to the script; dataset
  *   adds to or replaces the first-paint attributes of the block; repeatingIntervals makes the clock's intervals really repeat.
- * @returns {{ clock: object, note: { textContent: string }, button: object, api: object, press: () => Promise<void>, attributeLog: string[][], setVisibility: (state: string) => void }} The running page.
+ * @returns {{ clock: object, note: { textContent: string, dataset: object }, staleNote: { hidden: boolean, textContent: string }, button: object, api: object, press: () => Promise<void>, attributeLog: string[][], setVisibility: (state: string) => void }} The running page.
  */
 function startPage({ fetchImpl, onCollectionChanged, dataset = {}, repeatingIntervals = false }) {
   const clock = createClock(repeatingIntervals);
-  const note = { textContent: '' };
+  const note = { textContent: '', dataset: {} };
   const attributes = new Map([['aria-disabled', 'false']]);
   const attributeLog = [];
   const handlers = {};
@@ -294,18 +294,22 @@ function startPage({ fetchImpl, onCollectionChanged, dataset = {}, repeatingInte
       handlers[type] = handler;
     },
   };
-  const elements = { '.sync-exact': { hidden: true, id: 'sync-exact' }, '.sync-stale': { hidden: true, textContent: '' }, '.sync-note': note };
+  const staleNote = { hidden: true, textContent: '' };
+  const elements = { '.sync-exact': { hidden: true, id: 'sync-exact' }, '.sync-stale': staleNote, '.sync-note': note };
   const root = {
     dataset: { serverTime: isoAt(0), running: 'false', staleAfter: '10800', snapshotVersion: 'v1', ...dataset },
     parentElement: { querySelector: (selector) => elements[selector] ?? null },
     querySelector: (selector) => (selector === '.sync-button' ? button : null),
+    prepend: () => undefined,
   };
+  const timeElement = {};
+  const timeButton = { setAttribute: () => undefined, append: () => undefined, addEventListener: () => undefined, querySelector: () => timeElement };
 
   globalThis.window = clock.timers;
   globalThis.document = {
     visibilityState: 'visible',
     addEventListener: (type, handler) => (documentHandlers[type] ??= []).push(handler),
-    createElement: () => ({}),
+    createElement: (tagName) => (tagName === 'time' ? timeElement : timeButton),
   };
   globalThis.fetch = fetchImpl(clock);
   Date.now = clock.now;
@@ -316,7 +320,7 @@ function startPage({ fetchImpl, onCollectionChanged, dataset = {}, repeatingInte
     (documentHandlers.visibilitychange ?? []).forEach((handler) => handler());
   };
 
-  return { clock, note, button, api, press: () => handlers.click(), attributeLog, setVisibility };
+  return { clock, note, staleNote, button, api, press: () => handlers.click(), attributeLog, setVisibility };
 }
 
 const realNow = Date.now;
@@ -958,6 +962,153 @@ test('an own press whose result is held back ends with the held-back sentence an
 
       assert.equal(note.textContent, COPY.noteHeldBack);
       assert.notEqual(button.textContent, COPY.syncing);
+    },
+  );
+});
+
+test('the connection sentence goes away when the next status arrives, and only then', async () => {
+  await withPage(
+    {
+      fetchImpl: (clock) => async (url, init) => {
+        if (init?.method === 'POST') {
+          throw new TypeError('offline');
+        }
+
+        return answer(200, finished(clock.elapsed()));
+      },
+    },
+    async ({ clock, note, api, press }) => {
+      await press();
+      assert.equal(note.textContent, COPY.noteOffline);
+
+      await clock.advance(30 * SECONDS);
+      assert.equal(note.textContent, COPY.noteOffline);
+
+      api.applyStatus(finished(31 * SECONDS));
+      assert.equal(note.textContent, '');
+    },
+  );
+});
+
+test('a refused press that got a status back still ends with the connection sentence and a later status clears it', async () => {
+  const server = countingFetch((clock) => answer(500, { status: finished(clock.elapsed()) }));
+
+  await withPage({ fetchImpl: server.fetchImpl }, async ({ note, api, press }) => {
+    await press();
+    assert.equal(note.textContent, COPY.noteOffline);
+
+    api.applyStatus(finished(5 * SECONDS));
+    assert.equal(note.textContent, '');
+  });
+});
+
+test('a status arriving inside the window leaves the sentence about when to come back alone', async () => {
+  const server = countingFetch(() => answer(202, { outcome: 'started', status: running(0) }));
+
+  await withPage({ fetchImpl: server.fetchImpl, dataset: { cooldownEnds: isoAt(150 * SECONDS) } }, async ({ note, api, press }) => {
+    await press();
+    assert.equal(note.textContent, 'You can sync again in 3 minutes.');
+
+    api.applyStatus({ serverTimeUtc: isoAt(10 * SECONDS), running: false, cooldownEndsUtc: isoAt(150 * SECONDS), lastResult: 'changed' });
+    assert.equal(note.textContent, 'You can sync again in 3 minutes.');
+  });
+});
+
+test('the already-running sentence goes away when that sync ends, whether the window follows or not', async () => {
+  for (const cooldownEndsUtc of [isoAt(COOLDOWN_MS), null]) {
+    const server = countingFetch(() => answer(202, { outcome: 'started', status: running(0) }));
+
+    await withPage({ fetchImpl: server.fetchImpl, dataset: { running: 'true' } }, async ({ note, button, api, press }) => {
+      await press();
+      assert.equal(note.textContent, COPY.noteRunning);
+
+      api.applyStatus({ ...running(5 * SECONDS), cooldownEndsUtc });
+      assert.equal(note.textContent, COPY.noteRunning);
+
+      api.applyStatus({ ...finished(10 * SECONDS), cooldownEndsUtc });
+      assert.equal(note.textContent, '');
+      assert.notEqual(button.textContent, COPY.syncing);
+    });
+  }
+});
+
+test('a press that is waiting for its own outcome is not cleared by the sync ending, it gets its outcome sentence', async () => {
+  let server = running(0);
+
+  await withPage(
+    {
+      fetchImpl: (clock) => async (url, init) => {
+        if (init?.method === 'POST') {
+          return answer(202, { outcome: 'started', status: running(clock.elapsed()) });
+        }
+
+        return answer(200, { ...server, serverTimeUtc: isoAt(clock.elapsed()) });
+      },
+    },
+    async ({ clock, note, press }) => {
+      await press();
+      server = finished(0, 'unchanged');
+      await clock.advance(0);
+
+      assert.equal(note.textContent, COPY.noteUnchanged);
+    },
+  );
+});
+
+test('the own held-back sentence stays out of sight while the older-sync note says it, and shows again when that note goes', async () => {
+  let server = running(0);
+  const dataset = { lastSynced: isoAt(-60 * SECONDS), heldBack: 'true' };
+
+  await withPage(
+    {
+      dataset,
+      fetchImpl: (clock) => async (url, init) => {
+        if (init?.method === 'POST') {
+          return answer(202, { outcome: 'started', status: running(clock.elapsed()) });
+        }
+
+        return answer(200, { ...server, serverTimeUtc: isoAt(clock.elapsed()) });
+      },
+    },
+    async ({ clock, note, staleNote, api, press }) => {
+      assert.equal(staleNote.hidden, false);
+
+      await press();
+      server = finished(0, 'heldBack');
+      await clock.advance(0);
+
+      assert.equal(note.textContent, COPY.noteHeldBack);
+      assert.equal(note.dataset.covered, 'true');
+
+      api.applyStatus({ serverTimeUtc: isoAt(5 * SECONDS), heldBack: false });
+
+      assert.equal(staleNote.hidden, true);
+      assert.equal(note.textContent, COPY.noteHeldBack);
+      assert.equal(note.dataset.covered, undefined);
+    },
+  );
+});
+
+test('the own held-back sentence is shown as it is when there is no older-sync note to carry it', async () => {
+  let server = running(0);
+
+  await withPage(
+    {
+      fetchImpl: (clock) => async (url, init) => {
+        if (init?.method === 'POST') {
+          return answer(202, { outcome: 'started', status: running(clock.elapsed()) });
+        }
+
+        return answer(200, { ...server, serverTimeUtc: isoAt(clock.elapsed()) });
+      },
+    },
+    async ({ clock, note, press }) => {
+      await press();
+      server = finished(0, 'heldBack');
+      await clock.advance(0);
+
+      assert.equal(note.textContent, COPY.noteHeldBack);
+      assert.equal(note.dataset.covered, undefined);
     },
   );
 });

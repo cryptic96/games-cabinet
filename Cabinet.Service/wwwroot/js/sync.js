@@ -2,7 +2,8 @@
  * Wires the sync block: rewrites the server's UTC first paint into the visitor's own time, shows the exact time when the
  * relative time is pressed, keeps the relative time and the older-sync note current from local timers, runs the "Sync now"
  * button (its states, its countdown and the one sentence that follows the visitor's own press) and takes a newer status from
- * whatever fetches one. Only the visitor's own press ever writes to the note; a failed status fetch simply leaves the last values.
+ * whatever fetches one. Only the visitor's own press ever writes to the note; the page may only clear it, when what it says is no
+ * longer true. A failed status fetch simply leaves the last values.
  */
 import { COPY } from './copy.js';
 import { serverOffsetMs, elapsedSeconds, isStale, buttonState, countdownText, pressOutcome, shouldRedraw, isOutdatedStatus, ownSyncStillWaiting } from './status.js';
@@ -110,6 +111,7 @@ export function initSyncStatus(root, options = {}) {
     if (lastSyncedIso === '') {
       staleNote.hidden = true;
       staleNote.textContent = '';
+      updateNoteCover();
       return;
     }
 
@@ -128,6 +130,7 @@ export function initSyncStatus(root, options = {}) {
 
     staleNote.hidden = !stale;
     staleNote.textContent = stale ? (heldBack ? COPY.staleHeldBack(exact) : COPY.staleRecent(exact)) : '';
+    updateNoteCover();
   }
 
   /**
@@ -183,7 +186,11 @@ export function initSyncStatus(root, options = {}) {
     button.hidden = false;
 
     if (previousKind === 'cooldown' && state.kind === 'idle') {
-      note.textContent = '';
+      say('');
+    }
+
+    if (previousKind === 'running' && state.kind !== 'running' && !ownSyncPending && note.textContent === COPY.noteRunning) {
+      say('');
     }
 
     previousKind = state.kind;
@@ -206,11 +213,33 @@ export function initSyncStatus(root, options = {}) {
   }
 
   /**
-   * Writes the one sentence of the visitor's own press cycle.
+   * Writes the one sentence of the visitor's own press cycle, or clears it when given an empty text.
    * @param {string} text The sentence.
    */
   function say(text) {
     note.textContent = text;
+    updateNoteCover();
+  }
+
+  /**
+   * Keeps the visitor's own held-back sentence out of sight while the older-sync note already says the same thing. The sentence
+   * stays in the live region, so it is still announced, and shows again if the older-sync note goes away.
+   */
+  function updateNoteCover() {
+    if (note.textContent === COPY.noteHeldBack && !staleNote.hidden && heldBack) {
+      note.dataset.covered = 'true';
+    } else {
+      delete note.dataset.covered;
+    }
+  }
+
+  /**
+   * Clears the connection sentence once any status has arrived, because the site has just been reached.
+   */
+  function clearOfflineNote() {
+    if (note.textContent === COPY.noteOffline) {
+      say('');
+    }
   }
 
   /**
@@ -249,6 +278,8 @@ export function initSyncStatus(root, options = {}) {
    *   started a sync also treats the first status that finds nothing running as the end of it, wherever that status came from.
    */
   function applyStatus(status, context = {}) {
+    clearOfflineNote();
+
     if (isOutdatedStatus(newestServerTimeMs, status)) {
       return;
     }

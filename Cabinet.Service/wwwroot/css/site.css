@@ -215,6 +215,16 @@ main .cabinet-message {
   margin-top: 0;
 }
 
+.sync-note[data-covered] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 a:focus-visible,
 button:focus-visible {
   outline: 2px solid var(--wood-light);
