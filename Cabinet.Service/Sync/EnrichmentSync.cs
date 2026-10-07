@@ -69,7 +69,12 @@ public sealed class EnrichmentSync(
 
             foreach (var (id, details) in fetched.Games)
             {
-                games[id] = details;
+                games.TryGetValue(id, out var previous);
+                games[id] = details with
+                {
+                    EstimatedSize = SizeEstimate.Assign(details, previous?.EstimatedSize, previous?.EstimateModelVersion),
+                    EstimateModelVersion = SizeEstimate.ModelVersion,
+                };
                 enriched++;
             }
 
