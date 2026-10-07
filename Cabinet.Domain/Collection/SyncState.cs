@@ -8,6 +8,9 @@ public enum HeldBackKind
 
     /// <summary>The source reported far fewer items than the collection already shown.</summary>
     Shrunk,
+
+    /// <summary>The stored collection could not be read, so nothing is known to compare the answer with; it waits for a second identical answer.</summary>
+    Unverified,
 }
 
 /// <summary>An answer a sync did not apply because it looked wrong, remembered so the same answer is not held back twice in a row.</summary>
