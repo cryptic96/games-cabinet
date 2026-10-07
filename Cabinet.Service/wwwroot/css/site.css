@@ -82,6 +82,7 @@ main {
 footer {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 16px;
   padding: 0 16px 64px;
   font-size: 14px;
