@@ -156,7 +156,7 @@ async function redraw() {
       const same = mount.querySelector('[data-entry-id="' + CSS.escape(focused) + '"]');
 
       if (same !== null) {
-        same.focus();
+        same.focus({ preventScroll: true });
       } else {
         document.activeElement.blur();
       }
