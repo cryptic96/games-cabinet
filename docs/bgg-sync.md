@@ -115,12 +115,20 @@ status route once a minute while the tab is visible, and once more whenever the
 tab becomes visible again, the browser comes back online or the channel
 reconnects. Nothing about a lost connection is shown to the visitor.
 
+A page that loses the channel, or never gets it, tries again on a slow schedule:
+a brief randomised first retry (a fraction of a second to about a second), then
+about 2 seconds, 10 seconds and 30 seconds, then about every 60 seconds. Each wait
+is varied by up to 20 percent so that many pages do not reconnect together after a
+restart. The schedule starts over only after a connection has stayed up for a
+minute, so a channel that opens and is closed at once is retried gently instead of
+in a tight loop.
+
 The number of open channels is capped for the whole site, to keep a small server
 safe on the internet:
 
 | Key | Default | Range | Meaning |
 | --- | --- | --- | --- |
-| `Live__MaxConnections` | `100` | 1 to 10000 | The most live connections held open at once. A page that is refused falls back to the one-minute status check. |
+| `Live__MaxConnections` | `100` | 1 to 10000 | The most live connections held open at once. A page that is refused is closed right after it connects, without permission to reconnect by itself; it follows the slow retry schedule above and meanwhile uses the one-minute status check. |
 
 A value outside the range stops the service at start-up with a message that names
 the key. A push to the connected pages is given up on after 5 seconds, so a slow
@@ -273,7 +281,20 @@ version of the app, the app sets it aside as `snapshot.json.bad` (replacing an
 older one), logs one line naming the reason, shows the "being filled" state and
 keeps reporting healthy. The next sync rebuilds the file. If the file cannot be
 read at all (a permission or disk error), it is left where it is, one line is
-logged and the page shows the "being filled" state until the next sync or start.
+logged and the page shows the "being filled" state until a sync replaces the file, as described next.
+
+A file that exists but could not be read is not treated as "nothing stored yet".
+The service remembers this until it can read the file, and every sync tries to
+read it again first. While the file is still unreadable, a sync never replaces it
+with an empty answer, however often that repeats, and replaces it with a
+collection that has games only when two syncs in a row return exactly the same set
+of entries. The first of the two is held back in the same way as the answers
+described under "When BGG misbehaves": `sync-state.json` carries the record, the
+status route reports `heldBack`, and the record survives a restart. As soon as the
+file can be read, it is shown again and the usual rules for empty and shrunken
+answers apply, so one good read is enough to return to normal. If the file stays
+unreadable for good, fix the permission or disk problem, or delete the file to let
+the next sync rebuild it.
 
 ## Running locally
 
