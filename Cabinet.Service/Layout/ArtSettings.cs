@@ -15,10 +15,14 @@ public static class ArtSettings
     private const string FlatMaxCornerKey = "Art:FlatMaxCornerPercent";
     private const string ThreeDMaxFillKey = "Art:ThreeDMaxFillPercent";
     private const string ThreeDMinCornerKey = "Art:ThreeDMinCornerPercent";
+    private const string ShapeMarginKey = "Art:ShapeMarginPercent";
+    private const string OrientFromCoverKey = "Art:OrientFromCover";
+    private const int MinShapeMarginPercent = 1;
+    private const int MaxShapeMarginPercent = 50;
     private const double PercentDivisor = 100.0;
 
     /// <summary>
-    /// Reads the four Art keys. A key that is absent takes the default; a key that is present but out of range or not a
+    /// Reads the Art keys. A key that is absent takes the default; a key that is present but out of range or not a
     /// whole number throws, and so does a photographed-box fill limit above the flat-cover fill minimum, because no picture
     /// could then be judged both ways in a way that makes sense.
     /// </summary>
@@ -39,7 +43,43 @@ public static class ArtSettings
             throw new InvalidOperationException($"{ThreeDMaxFillKey} must not be above {FlatMinFillKey}.");
         }
 
-        return new ArtRules(new ArtThresholds(flatMinFill, flatMaxCorner, threeDMaxFill, threeDMinCorner, defaults.DegenerateBackdropShare));
+        return new ArtRules(
+            new ArtThresholds(flatMinFill, flatMaxCorner, threeDMaxFill, threeDMinCorner, defaults.DegenerateBackdropShare),
+            ReadWholeNumber(configuration, ShapeMarginKey, MinShapeMarginPercent, MaxShapeMarginPercent, ArtRules.DefaultShapeMarginPercent),
+            ReadSwitch(configuration, OrientFromCoverKey, fallback: true));
+    }
+
+    private static int ReadWholeNumber(IConfiguration configuration, string key, int min, int max, int fallback)
+    {
+        var text = configuration[key];
+
+        if (text is null)
+        {
+            return fallback;
+        }
+
+        if (!int.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var value)
+            || value < min
+            || value > max)
+        {
+            throw new InvalidOperationException($"{key} must be a whole number between {min} and {max}.");
+        }
+
+        return value;
+    }
+
+    private static bool ReadSwitch(IConfiguration configuration, string key, bool fallback)
+    {
+        var text = configuration[key];
+
+        if (text is null)
+        {
+            return fallback;
+        }
+
+        return bool.TryParse(text, out var value)
+            ? value
+            : throw new InvalidOperationException($"{key} must be true or false.");
     }
 
     private static double ReadPercent(IConfiguration configuration, string key, int min, int max, double fallback)
