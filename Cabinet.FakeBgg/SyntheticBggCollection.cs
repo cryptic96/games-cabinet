@@ -46,6 +46,7 @@ public static class SyntheticBggCollection
 
     private const int MissingBaseObjectId = 190001;
     private const int SecondMissingBaseObjectId = 190002;
+    private const int ThickOrphanIndex = 34;
 
     private static readonly IReadOnlyList<int> SecondOwnedBase = [FirstObjectId + 1];
 
@@ -56,7 +57,8 @@ public static class SyntheticBggCollection
     /// ones included. A size that is not offered is clamped to the nearest offered size. The first entries are
     /// hand-picked edge cases (a game owned twice, an unowned entry, expansions with and without their base game in
     /// the collection, expansions that name a second owned or unowned base game, an escaped character, a non-Latin title,
-    /// a blank title, versions with and without dimensions, two locations); the rest follow a regular pattern.
+    /// a blank title, versions with and without dimensions, two locations); the rest follow a regular pattern, except one
+    /// thick expansion of a game that is not owned, so an expansion box thick enough for a second line can be seen.
     /// </summary>
     /// <param name="size">The wanted number of entries.</param>
     public static IReadOnlyList<FakeBggItem> Create(int size)
@@ -79,7 +81,7 @@ public static class SyntheticBggCollection
         {
             var index = items.Count;
             var item = IsGeneratedExpansion(index)
-                ? Generated(index, isExpansion: true, lastBaseObjectId)
+                ? Generated(index, isExpansion: true, index == ThickOrphanIndex ? MissingBaseObjectId : lastBaseObjectId)
                 : Generated(index, isExpansion: false, baseObjectId: null);
             if (!item.IsExpansion)
             {
@@ -215,6 +217,11 @@ public static class SyntheticBggCollection
         if (index % 10 == 3)
         {
             return Dimensions(0, 0, 0);
+        }
+
+        if (isExpansion && index == ThickOrphanIndex)
+        {
+            return Dimensions(10.0, 11.5, 4.2);
         }
 
         if (isExpansion)
