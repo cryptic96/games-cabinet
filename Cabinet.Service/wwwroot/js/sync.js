@@ -1,28 +1,50 @@
 /**
- * Wires the sync status line: rewrites the server's UTC first paint into the visitor's own time, shows the exact time when the
- * relative time is pressed, keeps the relative time and the older-sync note current from local timers, and takes a newer
- * status from whatever fetches one. It never writes error text; a failed fetch elsewhere simply leaves the last values.
+ * Wires the sync block: rewrites the server's UTC first paint into the visitor's own time, shows the exact time when the
+ * relative time is pressed, keeps the relative time and the older-sync note current from local timers, runs the "Sync now"
+ * button (its states, its countdown and the one sentence that follows the visitor's own press) and takes a newer status from
+ * whatever fetches one. Only the visitor's own press ever writes to the note; a failed status fetch simply leaves the last values.
  */
 import { COPY } from './copy.js';
-import { serverOffsetMs, elapsedSeconds, isStale } from './status.js';
+import { serverOffsetMs, elapsedSeconds, isStale, buttonState, countdownText, pressOutcome } from './status.js';
 
 const REFRESH_INTERVAL_MS = 30000;
+const POLL_INTERVAL_MS = 5000;
+const POLL_LIMIT_MS = 600000;
+const TICK_INTERVAL_MS = 1000;
+const OUTCOME_NOTES = Object.freeze({
+  changed: COPY.noteChanged,
+  unchanged: COPY.noteUnchanged,
+  failed: COPY.noteFailed,
+  heldBack: COPY.noteHeldBack,
+});
 
 /**
- * Starts the status line behaviour for the sync block.
+ * Starts the sync block behaviour.
  * @param {HTMLElement} root The element carrying the first-paint state as data attributes.
- * @returns {{ applyStatus: (status: object) => void, refresh: () => void }} The status takers other scripts call.
+ * @param {{ onCollectionChanged?: () => Promise<boolean | void> | void }} [options] Called when the status shows a collection version
+ *   that is not the one on screen; a result of false means the redraw did not happen and the next status tries again.
+ * @returns {{ applyStatus: (status: object, options?: { ownPress?: boolean }) => void, refresh: () => void }} The status takers other scripts call.
  */
-export function initSyncStatus(root) {
+export function initSyncStatus(root, options = {}) {
   const scope = root.parentElement;
   const exactLine = scope.querySelector('.sync-exact');
   const staleNote = scope.querySelector('.sync-stale');
+  const note = scope.querySelector('.sync-note');
+  const button = root.querySelector('.sync-button');
 
   let timeButton = root.querySelector('.sync-time');
   let lastSyncedIso = root.dataset.lastSynced ?? '';
   let heldBack = root.dataset.heldBack === 'true';
   let staleAfterSeconds = Number(root.dataset.staleAfter);
   let offsetMs = serverOffsetMs(root.dataset.serverTime, Date.now());
+  let running = root.dataset.running === 'true';
+  let cooldownEndsIso = root.dataset.cooldownEnds ?? '';
+  let shownVersion = root.dataset.snapshotVersion ?? '';
+  let redrawingVersion = null;
+  let previousKind = null;
+  let ticker = null;
+  let pressing = false;
+  let pollTimer = null;
 
   /**
    * Builds the relative-time button when the first sync lands on a page that loaded before any had.
@@ -86,10 +108,119 @@ export function initSyncStatus(root) {
   }
 
   /**
-   * Takes a status in the shape the status route answers with: corrects the clock offset and redraws every field.
-   * @param {object} status The status; missing fields leave the last values in place.
+   * Where the button stands on the server's clock right now.
+   * @returns {{ kind: 'running' | 'cooldown' | 'idle', remainingMs: number }}
    */
-  function applyStatus(status) {
+  function currentState() {
+    return buttonState({ running, cooldownEndsUtc: cooldownEndsIso }, Date.now() + offsetMs);
+  }
+
+  /**
+   * Sets an attribute only when its value differs, so a tick that changes nothing touches nothing.
+   * @param {string} name The attribute name.
+   * @param {string | null} value The wanted value; null removes the attribute.
+   */
+  function setButtonAttribute(name, value) {
+    if (value === null) {
+      button.removeAttribute(name);
+    } else if (button.getAttribute(name) !== value) {
+      button.setAttribute(name, value);
+    }
+  }
+
+  /**
+   * Draws the button from the current state: its words, its aria-disabled and, during the window, an accessible name that only
+   * changes when the whole-minute wording does. Starts or stops the one-second tick as the state needs.
+   */
+  function renderButton() {
+    if (button === null) {
+      return;
+    }
+
+    const state = currentState();
+    let text = COPY.syncNow;
+    let disabled = 'false';
+    let label = null;
+
+    if (state.kind === 'running') {
+      text = COPY.syncing;
+      disabled = 'true';
+    } else if (state.kind === 'cooldown') {
+      text = COPY.syncAgainIn(countdownText(state.remainingMs));
+      disabled = 'true';
+      label = COPY.syncAgainName(state.remainingMs);
+    }
+
+    if (button.textContent !== text) {
+      button.textContent = text;
+    }
+
+    setButtonAttribute('aria-disabled', disabled);
+    setButtonAttribute('aria-label', label);
+    button.hidden = false;
+
+    if (previousKind === 'cooldown' && state.kind === 'idle') {
+      note.textContent = '';
+    }
+
+    previousKind = state.kind;
+    updateTicker(state.kind === 'cooldown');
+  }
+
+  /**
+   * Runs the one-second tick only while the window is active and the tab is visible; stops it otherwise.
+   * @param {boolean} wanted Whether the window is active.
+   */
+  function updateTicker(wanted) {
+    const shouldTick = wanted && document.visibilityState === 'visible';
+
+    if (shouldTick && ticker === null) {
+      ticker = window.setInterval(renderButton, TICK_INTERVAL_MS);
+    } else if (!shouldTick && ticker !== null) {
+      window.clearInterval(ticker);
+      ticker = null;
+    }
+  }
+
+  /**
+   * Writes the one sentence of the visitor's own press cycle.
+   * @param {string} text The sentence.
+   */
+  function say(text) {
+    note.textContent = text;
+  }
+
+  /**
+   * Asks the page to redraw when the status names a collection version that is not on screen, and remembers the version once the
+   * redraw reports success. A redraw already running for that version is not started twice.
+   * @param {string | null | undefined} version The version the status reports.
+   */
+  async function redrawIfChanged(version) {
+    if (typeof options.onCollectionChanged !== 'function' || typeof version !== 'string' || version === '' || version === shownVersion || version === redrawingVersion) {
+      return;
+    }
+
+    redrawingVersion = version;
+
+    try {
+      const drawn = await options.onCollectionChanged();
+
+      if (drawn !== false) {
+        shownVersion = version;
+      }
+    } finally {
+      redrawingVersion = null;
+    }
+  }
+
+  /**
+   * Takes a status in the shape the status route answers with: corrects the clock offset, redraws every field and the button, and
+   * asks for a redraw of the cabinet when the collection version changed. For the visitor's own finished press it also writes
+   * the one outcome sentence.
+   * @param {object} status The status; missing fields leave the last values in place.
+   * @param {{ ownPress?: boolean }} [context] ownPress is true only for the status that ends this visitor's own sync.
+   */
+  function applyStatus(status, context = {}) {
     if (typeof status.serverTimeUtc === 'string') {
       offsetMs = serverOffsetMs(status.serverTimeUtc, Date.now());
       root.dataset.serverTime = status.serverTimeUtc;
@@ -111,11 +242,13 @@ export function initSyncStatus(root) {
     }
 
     if ('running' in status) {
-      root.dataset.running = String(status.running === true);
+      running = status.running === true;
+      root.dataset.running = String(running);
     }
 
     if ('cooldownEndsUtc' in status) {
-      root.dataset.cooldownEnds = status.cooldownEndsUtc ?? '';
+      cooldownEndsIso = status.cooldownEndsUtc ?? '';
+      root.dataset.cooldownEnds = cooldownEndsIso;
     }
 
     if ('snapshotVersion' in status) {
@@ -123,10 +256,142 @@ export function initSyncStatus(root) {
     }
 
     refresh();
+    renderButton();
+
+    if (context.ownPress === true && !running) {
+      say(OUTCOME_NOTES[pressOutcome(status.lastResult)]);
+    }
+
+    redrawIfChanged(status.snapshotVersion);
+  }
+
+  /**
+   * Fetches the status once and applies it.
+   * @param {boolean} ownPress Whether this status may end the visitor's own press cycle.
+   * @returns {Promise<boolean>} True when the status arrived and no sync is running any more.
+   */
+  async function fetchStatus(ownPress) {
+    try {
+      const response = await fetch('/cabinet/status');
+
+      if (!response.ok) {
+        return false;
+      }
+
+      const status = await response.json();
+
+      applyStatus(status, { ownPress });
+
+      return status.running !== true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Checks the status every few seconds after this page's accepted press, until the sync ends or the longest plausible sync has
+   * passed, so the button can never stay on "Syncing..." for good.
+   */
+  function pollOwnSync() {
+    const deadline = Date.now() + POLL_LIMIT_MS;
+
+    window.clearTimeout(pollTimer);
+
+    const step = async () => {
+      if (await fetchStatus(true) || Date.now() >= deadline) {
+        pollTimer = null;
+        return;
+      }
+
+      pollTimer = window.setTimeout(step, POLL_INTERVAL_MS);
+    };
+
+    pollTimer = window.setTimeout(step, POLL_INTERVAL_MS);
+  }
+
+  /**
+   * Reads the answer body of the sync route, which carries the status under every outcome.
+   * @param {Response} response The answer.
+   * @returns {Promise<{ status?: object } | null>} The body, or null when it is not the expected JSON.
+   */
+  async function readAnswer(response) {
+    try {
+      return await response.json();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Adopts the window from a refusal that carried no status, using the whole seconds the server asked the visitor to wait.
+   * @param {Response} response The refusal.
+   */
+  function adoptRetryAfter(response) {
+    const seconds = Number(response.headers.get('Retry-After'));
+
+    if (Number.isFinite(seconds) && seconds > 0) {
+      applyStatus({ cooldownEndsUtc: new Date(Date.now() + offsetMs + seconds * 1000).toISOString() });
+    }
+  }
+
+  /**
+   * Handles a press: a button that is not pressable explains why and sends nothing; an idle one posts to the sync route and
+   * follows the answer.
+   */
+  async function onPress() {
+    if (pressing) {
+      return;
+    }
+
+    const state = currentState();
+
+    if (state.kind === 'running') {
+      say(COPY.noteRunning);
+      return;
+    }
+
+    if (state.kind === 'cooldown') {
+      say(COPY.youCanSyncAgain(state.remainingMs));
+      return;
+    }
+
+    pressing = true;
+
+    try {
+      const response = await fetch('/cabinet/sync', { method: 'POST' });
+      const answer = await readAnswer(response);
+
+      if (answer !== null && typeof answer.status === 'object' && answer.status !== null) {
+        applyStatus(answer.status);
+      }
+
+      if (response.status === 202) {
+        say('');
+        pollOwnSync();
+      } else if (response.status === 409) {
+        say(COPY.noteRunning);
+      } else if (response.status === 429) {
+        if (answer === null || answer.status === undefined) {
+          adoptRetryAfter(response);
+        }
+
+        say(COPY.youCanSyncAgain(currentState().remainingMs));
+      } else {
+        say(COPY.noteOffline);
+      }
+    } catch {
+      say(COPY.noteOffline);
+    } finally {
+      pressing = false;
+    }
   }
 
   if (timeButton !== null) {
     timeButton.addEventListener('click', toggleExact);
+  }
+
+  if (button !== null) {
+    button.addEventListener('click', onPress);
   }
 
   window.setInterval(() => {
@@ -139,9 +404,12 @@ export function initSyncStatus(root) {
     if (document.visibilityState === 'visible') {
       refresh();
     }
+
+    renderButton();
   });
 
   refresh();
+  renderButton();
 
   return { applyStatus, refresh };
 }

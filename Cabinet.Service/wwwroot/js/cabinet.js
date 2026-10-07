@@ -92,8 +92,97 @@ async function load() {
   }
 }
 
+/**
+ * Fetches the layout for the current profile and the mount's sample, if it carries one.
+ * @returns {Promise<object | null>} The layout, or null when the answer is not a success.
+ */
+async function fetchLayout() {
+  const sample = mount.dataset.sample;
+  const url = '/cabinet/layout?profile=' + currentProfile() + (sample ? '&sample=' + encodeURIComponent(sample) : '');
+  const response = await fetch(url);
+
+  return response.ok ? response.json() : null;
+}
+
+/**
+ * Waits until the tab is visible, so a hidden tab redraws once when it comes back instead of while nobody looks.
+ * @returns {Promise<void>}
+ */
+function whenVisible() {
+  if (!document.hidden) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    document.addEventListener('visibilitychange', () => resolve(), { once: true });
+  });
+}
+
+/**
+ * Redraws the cabinet quietly after the collection changed: no loading line, no error state, no animation. The old cabinet stays
+ * until the new layout is ready and is swapped for it in one step, together with the being-filled message. Keyboard focus returns
+ * to the box with the same entry id when it still exists. Any failure leaves the old cabinet and says nothing. A newer load or
+ * redraw supersedes this one.
+ * @returns {Promise<boolean>} True when the new cabinet is on screen; false when nothing changed on screen.
+ */
+async function redraw() {
+  await whenVisible();
+
+  latestLoad += 1;
+  const thisRedraw = latestLoad;
+
+  try {
+    const layout = await fetchLayout();
+
+    if (thisRedraw !== latestLoad) {
+      return false;
+    }
+
+    if (layout === null) {
+      return abandonRedraw();
+    }
+
+    const focused = mount.contains(document.activeElement) ? document.activeElement.dataset.entryId : undefined;
+
+    renderCabinet(mount, layout, COPY);
+
+    const filling = document.querySelector('.cabinet-filling');
+
+    if (filling !== null) {
+      filling.remove();
+    }
+
+    if (focused !== undefined) {
+      const same = mount.querySelector('[data-entry-id="' + CSS.escape(focused) + '"]');
+
+      if (same !== null) {
+        same.focus();
+      } else {
+        document.activeElement.blur();
+      }
+    }
+
+    return true;
+  } catch {
+    return thisRedraw === latestLoad ? abandonRedraw() : false;
+  }
+}
+
+/**
+ * Ends a redraw that could not get a layout without saying anything. If it had superseded a first load that was still showing
+ * the loading line, that load is repeated so the line cannot stay on screen for good.
+ * @returns {boolean} False: nothing changed on screen.
+ */
+function abandonRedraw() {
+  if (mount.querySelector('.cabinet-message[role="status"]') !== null) {
+    load();
+  }
+
+  return false;
+}
+
 if (syncRoot !== null) {
-  initSyncStatus(syncRoot);
+  initSyncStatus(syncRoot, { onCollectionChanged: redraw });
 }
 
 if (mount !== null) {
