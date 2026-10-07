@@ -5,7 +5,10 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 /**
  * Imports a script from the page's script folder through a data URL.
@@ -19,7 +22,7 @@ async function loadPageScript(name) {
 }
 
 const { COPY } = await loadPageScript('copy.js');
-const { serverOffsetMs, elapsedSeconds, isStale, buttonState, countdownText, wholeMinutesLeft, pressOutcome, shouldRedraw, reconnectDelayMs, isOutdatedStatus } = await loadPageScript('status.js');
+const { serverOffsetMs, elapsedSeconds, isStale, buttonState, countdownText, wholeMinutesLeft, pressOutcome, shouldRedraw, reconnectDelayMs, isOutdatedStatus, ownSyncStillWaiting } = await loadPageScript('status.js');
 const cases = JSON.parse(readFileSync(new URL('./fixtures/relative-time-cases.json', import.meta.url), 'utf8'));
 
 const SYNCED = '2030-01-15T12:00:00.000Z';
@@ -183,4 +186,292 @@ test('the reconnect delays are at once, 2 s, 10 s, 30 s and then every minute', 
   assert.equal(reconnectDelayMs(3), 30000);
   assert.equal(reconnectDelayMs(4), 60000);
   assert.equal(reconnectDelayMs(50), 60000);
+});
+
+test('a press is followed while it is pending and before the deadline, and not otherwise', () => {
+  assert.equal(ownSyncStillWaiting(true, 1000, 2000), true);
+  assert.equal(ownSyncStillWaiting(true, 2000, 2000), false);
+  assert.equal(ownSyncStillWaiting(true, 3000, 2000), false);
+  assert.equal(ownSyncStillWaiting(false, 1000, 2000), false);
+  assert.equal(ownSyncStillWaiting(undefined, 1000, 2000), false);
+});
+
+const PAGE_FOLDER = mkdtempSync(join(tmpdir(), 'cabinet-page-scripts-'));
+
+writeFileSync(join(PAGE_FOLDER, 'package.json'), '{"type":"module"}');
+
+for (const name of ['copy.js', 'status.js', 'sync.js']) {
+  copyFileSync(new URL('../../Cabinet.Service/wwwroot/js/' + name, import.meta.url), join(PAGE_FOLDER, name));
+}
+
+const { initSyncStatus } = await import(pathToFileURL(join(PAGE_FOLDER, 'sync.js')).href);
+const BASE_MS = Date.parse('2030-01-15T12:00:00.000Z');
+const COOLDOWN_MS = 600000;
+const flushMicrotasks = () => new Promise((resolve) => setImmediate(resolve));
+const isoAt = (offsetMs) => new Date(BASE_MS + offsetMs).toISOString();
+
+/**
+ * A clock the page script's timers and Date.now run on, so a ten-minute follow-up takes no real time.
+ * @returns {{ elapsed: () => number, now: () => number, advance: (ms: number) => Promise<void>, timers: object }} The clock.
+ */
+function createClock() {
+  let now = BASE_MS;
+  let nextId = 1;
+  const pending = new Map();
+
+  return {
+    elapsed: () => now - BASE_MS,
+    timers: {
+      setTimeout(callback, delay) {
+        const id = nextId++;
+
+        pending.set(id, { at: now + delay, callback });
+
+        return id;
+      },
+      clearTimeout: (id) => pending.delete(id),
+      setInterval: () => nextId++,
+      clearInterval: () => undefined,
+    },
+    now: () => now,
+    async advance(milliseconds) {
+      const target = now + milliseconds;
+
+      for (;;) {
+        await flushMicrotasks();
+
+        const due = [...pending.entries()].filter(([, timer]) => timer.at <= target).sort((a, b) => a[1].at - b[1].at)[0];
+
+        if (due === undefined) {
+          break;
+        }
+
+        pending.delete(due[0]);
+        now = Math.max(now, due[1].at);
+        due[1].callback();
+      }
+
+      now = target;
+      await flushMicrotasks();
+    },
+  };
+}
+
+/**
+ * Starts the sync block against a hand-made page, a fake clock and the given fetch.
+ * @param {object} setup fetchImpl builds the fetch from the clock; onCollectionChanged is passed through to the script.
+ * @returns {{ clock: object, note: { textContent: string }, button: object, api: object, press: () => Promise<void> }} The running page.
+ */
+function startPage({ fetchImpl, onCollectionChanged }) {
+  const clock = createClock();
+  const note = { textContent: '' };
+  const attributes = new Map([['aria-disabled', 'false']]);
+  const handlers = {};
+  const button = {
+    textContent: 'Sync now',
+    hidden: false,
+    getAttribute: (name) => (attributes.has(name) ? attributes.get(name) : null),
+    setAttribute: (name, value) => attributes.set(name, value),
+    removeAttribute: (name) => attributes.delete(name),
+    addEventListener: (type, handler) => {
+      handlers[type] = handler;
+    },
+  };
+  const elements = { '.sync-exact': { hidden: true, id: 'sync-exact' }, '.sync-stale': { hidden: true, textContent: '' }, '.sync-note': note };
+  const root = {
+    dataset: { serverTime: isoAt(0), running: 'false', staleAfter: '10800', snapshotVersion: 'v1' },
+    parentElement: { querySelector: (selector) => elements[selector] ?? null },
+    querySelector: (selector) => (selector === '.sync-button' ? button : null),
+  };
+
+  globalThis.window = clock.timers;
+  globalThis.document = { visibilityState: 'visible', addEventListener: () => undefined, createElement: () => ({}) };
+  globalThis.fetch = fetchImpl(clock);
+  Date.now = clock.now;
+
+  const api = initSyncStatus(root, { onCollectionChanged });
+
+  return { clock, note, button, api, press: () => handlers.click() };
+}
+
+const realNow = Date.now;
+const answer = (status, body) => ({ status, ok: status < 300, json: async () => body, headers: { get: () => null } });
+const running = (offsetMs) => ({ serverTimeUtc: isoAt(offsetMs), running: true, cooldownEndsUtc: isoAt(COOLDOWN_MS), lastResult: null, snapshotVersion: 'v1' });
+const finished = (offsetMs, lastResult = 'changed') => ({ serverTimeUtc: isoAt(offsetMs), running: false, cooldownEndsUtc: isoAt(COOLDOWN_MS), lastResult, snapshotVersion: 'v1' });
+
+test('a press whose sync ended without a push reaches its outcome sentence and frees the button, with no live connection involved', async () => {
+  let server = running(0);
+  const { clock, note, button, press } = startPage({
+    fetchImpl: (fakeClock) => async (url, init) => {
+      if (init?.method === 'POST') {
+        return answer(202, { outcome: 'started', status: running(fakeClock.elapsed()) });
+      }
+
+      return answer(200, { ...server, serverTimeUtc: isoAt(fakeClock.elapsed()) });
+    },
+  });
+
+  try {
+    await press();
+    assert.equal(button.textContent, COPY.syncing);
+    assert.equal(note.textContent, '');
+
+    server = finished(0);
+    await clock.advance(0);
+
+    assert.equal(note.textContent, COPY.noteChanged);
+    assert.notEqual(button.textContent, COPY.syncing);
+  } finally {
+    Date.now = realNow;
+  }
+});
+
+test('an answer that already shows the sync finished ends the press at once and starts no follow-up', async () => {
+  let statusRequests = 0;
+  const { clock, note, button, press } = startPage({
+    fetchImpl: (fakeClock) => async (url, init) => {
+      if (init?.method === 'POST') {
+        return answer(202, { outcome: 'started', status: finished(fakeClock.elapsed(), 'unchanged') });
+      }
+
+      statusRequests += 1;
+
+      return answer(200, finished(fakeClock.elapsed()));
+    },
+  });
+
+  try {
+    await press();
+    await clock.advance(30000);
+
+    assert.equal(note.textContent, COPY.noteUnchanged);
+    assert.notEqual(button.textContent, COPY.syncing);
+    assert.equal(statusRequests, 0);
+  } finally {
+    Date.now = realNow;
+  }
+});
+
+test('a finished status pushed before the older answer is built still ends the press through the follow-up fetch', async () => {
+  let releaseAnswer;
+  const answerReady = new Promise((resolve) => {
+    releaseAnswer = resolve;
+  });
+  const { clock, note, button, api, press } = startPage({
+    fetchImpl: (fakeClock) => async (url, init) => {
+      if (init?.method === 'POST') {
+        await answerReady;
+
+        return answer(202, { outcome: 'started', status: running(1000) });
+      }
+
+      return answer(200, finished(fakeClock.elapsed()));
+    },
+  });
+
+  try {
+    const pressed = press();
+
+    await clock.advance(2000);
+    api.applyStatus(finished(2000));
+    assert.equal(note.textContent, '');
+    releaseAnswer();
+    await pressed;
+    await clock.advance(0);
+
+    assert.equal(note.textContent, COPY.noteChanged);
+    assert.notEqual(button.textContent, COPY.syncing);
+  } finally {
+    Date.now = realNow;
+  }
+});
+
+test('the status is fetched one last time at the deadline, and the follow-up stops after it', async () => {
+  let statusRequests = 0;
+  const { clock, note, button, press } = startPage({
+    fetchImpl: (fakeClock) => async (url, init) => {
+      if (init?.method === 'POST') {
+        return answer(202, { outcome: 'started', status: running(fakeClock.elapsed()) });
+      }
+
+      statusRequests += 1;
+
+      return answer(200, fakeClock.elapsed() >= 600000 ? finished(fakeClock.elapsed(), 'failed') : running(fakeClock.elapsed()));
+    },
+  });
+
+  try {
+    await press();
+    await clock.advance(599000);
+    assert.equal(button.textContent, COPY.syncing);
+    assert.equal(note.textContent, '');
+
+    await clock.advance(1000);
+    assert.equal(note.textContent, COPY.noteFailed);
+
+    const requestsAtEnd = statusRequests;
+
+    await clock.advance(60000);
+    assert.equal(statusRequests, requestsAtEnd);
+  } finally {
+    Date.now = realNow;
+  }
+});
+
+test('a press request that hangs is given up on, says the offline sentence and lets the button be pressed again', async () => {
+  let presses = 0;
+  const { clock, note, api, press } = startPage({
+    fetchImpl: () => (url, init) => {
+      presses += 1;
+
+      return new Promise((resolve, reject) => {
+        init.signal.addEventListener('abort', () => reject(new Error('aborted')));
+      });
+    },
+  });
+
+  try {
+    const hung = press();
+
+    await clock.advance(14000);
+    api.applyStatus({ ...finished(14000), cooldownEndsUtc: null });
+    assert.equal(note.textContent, '');
+
+    await clock.advance(1000);
+    await hung;
+    assert.equal(note.textContent, COPY.noteOffline);
+
+    press();
+    await flushMicrotasks();
+    assert.equal(presses, 2);
+  } finally {
+    Date.now = realNow;
+  }
+});
+
+test('a redraw that is superseded does not clear the guard of the redraw that replaced it', async () => {
+  const redraws = [];
+  const { api } = startPage({
+    fetchImpl: () => async () => answer(200, {}),
+    onCollectionChanged: () => new Promise((resolve) => redraws.push(resolve)),
+  });
+  const withVersion = (offsetMs, version) => ({ serverTimeUtc: isoAt(offsetMs), snapshotVersion: version });
+
+  try {
+    api.applyStatus(withVersion(1, 'v2'));
+    api.applyStatus(withVersion(2, 'v3'));
+    assert.equal(redraws.length, 2);
+
+    redraws[0](false);
+    await flushMicrotasks();
+    api.applyStatus(withVersion(3, 'v3'));
+    assert.equal(redraws.length, 2);
+
+    redraws[1](true);
+    await flushMicrotasks();
+    api.applyStatus(withVersion(4, 'v3'));
+    assert.equal(redraws.length, 2);
+  } finally {
+    Date.now = realNow;
+  }
 });

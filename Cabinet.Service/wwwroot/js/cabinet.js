@@ -195,15 +195,10 @@ async function fetchStatus() {
   }
 }
 
-let live = null;
-
 if (syncRoot !== null) {
-  const sync = initSyncStatus(syncRoot, {
-    onCollectionChanged: redraw,
-    isLiveConnected: () => live !== null && live.isConnected(),
-  });
+  const sync = initSyncStatus(syncRoot, { onCollectionChanged: redraw });
 
-  live = startLive({ applyStatus: sync.applyStatus, fetchStatus });
+  startLive({ applyStatus: sync.applyStatus, fetchStatus });
 }
 
 if (mount !== null) {
