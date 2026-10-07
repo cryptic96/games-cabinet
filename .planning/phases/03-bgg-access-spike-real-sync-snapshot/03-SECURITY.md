@@ -4,7 +4,7 @@ slug: bgg-access-spike-real-sync-snapshot
 status: verified
 # threats_open = count of OPEN threats at or above workflow.security_block_on severity (the blocking gate)
 threats_open: 0
-open_below_threshold: 2
+open_below_threshold: 0
 asvs_level: 2
 block_on: high
 created: 2026-10-07
@@ -62,7 +62,7 @@ Plan IDs collide: `T-03-SC` appears in 03-07, 03-08, 03-13 and 03-14 with differ
 | T-03-01 | 03-01 | Information disclosure | access check report output | high | mitigate | `build/bgg-access-check.py:755-760`: the report is one string, `report_leaks` runs before the only `print`, and a leak exits 4. Guard at 220-230 covers `http`, `<`, credentials, username (`contains_name` 205-212), titles and locations. Sentinel self-test at 842-944. Stubbed real-run cases: `build/tests/bgg-access-check-test.sh:114-180`. Guard changed after the run (observation 3) | closed |
 | T-03-02 | 03-01 | Information disclosure | access check token transport | high | mitigate | `bgg-access-check.py:662`: a literal `HTTPSConnection("boardgamegeek.com")` with a default TLS context (627). `http.client` never follows redirects; a 3xx is only classified (567-580). The token is attached only in `build_headers` (636-648). The wrong token is a fixed constant (51, 641-642). Test: `bgg-access-check-test.sh:205-210` | closed |
 | T-03-03 | 03-01 | Denial of service | BGG quota (access check) | medium | mitigate | Limits at `bgg-access-check.py:46-48,56-58`; spacing at 650-656; cap at 682-686; 202 back-off at 691-697; stop rules at 713-722; self-test at 956-970. The run used 13 of 14 requests (03-SPIKE-OUTCOME). Owner approval of the run: SUMMARY claim | closed |
-| T-03-04 | 03-01 | Tampering | hostile XML in a BGG answer (access check) | medium | mitigate | **Partly delivered.** The DOCTYPE/ENTITY refusal (`bgg-access-check.py:243-244`) is a byte search on the raw body. A UTF-16 or UTF-32 body gets past it, and `ET.fromstring` (246) parses it with internal entities expanded (shown by an offline probe). Residual impact is low: expat limits entity amplification, ElementTree resolves no external entities, expanded text reaches only counts and the leak guard, and the tool has already done its one approved run. See Open Items | open — below high threshold (non-blocking) |
+| T-03-04 | 03-01 | Tampering | hostile XML in a BGG answer (access check) | medium | mitigate | **Partly delivered.** The DOCTYPE/ENTITY refusal (`bgg-access-check.py:243-244`) is a byte search on the raw body. A UTF-16 or UTF-32 body gets past it, and `ET.fromstring` (246) parses it with internal entities expanded (shown by an offline probe). Residual impact is low: expat limits entity amplification, ElementTree resolves no external entities, expanded text reaches only counts and the leak guard, and the tool has already done its one approved run. See Open Items | closed — fixed after the audit (`161f2f8`): bodies with a UTF-16/32 byte-order mark or a NUL byte are refused before parsing, every other body goes through an expat parse whose doctype and entity handlers raise; self-test and script cases cover UTF-16/32 with and without a mark |
 | T-03-05 | 03-01 | Information disclosure | access check docs page | low | mitigate | `docs/bgg-access-check.md:107,112,115` use the `<container>` placeholder; no IP, email or real domain. Repo-rules lint passes; the pre-commit denylist hook is active; denylist scan 0 | closed |
 | T-03-06 | 03-02 | Information disclosure | committed outcome file | high | mitigate | `03-SPIKE-OUTCOME.md` has no `http` or markup and holds the dated sign-off (line 9). It was committed alone with a noreply author; denylist scan 0. Owner sign-off before commit: SUMMARY claim | closed |
 | T-03-07 | 03-02 | Information disclosure | server env file | high | mitigate | The script reads the env file itself (`bgg-access-check.py:139-175`), and its argument parser (980-988) accepts no secret. Every committed `Bgg__*` line is a placeholder. That the executor never read the file: SUMMARY claim (03-01, 03-02, 03-15) | closed |
@@ -117,7 +117,7 @@ Plan IDs collide: `T-03-SC` appears in 03-07, 03-08, 03-13 and 03-14 with differ
 | T-03-56 | 03-13 | Denial of service | broadcast failure blocking syncs | medium | mitigate | `Live/LiveNotifier.cs:34-50` catches everything, logs the type name, and gives up after 5 s (review fix IN-03). Broadcasts are awaited with no lock held, and `Complete` runs before the closing broadcast (`SyncWorker.cs:32-34`). Tests: `HubLiveNotifierTests.cs:28-80` | closed |
 | T-03-57 | 03-14 | Tampering | vendored SignalR client supply chain | high | mitigate | The SHA-256 of `wwwroot/lib/signalr/signalr.min.js` matches the pin in `Cabinet.UnitTests/Configuration/VendoredAssetTests.cs:10-30` and in NOTICE.md. `.gitattributes:1` sets `-text`. The blob is identical in `v0.3.0`. Independent check: the registry tarball in the local npm cache has the NOTICE's SRI and a byte-identical file. Owner approval of the download: SUMMARY claim | closed |
 | T-03-58 | 03-14 | Tampering | CSP weakened for WebSockets | high | mitigate | Policy string unchanged since the previous phase; the exact string is pinned for the page, layout, static files, vendored script, logo, status, 404, 304 and negotiate (`ContentSecurityPolicyTests.cs:15-102`). There is no other policy source. SSE fallback (`LiveEndpoints.cs:99`) and status polling (`live.js:119-129`) are used instead of loosening the policy. Zero violations in Chromium and Firefox (SUMMARY claim); WebKit not run (03-VERIFICATION advisory; Open Items 6) | closed |
-| T-03-59 | 03-14 | Denial of service | reconnect storms from many pages | medium | mitigate | **Not effective in the cap-refusal path.** The schedule (`status.js:145-156`: 0, 2, 10 and 30 s, then 60 s) and the visible-only 60 s fallback (`live.js:125-129`) are present. However, an over-cap page is refused by `Context.Abort()` after the handshake (`CabinetHub.cs:25-28`), so the framework's close allows a reconnect. The client reconnects with its retry count reset, so the first delay is 0 ms, and `onreconnected` fires a status request each time (`live.js:79-82`). The page's own back-off (`live.js:91-116`) runs only after `onclose`, which never fires because the retry policy never returns null. The node test fakes the refusal as `onclose` (`page-scripts.test.mjs:742-761`). Confirmed by reading; not measured at runtime. See Open Items | open — below high threshold (non-blocking) |
+| T-03-59 | 03-14 | Denial of service | reconnect storms from many pages | medium | mitigate | **Not effective in the cap-refusal path.** The schedule (`status.js:145-156`: 0, 2, 10 and 30 s, then 60 s) and the visible-only 60 s fallback (`live.js:125-129`) are present. However, an over-cap page is refused by `Context.Abort()` after the handshake (`CabinetHub.cs:25-28`), so the framework's close allows a reconnect. The client reconnects with its retry count reset, so the first delay is 0 ms, and `onreconnected` fires a status request each time (`live.js:79-82`). The page's own back-off (`live.js:91-116`) runs only after `onclose`, which never fires because the retry policy never returns null. The node test fakes the refusal as `onclose` (`page-scripts.test.mjs:742-761`). Confirmed by reading; not measured at runtime. See Open Items | closed — re-measured after the audit: a refusal by `Context.Abort()` sends a close message without reconnect permission, so the browser client fires `onclose` and never auto-reconnects (verified with a raw WebSocket client and the vendored client in Node). Pinned by `LiveCapRefusalTests` with cap 1 and an auto-reconnecting client (`d49e709`); the page's own back-off now has ±20% jitter and no zero first delay (`c759104`); docs corrected (`e5e363e`). The loop described in this row does not occur |
 | T-03-60 | 03-14 | Tampering | lint bypass for real code | medium | mitigate | `build/lint/checks/10-repo-rules.sh:20` is an anchored `wwwroot/lib/` prefix applied only to `js_files` (377). The tracked-file and C# lists are unfiltered (375-376), and the planning-reference check still reads the vendored file (381). Self-tests at 306-318 | closed |
 | T-03-61 | 03-14 | Information disclosure | screenshots | low | mitigate | No image file was added between `v0.2.0` and HEAD. 03-14-SUMMARY uses a scratch placeholder. That the screenshots were taken against the fake: SUMMARY claim | closed |
 | T-03-62 | 03-15 | Elevation of privilege | release publication | high | mitigate | `.github/workflows/release.yml:166-168` puts `publish` behind `environment: deploy`. The environment requires the owner as reviewer and accepts only `v*.*.*` tags. `check-github-settings.sh` passes 13/13 (admin-only tag ruleset, immutable releases, no self-hosted runners). The `v0.3.0` run has one approval from the repository-owner account (that a human clicked: SUMMARY claim). Procedural-only residual: observation 16 | closed |
@@ -138,13 +138,14 @@ Plan IDs collide: `T-03-SC` appears in 03-07, 03-08, 03-13 and 03-14 with differ
 
 ## Accepted Risks Log
 
-These three risks were declared `accept` in the phase's plan threat models. This audit confirmed that each rationale still holds against the code at HEAD. The owner has not re-confirmed them in this run (see Open Items). All three are low severity, below the `high` block threshold.
+AR-03-01 to AR-03-03 were declared `accept` in the phase's plan threat models; this audit confirmed each rationale against the code at HEAD, and the owner confirmed all three on 2026-10-07. AR-03-04 records the residual of the skipped-entry tolerance the owner chose for the declared-total check. All are low severity, below the `high` block threshold.
 
 | Risk ID | Threat Ref | Rationale | Accepted By | Date |
 |---------|------------|-----------|-------------|------|
-| AR-03-01 | T-03-11 | `entryId` is BGG's collection entry id (`BggCollectionParser.cs:97` → `CubbyArrangement.cs:288,309,341` → `render.js:155`): a number with no other personal field attached, shown only for the owner's public collection. **Unverified assumption:** the acceptance relies on a collection id not being resolvable on BGG's site to the owner's BGG account. If it can be resolved, visitors could derive the BGG username that the repository otherwise keeps out, and this acceptance should be revisited | Plan threat model (03-03); owner confirmation pending | 2026-10-07 |
-| AR-03-02 | T-03-33 | The press handler reads nothing from the request (`SyncEndpoints.cs:113-137`), and there is no CORS, so a cross-site form POST is exactly a visitor press and cannot read the answer. It is bounded by the same persisted global window and single flight (`SyncCoordinator.cs:151-178`). No per-client limiter exists yet; that is deferred to the public-exposure work. Note: the refused-token slow-down applies only to timed syncs, so with a refused token, presses (including cross-site ones) can still cost one BGG request per window, at most six an hour | Plan threat model (03-08); owner confirmation pending | 2026-10-07 |
-| AR-03-03 | T-03-55 | The hub accepts no invocations (T-03-52) and pushes only the public status (T-03-54); there are no cookies or auth to abuse. The origin allow-list needs the real host name and belongs to the public-exposure work. Residual: with no origin check, a third-party page's visitors can take cap places, which feeds the reconnect loop in T-03-59 | Plan threat model (03-13); owner confirmation pending | 2026-10-07 |
+| AR-03-01 | T-03-11 | `entryId` is BGG's collection entry id (`BggCollectionParser.cs:97` → `CubbyArrangement.cs:288,309,341` → `render.js:155`): a number with no other personal field attached, shown only for the owner's public collection. **Unverified assumption:** the acceptance relies on a collection id not being resolvable on BGG's site to the owner's BGG account. If it can be resolved, visitors could derive the BGG username that the repository otherwise keeps out, and this acceptance should be revisited | Owner, 2026-10-07. The owner's BGG account name is not secret (it is already public through the repository's ownership), so an entry id that resolved to it would reveal nothing new; the name itself still never appears in the repository | 2026-10-07 |
+| AR-03-02 | T-03-33 | The press handler reads nothing from the request (`SyncEndpoints.cs:113-137`), and there is no CORS, so a cross-site form POST is exactly a visitor press and cannot read the answer. It is bounded by the same persisted global window and single flight (`SyncCoordinator.cs:151-178`). No per-client limiter exists yet; that is deferred to the public-exposure work. Note: the refused-token slow-down applies only to timed syncs, so with a refused token, presses (including cross-site ones) can still cost one BGG request per window, at most six an hour | Owner, 2026-10-07 | 2026-10-07 |
+| AR-03-03 | T-03-55 | The hub accepts no invocations (T-03-52) and pushes only the public status (T-03-54); there are no cookies or auth to abuse. The origin allow-list needs the real host name and belongs to the public-exposure work. Residual: with no origin check, a third-party page's visitors can take cap places, which feeds the reconnect loop in T-03-59 | Owner, 2026-10-07 (the reconnect-loop residual no longer applies: see T-03-59) | 2026-10-07 |
+| AR-03-04 | T-03-40 | Owner's choice for the declared-total check: an answer without a usable declared total is rejected, but an entry whose ids do not parse is skipped and counted toward the total, with the skipped count logged (count only). A single malformed entry therefore cannot block the whole collection; the cost is that one game can drop out with only a warning, while losses of more than half are still held back by the shrink guard | Owner, 2026-10-07 | 2026-10-07 |
 
 *Accepted risks do not resurface in future audit runs.*
 
@@ -157,7 +158,7 @@ Every summary's `## Threat Flags` reports "None", or maps its notes to registere
 | Flag | Category | Severity | Evidence | Proposed fix |
 |------|----------|----------|----------|--------------|
 | UF-03-01: runner label changed outside a plan | Elevation of privilege | low (mitigated) | Commit `7d802a1` moved every workflow to the `ubuntu-26.04` label, and `.github/actionlint.yaml` lists that label under `self-hosted-runner`. If GitHub's hosted pool stopped recognising the label, jobs would wait for a self-hosted runner. Mitigated today: zero registered self-hosted runners (settings check PASS), `--deny-self-hosted-runners` in publish and on the container, and `v0.3.0` provenance showing GitHub-hosted runners | Keep the zero-runner check; remove the actionlint entry once actionlint knows the label |
-| UF-03-02: CI no longer runs on branch pushes | Information disclosure | low | The `push` trigger was narrowed to `main` (`986e2eb`, review IN-14). Pushes to the public milestone branch no longer run CI lint (gitleaks over all refs, repo rules) until a pull request exists. The local pre-push hook (denylist, noreply identity) is the only gate in between | Add a lint-only push trigger for `milestone/**` and `feature/**`, or open the pull request before pushing |
+| UF-03-02: CI no longer runs on branch pushes | Information disclosure | low | The `push` trigger was narrowed to `main` (`986e2eb`, review IN-14). Pushes to the public milestone branch no longer run CI lint (gitleaks over all refs, repo rules) until a pull request exists. The local pre-push hook (denylist, noreply identity) is the only gate in between | Owner decision 2026-10-07: open the pull request before relying on CI for a working branch; the trigger stays on `main` |
 
 ---
 
@@ -207,28 +208,37 @@ Release, process and supply chain:
 
 ## Open Items (owner decisions)
 
-None of these blocks the phase (`threats_open: 0`). They need the owner's decision, and none was made or applied during this audit:
+Resolved on 2026-10-07 after this audit (see "Post-audit fixes"): T-03-59, T-03-04, the accepted risks AR-03-01 to AR-03-04, `noindex`, the T-03-46 wording, the CI push trigger and the follow-up changes. Still open, all owner actions outside the repository's code:
 
-1. **T-03-59 (medium, open, non-blocking): reconnect loop for pages refused at the connection cap.**
-   - Options: (a) fix now; (b) fix in the public-exposure work; (c) accept as a risk with a rationale.
-   - Proposed fix: refuse over the cap by throwing a `HubException` from `OnConnectedAsync`, so the close carries no reconnect permission, `onclose` fires and `live.js` backs off. Alternatively, have `live.js` stop the connection when a reconnected connection drops again within its stability window.
-   - Also add jitter to the reconnect delays, and an integration test with cap 1 and an auto-reconnecting client.
-   - `docs/bgg-sync.md:123` ("a page that is refused falls back to the one-minute status check") is probably inaccurate until this is fixed.
-   - Owner check without code: set the live cap to 1 locally, open two tabs, and watch the second tab for repeated `negotiate` requests.
-2. **T-03-04 (medium, open, non-blocking): the access check's DOCTYPE refusal can be bypassed by a UTF-16/32 body.**
-   - Options: (a) fix before the tool is ever run again; (b) accept, since the one approved run is done and the impact is low.
-   - Proposed fix: refuse bodies that start with a UTF-16/32 byte-order mark or contain a NUL byte, or parse with an `XMLParser` whose doctype and entity-declaration handlers raise. Add a UTF-16 case to the self-test.
-3. **Confirm or reject the plan-time accepted risks AR-03-01 to AR-03-03.** For AR-03-01, the owner should also confirm that a BGG collection entry id cannot be resolved to the owner's BGG account.
-4. **Release gates (observation 16; the previous phase's open item 3 is still unresolved).**
-   - Decide whether to turn off admin bypass on the `deploy` environment and add a check for it in `build/check-github-settings.sh`.
-   - Decide whether to add Claude Code permission rules (ask or deny) for merging pull requests, pushing `v*` tags and approving deployments.
-   - This audit did not change any settings.
-5. **Draft check before approval (observation 15; the previous phase's open item 4).** Verify the draft before approving, or reword T-03-63's mitigation to rely on the publish job's own check.
-6. **Before public exposure:** decide on `noindex` for the real collection (observation 21), and confirm the WebKit/Safari strict-policy check of live updates (T-03-58).
-7. **T-03-46 wording (observation 11):** change the held-back copy, or reword the mitigation.
-8. **WR-02 skipped-entry tolerance (observation 5):** record it as an accepted risk, or tighten it.
-9. **CI on branch pushes (UF-03-02):** add a lint-only push trigger for working branches, or adopt "open the pull request before pushing".
-10. **Approve the follow-up changes** proposed in observations 1, 3, 4, 6-10, 12-14 and 19-20 and in UF-03-01. None was applied during this audit.
+1. **Release gates (observation 16):** turn off admin bypass on the `deploy` environment, and optionally add Claude Code permission rules (ask or deny) for merging pull requests, pushing `v*` tags and approving deployments. These are the owner's settings; no agent changes them.
+2. **Draft check before approval (observation 15):** approve `deploy` only after the workstation draft check has passed.
+3. **WebKit/Safari (T-03-58):** open the deployed page once in Safari to confirm live updates under the strict policy.
+
+---
+
+## Post-audit fixes (2026-10-07)
+
+Applied in one fix round on the milestone branch after this audit, merged and verified together (937 .NET tests on four runs, 75 page-script tests, all five lint checks, the access-check tests and both end-to-end scripts pass). They reach the server with the next release.
+
+| Item | Resolution | Commit |
+|------|------------|--------|
+| T-03-59 | Re-measured: no reconnect loop (see the register row); behaviour pinned by tests, client jitter added, docs corrected | `d49e709`, `c759104`, `e5e363e` |
+| T-03-04 | Encoding-independent DOCTYPE/entity refusal | `161f2f8` |
+| Observation 1 (T-03-42) | Mitigation now reads: stop at once on 401, 403, other 4xx and redirects; retry a 429 or 5xx once per call through the shared pacer within the 16-request budget, never when `Retry-After` exceeds 60 s | wording |
+| Observation 3 (T-03-01) | Access-check docs match the guard; the four-character whole-word threshold is accepted | `5ce4294` |
+| Observation 4 (T-03-28, T-03-41) | An existing but unreadable snapshot is re-read before each sync; while it stays unreadable, an empty answer is always held back and any other answer must be confirmed by an identical second fetch before it replaces the file | `f23a2ed` |
+| Observation 5 (T-03-40) | Recorded as AR-03-04 | — |
+| Observation 6 (T-03-24) | Mitigation now reads: the client logs counts only, never the username, an address or a title | wording |
+| Observations 7 and 8 (T-03-24, T-03-26, T-03-35) | Tests pin the committed HTTP client log level and the 20 MB transport and XML limits (an oversized transport answer ends as `Unavailable` because the client buffer limit fires before the parser; the XML limit raises `XmlException`) | `72a9236` |
+| Observation 10 (T-03-20) | The release-layout end-to-end test fails if the zip contains the fake BGG or a test assembly | `c7cae25` |
+| Observation 11 (T-03-46) | Owner kept the note wording that names BGG; mitigation now reads: the header names no failure category, status code or count | wording |
+| Observation 12 (T-03-12) | Logo pinned by SHA-256 with a provenance notice (official reversed RGB SVG from BGG's logo pack linked from the XML API terms of use; exact page not recorded); marked `-text` so checkouts keep it byte-identical | `c2a71bf`, `a5e3f80` |
+| Observation 13 (T-03-10, T-03-45, T-03-50) | Repo-rules lint forbids `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write` and `.cssText` in page scripts (`eval` and `new Function` stay blocked by the strict policy, which has no `unsafe-eval`) | `e9fdefe` |
+| Observation 14 | Wording: the page also writes `title`, `dateTime`, `className` and `dataset` values, all inert sinks | wording |
+| Observation 18 (T-03-66) | Fixed at HEAD; ships with the next release | — |
+| Observation 20 | Kept: the SSH alias is a local shortcut, not a resolvable hostname or IP, and is already in published history | owner decision |
+| Observation 21 | `noindex` meta tag on every page, tested for every Razor page | `9a385fd` |
+| UI review warnings | Footer centred, 40rem limits, stale press notes cleared, held-back press sentence covered while the older-sync note shows | `569b3de`, `5c76ca1`, `d95d9da` |
 
 ---
 
@@ -237,6 +247,7 @@ None of these blocks the phase (`threats_open: 0`). They need the owner's decisi
 | Audit Date | Threats Total | Closed | Open | Run By |
 |------------|---------------|--------|------|--------|
 | 2026-10-07 | 70 | 68 (65 mitigated, 3 accepted) | 2 (both medium, below the high threshold; 0 blocking) | gsd-security-auditor ×3, split by area (ASVS L2, block_on high) |
+| 2026-10-07 (post-fix) | 70 | 70 (67 mitigated, 3 accepted; AR-03-04 records an accepted residual) | 0 | orchestrator, from the fix round's evidence |
 
 ## Security Audit 2026-10-07
 | Metric | Count |
@@ -251,7 +262,7 @@ None of these blocks the phase (`threats_open: 0`). They need the owner's decisi
 
 - [x] All threats have a disposition (mitigate / accept / transfer)
 - [x] Accepted risks documented in Accepted Risks Log
-- [x] `threats_open: 0` confirmed (two medium threats remain open below the `high` block threshold: T-03-04, T-03-59)
+- [x] `threats_open: 0` confirmed; the two medium threats open at audit time (T-03-04, T-03-59) were closed by the post-audit fix round
 - [x] `status: verified` set in frontmatter
 
-**Approval:** verified 2026-10-07 (owner confirmation of the accepted risks and decisions on the open non-blocking threats pending; see Open Items)
+**Approval:** verified 2026-10-07; the owner confirmed the accepted risks and the decisions recorded under Post-audit fixes. Remaining owner actions are listed under Open Items
