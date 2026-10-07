@@ -23,3 +23,6 @@ TestResults/
 
 # Agent worktrees must never be committable
 .claude/worktrees/
+
+# Python bytecode from the access-check tests
+__pycache__/

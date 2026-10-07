@@ -102,6 +102,60 @@ public sealed class SnapshotStoreTests : IDisposable
     }
 
     [Fact]
+    public void A_file_that_cannot_be_read_is_left_in_place_and_loads_once_it_can_be_read()
+    {
+        var store = CreateStore();
+        store.Save(Snapshot());
+
+        using (new FileStream(SnapshotPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            store.Load().Should().BeNull();
+        }
+
+        File.Exists(BadPath).Should().BeFalse();
+        _logger.Messages.Should().ContainSingle().Which.Should().Contain("unreadable").And.Contain("left in place");
+        store.Load().Should().BeEquivalentTo(Snapshot());
+    }
+
+    [Fact]
+    public void A_stored_file_that_cannot_be_read_is_reported_until_it_is_read_or_replaced()
+    {
+        var store = CreateStore();
+        store.Save(Snapshot());
+        store.HasUnreadStoredCollection.Should().BeFalse();
+
+        var locked = new FileStream(SnapshotPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        store.Load().Should().BeNull();
+        store.HasUnreadStoredCollection.Should().BeTrue();
+        store.Load().Should().BeNull();
+        store.HasUnreadStoredCollection.Should().BeTrue();
+
+        locked.Dispose();
+        store.Load().Should().NotBeNull();
+        store.HasUnreadStoredCollection.Should().BeFalse();
+
+        locked = new FileStream(SnapshotPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        store.Load().Should().BeNull();
+        store.Save(Snapshot());
+        locked.Dispose();
+        store.HasUnreadStoredCollection.Should().BeFalse("the file was replaced with a readable one");
+    }
+
+    [Fact]
+    public void A_missing_or_set_aside_file_is_not_reported_as_unread()
+    {
+        var store = CreateStore();
+        store.Load().Should().BeNull();
+        store.HasUnreadStoredCollection.Should().BeFalse();
+
+        File.WriteAllText(SnapshotPath, "damaged");
+        store.Load().Should().BeNull();
+
+        store.HasUnreadStoredCollection.Should().BeFalse("a damaged file is moved aside, so nothing readable is at risk");
+        File.Exists(SnapshotPath).Should().BeFalse();
+    }
+
+    [Fact]
     public void Setting_a_file_aside_replaces_an_older_bad_file()
     {
         File.WriteAllText(BadPath, "older damaged content");
@@ -134,6 +188,112 @@ public sealed class SnapshotStoreTests : IDisposable
         File.Exists(BadPath).Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData("\"kind\": 1")]
+    [InlineData("\"kind\": 0")]
+    [InlineData("\"kind\": \"1\"")]
+    [InlineData("\"kind\": \"Base\"")]
+    [InlineData("\"kind\": \"base, expansion\"")]
+    [InlineData("\"kind\": \"boardgame\"")]
+    [InlineData("\"kind\": null")]
+    public void An_enum_stored_as_a_number_or_an_unknown_name_is_malformed_and_set_aside(string kind)
+    {
+        var content = Items($"{{ \"collectionId\": 5, \"gameId\": 9, \"title\": \"Example\", {kind} }}");
+        File.WriteAllText(SnapshotPath, content);
+
+        CreateStore().Load().Should().BeNull();
+
+        File.Exists(SnapshotPath).Should().BeFalse();
+        File.ReadAllText(BadPath).Should().Be(content);
+        _logger.Messages.Should().ContainSingle().Which.Should().Contain("malformed");
+    }
+
+    [Theory]
+    [InlineData("\"collectionId\": 5, \"gameId\": 9, \"title\": null, \"kind\": \"base\"")]
+    [InlineData("\"collectionId\": 5, \"gameId\": 9, \"kind\": \"base\"")]
+    [InlineData("\"gameId\": 9, \"title\": \"Example\", \"kind\": \"base\"")]
+    [InlineData("\"collectionId\": 5, \"title\": \"Example\", \"kind\": \"base\"")]
+    [InlineData("\"collectionId\": 5, \"gameId\": 9, \"title\": \"Example\"")]
+    [InlineData("\"collectionId\": \"five\", \"gameId\": 9, \"title\": \"Example\", \"kind\": \"base\"")]
+    [InlineData("\"collectionId\": 5, \"gameId\": 9, \"title\": 7, \"kind\": \"base\"")]
+    public void An_item_with_a_null_title_or_a_missing_required_field_makes_the_snapshot_malformed(string fields)
+    {
+        var content = Items($"{{ {fields} }}");
+        File.WriteAllText(SnapshotPath, content);
+
+        CreateStore().Load().Should().BeNull();
+
+        File.Exists(SnapshotPath).Should().BeFalse();
+        File.ReadAllText(BadPath).Should().Be(content);
+        _logger.Messages.Should().ContainSingle().Which.Should().Contain("malformed");
+    }
+
+    [Fact]
+    public void A_snapshot_without_its_captured_time_is_malformed_and_set_aside()
+    {
+        File.WriteAllText(SnapshotPath, "{ \"schemaVersion\": 1, \"items\": [] }");
+
+        CreateStore().Load().Should().BeNull();
+
+        File.Exists(SnapshotPath).Should().BeFalse();
+        File.Exists(BadPath).Should().BeTrue();
+    }
+
+    [Fact]
+    public void A_blank_title_the_source_gave_is_stored_and_loads_back()
+    {
+        var snapshot = new CollectionSnapshot(
+            CollectionSnapshot.CurrentSchemaVersion,
+            DateTimeOffset.UnixEpoch,
+            [new SnapshotItem(1, 2, string.Empty, ItemKind.Expansion, null, null, null)]);
+        var store = CreateStore();
+        store.Save(snapshot);
+
+        store.Load().Should().BeEquivalentTo(snapshot);
+        File.Exists(BadPath).Should().BeFalse();
+    }
+
+    [Fact]
+    public void A_file_with_odd_content_that_cannot_be_read_is_left_in_place_and_judged_once_it_can()
+    {
+        var content = Items("{ \"collectionId\": 5, \"gameId\": 9, \"title\": \"Example\", \"kind\": 1 }");
+        File.WriteAllText(SnapshotPath, content);
+        var store = CreateStore();
+
+        using (new FileStream(SnapshotPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            store.Load().Should().BeNull();
+            store.HasUnreadStoredCollection.Should().BeTrue();
+        }
+
+        File.ReadAllText(SnapshotPath).Should().Be(content);
+        File.Exists(BadPath).Should().BeFalse();
+        _logger.Messages.Should().ContainSingle().Which.Should().Contain("unreadable");
+
+        store.Load().Should().BeNull();
+
+        File.Exists(SnapshotPath).Should().BeFalse();
+        File.ReadAllText(BadPath).Should().Be(content);
+        store.HasUnreadStoredCollection.Should().BeFalse("a damaged file is moved aside, so nothing readable is at risk");
+    }
+
+    [Fact]
+    public void A_snapshot_with_every_field_set_written_by_the_current_code_loads_unchanged()
+    {
+        var snapshot = new CollectionSnapshot(
+            CollectionSnapshot.CurrentSchemaVersion,
+            new DateTimeOffset(2030, 5, 6, 7, 8, 9, TimeSpan.Zero),
+            [
+                new SnapshotItem(1, 2, "Full", ItemKind.Base, 2001, new VersionDimensions(1.5, 2.5, 3.5), "Shelf A"),
+                new SnapshotItem(3, 4, "Plain", ItemKind.Expansion, null, null, null),
+            ]);
+        CreateStore().Save(snapshot);
+
+        CreateStore().Load().Should().BeEquivalentTo(snapshot, options => options.WithStrictOrdering());
+        File.Exists(BadPath).Should().BeFalse();
+        _logger.Messages.Should().BeEmpty();
+    }
+
     [Fact]
     public void Stray_temporary_files_are_removed_and_other_files_stay()
     {
@@ -147,6 +307,9 @@ public sealed class SnapshotStoreTests : IDisposable
         Directory.EnumerateFileSystemEntries(_directory).Select(Path.GetFileName)
             .Should().BeEquivalentTo(["snapshot.json", "notes.tmp"]);
     }
+
+    private static string Items(string item) =>
+        $"{{ \"schemaVersion\": 1, \"capturedAtUtc\": \"2026-01-01T00:00:00Z\", \"items\": [ {item} ] }}";
 
     private static CollectionSnapshot Snapshot() =>
         new(CollectionSnapshot.CurrentSchemaVersion, DateTimeOffset.UnixEpoch, [new SnapshotItem(1, 2, "Example", ItemKind.Base, null, null, null)]);

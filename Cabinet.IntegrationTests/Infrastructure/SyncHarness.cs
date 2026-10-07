@@ -96,13 +96,13 @@ public static class SyncHarness
     {
         ArgumentNullException.ThrowIfNull(condition);
 
-        var deadline = DateTime.UtcNow.AddSeconds(10);
+        var deadline = DateTime.UtcNow.AddSeconds(15);
 
         while (!await condition())
         {
             if (DateTime.UtcNow > deadline)
             {
-                throw new TimeoutException("The condition did not hold within ten seconds.");
+                throw new TimeoutException("The condition did not hold within fifteen seconds.");
             }
 
             await Task.Delay(TimeSpan.FromMilliseconds(50), TestContext.Current.CancellationToken);

@@ -146,6 +146,7 @@ JSON
   cat >"$dir/environments__deploy.json" <<'JSON'
 {
   "name": "deploy",
+  "can_admins_bypass": false,
   "protection_rules": [
     { "id": 1, "type": "required_reviewers", "prevent_self_review": false, "reviewers": [ { "type": "User", "reviewer": { "id": 1 } } ] },
     { "id": 2, "type": "branch_policy" }
@@ -209,8 +210,8 @@ if ! run_checker "$CASE_DIR"; then
   exit 1
 fi
 pass_count="$(grep -c '^PASS: ' "$STDOUT_FILE" || true)"
-if [ "$pass_count" -ne 13 ] || grep -q '^FAIL: ' "$STDOUT_FILE"; then
-  echo "FAIL (all good): expected 13 PASS lines and no FAIL line, got $pass_count" >&2
+if [ "$pass_count" -ne 14 ] || grep -q '^FAIL: ' "$STDOUT_FILE"; then
+  echo "FAIL (all good): expected 14 PASS lines and no FAIL line, got $pass_count" >&2
   cat "$STDOUT_FILE" >&2
   exit 1
 fi
@@ -268,6 +269,12 @@ expect_failure "deploy environment without a required reviewer" "deploy environm
 expect_failure "deploy environment without the tag policy" "deployment policy" \
   environments__deploy__deployment-branch-policies.json '.branch_policies = []'
 
+expect_failure "deploy environment lets administrators bypass" "let administrators bypass" \
+  environments__deploy.json '.can_admins_bypass = true'
+
+expect_failure "deploy environment does not report the bypass setting" "let administrators bypass" \
+  environments__deploy.json 'del(.can_admins_bypass)'
+
 expect_failure "a self-hosted runner is registered" "self-hosted runners" \
   actions__runners.json '.runners = [{"id": 1, "name": "synthetic-runner"}]'
 
@@ -281,8 +288,8 @@ if run_checker "$CASE_DIR"; then
   echo "FAIL (deploy environment missing): expected a non-zero exit" >&2
   exit 1
 fi
-if [ "$(grep -c '^FAIL: ' "$STDOUT_FILE" || true)" -ne 2 ]; then
-  echo "FAIL (deploy environment missing): expected both environment checks to fail" >&2
+if [ "$(grep -c '^FAIL: ' "$STDOUT_FILE" || true)" -ne 3 ]; then
+  echo "FAIL (deploy environment missing): expected all three environment checks to fail" >&2
   cat "$STDOUT_FILE" >&2
   exit 1
 fi

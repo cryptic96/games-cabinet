@@ -238,8 +238,10 @@ without JavaScript.
 The collections are made from invented syllables and mirror nothing real. A
 missing or unknown choice shows the synced collection, and the value that was
 asked for is never repeated back into the page. When the switch is off or the
-site runs in production, there is no switcher and no status line, and a `sample`
-value in the address is ignored.
+site runs in production, there is no switcher and no "Invented collection of N
+items" line, and a `sample` value in the address is ignored. The sync status
+line under the heading is a separate thing: it is shown whenever the synced
+collection is shown, whether or not the switch is on.
 
 A value for `Prototype:Enabled` that is neither `true` nor `false` stops the app
 at startup in every environment. The switch and everything behind it live in one

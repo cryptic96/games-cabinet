@@ -54,6 +54,8 @@ public static class SyncEndpoints
         services.AddSingleton(_ => SyncSettings.FromConfiguration(configuration));
         services.AddSingleton<ISyncStateStore>(provider => new SyncStateStore(
             provider.GetRequiredService<StorageDirectory>().Path,
+            provider.GetRequiredService<TimeProvider>(),
+            provider.GetRequiredService<SyncOptions>().ManualCooldown,
             provider.GetRequiredService<ILogger<SyncStateStore>>()));
         services.AddSingleton<ISnapshotStore>(provider => new SnapshotStore(
             provider.GetRequiredService<StorageDirectory>().Path,
@@ -117,9 +119,9 @@ public static class SyncEndpoints
         switch (coordinator.TryRequest(SyncTrigger.Manual))
         {
             case SyncRequestResult.Started:
-                var started = statusService.Current() with { Running = true };
-
-                return Results.Json(new { outcome = "started", status = started }, statusCode: StatusCodes.Status202Accepted);
+                return Results.Json(
+                    new { outcome = "started", status = statusService.Current() },
+                    statusCode: StatusCodes.Status202Accepted);
 
             case SyncRequestResult.CoolingDown cooling:
                 context.Response.Headers.RetryAfter = WholeSecondsUntil(cooling.Until, time.GetUtcNow())

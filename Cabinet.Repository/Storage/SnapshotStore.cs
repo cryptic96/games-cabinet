@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Cabinet.Domain.Collection;
 using Microsoft.Extensions.Logging;
 
@@ -11,17 +10,18 @@ public sealed class SnapshotStore : ISnapshotStore
     /// <summary>The name of the stored file.</summary>
     public const string FileName = "snapshot.json";
 
-    /// <summary>The name a damaged or too-new file is renamed to.</summary>
+    /// <summary>The name a damaged or too-new file is renamed to. A file that could not be read at all is left in place.</summary>
     public const string SetAsideFileName = "snapshot.json.bad";
 
     private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
 
     private readonly string _path;
     private readonly ILogger<SnapshotStore> _logger;
+    private volatile bool _unread;
 
     /// <summary>Creates a store over a directory.</summary>
     /// <param name="directory">The storage directory; it must exist.</param>
-    /// <param name="logger">Receives one line when a stored file has to be set aside.</param>
+    /// <param name="logger">Receives one line when a stored file has to be set aside or could not be read.</param>
     public SnapshotStore(string directory, ILogger<SnapshotStore> logger)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
@@ -32,6 +32,9 @@ public sealed class SnapshotStore : ISnapshotStore
     }
 
     /// <inheritdoc />
+    public bool HasUnreadStoredCollection => _unread;
+
+    /// <inheritdoc />
     public CollectionSnapshot? Load()
     {
         byte[] content;
@@ -40,6 +43,8 @@ public sealed class SnapshotStore : ISnapshotStore
         {
             if (!File.Exists(_path))
             {
+                _unread = false;
+
                 return null;
             }
 
@@ -47,10 +52,17 @@ public sealed class SnapshotStore : ISnapshotStore
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            return SetAside("unreadable");
+            _unread = true;
+            _logger.LogWarning("The stored collection could not be read ({Reason}) and was left in place.", "unreadable");
+
+            return null;
         }
 
-        return Parse(content);
+        var snapshot = Parse(content);
+
+        _unread = snapshot is null && File.Exists(_path);
+
+        return snapshot;
     }
 
     /// <inheritdoc />
@@ -59,6 +71,7 @@ public sealed class SnapshotStore : ISnapshotStore
         ArgumentNullException.ThrowIfNull(snapshot);
 
         AtomicJsonFile.WriteAtomically(_path, JsonSerializer.SerializeToUtf8Bytes(snapshot, JsonOptions));
+        _unread = false;
     }
 
     private CollectionSnapshot? Parse(byte[] content)
@@ -105,14 +118,10 @@ public sealed class SnapshotStore : ISnapshotStore
         return null;
     }
 
-    private static JsonSerializerOptions CreateJsonOptions()
-    {
-        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+    private static JsonSerializerOptions CreateJsonOptions() => StoredJson.CreateOptions(
+        new Dictionary<Type, string[]>
         {
-            WriteIndented = false,
-        };
-        options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
-
-        return options;
-    }
+            [typeof(CollectionSnapshot)] = ["schemaVersion", "capturedAtUtc", "items"],
+            [typeof(SnapshotItem)] = ["collectionId", "gameId", "title", "kind"],
+        });
 }

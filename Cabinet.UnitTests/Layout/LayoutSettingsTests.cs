@@ -1,5 +1,6 @@
 using Cabinet.Domain.Layout;
 using Cabinet.Service.Layout;
+using Cabinet.UnitTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 
@@ -13,7 +14,7 @@ public class LayoutSettingsTests
     public void The_committed_appsettings_bind_to_the_documented_defaults()
     {
         var configuration = new ConfigurationBuilder()
-            .AddJsonFile(Path.Combine(FindServiceDirectory(), "appsettings.json"), optional: false)
+            .AddJsonFile(Path.Combine(RepositoryPaths.ServiceDirectory(), "appsettings.json"), optional: false)
             .Build();
 
         var options = LayoutSettings.FromConfiguration(configuration);
@@ -152,23 +153,4 @@ public class LayoutSettingsTests
         new ConfigurationBuilder()
             .AddInMemoryCollection(values.Select(pair => new KeyValuePair<string, string?>(pair.Key, pair.Value)))
             .Build();
-
-    private static string FindServiceDirectory()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-
-        while (directory is not null)
-        {
-            var candidate = Path.Combine(directory.FullName, "Cabinet.Service");
-
-            if (File.Exists(Path.Combine(candidate, "Cabinet.Service.csproj")))
-            {
-                return candidate;
-            }
-
-            directory = directory.Parent;
-        }
-
-        throw new InvalidOperationException("Could not locate Cabinet.Service above the test output directory.");
-    }
 }

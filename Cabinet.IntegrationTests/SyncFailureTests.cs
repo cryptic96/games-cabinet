@@ -40,7 +40,7 @@ public class SyncFailureTests
         var syncedBefore = (await SyncHarness.ReadStatus(client)).Json.GetProperty("lastSyncedUtc").GetDateTimeOffset();
 
         source.Fail(Failure(answer));
-        await SyncRounds.PressAndWait(client, clock);
+        await SyncRounds.PressAndWait(client, clock, moveClockWhileWaiting: true);
         var status = await SyncHarness.ReadStatus(client);
 
         (await SyncRounds.ReadLayout(client)).Should().BeEquivalentTo(before);
@@ -77,7 +77,7 @@ public class SyncFailureTests
         (await SyncHarness.ReadStatus(client)).LastResult.Should().Be("failed");
         (await SyncRounds.ReadLayout(client)).Should().BeEquivalentTo(before);
         (await File.ReadAllBytesAsync(snapshotPath, TestContext.Current.CancellationToken)).Should().Equal(storedBefore);
-        handler.Requests.Should().HaveCount(4);
+        handler.Requests.Should().HaveCount(5, "two for the first sync, then the base call, the failing expansion call and its one retry");
     }
 
     [Fact]
@@ -111,7 +111,7 @@ public class SyncFailureTests
         using var client = factory.CreatePublicClient();
         await SyncRounds.PressAndWait(client, clock, advance: false);
         source.Fail(Failure("too-many-requests"));
-        await SyncRounds.PressAndWait(client, clock);
+        await SyncRounds.PressAndWait(client, clock, moveClockWhileWaiting: true);
         var during = await SyncRounds.ReadLayout(client);
 
         source.Serve(SyntheticBggCollection.Create(5));

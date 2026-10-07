@@ -41,6 +41,12 @@ public interface ISnapshotStore
     /// <summary>Reads the stored collection, or returns null when there is none that can be used.</summary>
     CollectionSnapshot? Load();
 
+    /// <summary>
+    /// True when a stored collection exists that the last read could not use, so it is still on disk and a store would replace
+    /// it. A store that has no such notion never reports it.
+    /// </summary>
+    bool HasUnreadStoredCollection => false;
+
     /// <summary>Stores the collection so that a reader sees either the previous copy or this one, never a mixture.</summary>
     /// <param name="snapshot">The collection to store.</param>
     void Save(CollectionSnapshot snapshot);

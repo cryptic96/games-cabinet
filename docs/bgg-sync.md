@@ -19,6 +19,20 @@ which is why there are two calls. Only items marked as owned are kept. If either
 call fails, or an answer is not in the expected shape, the whole sync fails and
 the collection that is already shown stays as it is.
 
+Every collection answer must declare how many items it holds, and that number
+must match what was read. An answer with no declared total, or one that is not a
+number, is treated as a bad answer, because BGG declares the total on every
+collection answer. The one tolerance is an owned entry that has no usable
+identifier: it is left out, it counts towards the declared total, and the rest of
+the collection is kept, so one malformed entry cannot reject a complete
+collection. Whenever entries were left out the server logs how many (the number
+only, never a title or an identifier).
+
+Titles are stored exactly as BGG sends them, apart from invisible characters:
+control characters (including DEL and the extended controls), line and paragraph
+separators and the characters that switch text direction are removed, the ends
+are trimmed and a very long title is cut at 300 characters.
+
 The server is polite to BGG:
 
 - every request waits at least 5 seconds after the previous one finished, and a
@@ -55,7 +69,10 @@ is queued, so restarting the service does not give anyone a fresh press.
 The start-up sync runs once, a random 10 to 120 seconds after the service
 starts, and only when there is no collection yet or the last successful sync is
 older than the hourly interval. It also waits until the last sync started at
-least 15 minutes ago, so a service that keeps crashing cannot hammer BGG.
+least 15 minutes ago, so a service that keeps crashing cannot hammer BGG. The
+hourly timer is armed only after that start-up wait, so the first hourly sync is
+one interval after the start-up sync (or after the start when there was none),
+even when the start-up wait is longer than the interval.
 
 Pages learn about the sync from `GET /cabinet/status`: when the collection was
 last synced, whether a sync is running, when the button may be used again and a
@@ -71,7 +88,7 @@ Settings, all optional, in the same env file:
 | `Sync__IntervalMinutes` | `60` | 15 to 1440 | Minutes between hourly syncs. |
 | `Sync__ManualCooldownMinutes` | `10` | 1 to 120 | Length of the shared window. |
 | `Sync__StartupJitterMaxSeconds` | `120` | 10 to 3600 | The latest the start-up sync may begin after the service starts. |
-| `Sync__StaleAfterHours` | `3` | 1 to 168 | How old the collection may get before a page treats it as out of date. |
+| `Sync__StaleAfterHours` | `3` | 1 to 168 | How old the collection may get before a page treats it as out of date and shows a calm note. |
 
 A value outside its range stops the service at start-up with a message that
 names the key.
@@ -80,32 +97,98 @@ The bookkeeping (when the last sync started and finished, how it ended and when
 the window closes) lives in `sync-state.json`, next to `snapshot.json` in the
 state directory. It holds no secrets and can be deleted at any time: a missing,
 damaged or newer-format file is replaced by a fresh one (a damaged file is set
-aside as `sync-state.json.bad`), which only means the window starts closed.
+aside as `sync-state.json.bad`), which only means the window starts closed. A
+file that cannot be read at that moment (a permission or disk error) is left
+where it is and read again at the next start.
+
+## Live updates
+
+An open page learns that a sync started or finished without a reload, through a
+small live channel at `/cabinet/live`. The channel only sends: the server pushes
+the same status that `GET /cabinet/status` answers with, and nothing a page
+sends over it is ever acted on, so it can never start a sync or cause a request
+to BGG. It offers WebSockets and Server-Sent Events only (long polling is not
+offered).
+
+If a page cannot hold the channel open, it still stays current: it asks the
+status route once a minute while the tab is visible, and once more whenever the
+tab becomes visible again, the browser comes back online or the channel
+reconnects. Nothing about a lost connection is shown to the visitor.
+
+A page that loses the channel, or never gets it, tries again on a slow schedule:
+a brief randomised first retry (a fraction of a second to about a second), then
+about 2 seconds, 10 seconds and 30 seconds, then about every 60 seconds. Each wait
+is varied by up to 20 percent so that many pages do not reconnect together after a
+restart. The schedule starts over only after a connection has stayed up for a
+minute, so a channel that opens and is closed at once is retried gently instead of
+in a tight loop.
+
+The number of open channels is capped for the whole site, to keep a small server
+safe on the internet:
+
+| Key | Default | Range | Meaning |
+| --- | --- | --- | --- |
+| `Live__MaxConnections` | `100` | 1 to 10000 | The most live connections held open at once. A page that is refused is closed right after it connects, without permission to reconnect by itself; it follows the slow retry schedule above and meanwhile uses the one-minute status check. |
+
+A value outside the range stops the service at start-up with a message that names
+the key. A push to the connected pages is given up on after 5 seconds, so a slow
+or stuck connection never delays a sync.
+
+The reverse proxy in front of the service must pass WebSocket upgrades through
+(Traefik does by default) and must not buffer the streamed answer of an
+event-stream connection. If it does not, nothing breaks: the pages simply fall
+back to the one-minute status check and learn about a finished sync a little
+later.
 
 ## When BGG misbehaves
 
 A sync that goes wrong never changes what visitors see. Whatever BGG answers,
 the collection that is already shown, the copy stored in `snapshot.json` and the
-layout stay exactly as they were; the sync only records how it ended. The hourly
-sync is the only retry, so there is nothing to restart or clear.
+layout stay exactly as they were; the sync only records how it ended. Apart from
+the single retry described below, the next scheduled sync is the retry, so there
+is nothing to restart or clear.
 
 How a sync ends when something is wrong:
 
 | BGG answers | The sync ends as |
 | --- | --- |
 | 401 (the token is missing or wrong) | an authentication problem, at once, with no retry and without reading the body |
-| 429 or 503 | throttled, at once; a `Retry-After` value is only noted |
-| 403, a redirect, or any other error status | unavailable |
-| a web page, an error document, the wrong kind of document, malformed XML, or a total that does not match the entries | a bad answer |
+| 429 or 503 | throttled, after one retry (see below) |
+| 500 or any other 5xx status | unavailable, after one retry (see below) |
+| 403, a redirect, or any other 4xx status | unavailable, at once, with no retry |
+| a web page, an error document, the wrong kind of document, malformed XML, no declared total, or a total that does not match the entries | a bad answer |
 | a connection error | unavailable |
 | no answer in time | a timeout |
 | "queued" answers that do not clear | queued, once the polite waiting is used up |
+
+A throttle (429, 503) or a server error (any 5xx) is retried once for each of the
+two calls, so one hiccup on BGG's side does not cost a whole hour. The retry is
+polite on purpose:
+
+- it goes through the same pacer as every other request, so it starts at least 5
+  seconds after the failed one finished;
+- when the answer carries a `Retry-After` header, the retry also waits for it
+  (a number of seconds or a date). A header asking for more than 60 seconds means
+  no retry at all: the next scheduled sync is the retry;
+- a throttle (429 or 503) that carries no usable `Retry-After` header, including
+  one that cannot be read, waits a floor of 30 seconds before the retry, because a
+  throttle that names no wait deserves a longer pause than the 5-second gap. Any
+  other 5xx answer keeps the 5-second gap. The floor is measured on the same clock
+  as every other wait, so tests move that clock instead of waiting;
+- it counts against the 16 requests a sync may send, and it is skipped when that
+  budget is used up;
+- a refusal (401 or 403) is never retried, and there is no second retry.
 
 A "queued" answer (HTTP 202) means BGG is still preparing the collection. The
 server asks again after 5, 10, 20 and then 30 seconds, at most six times for each
 call, and every ask goes through the same 5-second pacing as any other request.
 One sync sends at most 16 requests in total, and a whole sync is cancelled after
-10 minutes.
+10 minutes, counted on the same clock as the waits. Even the longest waits that
+can be asked for (every queued wait, a retry wait of up to 60 seconds for each
+call and the 5-second gaps) add up to well under that limit, so the limit only
+ever ends a sync whose requests themselves stall. A sync ended by the limit is
+recorded as a timeout; a sync interrupted because the service is stopping is not
+recorded at all, because it did not fail.
 
 Two kinds of answer are held back instead of applied, even though BGG answered
 properly:
@@ -126,8 +209,20 @@ result reads `heldBack`. Visitors never see the held-back entries or their numbe
 A good answer that is accepted removes the record; a failed sync leaves it in
 place.
 
-Pages show a calm note when there has been no good sync for 3 hours, and while a
-result is held back.
+Pages show a calm note when there has been no good sync for longer than the
+`Sync__StaleAfterHours` setting allows (3 hours unless you changed it), and while
+a result is held back.
+
+### A token that keeps being refused
+
+If BGG answers 401 to three syncs in a row, the token is probably wrong or has
+been revoked, and retrying every hour only wastes requests. From then on the
+hourly sync slows down to about one a day. It speeds up again as soon as a sync
+succeeds (for example after you fix the token and a visitor presses "sync now")
+or the service restarts. "Sync now" is never held back by this; it keeps working
+within its usual window. The service logs one line when the slow-down begins.
+Fixing the token in the env file and restarting the service is the quickest
+recovery.
 
 ## Showing a genuinely empty collection
 
@@ -191,10 +286,25 @@ file. When the app starts it removes leftover temporary files and loads
 `snapshot.json` before it begins listening, so a restart shows the same cabinet
 as before.
 
-The file can always be rebuilt from BGG. If it is damaged, unreadable or written
-by a newer version of the app, the app sets it aside as `snapshot.json.bad`
-(replacing an older one), logs one line naming the reason, shows the "being
-filled" state and keeps reporting healthy. The next sync rebuilds the file.
+The file can always be rebuilt from BGG. If it is damaged or written by a newer
+version of the app, the app sets it aside as `snapshot.json.bad` (replacing an
+older one), logs one line naming the reason, shows the "being filled" state and
+keeps reporting healthy. The next sync rebuilds the file. If the file cannot be
+read at all (a permission or disk error), it is left where it is, one line is
+logged and the page shows the "being filled" state until a sync replaces the file, as described next.
+
+A file that exists but could not be read is not treated as "nothing stored yet".
+The service remembers this until it can read the file, and every sync tries to
+read it again first. While the file is still unreadable, a sync never replaces it
+with an empty answer, however often that repeats, and replaces it with a
+collection that has games only when two syncs in a row return exactly the same set
+of entries. The first of the two is held back in the same way as the answers
+described under "When BGG misbehaves": `sync-state.json` carries the record, the
+status route reports `heldBack`, and the record survives a restart. As soon as the
+file can be read, it is shown again and the usual rules for empty and shrunken
+answers apply, so one good read is enough to return to normal. If the file stays
+unreadable for good, fix the permission or disk problem, or delete the file to let
+the next sync rebuild it.
 
 ## Running locally
 

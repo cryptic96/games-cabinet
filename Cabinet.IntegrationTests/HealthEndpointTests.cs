@@ -19,7 +19,7 @@ public class HealthEndpointTests
         using var publicResponse = await publicClient.GetAsync("/health", TestContext.Current.CancellationToken);
 
         opsResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-        opsResponse.Content.Headers.ContentType?.MediaType.Should().Be("application/json");
+        opsResponse.ShouldHaveMediaType("application/json");
         publicResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 

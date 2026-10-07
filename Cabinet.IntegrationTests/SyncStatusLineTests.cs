@@ -80,7 +80,7 @@ public partial class SyncStatusLineTests
     public async Task A_held_back_result_shows_its_variant_even_when_the_last_good_sync_is_recent()
     {
         using var storage = new TemporaryDirectory();
-        var heldBack = new HeldBackRecord(HeldBackKind.Shrunk, "0123456789abcdef", 3, SyncHarness.StartTime - TimeSpan.FromMinutes(10));
+        var heldBack = new HeldBackRecord(HeldBackKind.Shrunk, ShrinkGuard.Fingerprint([1, 2, 3]), 3, SyncHarness.StartTime - TimeSpan.FromMinutes(10));
         Seed(storage, SyncHarness.StartTime - TimeSpan.FromMinutes(50), SyncResult.HeldBack, heldBack);
         await using var factory = CreateSeededFactory(storage);
         using var client = factory.CreatePublicClient();
@@ -144,7 +144,7 @@ public partial class SyncStatusLineTests
             using var response = await client.GetAsync(path, TestContext.Current.CancellationToken);
 
             response.StatusCode.Should().Be(HttpStatusCode.OK, path);
-            response.Content.Headers.ContentType?.MediaType.Should().Be("text/javascript", path);
+            response.ShouldHaveMediaType("text/javascript", path);
         }
     }
 
@@ -154,17 +154,24 @@ public partial class SyncStatusLineTests
         using var storage = new TemporaryDirectory();
         Seed(storage, SyncHarness.StartTime - TimeSpan.FromHours(4), SyncResult.Changed, heldBack: null);
 
-        foreach (var factory in new[] { SyncHarness.CreateFactory(new ScriptedBggHandler(), SyncHarness.NewClock()), CreateSeededFactory(storage) })
+        await using (var unsynced = SyncHarness.CreateFactory(new ScriptedBggHandler(), SyncHarness.NewClock()))
         {
-            await using (factory)
-            {
-                using var client = factory.CreatePublicClient();
-                var html = await client.GetStringAsync("/", TestContext.Current.CancellationToken);
-                var header = html[..html.IndexOf("</header>", StringComparison.Ordinal)];
-
-                header.Should().NotContainEquivalentOf("BGG").And.NotContainEquivalentOf("BoardGameGeek");
-            }
+            await AssertHeaderNamesNoSource(unsynced);
         }
+
+        await using (var seeded = CreateSeededFactory(storage))
+        {
+            await AssertHeaderNamesNoSource(seeded);
+        }
+    }
+
+    private static async Task AssertHeaderNamesNoSource(CabinetWebApplicationFactory factory)
+    {
+        using var client = factory.CreatePublicClient();
+        var html = await client.GetStringAsync("/", TestContext.Current.CancellationToken);
+        var header = html[..html.IndexOf("</header>", StringComparison.Ordinal)];
+
+        header.Should().NotContainEquivalentOf("BGG").And.NotContainEquivalentOf("BoardGameGeek");
     }
 
     [Fact]
@@ -223,7 +230,7 @@ public partial class SyncStatusLineTests
 
         new SnapshotStore(storage.FullPath, NullLogger<SnapshotStore>.Instance)
             .Save(new CollectionSnapshot(CollectionSnapshot.CurrentSchemaVersion, lastSuccess, [item]));
-        new SyncStateStore(storage.FullPath, NullLogger<SyncStateStore>.Instance).Save(new SyncState(
+        new SyncStateStore(storage.FullPath, TimeProvider.System, TimeSpan.FromMinutes(10), NullLogger<SyncStateStore>.Instance).Save(new SyncState(
             SyncState.CurrentSchemaVersion,
             lastSuccess,
             lastSuccess,

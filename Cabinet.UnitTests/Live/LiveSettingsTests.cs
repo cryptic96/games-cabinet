@@ -1,4 +1,5 @@
 using Cabinet.Service.Live;
+using Cabinet.UnitTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,7 +14,7 @@ public class LiveSettingsTests
     public void The_committed_appsettings_bind_to_one_hundred_connections()
     {
         var configuration = new ConfigurationBuilder()
-            .AddJsonFile(Path.Combine(FindServiceDirectory(), "appsettings.json"), optional: false)
+            .AddJsonFile(Path.Combine(RepositoryPaths.ServiceDirectory(), "appsettings.json"), optional: false)
             .Build();
 
         LiveSettings.FromConfiguration(configuration).Should().Be(new LiveOptions(100));
@@ -74,23 +75,4 @@ public class LiveSettingsTests
         new ConfigurationBuilder()
             .AddInMemoryCollection(values.Select(pair => new KeyValuePair<string, string?>(pair.Key, pair.Value)))
             .Build();
-
-    private static string FindServiceDirectory()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-
-        while (directory is not null)
-        {
-            var candidate = Path.Combine(directory.FullName, "Cabinet.Service");
-
-            if (File.Exists(Path.Combine(candidate, "Cabinet.Service.csproj")))
-            {
-                return candidate;
-            }
-
-            directory = directory.Parent;
-        }
-
-        throw new DirectoryNotFoundException("Cabinet.Service was not found above the test output directory.");
-    }
 }

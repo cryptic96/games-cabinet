@@ -4,7 +4,7 @@
  */
 import { renderCabinet } from './render.js';
 import { COPY } from './copy.js';
-import { initSyncStatus } from './sync.js';
+import { initSyncStatus, fetchStatus } from './sync.js';
 import { startLive } from './live.js';
 
 const mount = document.getElementById('cabinet');
@@ -22,12 +22,21 @@ function currentProfile() {
 }
 
 /**
+ * Builds the layout address for the current profile and the mount's sample, if it carries one.
+ * @returns {string}
+ */
+function layoutUrl() {
+  const sample = mount.dataset.sample;
+
+  return '/cabinet/layout?profile=' + currentProfile() + (sample ? '&sample=' + encodeURIComponent(sample) : '');
+}
+
+/**
  * Replaces the mount's content with the loading line.
  */
 function showLoading() {
   const message = document.createElement('p');
-  message.className = 'cabinet-message';
-  message.setAttribute('role', 'status');
+  message.className = 'cabinet-message cabinet-loading';
   message.textContent = COPY.loading;
   mount.replaceChildren(message);
 }
@@ -66,9 +75,7 @@ async function load() {
   showLoading();
 
   try {
-    const sample = mount.dataset.sample;
-    const url = '/cabinet/layout?profile=' + currentProfile() + (sample ? '&sample=' + encodeURIComponent(sample) : '');
-    const response = await fetch(url);
+    const response = await fetch(layoutUrl());
 
     if (thisLoad !== latestLoad) {
       return;
@@ -98,9 +105,7 @@ async function load() {
  * @returns {Promise<object | null>} The layout, or null when the answer is not a success.
  */
 async function fetchLayout() {
-  const sample = mount.dataset.sample;
-  const url = '/cabinet/layout?profile=' + currentProfile() + (sample ? '&sample=' + encodeURIComponent(sample) : '');
-  const response = await fetch(url);
+  const response = await fetch(layoutUrl());
 
   return response.ok ? response.json() : null;
 }
@@ -157,7 +162,7 @@ async function redraw() {
       const same = mount.querySelector('[data-entry-id="' + CSS.escape(focused) + '"]');
 
       if (same !== null) {
-        same.focus();
+        same.focus({ preventScroll: true });
       } else {
         document.activeElement.blur();
       }
@@ -175,36 +180,17 @@ async function redraw() {
  * @returns {boolean} False: nothing changed on screen.
  */
 function abandonRedraw() {
-  if (mount.querySelector('.cabinet-message[role="status"]') !== null) {
+  if (mount.querySelector('.cabinet-loading') !== null) {
     load();
   }
 
   return false;
 }
 
-/**
- * Asks the server for the current sync status.
- * @returns {Promise<object | null>} The status, or null when it could not be had; a failure is never shown.
- */
-async function fetchStatus() {
-  try {
-    const response = await fetch('/cabinet/status');
-
-    return response.ok ? await response.json() : null;
-  } catch {
-    return null;
-  }
-}
-
-let live = null;
-
 if (syncRoot !== null) {
-  const sync = initSyncStatus(syncRoot, {
-    onCollectionChanged: redraw,
-    isLiveConnected: () => live !== null && live.isConnected(),
-  });
+  const sync = initSyncStatus(syncRoot, { onCollectionChanged: redraw });
 
-  live = startLive({ applyStatus: sync.applyStatus, fetchStatus });
+  startLive({ applyStatus: sync.applyStatus, fetchStatus });
 }
 
 if (mount !== null) {

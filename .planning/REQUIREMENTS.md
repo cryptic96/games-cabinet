@@ -9,18 +9,18 @@ Requirements for the initial release. Each maps to a roadmap phase.
 
 ### BGG Sync
 
-- [ ] **SYNC-01**: The owner's BGG "owned" collection (base games and expansions) syncs automatically about every hour. Nothing has to be entered in the app.
-- [ ] **SYNC-02**: A visitor can press "sync now". One global cooldown, shared by all visitors and persisted across restarts, allows at most one sync per cooldown window. While it is active the button shows the time remaining.
-- [ ] **SYNC-03**: Visitors can see when the collection was last synced.
-- [ ] **SYNC-04**: When BGG is down, throttling, or returns an error or a suspiciously empty or shrunken result, visitors keep seeing the last good collection with a "showing last sync from …" note. The cabinet is never wiped.
-- [ ] **SYNC-05**: Before the first successful sync, visitors see an intentional "cabinet is being filled" state instead of an error.
+- [x] **SYNC-01**: The owner's BGG "owned" collection (base games and expansions) syncs automatically about every hour. Nothing has to be entered in the app.
+- [x] **SYNC-02**: A visitor can press "sync now". One global cooldown, shared by all visitors and persisted across restarts, allows at most one sync per cooldown window. While it is active the button shows the time remaining.
+- [x] **SYNC-03**: Visitors can see when the collection was last synced.
+- [x] **SYNC-04**: When BGG is down, throttling, or returns an error or a suspiciously empty or shrunken result, visitors keep seeing the last good collection with a "showing last sync from …" note. The cabinet is never wiped.
+- [x] **SYNC-05**: Before the first successful sync, visitors see an intentional "cabinet is being filled" state instead of an error.
 - [ ] **SYNC-06**: Each game is enriched from BGG with:
   - player count and play time
   - weight, designers, mechanics and minimum age
   - BGG rating
   - for expansions, which base game(s) it expands
 - [ ] **SYNC-07**: Box art is downloaded during sync, downscaled and served from the site itself. Visitors' browsers never load images from BGG.
-- [ ] **SYNC-08**: Every public page credits BGG with the linked "Powered by BGG" logo, as BGG's API licence requires.
+- [x] **SYNC-08**: Every public page credits BGG with the linked "Powered by BGG" logo, as BGG's API licence requires.
 
 ### Cabinet
 
@@ -61,7 +61,7 @@ Requirements for the initial release. Each maps to a roadmap phase.
 ### Storage Location
 
 - [ ] **LOC-01**: Each game's storage location is visible to every visitor.
-- [ ] **LOC-02**: An early spike with the real BGG token determines whether BGG exposes the private "inventory location" field to the app. The outcome is recorded.
+- [x] **LOC-02**: An early spike with the real BGG token determines whether BGG exposes the private "inventory location" field to the app. The outcome is recorded.
   - **If it does:** the owner sets locations on BGG and the app reads them.
   - **If it does not:** LOC-03 and LOC-04 are built as owner tools.
 - [ ] **LOC-03**: The owner can define their own list of storage locations, for example rooms, cabinets, or "Lent out".
@@ -113,7 +113,7 @@ Requirements for the initial release. Each maps to a roadmap phase.
 - [ ] **SEC-02**: Public traffic is rate-limited, with a much stricter limit on "sync now".
 - [ ] **SEC-03**: Every response carries security headers, including a strict Content-Security-Policy.
 - [ ] **SEC-04**: Health and ops endpoints are not reachable from the internet, and neither are any owner tools (OWN-01).
-- [ ] **SEC-05**: The BGG username and token exist only in server-side configuration. Visitors can never supply a username or cause BGG calls beyond the cooldown-guarded sync.
+- [x] **SEC-05**: The BGG username and token exist only in server-side configuration. Visitors can never supply a username or cause BGG calls beyond the cooldown-guarded sync.
 - [ ] **SEC-06**: The app's container has CPU and memory caps, so a traffic flood cannot starve the other guests on the host.
 
 ## v2 Requirements
@@ -172,14 +172,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SYNC-01 | Phase 3 | Pending |
-| SYNC-02 | Phase 3 | Pending |
-| SYNC-03 | Phase 3 | Pending |
-| SYNC-04 | Phase 3 | Pending |
-| SYNC-05 | Phase 3 | Pending |
+| SYNC-01 | Phase 3 | Complete |
+| SYNC-02 | Phase 3 | Complete |
+| SYNC-03 | Phase 3 | Complete |
+| SYNC-04 | Phase 3 | Complete |
+| SYNC-05 | Phase 3 | Complete |
 | SYNC-06 | Phase 4 | Pending |
 | SYNC-07 | Phase 4 | Pending |
-| SYNC-08 | Phase 3 | Pending |
+| SYNC-08 | Phase 3 | Complete |
 | CAB-01 | Phase 2 | Complete |
 | CAB-02 | Phase 2 | Complete |
 | CAB-03 | Phase 4 | Pending |
@@ -200,7 +200,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FILT-04 | Phase 7 | Pending |
 | FILT-05 | Phase 7 | Pending |
 | LOC-01 | Phase 7 | Pending |
-| LOC-02 | Phase 3 | Pending |
+| LOC-02 | Phase 3 | Complete |
 | LOC-03 | Phase 6 | Pending (conditional on LOC-02 outcome) |
 | LOC-04 | Phase 6 | Pending (conditional on LOC-02 outcome) |
 | LOC-05 | Phase 7 | Pending |
@@ -221,7 +221,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SEC-02 | Phase 8 | Pending |
 | SEC-03 | Phase 8 | Pending |
 | SEC-04 | Phase 8 | Pending |
-| SEC-05 | Phase 3 | Pending |
+| SEC-05 | Phase 3 | Complete |
 | SEC-06 | Phase 8 | Pending |
 
 **Coverage:**

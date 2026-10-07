@@ -1,12 +1,10 @@
 ---
 created: 2026-10-06T09:48:44.000Z
-title: Turn off prototype mode and add noindex before go-public
+title: Add noindex before go-public
 area: security
 severity: major
 files:
-  - Cabinet.Service/appsettings.json
-  - Cabinet.Service/Pages/Index.cshtml
-  - Cabinet.Service/Prototype/SampleCatalog.cs
+  - Cabinet.Service/Pages/Shared/_Layout.cshtml
 ---
 
 ## Problem
@@ -16,3 +14,13 @@ The committed appsettings.json turns the prototype on (Prototype:Enabled true), 
 ## Solution
 
 Part of the Phase 8 go-public checklist: set the prototype off in the committed defaults (or remove the prototype entirely per the prototype removal list in the release summary of the layout prototype), add a robots noindex until the owner decides the site may be indexed, and add a test that the public page shows neither sample links nor the prototype status line when the setting is off.
+
+## Status (2026-10-07, Phase 3 release v0.3.0)
+
+The prototype part is done: the committed default is `Prototype:Enabled` false, `appsettings.Development.json` turns it on for local development only, and the sample catalog is disabled in Production whatever the env file says (tests cover the page with the setting on and off). The deployed v0.3.0 serves only the synced collection.
+
+Only the robots noindex remains: add it to the shared layout (`Pages/Shared/_Layout.cshtml`) so every page carries it until the owner decides the site may be indexed, with a test on the served HTML.
+
+## Completed (2026-10-07)
+
+noindex shipped: the shared layout carries a robots noindex tag on every page, and an integration test checks every Razor page. Re-open this when the owner decides the site may be indexed.

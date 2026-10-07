@@ -9,7 +9,10 @@ cd "$REPO_ROOT"
 # the directory patterns bracket a single letter to break contiguity).
 REQUIREMENT_KEY_PATTERN='\b(A11Y|CABX?|DET|EXP|FILT|I18N|IMG|LOC|NIGHT|OPSX?|OWN|SEC|SHARE|SYNC)-[0-9]{2}\b'
 DECISION_ID_PATTERN='\bD-[0-9]{2}\b'
-PHASE_WORD_PATTERN='\b[Pp]hase[-_ ]?[0-9]+\b'
+PHASE_WORD_PATTERN='\bphase[-_ ]?([0-9]+|one|two|three|four|five|six|seven|eight|nine|ten)\b'
+PLAN_WAVE_PATTERN='\b(plan|wave|milestone)[-_ ]?[0-9]+\b'
+REVIEW_FINDING_PATTERN='\b(CR|WR|IN|BL)-[0-9]{2}\b'
+PLAN_NUMBER_PATTERN='(^|[^0-9A-Za-z:-])[0-9]{2}-[0-9]{2}([^0-9A-Za-z:-]|$)'
 PLANNING_FILE_PATTERN='\b(PROJECT|REQUIREMENTS|ROADMAP|STATE|RESEARCH|CONTEXT|PLAN|SPEC)\.md\b'
 PLANNING_DIR_PATTERN='\.plannin[g]/'
 CLAUDE_DIR_PATTERN='\.claud[e]/'
@@ -20,10 +23,20 @@ VENDORED_JS_PATTERN='^Cabinet\.Service/wwwroot/lib/'
 # (URLs such as https://) is a line comment, wherever it sits on the line.
 CS_LINE_COMMENT_PATTERN='(^|[^/:])//([^/]|$)'
 
+# A /* that opens a block comment follows whitespace, a statement or a bracket, or starts the
+# line; one inside a string or an address (http://*:80, image/*) follows another character.
+CS_BLOCK_COMMENT_PATTERN='(^|[[:space:];{}()])/\*'
+
 # In JavaScript every // not following a colon is a line comment (doc blocks
 # are the only allowed comment form), and a block comment must open with /**.
 JS_LINE_COMMENT_PATTERN='(^|[^:])//'
 JS_PLAIN_BLOCK_COMMENT_PATTERN='/\*([^*]|$)'
+
+PAGE_SCRIPT_PATTERN='^Cabinet\.Service/wwwroot/js/'
+
+# Page scripts build the DOM from elements and text nodes only. The APIs that parse markup or
+# style text from a string are refused so a visitor-controlled value can never become markup.
+JS_MARKUP_API_PATTERN='\b(inner|outer)HTM[L]\b|insertAdjacentHTM[L]|document\.writ[e]|\.cssTex[t]'
 
 RUNS_ON_ALLOWED='ubuntu-26.04'
 
@@ -35,12 +48,12 @@ assert_clean_planning_references() {
   [ "${#files[@]}" -eq 0 ] && return 0
   local pattern
   local violations=0
-  for pattern in "$REQUIREMENT_KEY_PATTERN" "$DECISION_ID_PATTERN"; do
+  for pattern in "$REQUIREMENT_KEY_PATTERN" "$DECISION_ID_PATTERN" "$PHASE_WORD_PATTERN" "$PLAN_WAVE_PATTERN"; do
     if grep -niE "$pattern" "${files[@]}" 2>/dev/null; then
       violations=1
     fi
   done
-  for pattern in "$PHASE_WORD_PATTERN" "$PLANNING_FILE_PATTERN" "$PLANNING_DIR_PATTERN"; do
+  for pattern in "$REVIEW_FINDING_PATTERN" "$PLAN_NUMBER_PATTERN" "$PLANNING_FILE_PATTERN" "$PLANNING_DIR_PATTERN"; do
     if grep -nE "$pattern" "${files[@]}" 2>/dev/null; then
       violations=1
     fi
@@ -51,10 +64,14 @@ assert_clean_planning_references() {
 assert_clean_cs_comments() {
   local -a files=("$@")
   [ "${#files[@]}" -eq 0 ] && return 0
+  local violations=0
   if grep -nE "$CS_LINE_COMMENT_PATTERN" "${files[@]}" 2>/dev/null; then
-    return 1
+    violations=1
   fi
-  return 0
+  if grep -nE "$CS_BLOCK_COMMENT_PATTERN" "${files[@]}" 2>/dev/null; then
+    violations=1
+  fi
+  [ "$violations" -eq 0 ]
 }
 
 # Drops vendored third-party scripts (paths under Cabinet.Service/wwwroot/lib/) from a list of
@@ -75,6 +92,19 @@ assert_clean_js_comments() {
     violations=1
   fi
   [ "$violations" -eq 0 ]
+}
+
+filter_page_scripts() {
+  grep -E "$PAGE_SCRIPT_PATTERN" || true
+}
+
+assert_no_markup_apis() {
+  local -a files=("$@")
+  [ "${#files[@]}" -eq 0 ] && return 0
+  if grep -nE "$JS_MARKUP_API_PATTERN" "${files[@]}" 2>/dev/null; then
+    return 1
+  fi
+  return 0
 }
 
 assert_clean_runs_on() {
@@ -168,6 +198,48 @@ self_test() {
     failed=1
   fi
 
+  local finding_prefix
+  for finding_prefix in CR WR IN BL; do
+    printf '%s%s\n' "$finding_prefix" "-09 example review finding" >"$bad_file"
+    if assert_clean_planning_references "$bad_file" >/dev/null 2>&1; then
+      echo "self-test failed: a synthetic review finding id with prefix ${finding_prefix} was not detected" >&2
+      failed=1
+    fi
+  done
+
+  printf 'Covered by %s%s\n' "03" "-15" >"$bad_file"
+  if assert_clean_planning_references "$bad_file" >/dev/null 2>&1; then
+    echo "self-test failed: a synthetic plan number was not detected" >&2
+    failed=1
+  fi
+
+  local phase_text
+  for phase_text in "PHAS""E 3" "phas""e-3" "Phas""e two" "phas""e_ten"; do
+    printf 'Done in %s of the rollout\n' "$phase_text" >"$bad_file"
+    if assert_clean_planning_references "$bad_file" >/dev/null 2>&1; then
+      echo "self-test failed: the phase reference '${phase_text}' was not detected" >&2
+      failed=1
+    fi
+  done
+
+  local grouping
+  for grouping in "Pla""n 2" "wav""e 4" "Wav""e-1" "Mileston""e 3" "MILESTON""E_2"; do
+    printf 'Shipped with %s today\n' "$grouping" >"$bad_file"
+    if assert_clean_planning_references "$bad_file" >/dev/null 2>&1; then
+      echo "self-test failed: the grouping reference '${grouping}' was not detected" >&2
+      failed=1
+    fi
+  done
+
+  local innocent
+  for innocent in 'Released on 2026-10-07 at noon' 'Branch names look like milestone/v1-example' 'The built-in-10 items plug-in' 'A plan for the next wave of games' 'In phases of the moon' 'Between 10:00-18:00 daily' 'Uses 16-bit and 4-8 players'; do
+    printf '%s\n' "$innocent" >"$good_file"
+    if ! assert_clean_planning_references "$good_file" >/dev/null 2>&1; then
+      echo "self-test failed: innocent text was flagged as a planning reference: ${innocent}" >&2
+      failed=1
+    fi
+  done
+
   local bad_cs="$tmp/Bad.cs"
   local good_cs="$tmp/Good.cs"
   printf 'namespace Example;\n%s explanation\npublic class Foo { }\n' "// inline" >"$bad_cs"
@@ -196,6 +268,24 @@ self_test() {
   printf 'namespace Example;\nvar url = "https://example.com/path";\n' >"$good_cs"
   if ! assert_clean_cs_comments "$good_cs"; then
     echo "self-test failed: a URL inside a string was incorrectly flagged" >&2
+    failed=1
+  fi
+
+  printf 'namespace Example;\n%s explanation */\npublic class Foo { }\n' "/*" >"$bad_cs"
+  if assert_clean_cs_comments "$bad_cs" >/dev/null 2>&1; then
+    echo "self-test failed: a C# block comment at the start of a line was not detected" >&2
+    failed=1
+  fi
+
+  printf 'namespace Example;\nvar x = 1; %s note */\n' "/*" >"$bad_cs"
+  if assert_clean_cs_comments "$bad_cs" >/dev/null 2>&1; then
+    echo "self-test failed: a trailing C# block comment was not detected" >&2
+    failed=1
+  fi
+
+  printf 'namespace Example;\nvar listener = "http:%s*:6080";\nvar accept = "image%s*";\n' "//" "/" >"$good_cs"
+  if ! assert_clean_cs_comments "$good_cs"; then
+    echo "self-test failed: a wildcard address or media type inside a string was flagged as a block comment" >&2
     failed=1
   fi
 
@@ -243,6 +333,28 @@ self_test() {
   normal_js_list="$(printf '%s\n' "$tmp/Cabinet.Service-wwwroot-js-own.js" | filter_vendored_js)"
   if [ -z "$normal_js_list" ] || assert_clean_js_comments "$normal_js_list" >/dev/null 2>&1; then
     echo "self-test failed: a // comment in a normal script path was not detected through the vendored-path filter" >&2
+    failed=1
+  fi
+
+  local markup_api
+  for markup_api in 'el.innerHTML' 'el.outerHTML' 'el.insertAdjacentHTML' 'document.write' 'el.style.cssText'; do
+    printf 'const value = %s;\n' "$markup_api" >"$tmp/markup.js"
+    if assert_no_markup_apis "$tmp/markup.js" >/dev/null 2>&1; then
+      echo "self-test failed: the markup-building API '${markup_api}' was not detected" >&2
+      failed=1
+    fi
+  done
+
+  printf 'const node = document.createElement("div");\nnode.textContent = "plain";\nnode.style.setProperty("--x", "1");\n' >"$tmp/clean.js"
+  if ! assert_no_markup_apis "$tmp/clean.js" >/dev/null 2>&1; then
+    echo "self-test failed: a script that builds elements and text nodes was incorrectly flagged" >&2
+    failed=1
+  fi
+
+  local page_scripts
+  page_scripts="$(printf '%s\n' 'Cabinet.Service/wwwroot/js/render.js' 'Cabinet.Service/wwwroot/lib/signalr/signalr.min.js' 'Cabinet.Service/other/tool.js' | filter_page_scripts)"
+  if [ "$page_scripts" != "Cabinet.Service/wwwroot/js/render.js" ]; then
+    echo "self-test failed: the vendored folder was not ignored, or a page script was dropped, in the markup-API file list" >&2
     failed=1
   fi
 
@@ -316,6 +428,11 @@ if ! assert_clean_cs_comments "${cs_files[@]}"; then
 fi
 
 if ! assert_clean_js_comments "${js_files[@]}"; then
+  overall_ok=0
+fi
+
+mapfile -t page_script_files < <(git ls-files '*.js' '*.mjs' | filter_page_scripts || true)
+if ! assert_no_markup_apis "${page_script_files[@]}"; then
   overall_ok=0
 fi
 

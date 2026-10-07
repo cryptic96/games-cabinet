@@ -2,9 +2,9 @@ using Cabinet.Domain.Collection;
 using Cabinet.Repository.Bgg;
 using Cabinet.Service.Collection;
 using Cabinet.Service.Sync;
+using Cabinet.UnitTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting.Internal;
 using Microsoft.Extensions.Logging;
 
 namespace Cabinet.UnitTests.Sync;
@@ -141,7 +141,7 @@ public class BggSettingsTests
             .AddInMemoryCollection(values.Select(pair => new KeyValuePair<string, string?>(pair.Key, pair.Value)))
             .Build();
 
-        return BggSettings.FromConfiguration(configuration, new HostingEnvironment { EnvironmentName = environment }, "1.2.3");
+        return BggSettings.FromConfiguration(configuration, new TestEnvironment(environment), "1.2.3");
     }
 
     private sealed class EmptyStore : ISnapshotStore
@@ -164,15 +164,5 @@ public class BggSettingsTests
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
             Lines.Add(formatter(state, exception));
-    }
-
-    private sealed class TemporaryDirectory : IDisposable
-    {
-        public TemporaryDirectory() =>
-            Directory.CreateDirectory(FullPath = Path.Combine(Path.GetTempPath(), $"cabinet-settings-tests-{Guid.NewGuid():N}"));
-
-        public string FullPath { get; }
-
-        public void Dispose() => Directory.Delete(FullPath, recursive: true);
     }
 }

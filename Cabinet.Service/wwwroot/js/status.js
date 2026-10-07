@@ -94,15 +94,6 @@ export function countdownText(remainingMs) {
 }
 
 /**
- * Whole minutes left in the window, rounded up.
- * @param {number} remainingMs Milliseconds left in the window.
- * @returns {number} Zero for zero or less.
- */
-export function wholeMinutesLeft(remainingMs) {
-  return remainingMs > 0 ? Math.ceil(remainingMs / 60000) : 0;
-}
-
-/**
  * Which of the four outcome sentences a finished press gets; anything unknown counts as a failure.
  * @param {string | null | undefined} lastResult The last result the status reports.
  * @returns {'changed' | 'unchanged' | 'failed' | 'heldBack'}
@@ -139,15 +130,51 @@ export function isOutdatedStatus(newestServerTimeMs, status) {
   return Number.isFinite(at) && at < newestServerTimeMs;
 }
 
+/**
+ * Whether the page should keep following the visitor's own press: while the press has not reached its outcome and the longest
+ * plausible sync has not passed.
+ * @param {boolean} pending Whether the press is still waiting for its outcome.
+ * @param {number} nowMs The visitor's clock now.
+ * @param {number} deadlineMs When to stop following the press, on the same clock.
+ * @returns {boolean}
+ */
+export function ownSyncStillWaiting(pending, nowMs, deadlineMs) {
+  return pending === true && nowMs < deadlineMs;
+}
+
 const RECONNECT_DELAYS_MS = Object.freeze([0, 2000, 10000, 30000]);
 const STEADY_RECONNECT_DELAY_MS = 60000;
+const RECONNECT_JITTER_RATIO = 0.2;
+const FIRST_RETRY_FLOOR_MS = 250;
+const FIRST_RETRY_SPREAD_MS = 1000;
 
 /**
- * How long to wait before the next try to reach the live connection: at once, then 2 s, 10 s, 30 s, and every 60 s after that
- * without ever giving up.
- * @param {number} previousRetryCount How many tries have already failed since the connection was last up.
- * @returns {number} Milliseconds to wait.
+ * Turns a random source's answer into a number in [0, 1), so a faulty source can never push a delay out of its bounds.
+ * @param {() => number} random The random source.
+ * @returns {number} The answer clamped into [0, 1); the middle when it is not a number.
  */
-export function reconnectDelayMs(previousRetryCount) {
-  return RECONNECT_DELAYS_MS[previousRetryCount] ?? STEADY_RECONNECT_DELAY_MS;
+function unitInterval(random) {
+  const value = random();
+
+  return Number.isFinite(value) ? Math.min(Math.max(value, 0), 1 - Number.EPSILON) : 0.5;
+}
+
+/**
+ * How long to wait before the next try to reach the live connection: a moment (a quarter to one and a quarter seconds) for the
+ * first try, then about 2 s, 10 s, 30 s, and about every 60 s after that without ever giving up. Every wait is spread so that
+ * pages that lost the channel together do not all come back together: the later steps vary by up to 20 percent either way, and
+ * the first one is spread over a second. A wait is never negative and the first is never zero.
+ * @param {number} previousRetryCount How many tries have already failed since the connection was last up.
+ * @param {() => number} [random] A source of numbers in [0, 1); Math.random unless a test hands in its own.
+ * @returns {number} Whole milliseconds to wait.
+ */
+export function reconnectDelayMs(previousRetryCount, random = Math.random) {
+  const unit = unitInterval(random);
+  const base = RECONNECT_DELAYS_MS[previousRetryCount] ?? STEADY_RECONNECT_DELAY_MS;
+
+  if (base === 0) {
+    return FIRST_RETRY_FLOOR_MS + Math.floor(unit * FIRST_RETRY_SPREAD_MS);
+  }
+
+  return Math.round(base * (1 - RECONNECT_JITTER_RATIO + 2 * RECONNECT_JITTER_RATIO * unit));
 }

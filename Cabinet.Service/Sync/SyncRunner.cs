@@ -12,7 +12,9 @@ public sealed record SyncRunResult(SyncResult Result, SyncFailure Failure, HeldB
 /// <summary>
 /// Runs one sync: fetch the owned collection, let the shrink guard judge it, and when it is accepted and differs from the
 /// shown one, store it and then show it. The stored copy is written first, so a restart never shows something older than
-/// what visitors saw. A collection the guard holds back is neither stored nor shown. It logs the failure category only,
+/// what visitors saw. A collection the guard holds back is neither stored nor shown. When a stored collection exists but
+/// could not be read, each run tries to read it again first; while it still cannot be read, the run does not treat itself as
+/// the first sync, so a stored file is never replaced by an empty answer or by one answer that nothing confirms. It logs the failure category only,
 /// never an address, an answer or a title.
 /// </summary>
 public sealed class SyncRunner
@@ -66,7 +68,9 @@ public sealed class SyncRunner
 
         var entryIds = collection.Items.Select(item => item.CollectionId).Distinct().ToList();
 
-        if (ShrinkGuard.Evaluate(_collection.Current.Items.Count, entryIds, previousHeldBack) is GuardDecision.HeldBack held)
+        var unreadable = StoredCollectionStillUnreadable();
+
+        if (ShrinkGuard.Evaluate(_collection.Current.Items.Count, entryIds, previousHeldBack, unreadable) is GuardDecision.HeldBack held)
         {
             _logger.LogWarning("BGG sync held back a collection: {Kind}", held.Kind);
 
@@ -88,5 +92,24 @@ public sealed class SyncRunner
         _collection.Replace(next);
 
         return new SyncRunResult(SyncResult.Changed, SyncFailure.None);
+    }
+
+    private bool StoredCollectionStillUnreadable()
+    {
+        if (!_snapshots.HasUnreadStoredCollection)
+        {
+            return false;
+        }
+
+        var stored = _snapshots.Load();
+
+        if (stored is null)
+        {
+            return _snapshots.HasUnreadStoredCollection;
+        }
+
+        _collection.Replace(CollectionState.FromSnapshot(stored));
+
+        return false;
     }
 }

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using Cabinet.FakeBgg;
@@ -17,7 +18,7 @@ public class SyncNowTests
     private static readonly TimeSpan Cooldown = TimeSpan.FromMinutes(10);
 
     [Fact]
-    public async Task The_first_press_is_accepted_and_reports_a_running_sync()
+    public async Task The_first_press_is_accepted_and_reports_the_sync_as_running_or_already_finished()
     {
         var handler = ScriptedBggHandler.ForCollection(SyntheticBggCollection.Create(3));
         await using var factory = SyncHarness.CreateFactory(handler, SyncHarness.NewClock());
@@ -28,7 +29,11 @@ public class SyncNowTests
 
         press.StatusCode.Should().Be(HttpStatusCode.Accepted);
         body.RootElement.GetProperty("outcome").GetString().Should().Be("started");
-        body.RootElement.GetProperty("status").GetProperty("running").GetBoolean().Should().BeTrue();
+        var status = body.RootElement.GetProperty("status");
+        var running = status.GetProperty("running").GetBoolean();
+        var finished = status.GetProperty("lastResult").ValueKind != JsonValueKind.Null;
+
+        (running || finished).Should().BeTrue("the answer reports the state as it is, and a sync that has already ended is not reported as running");
         await SyncHarness.WaitForRunToEnd(client);
     }
 
@@ -122,6 +127,28 @@ public class SyncNowTests
         handler.Requests.Should().NotBeEmpty();
         handler.Requests.Should().OnlyContain(request =>
             request.Uri.Query.Contains("username=sentinel-user-name") && !request.Uri.Query.Contains("other-person"));
+    }
+
+    [Theory]
+    [InlineData(0, 600)]
+    [InlineData(10.4, 590)]
+    [InlineData(195, 405)]
+    [InlineData(599, 1)]
+    [InlineData(599.6, 1)]
+    public async Task A_refused_press_is_told_to_wait_the_remaining_time_in_whole_seconds_rounded_up(double secondsIntoWindow, int expectedSeconds)
+    {
+        var clock = SyncHarness.NewClock();
+        await using var factory = SyncHarness.CreateFactory(ScriptedBggHandler.ForCollection(SyntheticBggCollection.Create(3)), clock);
+        using var client = factory.CreatePublicClient();
+        using var first = await client.PostAsync(SyncHarness.SyncRoute, content: null, TestContext.Current.CancellationToken);
+        await SyncHarness.WaitForRunToEnd(client);
+
+        clock.Advance(TimeSpan.FromSeconds(secondsIntoWindow));
+        using var refused = await client.PostAsync(SyncHarness.SyncRoute, content: null, TestContext.Current.CancellationToken);
+
+        refused.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        refused.Headers.NonValidated["Retry-After"].ToString()
+            .Should().Be(expectedSeconds.ToString(CultureInfo.InvariantCulture), "the header carries the raw whole number of seconds");
     }
 
     private static async Task<JsonDocument> ReadBody(HttpResponseMessage response) =>

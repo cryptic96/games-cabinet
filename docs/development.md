@@ -6,6 +6,7 @@ How to work on this repository without leaking personal data, and how to run the
 
 - The .NET SDK version pinned in `global.json`. The pin allows newer feature bands, so any current SDK of the same major version works.
 - Docker, for the containerised lint and secret-scanning tools that `build/lint.sh` and `build/scan-history.sh` run.
+- Node.js, only to run the page script tests (`node --test build/tests/page-scripts.test.mjs`). The site itself has no Node toolchain.
 - `git` and `bash`. The hooks and scripts are plain bash with no other dependencies.
 
 ## Enable the personal-data hooks
@@ -159,4 +160,5 @@ Use any dummy username and token. The base address override is honoured only in 
 
 - Lint and script tests: `build/lint.sh`
 - .NET tests: `dotnet test --solution Cabinet.slnx`
+- Page script tests: `node --test build/tests/page-scripts.test.mjs`
 - Hook tests alone: `bash build/tests/githooks-test.sh`

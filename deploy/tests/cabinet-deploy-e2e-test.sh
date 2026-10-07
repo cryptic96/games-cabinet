@@ -65,6 +65,24 @@ check() {
   fi
 }
 
+# Runs a command in a subshell with errexit on, the way the installer runs in
+# production, and stores its exit status in the named variable. The command must
+# not sit on the left of an || or inside an if: bash then ignores errexit for
+# everything it runs, which would hide a step that only works because of it.
+run_with_errexit() {
+  local status_var="$1"
+  shift
+  local status=0
+  set +e
+  (
+    set -e
+    "$@"
+  )
+  status=$?
+  set -e
+  printf -v "$status_var" '%s' "$status"
+}
+
 free_port() {
   python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()'
 }
@@ -158,7 +176,7 @@ load_configuration
 build_release 0.0.1
 
 INSTALL_EXIT=0
-(cmd_install v0.0.1 --from-dir "$ASSETS") >"${TMP}/install-0.0.1.log" 2>&1 || INSTALL_EXIT=$?
+run_with_errexit INSTALL_EXIT cmd_install v0.0.1 --from-dir "$ASSETS" >"${TMP}/install-0.0.1.log" 2>&1
 cat "${TMP}/install-0.0.1.log"
 
 check "install of 0.0.1 exits 0" "0" "$INSTALL_EXIT"
@@ -192,7 +210,7 @@ pack_release "$BROKEN_STAGE" 0.0.2
 
 printf 'v0.0.2' > "$SERVED_TAG_FILE"
 POLL_RC=0
-(cmd_poll) >"${TMP}/poll-broken.log" 2>&1 || POLL_RC=$?
+run_with_errexit POLL_RC cmd_poll >"${TMP}/poll-broken.log" 2>&1
 cat "${TMP}/poll-broken.log"
 
 check "polling a release that never reports healthy exits non-zero" "1" "$POLL_RC"
@@ -206,7 +224,7 @@ check "the last good release is still the previous one after the rollback" "0.0.
 
 for attempt in 1 2; do
   SKIP_RC=0
-  (cmd_poll) >"${TMP}/poll-skip-${attempt}.log" 2>&1 || SKIP_RC=$?
+  run_with_errexit SKIP_RC cmd_poll >"${TMP}/poll-skip-${attempt}.log" 2>&1
   check "skip poll ${attempt} exits 0" "0" "$SKIP_RC"
   check "skip poll ${attempt} says the release was rolled back" "yes" \
     "$(grep -q 'was rolled back after a failed health check' "${TMP}/poll-skip-${attempt}.log" && echo yes || echo no)"
@@ -217,7 +235,7 @@ check "skip polls keep 0.0.1 active and healthy" "0.0.1" "$(ops_health | jq -r '
 build_release 0.0.3
 printf 'v0.0.3' > "$SERVED_TAG_FILE"
 FIXED_RC=0
-(cmd_poll) >"${TMP}/poll-fixed.log" 2>&1 || FIXED_RC=$?
+run_with_errexit FIXED_RC cmd_poll >"${TMP}/poll-fixed.log" 2>&1
 cat "${TMP}/poll-fixed.log"
 
 check "install of 0.0.3: the poll exits 0" "0" "$FIXED_RC"

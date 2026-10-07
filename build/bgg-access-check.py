@@ -39,6 +39,7 @@ import sys
 import time
 import typing
 import xml.etree.ElementTree as ET
+import xml.parsers.expat as expat
 from urllib.parse import urlencode, urlsplit
 
 HOST = "boardgamegeek.com"
@@ -49,6 +50,7 @@ POLL_WAITS = (5, 10, 20, 30, 30, 30)
 MAX_BODY_BYTES = 20 * 1024 * 1024
 REQUEST_TIMEOUT_SECONDS = 60
 WRONG_TOKEN = "invalid-token-for-shape-check"
+MIN_SUBSTRING_NAME_LENGTH = 4
 USER_AGENT = "GamesCabinet-access-check/1"
 DEFAULT_ENV_FILE = "/etc/cabinet/cabinet.env"
 SHOWN_HEADERS = ("content-type", "content-length", "cache-control", "retry-after", "server", "cf-mitigated")
@@ -63,6 +65,10 @@ EXIT_WITHHELD = 4
 EXIT_STOPPED = 5
 
 WITHHELD_MESSAGE = "output withheld: it would have contained a sensitive value"
+WITHHELD_HINT = (
+    "hint: the report matched the token, the contact address, the username (a name under four characters "
+    "only as a whole word) or a title or location seen in the answers"
+)
 
 USERNAME_PARAMETER = None
 
@@ -197,28 +203,76 @@ def contains_value(report, value):
     return value in report
 
 
-def report_leaks(report, credentials, values):
-    """True when the report holds a credential, a remembered value, a URL marker or markup."""
+def contains_name(report, name):
+    """Case-insensitive match of a username: anywhere for a long one, as a whole word for a short one."""
+    if not name:
+        return False
+    if len(name) < MIN_SUBSTRING_NAME_LENGTH:
+        pattern = r"(?<![A-Za-z0-9])" + re.escape(name) + r"(?![A-Za-z0-9])"
+        return re.search(pattern, report, re.IGNORECASE) is not None
+    return name.lower() in report.lower()
+
+
+def guarded_credentials(token, contact):
+    """The secrets that withhold the report when they appear anywhere in it, even inside a longer word."""
+    return [token, contact, WRONG_TOKEN]
+
+
+def report_leaks(report, credentials, values, names=()):
+    """True when the report holds a credential, a username, a remembered value, a URL marker or markup."""
     lowered = report.lower()
     if "http" in lowered or "<" in report:
         return True
     for credential in credentials:
         if credential and credential.lower() in lowered:
             return True
+    if any(contains_name(report, name) for name in names):
+        return True
     return any(contains_value(report, value) for value in values)
+
+
+WIDE_ENCODING_MARKS = (b"\xff\xfe", b"\xfe\xff", b"\x00\x00\xfe\xff")
+
+
+class DoctypeRefused(Exception):
+    """Raised by the parser callbacks when a document declares a doctype or an entity."""
+
+
+def refuse_declaration(*arguments):
+    """Parser callback: any doctype or entity declaration is refused outright."""
+    raise DoctypeRefused()
+
+
+def is_wide_encoded(body):
+    """True for a body in a UTF-16 or UTF-32 form: it starts with their byte-order mark or holds a NUL byte."""
+    return body.startswith(WIDE_ENCODING_MARKS) or b"\x00" in body
+
+
+def declares_doctype_or_entity(body):
+    """True when a strict parse meets a doctype or an entity declaration, or cannot parse the body at all."""
+    parser = expat.ParserCreate()
+    parser.StartDoctypeDeclHandler = refuse_declaration
+    parser.EntityDeclHandler = refuse_declaration
+    try:
+        parser.Parse(body, True)
+    except DoctypeRefused:
+        return True
+    except expat.ExpatError:
+        return False
+    return False
 
 
 def classify_body(body):
     """Return (class, parsed root or None) for a response body."""
     if not body.strip():
         return "empty", None
-    if len(body) > MAX_BODY_BYTES:
+    if len(body) > MAX_BODY_BYTES or is_wide_encoded(body):
         return "other", None
     lowered = body.lower()
     head = lowered[:2048].lstrip()
     if head.startswith((b"<!doctype html", b"<html")) or b"<html" in head:
         return "html", None
-    if b"<!doctype" in lowered or b"<!entity" in lowered:
+    if b"<!doctype" in lowered or b"<!entity" in lowered or declares_doctype_or_entity(body):
         return "other", None
     try:
         root = ET.fromstring(body)
@@ -731,9 +785,9 @@ def run_check(env_file):
     lines, stopped = run_calls(transport, username, collector, progress)
     lines.append("elapsed seconds: %d" % int(time.monotonic() - started))
     report = "\n".join(lines)
-    credentials = [token, username, contact, WRONG_TOKEN]
-    if report_leaks(report, credentials, collector.sensitive):
+    if report_leaks(report, guarded_credentials(token, contact), collector.sensitive, [username]):
         print(WITHHELD_MESSAGE)
+        print(WITHHELD_HINT)
         return EXIT_WITHHELD
     print(report)
     return EXIT_STOPPED if stopped else EXIT_OK
@@ -881,10 +935,26 @@ def run_self_test():
     for fragment in expected:
         check("report keeps " + fragment, fragment in report)
 
+    hostile_text = "<?xml version='1.0'?><!DOCTYPE items [<!ENTITY invented 'x'>]><items>&invented;</items>"
+    clean_text = "<?xml version='1.0'?><items totalitems='0'></items>"
+    for encoding in ("utf-16", "utf-16-le", "utf-16-be", "utf-32", "utf-32-le", "utf-32-be"):
+        check("a doctype in " + encoding + " is refused", classify_body(hostile_text.encode(encoding)) == ("other", None))
+        check("a clean document in " + encoding + " is refused", classify_body(clean_text.encode(encoding)) == ("other", None))
+    check("a byte-order mark alone is refused", classify_body(b"\xff\xfe<") == ("other", None))
+    check("a body holding a NUL byte is refused", classify_body(clean_text.encode("utf-8") + b"\x00") == ("other", None))
+    check("a doctype in plain text is refused", classify_body(hostile_text.encode("utf-8"))[0] == "other")
+    check("a doctype in mixed case is refused", classify_body(b"<!DocType items><items></items>")[0] == "other")
+    check("a doctype is found by the strict parse", declares_doctype_or_entity(b"<!DOCTYPE items><items/>"))
+    check("an entity declaration is found by the strict parse", declares_doctype_or_entity(b"<!DOCTYPE items [<!ENTITY a 'b'>]><items/>"))
+    check("a clean document passes the strict parse", not declares_doctype_or_entity(clean_text.encode("utf-8")))
+    check("a clean utf-8 document is still read", classify_body(clean_text.encode("utf-8"))[0] == "xml:items")
+    check("a clean utf-8 document with a byte-order mark is still read", classify_body(b"\xef\xbb\xbf" + clean_text.encode("utf-8"))[0] == "xml:items")
+
     skipped_lines = render_call(calls["I"], Result(None, 0, [], b"", 0, None, "request budget reached", False), Collector())
     check("a skipped call is recorded as skipped", "  skipped: request budget reached" in skipped_lines)
 
-    credentials = [token, username, contact, WRONG_TOKEN]
+    credentials = guarded_credentials(token, contact)
+    names = [username]
     forbidden = (
         "Example Game One",
         "Example Game Two",
@@ -899,20 +969,26 @@ def run_self_test():
     )
     for value in forbidden:
         check("report drops " + value, value not in report)
-    for credential in credentials:
+    for credential in credentials + names:
         check("report drops credential " + credential, credential not in report)
     check("report holds no url marker", "http" not in report.lower())
     check("report holds no markup", "<" not in report)
     check("collector remembered the invented titles", {"Example Game One", "Example Expansion", "Shelf A"} <= collector.sensitive)
-    check("guard passes the clean report", not report_leaks(report, credentials, collector.sensitive))
-    check("guard fires on a token", report_leaks(report + " " + token, credentials, collector.sensitive))
-    check("guard fires on a username", report_leaks(report + " " + username.upper(), credentials, collector.sensitive))
-    check("guard fires on a contact address", report_leaks(report + " " + contact, credentials, collector.sensitive))
-    check("guard fires on a remembered title", report_leaks(report + " Example Game One", credentials, collector.sensitive))
-    check("guard fires on a remembered location", report_leaks(report + " Shelf A", credentials, collector.sensitive))
-    check("guard fires on a url marker", report_leaks(report + " https", credentials, collector.sensitive))
-    check("guard fires on markup", report_leaks(report + " <", credentials, collector.sensitive))
+    check("guard passes the clean report", not report_leaks(report, credentials, collector.sensitive, names))
+    check("guard fires on a token", report_leaks(report + " " + token, credentials, collector.sensitive, names))
+    check("guard fires on a username", report_leaks(report + " " + username.upper(), credentials, collector.sensitive, names))
+    check("guard fires on a contact address", report_leaks(report + " " + contact, credentials, collector.sensitive, names))
+    check("guard fires on a remembered title", report_leaks(report + " Example Game One", credentials, collector.sensitive, names))
+    check("guard fires on a remembered location", report_leaks(report + " Shelf A", credentials, collector.sensitive, names))
+    check("guard fires on a url marker", report_leaks(report + " https", credentials, collector.sensitive, names))
+    check("guard fires on markup", report_leaks(report + " <", credentials, collector.sensitive, names))
     check("guard matches short values as whole words", report_leaks("Go now", [], {"Go"}) and not report_leaks("Gone", [], {"Go"}))
+    check("guard passes a short username inside longer words", not report_leaks("status items stats", [], set(), ["us"]))
+    check("guard fires on a short username as a whole word", report_leaks("seen by us today", [], set(), ["us"]))
+    check("guard fires on a short username in any case", report_leaks("seen by US today", [], set(), ["us"]))
+    check("guard fires on a long username inside a longer word", report_leaks("status", [], set(), ["stat"]))
+    check("guard fires on a short token inside a longer word", report_leaks("status", ["us"], set()))
+    check("guard credentials are the token, the contact address and the fixed wrong token", guarded_credentials(token, contact) == [token, contact, WRONG_TOKEN])
 
     plan_text = " ".join(name for call in CALLS for name, _ in call.parameters)
     check("plan names showprivate", "showprivate" in plan_text)

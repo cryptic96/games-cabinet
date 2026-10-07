@@ -9,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Cabinet.IntegrationTests;
 
-/// <summary>Verifies every HTML page carries the linked BoardGameGeek credit through the shared layout.</summary>
+/// <summary>Verifies every HTML page carries the linked BoardGameGeek credit and the robots tag through the shared layout.</summary>
 [Trait("Category", "Credit")]
 public partial class CreditTests
 {
@@ -29,6 +29,26 @@ public partial class CreditTests
 
             response.StatusCode.Should().Be(HttpStatusCode.OK, $"page {route} is served");
             Credit().IsMatch(html).Should().BeTrue($"page {route} renders the credit link with its logo");
+        }
+    }
+
+    [Fact]
+    public async Task Every_razor_page_asks_search_engines_not_to_index_it()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        using var client = factory.CreatePublicClient();
+        var routes = PageRoutes(factory);
+
+        routes.Should().NotBeEmpty("the app serves at least the cabinet page");
+
+        foreach (var route in routes)
+        {
+            using var response = await client.GetAsync(route, TestContext.Current.CancellationToken);
+            var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+            response.StatusCode.Should().Be(HttpStatusCode.OK, $"page {route} is served");
+            NoIndex().Matches(html).Should().ContainSingle($"page {route} carries exactly one robots tag asking for no indexing");
+            NoIndex().Match(html).Index.Should().BeLessThan(html.IndexOf("</head>", StringComparison.Ordinal), $"page {route} puts the robots tag in the head");
         }
     }
 
@@ -86,7 +106,7 @@ public partial class CreditTests
         var body = await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        response.Content.Headers.ContentType?.MediaType.Should().StartWith("image/");
+        response.ShouldHaveMediaTypeStartingWith("image/");
         body.Should().NotBeEmpty();
     }
 
@@ -129,6 +149,9 @@ public partial class CreditTests
         pattern.Parameters.Should().BeEmpty($"page route {pattern.RawText} must be requestable without values");
         return "/" + pattern.RawText?.TrimStart('/');
     }
+
+    [GeneratedRegex("<meta name=\"robots\" content=\"noindex\" />")]
+    private static partial Regex NoIndex();
 
     [GeneratedRegex("<a class=\"bgg-credit\" href=\"https://boardgamegeek\\.com\" rel=\"noopener\">\\s*<img [^>]*alt=\"Powered by BGG\"")]
     private static partial Regex Credit();

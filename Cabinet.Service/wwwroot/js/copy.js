@@ -45,7 +45,6 @@ export const COPY = Object.freeze({
   errorBody: 'Check your connection and try again.',
   retry: 'Try again',
   untitled: 'Untitled game',
-  notSynced: 'Not synced yet',
 
   /**
    * How long ago the collection was synced: just now under a minute or for a time in the future, then whole minutes, whole

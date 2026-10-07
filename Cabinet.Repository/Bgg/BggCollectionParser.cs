@@ -78,8 +78,9 @@ public static class BggCollectionParser
     }
 
     /// <summary>
-    /// Cleans a title the way every stored title is cleaned: characters below U+0020 are removed, the ends are trimmed and the
-    /// length is capped. Nothing else about the title is changed.
+    /// Cleans a title the way every stored title is cleaned: control characters (the C0 and C1 ranges and DEL), the line and
+    /// paragraph separators and the bidirectional override, embedding and isolate characters are removed, the ends are
+    /// trimmed and the length is capped. Nothing else about the title is changed.
     /// </summary>
     /// <param name="title">The title as BGG returned it.</param>
     public static string CleanTitle(string title)
@@ -144,8 +145,14 @@ public static class BggCollectionParser
         return cleaned.Length == 0 ? null : cleaned;
     }
 
+    private static bool IsInvisibleControl(char character) =>
+        char.IsControl(character)
+        || character is '\u2028' or '\u2029'
+        || character is >= '\u202A' and <= '\u202E'
+        || character is >= '\u2066' and <= '\u2069';
+
     private static string RemoveControlCharacters(string text) =>
-        text.Any(character => character < ' ') ? string.Concat(text.Where(character => character >= ' ')) : text;
+        text.Any(IsInvisibleControl) ? string.Concat(text.Where(character => !IsInvisibleControl(character))) : text;
 
     private static string Cap(string text, int maxLength)
     {

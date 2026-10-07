@@ -39,7 +39,7 @@ public partial class CabinetPageTests
         using var stylesheet = await client.GetAsync(cabinetHref, TestContext.Current.CancellationToken);
 
         stylesheet.StatusCode.Should().Be(HttpStatusCode.OK);
-        stylesheet.Content.Headers.ContentType?.MediaType.Should().Be("text/css");
+        stylesheet.ShouldHaveMediaType("text/css");
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public partial class CabinetPageTests
         using var script = await client.GetAsync(match.Groups["src"].Value, TestContext.Current.CancellationToken);
 
         script.StatusCode.Should().Be(HttpStatusCode.OK);
-        script.Content.Headers.ContentType?.MediaType.Should().Be("text/javascript");
+        script.ShouldHaveMediaType("text/javascript");
     }
 
     [Theory]
@@ -71,7 +71,7 @@ public partial class CabinetPageTests
         using var response = await client.GetAsync(path, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        response.Content.Headers.ContentType?.MediaType.Should().Be("text/javascript");
+        response.ShouldHaveMediaType("text/javascript");
     }
 
     [Fact]

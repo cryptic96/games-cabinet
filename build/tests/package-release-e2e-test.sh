@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
+# End-to-end proof of the packaged release layout: builds a real release, starts
+# it and checks the served page. Needs the .NET SDK and runs only with
+# CABINET_E2E=1.
 set -euo pipefail
+
+if [ "${CABINET_E2E:-0}" != "1" ]; then
+  echo "skipping package-release end-to-end test (set CABINET_E2E=1 to run)"
+  exit 0
+fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
@@ -56,6 +64,14 @@ if grep -q '^deploy/tests/' <<<"$LISTING"; then
   fail "zip ships deploy/tests/, which must stay out of releases"
 fi
 
+if grep -q 'Cabinet\.FakeBgg' <<<"$LISTING"; then
+  fail "zip ships the fake BGG, which is for tests only"
+fi
+
+if grep -qE 'Cabinet\.(UnitTests|IntegrationTests)' <<<"$LISTING"; then
+  fail "zip ships test assemblies, which must stay out of releases"
+fi
+
 (cd "$OUTPUT" && sha256sum -c "cabinet-$VERSION.zip.sha256" >/dev/null) || fail "sha256 does not match the zip"
 
 MANIFEST="$(unzip -p "$ZIP" release-manifest.json | jq -c .)"
@@ -110,7 +126,7 @@ echo "$HEALTH"
 PAGE="$(curl -fsS --max-time 5 "http://127.0.0.1:$WEB_PORT/")" || fail "hello page did not return 200"
 grep -q "$VERSION" <<<"$PAGE" || fail "hello page does not mention version $VERSION"
 
-STYLESHEET="$(grep -oE '<link[^>]*rel="stylesheet"[^>]*>' <<<"$PAGE" | grep -oE 'href="[^"]+"' | head -n 1 | sed -e 's/^href="//' -e 's/"$//')"
+STYLESHEET="$({ grep -oE '<link[^>]*rel="stylesheet"[^>]*>' <<<"$PAGE" || true; } | sed -nE 's/.*href="([^"]+)".*/\1/p' | sed -n '1p')"
 [ -n "$STYLESHEET" ] || fail "hello page has no stylesheet link"
 grep -qE '\?v=|\.[A-Za-z0-9_-]{6,}\.css' <<<"$STYLESHEET" || fail "stylesheet href is not fingerprinted: $STYLESHEET"
 
