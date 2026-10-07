@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Xml;
 using Cabinet.Domain.Collection;
 using Cabinet.Domain.Layout;
+using Microsoft.Extensions.Logging;
 
 namespace Cabinet.Repository.Bgg;
 
@@ -11,8 +12,9 @@ namespace Cabinet.Repository.Bgg;
 /// base games: base games with expansions excluded, then expansions. Every call goes through the shared pacer. A queued
 /// answer is polled on a slow, bounded schedule, and a whole sync never sends more than <see cref="MaxRequestsPerSync"/>
 /// requests. Whatever goes wrong ends the fetch with a failure category and never with a partial collection; the one
-/// exception is the caller cancelling, which propagates so the caller can tell a stop from a slow answer. The client
-/// never logs: a request address carries the username and an answer carries the owner's data.
+/// exception is the caller cancelling, which propagates so the caller can tell a stop from a slow answer. A collection
+/// answer must declare its total, and the total must equal the entries read plus the entries left out for lacking an
+/// identifier. The client logs a count at most: a request address carries the username and an answer carries the owner's data.
 /// </summary>
 public sealed class BggClient : ICollectionSource
 {
@@ -35,6 +37,7 @@ public sealed class BggClient : ICollectionSource
     private readonly IRequestPacer _pacer;
     private readonly TimeProvider _time;
     private readonly IReadOnlyList<TimeSpan> _queuedWaits;
+    private readonly ILogger<BggClient>? _logger;
 
     /// <summary>Creates the client.</summary>
     /// <param name="http">The client to send with; its base address is the API address and it never follows redirects.</param>
@@ -42,12 +45,14 @@ public sealed class BggClient : ICollectionSource
     /// <param name="pacer">Spaces the calls out.</param>
     /// <param name="time">The clock the waits between polls of a queued answer run on.</param>
     /// <param name="queuedWaits">The waits before each poll of a queued answer; <see cref="QueuedWaits"/> when omitted.</param>
+    /// <param name="logger">Receives the number of entries left out of an answer, never a title or an identifier; optional.</param>
     public BggClient(
         HttpClient http,
         BggOptions options,
         IRequestPacer pacer,
         TimeProvider time,
-        IReadOnlyList<TimeSpan>? queuedWaits = null)
+        IReadOnlyList<TimeSpan>? queuedWaits = null,
+        ILogger<BggClient>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(http);
         ArgumentNullException.ThrowIfNull(options);
@@ -59,6 +64,7 @@ public sealed class BggClient : ICollectionSource
         _pacer = pacer;
         _time = time;
         _queuedWaits = queuedWaits ?? QueuedWaits;
+        _logger = logger;
     }
 
     /// <inheritdoc />
@@ -180,7 +186,12 @@ public sealed class BggClient : ICollectionSource
         await using var body = await response.Content.ReadAsStreamAsync(cancellationToken);
         var parsed = BggCollectionParser.Parse(body, kind, _options.IncludePrivateInfo);
 
-        return parsed.TotalItems is { } total && total != parsed.Items.Count + parsed.SkippedItems
+        if (parsed.SkippedItems > 0)
+        {
+            _logger?.LogWarning("A BGG answer held {SkippedCount} owned entries without a usable identifier; they were left out.", parsed.SkippedItems);
+        }
+
+        return parsed.TotalItems is not { } total || total != parsed.Items.Count + parsed.SkippedItems
             ? Failed(SyncFailure.BadAnswer)
             : new CollectionFetchResult.Fetched(parsed.Items);
     }
