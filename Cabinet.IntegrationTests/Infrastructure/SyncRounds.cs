@@ -27,7 +27,11 @@ public static class SyncRounds
     /// <param name="client">A client on the public listener.</param>
     /// <param name="clock">The clock the host measures its windows on.</param>
     /// <param name="advance">Whether to move the clock past the window before pressing.</param>
-    public static async Task PressAndWait(HttpClient client, FakeTimeProvider clock, bool advance = true)
+    /// <param name="moveClockWhileWaiting">
+    /// Whether to keep moving the clock forward while the run is in progress, so a wait inside the run (such as the pause
+    /// before a retry) passes without a real wait.
+    /// </param>
+    public static async Task PressAndWait(HttpClient client, FakeTimeProvider clock, bool advance = true, bool moveClockWhileWaiting = false)
     {
         if (advance)
         {
@@ -41,10 +45,16 @@ public static class SyncRounds
         await SyncHarness.WaitUntil(async () =>
         {
             var status = await SyncHarness.ReadStatus(client);
-
-            return !status.Running
+            var ended = !status.Running
                 && status.Json.GetProperty("lastResultAtUtc").ValueKind != JsonValueKind.Null
-                && status.Json.GetProperty("lastResultAtUtc").GetDateTimeOffset() == pressedAt;
+                && status.Json.GetProperty("lastResultAtUtc").GetDateTimeOffset() >= pressedAt;
+
+            if (!ended && moveClockWhileWaiting)
+            {
+                clock.Advance(TimeSpan.FromSeconds(10));
+            }
+
+            return ended;
         });
     }
 

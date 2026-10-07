@@ -40,7 +40,7 @@ public class SyncFailureTests
         var syncedBefore = (await SyncHarness.ReadStatus(client)).Json.GetProperty("lastSyncedUtc").GetDateTimeOffset();
 
         source.Fail(Failure(answer));
-        await SyncRounds.PressAndWait(client, clock);
+        await SyncRounds.PressAndWait(client, clock, moveClockWhileWaiting: true);
         var status = await SyncHarness.ReadStatus(client);
 
         (await SyncRounds.ReadLayout(client)).Should().BeEquivalentTo(before);
@@ -111,7 +111,7 @@ public class SyncFailureTests
         using var client = factory.CreatePublicClient();
         await SyncRounds.PressAndWait(client, clock, advance: false);
         source.Fail(Failure("too-many-requests"));
-        await SyncRounds.PressAndWait(client, clock);
+        await SyncRounds.PressAndWait(client, clock, moveClockWhileWaiting: true);
         var during = await SyncRounds.ReadLayout(client);
 
         source.Serve(SyntheticBggCollection.Create(5));

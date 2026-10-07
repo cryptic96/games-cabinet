@@ -20,7 +20,8 @@ public sealed class SyncWorker(
     ILiveNotifier live,
     ILogger<SyncWorker> logger) : BackgroundService
 {
-    private static readonly TimeSpan RunLimit = TimeSpan.FromMinutes(10);
+    /// <summary>The longest one whole run may take before it is ended and recorded as a timeout.</summary>
+    public static readonly TimeSpan RunLimit = TimeSpan.FromMinutes(10);
 
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
