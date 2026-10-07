@@ -154,17 +154,24 @@ public partial class SyncStatusLineTests
         using var storage = new TemporaryDirectory();
         Seed(storage, SyncHarness.StartTime - TimeSpan.FromHours(4), SyncResult.Changed, heldBack: null);
 
-        foreach (var factory in new[] { SyncHarness.CreateFactory(new ScriptedBggHandler(), SyncHarness.NewClock()), CreateSeededFactory(storage) })
+        await using (var unsynced = SyncHarness.CreateFactory(new ScriptedBggHandler(), SyncHarness.NewClock()))
         {
-            await using (factory)
-            {
-                using var client = factory.CreatePublicClient();
-                var html = await client.GetStringAsync("/", TestContext.Current.CancellationToken);
-                var header = html[..html.IndexOf("</header>", StringComparison.Ordinal)];
-
-                header.Should().NotContainEquivalentOf("BGG").And.NotContainEquivalentOf("BoardGameGeek");
-            }
+            await AssertHeaderNamesNoSource(unsynced);
         }
+
+        await using (var seeded = CreateSeededFactory(storage))
+        {
+            await AssertHeaderNamesNoSource(seeded);
+        }
+    }
+
+    private static async Task AssertHeaderNamesNoSource(CabinetWebApplicationFactory factory)
+    {
+        using var client = factory.CreatePublicClient();
+        var html = await client.GetStringAsync("/", TestContext.Current.CancellationToken);
+        var header = html[..html.IndexOf("</header>", StringComparison.Ordinal)];
+
+        header.Should().NotContainEquivalentOf("BGG").And.NotContainEquivalentOf("BoardGameGeek");
     }
 
     [Fact]
