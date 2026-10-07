@@ -39,6 +39,7 @@ import sys
 import time
 import typing
 import xml.etree.ElementTree as ET
+import xml.parsers.expat as expat
 from urllib.parse import urlencode, urlsplit
 
 HOST = "boardgamegeek.com"
@@ -230,17 +231,48 @@ def report_leaks(report, credentials, values, names=()):
     return any(contains_value(report, value) for value in values)
 
 
+WIDE_ENCODING_MARKS = (b"\xff\xfe", b"\xfe\xff", b"\x00\x00\xfe\xff")
+
+
+class DoctypeRefused(Exception):
+    """Raised by the parser callbacks when a document declares a doctype or an entity."""
+
+
+def refuse_declaration(*arguments):
+    """Parser callback: any doctype or entity declaration is refused outright."""
+    raise DoctypeRefused()
+
+
+def is_wide_encoded(body):
+    """True for a body in a UTF-16 or UTF-32 form: it starts with their byte-order mark or holds a NUL byte."""
+    return body.startswith(WIDE_ENCODING_MARKS) or b"\x00" in body
+
+
+def declares_doctype_or_entity(body):
+    """True when a strict parse meets a doctype or an entity declaration, or cannot parse the body at all."""
+    parser = expat.ParserCreate()
+    parser.StartDoctypeDeclHandler = refuse_declaration
+    parser.EntityDeclHandler = refuse_declaration
+    try:
+        parser.Parse(body, True)
+    except DoctypeRefused:
+        return True
+    except expat.ExpatError:
+        return False
+    return False
+
+
 def classify_body(body):
     """Return (class, parsed root or None) for a response body."""
     if not body.strip():
         return "empty", None
-    if len(body) > MAX_BODY_BYTES:
+    if len(body) > MAX_BODY_BYTES or is_wide_encoded(body):
         return "other", None
     lowered = body.lower()
     head = lowered[:2048].lstrip()
     if head.startswith((b"<!doctype html", b"<html")) or b"<html" in head:
         return "html", None
-    if b"<!doctype" in lowered or b"<!entity" in lowered:
+    if b"<!doctype" in lowered or b"<!entity" in lowered or declares_doctype_or_entity(body):
         return "other", None
     try:
         root = ET.fromstring(body)
@@ -902,6 +934,21 @@ def run_self_test():
     )
     for fragment in expected:
         check("report keeps " + fragment, fragment in report)
+
+    hostile_text = "<?xml version='1.0'?><!DOCTYPE items [<!ENTITY invented 'x'>]><items>&invented;</items>"
+    clean_text = "<?xml version='1.0'?><items totalitems='0'></items>"
+    for encoding in ("utf-16", "utf-16-le", "utf-16-be", "utf-32", "utf-32-le", "utf-32-be"):
+        check("a doctype in " + encoding + " is refused", classify_body(hostile_text.encode(encoding)) == ("other", None))
+        check("a clean document in " + encoding + " is refused", classify_body(clean_text.encode(encoding)) == ("other", None))
+    check("a byte-order mark alone is refused", classify_body(b"\xff\xfe<") == ("other", None))
+    check("a body holding a NUL byte is refused", classify_body(clean_text.encode("utf-8") + b"\x00") == ("other", None))
+    check("a doctype in plain text is refused", classify_body(hostile_text.encode("utf-8"))[0] == "other")
+    check("a doctype in mixed case is refused", classify_body(b"<!DocType items><items></items>")[0] == "other")
+    check("a doctype is found by the strict parse", declares_doctype_or_entity(b"<!DOCTYPE items><items/>"))
+    check("an entity declaration is found by the strict parse", declares_doctype_or_entity(b"<!DOCTYPE items [<!ENTITY a 'b'>]><items/>"))
+    check("a clean document passes the strict parse", not declares_doctype_or_entity(clean_text.encode("utf-8")))
+    check("a clean utf-8 document is still read", classify_body(clean_text.encode("utf-8"))[0] == "xml:items")
+    check("a clean utf-8 document with a byte-order mark is still read", classify_body(b"\xef\xbb\xbf" + clean_text.encode("utf-8"))[0] == "xml:items")
 
     skipped_lines = render_call(calls["I"], Result(None, 0, [], b"", 0, None, "request budget reached", False), Collector())
     check("a skipped call is recorded as skipped", "  skipped: request budget reached" in skipped_lines)
