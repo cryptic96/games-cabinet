@@ -62,6 +62,10 @@ public static class SyntheticArt
     private const int BoxCanvasSize = 800;
     private const int PngQuality = 100;
     private const float BoxTiltDegrees = -14f;
+    private const float WhiteFrameShare = 0.15f;
+    private const float BlackFrameShare = 0.025f;
+
+    private static readonly SKColor FramedFieldColour = new(20, 130, 140);
 
     private static readonly byte[] UndecodableBytes = "these bytes are not a picture"u8.ToArray();
 
@@ -111,11 +115,52 @@ public static class SyntheticArt
             case SyntheticArtKind.FlatCover:
                 DrawDiagonalIllustration(canvas, width, height, new SKColor(120, 12, 24), new SKColor(244, 150, 36));
                 break;
+            case SyntheticArtKind.FlatWide:
+                DrawDiagonalIllustration(canvas, width, height, new SKColor(10, 60, 110), new SKColor(80, 200, 190));
+                break;
+            case SyntheticArtKind.FlatNarrow:
+                DrawDiagonalIllustration(canvas, width, height, new SKColor(60, 20, 100), new SKColor(220, 80, 160));
+                break;
+            case SyntheticArtKind.Banner:
+                DrawBanner(canvas, width, height);
+                break;
+            case SyntheticArtKind.WhiteFramed:
+                DrawFramedCover(canvas, width, height, new SKColor(255, 255, 255), WhiteFrameShare);
+                break;
+            case SyntheticArtKind.BlackFramed:
+                DrawFramedCover(canvas, width, height, new SKColor(0, 0, 0), BlackFrameShare);
+                break;
+            case SyntheticArtKind.AllWhite:
+                DrawAllWhite(canvas, width, height);
+                break;
+            case SyntheticArtKind.NearBlack:
+                DrawFieldWithBand(canvas, width, height, new SKColor(18, 18, 22), new SKColor(205, 160, 40));
+                break;
+            case SyntheticArtKind.MidGreen:
+                DrawFieldWithBand(canvas, width, height, new SKColor(51, 153, 51), new SKColor(240, 232, 190));
+                break;
+            case SyntheticArtKind.GradientFullBleed:
+                DrawVerticalGradient(canvas, width, height, [new SKColor(6, 22, 96), new SKColor(40, 90, 190), new SKColor(200, 236, 255)]);
+                DrawTitleBand(canvas, width, height, new SKColor(255, 250, 235, 230));
+                break;
             case SyntheticArtKind.BoxOnWhite:
                 DrawBoxShot(canvas, new SKColor(255, 255, 255), new SKColor(189, 30, 40), true);
                 break;
+            case SyntheticArtKind.BoxOnGreyGradient:
+                DrawVerticalGradient(canvas, width, height, [new SKColor(232, 232, 234), new SKColor(212, 212, 216)]);
+                DrawVignette(canvas, width, height);
+                DrawBoxShot(canvas, null, new SKColor(40, 90, 169), true);
+                break;
+            case SyntheticArtKind.BoxOnBlack:
+                DrawVerticalGradient(canvas, width, height, [new SKColor(24, 24, 28), new SKColor(8, 8, 10)]);
+                DrawVignette(canvas, width, height);
+                DrawBoxShot(canvas, null, new SKColor(218, 168, 29), false);
+                break;
+            case SyntheticArtKind.BoxTransparent:
+                DrawBoxShot(canvas, SKColors.Transparent, new SKColor(59, 148, 69), false);
+                break;
             default:
-                throw new NotSupportedException($"No drawing exists for {kind} yet.");
+                throw new NotSupportedException($"No drawing exists for {kind}.");
         }
     }
 
@@ -130,15 +175,80 @@ public static class SyntheticArt
         DrawTitleBand(canvas, width, height, new SKColor(255, 244, 214, 220));
     }
 
+    private static void DrawVerticalGradient(SKCanvas canvas, int width, int height, SKColor[] stops)
+    {
+        using var paint = new SKPaint();
+        paint.Shader = SKShader.CreateLinearGradient(new SKPoint(0, 0), new SKPoint(0, height), stops, SKShaderTileMode.Clamp);
+        canvas.DrawRect(new SKRect(0, 0, width, height), paint);
+    }
+
+    private static void DrawBanner(SKCanvas canvas, int width, int height)
+    {
+        DrawVerticalGradient(canvas, width, height, [new SKColor(20, 40, 90), new SKColor(240, 200, 80)]);
+        using (var sweep = new SKPaint())
+        {
+            sweep.Shader = SKShader.CreateLinearGradient(
+                new SKPoint(0, 0),
+                new SKPoint(width, 0),
+                [new SKColor(220, 40, 60, 110), new SKColor(40, 200, 90, 110), new SKColor(60, 80, 230, 110), new SKColor(230, 60, 200, 110)],
+                SKShaderTileMode.Clamp);
+            canvas.DrawRect(new SKRect(0, 0, width, height), sweep);
+        }
+
+        DrawTitleBand(canvas, width, height, new SKColor(255, 250, 235, 230));
+    }
+
+    private static void DrawFramedCover(SKCanvas canvas, int width, int height, SKColor frame, float frameShare)
+    {
+        canvas.Clear(frame);
+        var field = new SKRect(width * frameShare, height * frameShare, width * (1 - frameShare), height * (1 - frameShare));
+        using var fieldPaint = new SKPaint { Color = FramedFieldColour, IsAntialias = true };
+        canvas.DrawRect(field, fieldPaint);
+        using var bandPaint = new SKPaint { Color = new SKColor(250, 236, 190), IsAntialias = true };
+        canvas.DrawRect(
+            new SKRect(field.Left + (field.Width * 0.1f), field.Top + (field.Height * 0.1f), field.Right - (field.Width * 0.1f), field.Top + (field.Height * 0.24f)),
+            bandPaint);
+    }
+
+    private static void DrawAllWhite(SKCanvas canvas, int width, int height)
+    {
+        canvas.Clear(new SKColor(255, 255, 255));
+        using var paint = new SKPaint { Color = new SKColor(225, 225, 225), IsAntialias = true };
+        canvas.DrawRect(new SKRect((width - 200) / 2f, height * 0.16f, (width + 200) / 2f, (height * 0.16f) + 24), paint);
+    }
+
+    private static void DrawFieldWithBand(SKCanvas canvas, int width, int height, SKColor field, SKColor band)
+    {
+        canvas.Clear(field);
+        using var paint = new SKPaint { Color = band, IsAntialias = true };
+        canvas.DrawRect(new SKRect(width * 0.2f, height * 0.375f, width * 0.8f, height * 0.625f), paint);
+    }
+
     private static void DrawTitleBand(SKCanvas canvas, int width, int height, SKColor colour)
     {
         using var paint = new SKPaint { Color = colour, IsAntialias = true };
         canvas.DrawRect(new SKRect(width * 0.08f, height * 0.10f, width * 0.92f, height * 0.26f), paint);
     }
 
-    private static void DrawBoxShot(SKCanvas canvas, SKColor backdrop, SKColor front, bool shadow)
+    private static void DrawVignette(SKCanvas canvas, int width, int height)
     {
-        canvas.Clear(backdrop);
+        using var paint = new SKPaint();
+        paint.Shader = SKShader.CreateRadialGradient(
+            new SKPoint(width / 2f, height / 2f),
+            width * 0.75f,
+            [new SKColor(0, 0, 0, 0), new SKColor(0, 0, 0, 0), new SKColor(0, 0, 0, 12)],
+            [0f, 0.6f, 1f],
+            SKShaderTileMode.Clamp);
+        canvas.DrawRect(new SKRect(0, 0, width, height), paint);
+    }
+
+    private static void DrawBoxShot(SKCanvas canvas, SKColor? backdrop, SKColor front, bool shadow)
+    {
+        if (backdrop is { } colour)
+        {
+            canvas.Clear(colour);
+        }
+
         canvas.Save();
         canvas.RotateDegrees(BoxTiltDegrees, BoxCanvasSize / 2f, BoxCanvasSize / 2f);
 
