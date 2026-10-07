@@ -34,10 +34,18 @@ public abstract record SyncRequestResult
 /// Lets only one sync exist at a time and keeps the shared window. A request is accepted only when none is running; every
 /// accepted request opens a window of the manual cooldown, written to disk before the request is queued, during which a
 /// visitor's request is refused. The accepted request travels over a channel with room for one, and the single worker that
-/// reads it reports back when the run has finished.
+/// reads it reports back when the run has finished. It also notices a rejected token: after
+/// <see cref="RejectionsBeforeBackoff"/> unauthorized runs in a row the timed syncs are paused to about one a day, which
+/// ends with the next successful run or a restart of the service. A visitor's request is never affected.
 /// </summary>
 public sealed class SyncCoordinator
 {
+    /// <summary>How many runs in a row BGG must refuse the token on before the timed syncs slow down.</summary>
+    public const int RejectionsBeforeBackoff = 3;
+
+    /// <summary>How long timed syncs are spaced out while the token is being refused.</summary>
+    public static readonly TimeSpan BackoffSpacing = TimeSpan.FromHours(24);
+
     private readonly Channel<SyncTrigger> _channel = Channel.CreateBounded<SyncTrigger>(
         new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.Wait, SingleReader = true });
 
@@ -49,6 +57,7 @@ public sealed class SyncCoordinator
     private SyncState _state;
     private bool _running;
     private SyncRunResult? _lastResult;
+    private int _rejectionsInARow;
 
     /// <summary>Creates the coordinator and loads the stored bookkeeping, so a restart keeps the shared window.</summary>
     /// <param name="stateStore">Keeps the bookkeeping on disk.</param>
@@ -100,6 +109,30 @@ public sealed class SyncCoordinator
             lock (_gate)
             {
                 return _lastResult;
+            }
+        }
+    }
+
+    /// <summary>
+    /// When the timed syncs may run again while BGG keeps refusing the token, or null when they are not paused. The count of
+    /// refusals is kept in memory only, so a restart of the service clears the pause. The moment is about
+    /// <see cref="BackoffSpacing"/> after the last start, less half an interval, so the tick nearest to a day later is the one
+    /// that runs.
+    /// </summary>
+    public DateTimeOffset? TimedSyncsResumeAtUtc
+    {
+        get
+        {
+            lock (_gate)
+            {
+                if (_rejectionsInARow < RejectionsBeforeBackoff
+                    || _options.Interval >= BackoffSpacing
+                    || _state.LastStartedUtc is not { } started)
+                {
+                    return null;
+                }
+
+                return started + BackoffSpacing - (_options.Interval / 2);
             }
         }
     }
@@ -156,6 +189,8 @@ public sealed class SyncCoordinator
 
         lock (_gate)
         {
+            CountRejection(result);
+
             try
             {
                 var now = _time.GetUtcNow();
@@ -182,6 +217,23 @@ public sealed class SyncCoordinator
             {
                 _running = false;
             }
+        }
+    }
+
+    private void CountRejection(SyncRunResult result)
+    {
+        if (result.Result != SyncResult.Failed || result.Failure != SyncFailure.Unauthorized)
+        {
+            _rejectionsInARow = 0;
+
+            return;
+        }
+
+        _rejectionsInARow++;
+
+        if (_rejectionsInARow == RejectionsBeforeBackoff)
+        {
+            _logger?.LogWarning("BGG keeps refusing the token; timed syncs now run about once a day until a sync succeeds or the service restarts.");
         }
     }
 }

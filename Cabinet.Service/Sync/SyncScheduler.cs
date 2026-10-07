@@ -7,6 +7,8 @@ namespace Cabinet.Service.Sync;
 /// interval. It asks the same way a visitor's button does, so a request that arrives while a run is in progress queues
 /// nothing, and it never starts a sync right after the last start, so a crash loop cannot hammer BGG. The interval timer
 /// is armed only after the start-up delay, so a long delay can never leave a tick pending beside the start-up request.
+/// While BGG keeps refusing the token the ticks are skipped until the coordinator says the timed syncs may resume, which
+/// spaces them to about one a day.
 /// </summary>
 /// <param name="coordinator">Accepts or refuses each request.</param>
 /// <param name="collection">Tells whether a collection has been synced yet.</param>
@@ -40,6 +42,11 @@ public sealed class SyncScheduler(
 
             while (await timer.WaitForNextTickAsync(stoppingToken))
             {
+                if (coordinator.TimedSyncsResumeAtUtc is { } resumeAt && time.GetUtcNow() < resumeAt)
+                {
+                    continue;
+                }
+
                 Request(SyncTrigger.Scheduled);
             }
         }
