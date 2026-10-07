@@ -193,6 +193,66 @@ public class BggXmlTests
         items.Where(item => !item.IsExpansion && item.Owned).Select(item => item.ObjectId).Should().Contain(lantern.AlsoExpands!.Single());
     }
 
+    [Fact]
+    public void Without_an_art_origin_every_picture_address_is_an_invented_example_address()
+    {
+        var items = SyntheticBggCollection.Create(5);
+
+        var collection = XDocument.Parse(BggXml.Collection(items, OwnedBaseGames));
+        var things = XDocument.Parse(BggXml.Things(items.Select(item => item.ObjectId), items, stats: false));
+
+        PictureAddresses(collection).Should().NotBeEmpty().And.OnlyContain(address => address.StartsWith("https://example.org/", StringComparison.Ordinal));
+        PictureAddresses(things).Should().NotBeEmpty().And.OnlyContain(address => address.StartsWith("https://example.org/", StringComparison.Ordinal));
+        PictureAddresses(collection).Should().Contain("https://example.org/images/version-900001.jpg");
+    }
+
+    [Fact]
+    public void With_an_art_origin_every_picture_address_points_at_the_fake_art_route()
+    {
+        const string Origin = "http://127.0.0.1:6190";
+        var items = SyntheticBggCollection.Create(65);
+
+        var collection = XDocument.Parse(BggXml.Collection(items, OwnedBaseGames, artOrigin: Origin));
+        var things = XDocument.Parse(BggXml.Things(items.Select(item => item.ObjectId), items, stats: false, artOrigin: Origin));
+
+        PictureAddresses(collection).Should().NotBeEmpty().And.OnlyContain(address => address.StartsWith($"{Origin}/fake-art/", StringComparison.Ordinal));
+        PictureAddresses(things).Should().NotBeEmpty().And.OnlyContain(address => address.StartsWith($"{Origin}/fake-art/", StringComparison.Ordinal));
+        PictureAddresses(collection).Should().Contain($"{Origin}/fake-art/900001-version.png").And.Contain($"{Origin}/fake-art/100001-main.png");
+    }
+
+    [Fact]
+    public void The_first_sixty_five_entries_assign_every_picture_case_the_review_needs()
+    {
+        var items = SyntheticBggCollection.Create(65);
+        var pairs = items.Select(item => (Version: SyntheticBggCollection.ArtFor(item, version: true), Main: SyntheticBggCollection.ArtFor(item, version: false))).ToList();
+
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.FlatCover && pair.Main == SyntheticArtKind.FlatCover);
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.FlatWide);
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.FlatNarrow);
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.BoxOnWhite && pair.Main == SyntheticArtKind.FlatCover);
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.BoxOnGreyGradient && pair.Main == SyntheticArtKind.BoxOnGreyGradient);
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.BoxOnBlack && pair.Main == null);
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.WhiteFramed);
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.AllWhite);
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.NearBlack);
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.MidGreen);
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.Banner);
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.Undecodable && pair.Main == SyntheticArtKind.Undecodable);
+        pairs.Should().Contain(pair => pair.Version == null && pair.Main == null);
+    }
+
+    [Fact]
+    public void The_picture_assignment_is_the_same_every_time()
+    {
+        var first = SyntheticBggCollection.Create(65).Select(item => (SyntheticBggCollection.ArtFor(item, true), SyntheticBggCollection.ArtFor(item, false)));
+        var second = SyntheticBggCollection.Create(65).Select(item => (SyntheticBggCollection.ArtFor(item, true), SyntheticBggCollection.ArtFor(item, false)));
+
+        first.Should().Equal(second);
+    }
+
+    private static IEnumerable<string> PictureAddresses(XDocument document) =>
+        document.Descendants().Where(element => element.Name == "image" || element.Name == "thumbnail").Select(element => element.Value);
+
     private static IEnumerable<XElement> LinksOf(XElement thing, string type) =>
         thing.Elements("link").Where(link => (string?)link.Attribute("type") == type);
 
