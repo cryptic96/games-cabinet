@@ -56,6 +56,31 @@ public static class LayoutDensity
     }
 
     /// <summary>
+    /// Counts, for every section, the shelf rows without a placement that sit above a row that holds one: a bare row in the
+    /// middle of a drawn section. The rows below the last used row of the last section are not drawn, so they never count.
+    /// </summary>
+    /// <param name="layout">The layout to measure.</param>
+    public static IReadOnlyList<int> HollowRows(CabinetLayout layout) =>
+        layout.Sections
+            .Select(section =>
+            {
+                var rows = section.Cubbies
+                    .GroupBy(cubby => cubby.YMm)
+                    .OrderBy(row => row.Key)
+                    .Select(row => row.Sum(cubby => cubby.Placements.Count))
+                    .ToList();
+                var lastUsed = rows.FindLastIndex(count => count > 0);
+
+                return rows.Take(Math.Max(0, lastUsed)).Count(count => count == 0);
+            })
+            .ToList();
+
+    /// <summary>The number of placements in every section, first to last.</summary>
+    /// <param name="layout">The layout to measure.</param>
+    public static IReadOnlyList<int> PlacementsPerSection(CabinetLayout layout) =>
+        layout.Sections.Select(section => section.Cubbies.Sum(cubby => cubby.Placements.Count)).ToList();
+
+    /// <summary>
     /// A seeded collection with a share of expansions in which thirty percent of the base games and forty percent of the
     /// expansions have the default box and the rest a box drawn from the recorded size ranges, the longer front side as
     /// the height.

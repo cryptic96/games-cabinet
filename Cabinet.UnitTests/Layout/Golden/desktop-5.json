@@ -1,5 +1,5 @@
 {
-  "layoutVersion": 11,
+  "layoutVersion": 12,
   "profile": "desktop",
   "optionsFingerprint": "09a03be9acd0723f",
   "palette": [
@@ -63,8 +63,8 @@
           "index": 0,
           "xMm": 0,
           "yMm": 0,
-          "widthMm": 380,
-          "heightMm": 360,
+          "widthMm": 250,
+          "heightMm": 330,
           "placements": [
             {
               "gameId": 10000,
@@ -78,12 +78,21 @@
               "label": "Yardis Tarnlo",
               "toneIndex": 10,
               "patternIndex": 4
-            },
+            }
+          ]
+        },
+        {
+          "index": 1,
+          "xMm": 270,
+          "yMm": 0,
+          "widthMm": 190,
+          "heightMm": 330,
+          "placements": [
             {
               "gameId": 10037,
               "entryId": 500019,
               "kind": "cover",
-              "xMm": 159,
+              "xMm": 0,
               "yMm": 0,
               "widthMm": 118,
               "heightMm": 165,
@@ -95,11 +104,11 @@
           ]
         },
         {
-          "index": 1,
-          "xMm": 400,
+          "index": 2,
+          "xMm": 480,
           "yMm": 0,
-          "widthMm": 220,
-          "heightMm": 360,
+          "widthMm": 260,
+          "heightMm": 330,
           "placements": [
             {
               "gameId": 10060,
@@ -117,51 +126,51 @@
           ]
         },
         {
-          "index": 2,
-          "xMm": 640,
-          "yMm": 0,
-          "widthMm": 560,
-          "heightMm": 360,
-          "placements": []
-        },
-        {
           "index": 3,
-          "xMm": 0,
-          "yMm": 380,
-          "widthMm": 260,
-          "heightMm": 300,
+          "xMm": 760,
+          "yMm": 0,
+          "widthMm": 440,
+          "heightMm": 330,
           "placements": []
         },
         {
           "index": 4,
-          "xMm": 280,
-          "yMm": 380,
-          "widthMm": 340,
-          "heightMm": 300,
+          "xMm": 0,
+          "yMm": 350,
+          "widthMm": 260,
+          "heightMm": 360,
           "placements": []
         },
         {
           "index": 5,
-          "xMm": 640,
-          "yMm": 380,
-          "widthMm": 200,
-          "heightMm": 300,
+          "xMm": 280,
+          "yMm": 350,
+          "widthMm": 270,
+          "heightMm": 360,
           "placements": []
         },
         {
           "index": 6,
-          "xMm": 860,
-          "yMm": 380,
-          "widthMm": 340,
-          "heightMm": 300,
+          "xMm": 570,
+          "yMm": 350,
+          "widthMm": 430,
+          "heightMm": 360,
           "placements": []
         },
         {
           "index": 7,
+          "xMm": 1020,
+          "yMm": 350,
+          "widthMm": 180,
+          "heightMm": 360,
+          "placements": []
+        },
+        {
+          "index": 8,
           "xMm": 0,
-          "yMm": 700,
-          "widthMm": 460,
-          "heightMm": 400,
+          "yMm": 730,
+          "widthMm": 360,
+          "heightMm": 370,
           "placements": [
             {
               "gameId": 10044,
@@ -169,8 +178,8 @@
               "kind": "cover",
               "xMm": 0,
               "yMm": 0,
-              "widthMm": 291,
-              "heightMm": 374,
+              "widthMm": 287,
+              "heightMm": 370,
               "title": "Quaywyn Sulven Ulmbar",
               "label": "Quaywyn Sulven Ulmbar",
               "toneIndex": 11,
@@ -179,19 +188,11 @@
           ]
         },
         {
-          "index": 8,
-          "xMm": 480,
-          "yMm": 700,
-          "widthMm": 300,
-          "heightMm": 400,
-          "placements": []
-        },
-        {
           "index": 9,
-          "xMm": 800,
-          "yMm": 700,
-          "widthMm": 400,
-          "heightMm": 400,
+          "xMm": 380,
+          "yMm": 730,
+          "widthMm": 320,
+          "heightMm": 370,
           "placements": [
             {
               "gameId": 10100,
@@ -199,14 +200,30 @@
               "kind": "cover",
               "xMm": 0,
               "yMm": 0,
-              "widthMm": 310,
-              "heightMm": 379,
+              "widthMm": 302,
+              "heightMm": 370,
               "title": "Heskquin Cassnia Pellventhan: Vosswyn Drelmont",
               "label": "Heskquin Cassnia Pellventhan: Vosswyn Drelmont",
               "toneIndex": 1,
               "patternIndex": 4
             }
           ]
+        },
+        {
+          "index": 10,
+          "xMm": 720,
+          "yMm": 730,
+          "widthMm": 230,
+          "heightMm": 370,
+          "placements": []
+        },
+        {
+          "index": 11,
+          "xMm": 970,
+          "yMm": 730,
+          "widthMm": 230,
+          "heightMm": 370,
+          "placements": []
         }
       ]
     }

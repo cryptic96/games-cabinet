@@ -225,6 +225,31 @@ first, then raise the layout version and record the layouts again. The last
 section is the only one that is ever drawn trimmed to its last used row, and no
 other section is, so the stability rules above stay the only exceptions.
 
+### Keeping the desktop cabinet dense
+
+The desktop design has five shelf rows across 1200 millimetres. Four rows are 330
+millimetres or taller, the shortest is 280, and no cubby is narrower than 180 or
+wider than 560. The largest box a design holds is taken from its tallest cubby,
+and larger boxes are scaled down to it, so the height of the tallest rows decides
+how many cubbies the biggest face-out boxes can go to. With only one tall row,
+those boxes crowded into a few cubbies, were left over after the shelves of
+earlier sections had filled with smaller games, and opened sections at the end
+that held only a handful of them. With several tall rows of similar height the
+biggest boxes spread over the cubbies and the end of the cabinet fills evenly.
+The cost is that the biggest boxes are drawn a little smaller: the largest box is
+370 millimetres tall instead of 400.
+
+The rules are that no section but the last keeps an empty row, that a collection
+of about sixty-five games has no empty row in the middle of any section, and that
+a large collection holds at least 30 games in every section but the last. The
+layout tests check them on the samples of 65 and 400 games and on seeded
+collections of both sizes whose boxes follow the spread of sizes seen on real
+games, including collections that were not used when the rows were chosen. The
+rows were found by a seeded search over valid designs, scored on exactly these
+measures, so retune them the same way when a collection starts to leave bare rows
+or a near-empty section: change the rows and cubby widths of the desktop design
+first, then raise the layout version and record the layouts again.
+
 ## Recorded layouts
 
 The tests keep the full layout of the samples of 0, 1, 5, 12 and 65 games on

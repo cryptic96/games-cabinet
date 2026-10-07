@@ -37,7 +37,7 @@ public class SectionDesignTests
     [Trait("Category", "Layout")]
     public void The_shipped_designs_derive_their_interior_height_from_their_rows()
     {
-        SectionDesigns.Desktop.InteriorHeightMm.Should().Be(1730);
+        SectionDesigns.Desktop.InteriorHeightMm.Should().Be(1790);
         SectionDesigns.Phone.InteriorHeightMm.Should().Be(2560);
     }
 
@@ -230,7 +230,7 @@ public class SectionDesignTests
     public void A_wide_base_game_standing_as_a_spine_keeps_its_full_height_with_or_without_expansions(string name)
     {
         var design = DesignNamed(name);
-        var baseGame = BaseOf(300, 400, depth: 70);
+        var baseGame = BaseOf(400, 360, depth: 70);
         var family = FamilyOf(baseGame, 3, ThinDepthMm);
 
         var alone = SinglePlacement(CabinetLayoutEngine.Build([baseGame], design, AllSpines));
@@ -239,10 +239,10 @@ public class SectionDesignTests
         LayoutAssertions.AssertValid(withExpansions, family);
         var familyBase = withExpansions.Sections.SelectMany(section => section.Cubbies).SelectMany(cubby => cubby.Placements)
             .Single(placement => placement.GameId == baseGame.BggId && placement.Kind == PlacementKind.Spine);
-        design.Limits.MaxFamilyBaseWidthMm.Should().BeLessThan(300, "the box is wider than a family base may be when it faces out");
+        design.Limits.MaxFamilyBaseWidthMm.Should().BeLessThan(400, "the box is wider than a family base may be when it faces out");
         alone.Kind.Should().Be(PlacementKind.Spine);
-        alone.HeightMm.Should().Be(400);
-        familyBase.HeightMm.Should().Be(400, "how wide the front is does not matter for a box that stands as a spine");
+        alone.HeightMm.Should().Be(360);
+        familyBase.HeightMm.Should().Be(360, "how wide the front is does not matter for a box that stands as a spine");
         familyBase.WidthMm.Should().Be(alone.WidthMm);
     }
 
@@ -253,7 +253,7 @@ public class SectionDesignTests
     {
         var design = DesignNamed(name);
         var limits = design.Limits;
-        var baseGame = BaseOf(300, 400, depth: 70);
+        var baseGame = BaseOf(500, 360, depth: 70);
         var family = FamilyOf(baseGame, 3, ThinDepthMm);
 
         var layout = CabinetLayoutEngine.Build(family, design, AllCovers);
@@ -263,12 +263,12 @@ public class SectionDesignTests
             .Single(placement => placement.GameId == baseGame.BggId);
         familyBase.Kind.Should().Be(PlacementKind.Cover);
         familyBase.WidthMm.Should().Be(limits.MaxFamilyBaseWidthMm);
-        familyBase.HeightMm.Should().Be(400 * limits.MaxFamilyBaseWidthMm / 300);
+        familyBase.HeightMm.Should().Be(360 * limits.MaxFamilyBaseWidthMm / 500);
     }
 
     [Theory]
-    [InlineData("65", 2)]
-    [InlineData("400", 6)]
+    [InlineData("65", 5)]
+    [InlineData("400", 25)]
     [Trait("Category", "Layout")]
     public void The_samples_hold_a_few_oversize_boxes_and_build_valid_layouts_on_both_profiles(string name, int oversizeCount)
     {

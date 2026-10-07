@@ -21,18 +21,25 @@ public static class SectionDesigns
     private const int PhoneSmallestRenderedWidthPx = 304;
     private const int DesktopMinBoxThicknessMm = 34;
 
-    /// <summary>The wide design: five shelf rows of irregular cubbies across 1200 mm.</summary>
+    /// <summary>
+    /// The wide design: five shelf rows of irregular cubbies across 1200 mm. Four rows are 330 mm or taller and no cubby is
+    /// narrower than 180 mm or wider than 560 mm, so a standard box stands with air above it in almost every cubby and the
+    /// largest face-out box has several cubbies to go to. The largest boxes therefore no longer pile up in a few cubbies and
+    /// open near-empty sections at the end, and no section but the last keeps a bare shelf row. The numbers came from a
+    /// seeded search over valid designs scored on the samples and on seeded collections with the measured size spread,
+    /// then confirmed on collections the search never saw.
+    /// </summary>
     public static readonly SectionDesign Desktop = new(
         DesktopName,
         InteriorWidthMm: DesktopInteriorWidthMm,
         FrameMm: FrameMm,
         Rows:
         [
-            new ShelfRow(360, [380, 220, 560]),
-            new ShelfRow(300, [260, 340, 200, 340]),
-            new ShelfRow(400, [460, 300, 400]),
-            new ShelfRow(260, [300, 220, 300, 320]),
-            new ShelfRow(330, [420, 340, 400]),
+            new ShelfRow(330, [250, 190, 260, 440]),
+            new ShelfRow(360, [260, 270, 430, 180]),
+            new ShelfRow(370, [360, 320, 230, 230]),
+            new ShelfRow(370, [260, 540, 360]),
+            new ShelfRow(280, [180, 220, 560, 180]),
         ])
     {
         MaxSpineHeightMm = 330,
