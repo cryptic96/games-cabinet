@@ -10,7 +10,8 @@ namespace Cabinet.Repository.Bgg;
 /// Reads the owner's owned collection from the BGG XML API in two calls, because the unfiltered call labels expansions as
 /// base games: base games with expansions excluded, then expansions. Every call goes through the shared pacer. A queued
 /// answer is polled on a slow, bounded schedule, and a whole sync never sends more than <see cref="MaxRequestsPerSync"/>
-/// requests. Whatever goes wrong ends the fetch with a failure category and never with a partial collection. The client
+/// requests. Whatever goes wrong ends the fetch with a failure category and never with a partial collection; the one
+/// exception is the caller cancelling, which propagates so the caller can tell a stop from a slow answer. The client
 /// never logs: a request address carries the username and an answer carries the owner's data.
 /// </summary>
 public sealed class BggClient : ICollectionSource
@@ -138,7 +139,7 @@ public sealed class BggClient : ICollectionSource
         {
             return Failed(SyncFailure.Unavailable);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             return Failed(SyncFailure.Timeout);
         }

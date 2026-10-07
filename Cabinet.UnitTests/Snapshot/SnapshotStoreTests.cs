@@ -102,6 +102,22 @@ public sealed class SnapshotStoreTests : IDisposable
     }
 
     [Fact]
+    public void A_file_that_cannot_be_read_is_left_in_place_and_loads_once_it_can_be_read()
+    {
+        var store = CreateStore();
+        store.Save(Snapshot());
+
+        using (new FileStream(SnapshotPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            store.Load().Should().BeNull();
+        }
+
+        File.Exists(BadPath).Should().BeFalse();
+        _logger.Messages.Should().ContainSingle().Which.Should().Contain("unreadable").And.Contain("left in place");
+        store.Load().Should().BeEquivalentTo(Snapshot());
+    }
+
+    [Fact]
     public void Setting_a_file_aside_replaces_an_older_bad_file()
     {
         File.WriteAllText(BadPath, "older damaged content");

@@ -20,11 +20,11 @@ public sealed class RequestPacer : IRequestPacer
     private readonly SemaphoreSlim _turn = new(1, 1);
     private readonly TimeSpan _gap;
     private readonly TimeProvider _time;
-    private DateTimeOffset? _lastEnd;
+    private long? _lastEndTimestamp;
 
     /// <summary>Creates a pacer.</summary>
     /// <param name="gap">The least time between two requests; raised to the API minimum when it is shorter.</param>
-    /// <param name="time">The clock the gap is measured with.</param>
+    /// <param name="time">The clock the gap is measured with, read through its monotonic timestamp so a change of the wall clock never lengthens a wait.</param>
     public RequestPacer(TimeSpan gap, TimeProvider time)
     {
         ArgumentNullException.ThrowIfNull(time);
@@ -40,9 +40,14 @@ public sealed class RequestPacer : IRequestPacer
 
         try
         {
-            if (_lastEnd is { } lastEnd)
+            if (_lastEndTimestamp is { } lastEndTimestamp)
             {
-                var wait = lastEnd + _gap - _time.GetUtcNow();
+                var wait = _gap - _time.GetElapsedTime(lastEndTimestamp);
+
+                if (wait > _gap)
+                {
+                    wait = _gap;
+                }
 
                 if (wait > TimeSpan.Zero)
                 {
@@ -61,7 +66,7 @@ public sealed class RequestPacer : IRequestPacer
 
     private void End()
     {
-        _lastEnd = _time.GetUtcNow();
+        _lastEndTimestamp = _time.GetTimestamp();
         _turn.Release();
     }
 

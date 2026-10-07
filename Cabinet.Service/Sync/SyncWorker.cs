@@ -5,7 +5,8 @@ namespace Cabinet.Service.Sync;
 
 /// <summary>
 /// The one consumer of sync requests. It runs each accepted request to the end, with a limit on how long a run may take,
-/// and always reports back, so a failed or stuck run never blocks the next request.
+/// and always reports back, so a failed or stuck run never blocks the next request. A run that the limit ends is recorded
+/// as a timeout; a run that a service stop interrupts is not recorded at all, because it did not fail.
 /// </summary>
 /// <param name="coordinator">Supplies the accepted requests and learns when a run has finished.</param>
 /// <param name="runner">Runs one sync.</param>
@@ -52,11 +53,7 @@ public sealed class SyncWorker(
         {
             return new SyncRunResult(SyncResult.Failed, SyncFailure.Timeout);
         }
-        catch (OperationCanceledException)
-        {
-            return new SyncRunResult(SyncResult.Failed, SyncFailure.Unavailable);
-        }
-        catch (Exception exception)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
             logger.LogError("BGG sync stopped unexpectedly: {ExceptionType}", exception.GetType().Name);
 
