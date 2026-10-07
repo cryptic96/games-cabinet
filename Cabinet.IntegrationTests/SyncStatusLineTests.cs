@@ -148,6 +148,69 @@ public partial class SyncStatusLineTests
         }
     }
 
+    [Fact]
+    public async Task The_header_never_names_the_data_source()
+    {
+        using var storage = new TemporaryDirectory();
+        Seed(storage, SyncHarness.StartTime - TimeSpan.FromHours(4), SyncResult.Changed, heldBack: null);
+
+        foreach (var factory in new[] { SyncHarness.CreateFactory(new ScriptedBggHandler(), SyncHarness.NewClock()), CreateSeededFactory(storage) })
+        {
+            await using (factory)
+            {
+                using var client = factory.CreatePublicClient();
+                var html = await client.GetStringAsync("/", TestContext.Current.CancellationToken);
+                var header = html[..html.IndexOf("</header>", StringComparison.Ordinal)];
+
+                header.Should().NotContainEquivalentOf("BGG").And.NotContainEquivalentOf("BoardGameGeek");
+            }
+        }
+    }
+
+    [Fact]
+    public async Task The_stale_note_holds_no_digit_other_than_those_of_its_date()
+    {
+        using var storage = new TemporaryDirectory();
+        Seed(storage, SyncHarness.StartTime - TimeSpan.FromHours(4), SyncResult.Changed, heldBack: null);
+        await using var factory = CreateSeededFactory(storage);
+        using var client = factory.CreatePublicClient();
+
+        var html = await client.GetStringAsync("/", TestContext.Current.CancellationToken);
+        var withoutDate = StaleNote(html).Text.Replace("15 January 2030 at 08:00 UTC", string.Empty, StringComparison.Ordinal);
+
+        withoutDate.Should().NotBeEmpty();
+        withoutDate.Should().NotMatchRegex("[0-9]");
+    }
+
+    [Fact]
+    public async Task The_relative_time_never_wraps_and_the_exact_line_may()
+    {
+        await using var factory = SyncHarness.CreateFactory(new ScriptedBggHandler(), SyncHarness.NewClock());
+        using var client = factory.CreatePublicClient();
+
+        var html = await client.GetStringAsync("/", TestContext.Current.CancellationToken);
+        var href = SiteStylesheetLink().Match(html).Groups["href"].Value;
+        var css = await client.GetStringAsync(href, TestContext.Current.CancellationToken);
+
+        RuleFor(css, ".sync-time").Should().Contain("white-space: nowrap");
+        RuleFor(css, ".sync-time-text").Should().Contain("white-space: nowrap");
+        RuleFor(css, ".sync-exact").Should().NotContain("white-space");
+        RuleFor(css, ".sync-note").Should().Contain("max-width: 40rem");
+        RuleFor(css, ".sync-stale").Should().Contain("max-width: 40rem");
+    }
+
+    private static string RuleFor(string css, string selector)
+    {
+        var rules = Regex.Matches(css, @"(?<selectors>[^{}]+)\{(?<body>[^}]*)\}")
+            .Where(rule => rule.Groups["selectors"].Value.Split(',').Select(part => part.Trim()).Contains(selector))
+            .Select(rule => rule.Groups["body"].Value)
+            .ToList();
+
+        rules.Should().NotBeEmpty($"the stylesheet styles {selector}");
+
+        return string.Join(' ', rules);
+    }
+
     private static CabinetWebApplicationFactory CreateSeededFactory(TemporaryDirectory storage) =>
         SyncHarness.CreateFactory(
             new ScriptedBggHandler(),
@@ -183,6 +246,9 @@ public partial class SyncStatusLineTests
 
     [GeneratedRegex("<p class=\"sync-stale\"(?<attributes>[^>]*)>(?<text>[^<]*)</p>")]
     private static partial Regex StaleNoteElement();
+
+    [GeneratedRegex("<link[^>]*rel=\"stylesheet\"[^>]*href=\"(?<href>/css/site\\.[^\"]+)\"")]
+    private static partial Regex SiteStylesheetLink();
 
     [GeneratedRegex("<div class=\"sync\"[^>]*>")]
     private static partial Regex SyncElement();

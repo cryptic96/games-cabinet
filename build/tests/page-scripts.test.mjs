@@ -60,3 +60,32 @@ test('a held-back result is stale at one minute', () => {
 test('a last sync in the future is not stale', () => {
   assert.equal(isStale(SYNCED, SYNCED_MS - 60 * 1000, THREE_HOURS, false), false);
 });
+
+test('a server 5 minutes ahead of the visitor makes the elapsed time count on the server clock', () => {
+  const clientNowMs = SYNCED_MS + 60 * 1000;
+  const serverTime = new Date(clientNowMs + 5 * 60 * 1000).toISOString();
+  const offset = serverOffsetMs(serverTime, clientNowMs);
+
+  assert.equal(offset, 5 * 60 * 1000);
+  assert.equal(elapsedSeconds(SYNCED, clientNowMs + offset), 6 * 60);
+  assert.equal(elapsedSeconds(SYNCED, clientNowMs), 60);
+  assert.equal(COPY.syncedAgo(elapsedSeconds(SYNCED, clientNowMs + offset)), 'Synced 6 minutes ago');
+});
+
+test('an unusable server time leaves the visitor clock as it is', () => {
+  assert.equal(serverOffsetMs('', SYNCED_MS), 0);
+  assert.equal(serverOffsetMs('not a time', SYNCED_MS), 0);
+  assert.equal(elapsedSeconds('', SYNCED_MS), null);
+});
+
+test('held back without a last sync is not stale', () => {
+  assert.equal(isStale(null, SYNCED_MS, THREE_HOURS, true), false);
+  assert.equal(isStale('', SYNCED_MS, THREE_HOURS, true), false);
+});
+
+test('the stale notes carry no digit beyond the date they are given', () => {
+  const exact = 'DATE';
+
+  assert.doesNotMatch(COPY.staleRecent(exact), /\d/);
+  assert.doesNotMatch(COPY.staleHeldBack(exact), /\d/);
+});
