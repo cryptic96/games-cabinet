@@ -19,10 +19,13 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
 
     private const string StorageDirectoryKey = "Storage:Directory";
 
+    private const string BackgroundSyncKey = "Sync:BackgroundEnabled";
+
     private readonly IReadOnlyDictionary<string, string?> _settings;
     private readonly Action<IServiceCollection>? _configureServices;
     private readonly Func<(int Public, int Ops)> _pickPorts;
     private readonly string? _ownedStorageDirectory;
+    private readonly bool _backgroundSyncOnServingHost;
     private IHost? _realHost;
 
     /// <summary>Creates the factory and picks two free loopback ports so clients can be built before the host starts.</summary>
@@ -37,7 +40,9 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
     /// </summary>
     /// <param name="settings">
     /// Configuration keys and values added on top of the committed settings. They are applied as host settings because
-    /// the program reads some of them while it builds its services, before later configuration sources are added.
+    /// the program reads some of them while it builds its services, before later configuration sources are added. The
+    /// key <c>Sync:BackgroundEnabled</c> is special: set to <c>true</c> it starts the hourly and start-up syncs on the
+    /// serving host only, and left out it keeps them off on both hosts, so a test never sees doubled calls to the source.
     /// </param>
     public CabinetWebApplicationFactory(IReadOnlyDictionary<string, string?> settings)
         : this(settings, PickFreeLoopbackPorts)
@@ -72,6 +77,8 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
         ArgumentNullException.ThrowIfNull(pickPorts);
 
         var effective = new Dictionary<string, string?>(settings);
+        _backgroundSyncOnServingHost = effective.Remove(BackgroundSyncKey, out var background)
+            && string.Equals(background?.Trim(), "true", StringComparison.OrdinalIgnoreCase);
         if (!effective.ContainsKey(StorageDirectoryKey))
         {
             _ownedStorageDirectory = Path.Combine(Path.GetTempPath(), $"cabinet-tests-{Guid.NewGuid():N}");
@@ -91,6 +98,17 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
 
     /// <summary>The loopback port the ops listener uses for this instance.</summary>
     public int OpsPort { get; private set; }
+
+    /// <summary>The services of the host that listens on the real sockets, which is where background syncs run when a test asks for them.</summary>
+    internal IServiceProvider ServingServices
+    {
+        get
+        {
+            _ = Server;
+
+            return _realHost!.Services;
+        }
+    }
 
     /// <summary>An HttpClient bound to the public listener.</summary>
     public HttpClient CreatePublicClient() => new() { BaseAddress = new Uri($"http://127.0.0.1:{PublicPort}") };
@@ -112,6 +130,8 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
             });
         });
 
+        builder.UseSetting(BackgroundSyncKey, "false");
+
         foreach (var (key, value) in _settings)
         {
             builder.UseSetting(key, value);
@@ -128,7 +148,15 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
     {
         var testHost = builder.Build();
 
-        builder.ConfigureWebHost(webHostBuilder => webHostBuilder.UseKestrel());
+        builder.ConfigureWebHost(webHostBuilder =>
+        {
+            webHostBuilder.UseKestrel();
+
+            if (_backgroundSyncOnServingHost)
+            {
+                webHostBuilder.UseSetting(BackgroundSyncKey, "true");
+            }
+        });
 
         var realHost = builder.Build();
         try
