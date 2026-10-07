@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Cabinet.Domain.Collection;
 using Microsoft.Extensions.Logging;
 
@@ -16,18 +15,28 @@ public sealed class SyncStateStore : ISyncStateStore
 
     private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
 
+    private const int FingerprintLength = 64;
+
     private readonly string _path;
+    private readonly TimeProvider _time;
+    private readonly TimeSpan _manualCooldown;
     private readonly ILogger<SyncStateStore> _logger;
 
     /// <summary>Creates a store over a directory.</summary>
     /// <param name="directory">The storage directory; it must exist.</param>
-    /// <param name="logger">Receives one line when a stored file has to be set aside or could not be read.</param>
-    public SyncStateStore(string directory, ILogger<SyncStateStore> logger)
+    /// <param name="time">The clock a loaded cooldown is checked against.</param>
+    /// <param name="manualCooldown">How long a sync that starts now keeps visitors from asking for another; no stored cooldown may end later than this from now.</param>
+    /// <param name="logger">Receives one line when a stored file has to be set aside or could not be read, or a stored value is corrected.</param>
+    public SyncStateStore(string directory, TimeProvider time, TimeSpan manualCooldown, ILogger<SyncStateStore> logger)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
+        ArgumentNullException.ThrowIfNull(time);
         ArgumentNullException.ThrowIfNull(logger);
+        ArgumentOutOfRangeException.ThrowIfLessThan(manualCooldown, TimeSpan.Zero);
 
         _path = Path.Combine(directory, FileName);
+        _time = time;
+        _manualCooldown = manualCooldown;
         _logger = logger;
     }
 
@@ -81,8 +90,33 @@ public sealed class SyncStateStore : ISyncStateStore
             return SetAside("malformed");
         }
 
-        return state.SchemaVersion > SyncState.CurrentSchemaVersion ? SetAside("newer schema") : state;
+        return state.SchemaVersion > SyncState.CurrentSchemaVersion ? SetAside("newer schema") : Sanitize(state);
     }
+
+    private SyncState Sanitize(SyncState state)
+    {
+        var heldBack = state.HeldBack;
+
+        if (heldBack is not null && !IsWellFormedFingerprint(heldBack.Fingerprint))
+        {
+            _logger.LogWarning("The stored sync state held an answer set aside with a malformed fingerprint; it was dropped.");
+            heldBack = null;
+        }
+
+        var cooldownEnds = state.CooldownEndsUtc;
+        var latestSensible = _time.GetUtcNow() + _manualCooldown;
+
+        if (cooldownEnds is { } ends && ends > latestSensible)
+        {
+            _logger.LogWarning("The stored sync state had a cooldown ending later than the cooldown allows; it was shortened.");
+            cooldownEnds = latestSensible;
+        }
+
+        return state with { HeldBack = heldBack, CooldownEndsUtc = cooldownEnds };
+    }
+
+    private static bool IsWellFormedFingerprint(string fingerprint) =>
+        fingerprint.Length == FingerprintLength && fingerprint.All(character => character is (>= '0' and <= '9') or (>= 'a' and <= 'f'));
 
     private SyncState SetAside(string reason)
     {
@@ -102,14 +136,5 @@ public sealed class SyncStateStore : ISyncStateStore
         return SyncState.Initial;
     }
 
-    private static JsonSerializerOptions CreateJsonOptions()
-    {
-        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
-        {
-            WriteIndented = false,
-        };
-        options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
-
-        return options;
-    }
+    private static JsonSerializerOptions CreateJsonOptions() => StoredJson.CreateOptions(new Dictionary<Type, string[]>());
 }

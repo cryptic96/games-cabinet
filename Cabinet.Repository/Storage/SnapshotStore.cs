@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Cabinet.Domain.Collection;
 using Microsoft.Extensions.Logging;
 
@@ -119,14 +118,10 @@ public sealed class SnapshotStore : ISnapshotStore
         return null;
     }
 
-    private static JsonSerializerOptions CreateJsonOptions()
-    {
-        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+    private static JsonSerializerOptions CreateJsonOptions() => StoredJson.CreateOptions(
+        new Dictionary<Type, string[]>
         {
-            WriteIndented = false,
-        };
-        options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
-
-        return options;
-    }
+            [typeof(CollectionSnapshot)] = ["schemaVersion", "capturedAtUtc", "items"],
+            [typeof(SnapshotItem)] = ["collectionId", "gameId", "title", "kind"],
+        });
 }

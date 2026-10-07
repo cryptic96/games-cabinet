@@ -54,6 +54,8 @@ public static class SyncEndpoints
         services.AddSingleton(_ => SyncSettings.FromConfiguration(configuration));
         services.AddSingleton<ISyncStateStore>(provider => new SyncStateStore(
             provider.GetRequiredService<StorageDirectory>().Path,
+            provider.GetRequiredService<TimeProvider>(),
+            provider.GetRequiredService<SyncOptions>().ManualCooldown,
             provider.GetRequiredService<ILogger<SyncStateStore>>()));
         services.AddSingleton<ISnapshotStore>(provider => new SnapshotStore(
             provider.GetRequiredService<StorageDirectory>().Path,
