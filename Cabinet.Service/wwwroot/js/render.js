@@ -2,9 +2,10 @@
  * Draws a cabinet layout as DOM. Geometry and colours reach the page only through custom properties set on element
  * styles and text only through text content; the script makes no layout decisions.
  *
- * Every box takes its background and text colour from the layout's palette table through --bg and --fg. A face-out box
- * is a generated cover: the palette colour, a pattern chosen from the game's own hash and a solid title plate. That
- * generated cover is also what stands in whenever a game has no usable box art.
+ * Every box takes its background and text colour through --bg and --fg: the pair taken from the game's box art when the
+ * placement carries a valid one, and the layout's palette table otherwise. A face-out box without a picture is a
+ * generated cover: that colour, a pattern chosen from the game's own hash and a solid title plate. That generated cover
+ * is also what stands in whenever a game has no usable box art.
  *
  * The three decorative elements of every section and the two attributes on every cubby carry no meaning of their own.
  * They exist only so the stylesheet can draw the furniture: the moulded top, the side boards, the plinth, a stable tone
@@ -23,6 +24,12 @@ const ART_FITS = ['width', 'height', 'exact'];
 /** A colour as the layout writes it: a hexadecimal triple. */
 const HEX_COLOUR = /^#[0-9a-fA-F]{6}$/;
 
+/** A colour taken from box art as the layout writes it: lowercase hexadecimal only. */
+const ART_COLOUR = /^#[0-9a-f]{6}$/;
+
+/** The only two text colours a colour taken from box art may carry. */
+const ART_TEXT_COLOURS = ['#ffffff', '#000000'];
+
 /** The custom properties the four edge colours of a picture are set on, as pairs of side name and property. */
 const EDGE_PROPERTIES = [
   ['top', '--edge-t'],
@@ -30,6 +37,27 @@ const EDGE_PROPERTIES = [
   ['bottom', '--edge-b'],
   ['left', '--edge-l'],
 ];
+
+/**
+ * Returns the colour pair taken from the game's box art when the placement carries a valid one, and null otherwise. The
+ * background must be a lowercase six-digit hexadecimal colour and the text exactly white or black; anything else is
+ * ignored, so the box keeps its palette colour.
+ * @param {object} placement One placement from the layout.
+ * @returns {{background: string, text: string} | null}
+ */
+function colourOf(placement) {
+  const colour = placement.colour;
+
+  if (placement.kind === 'moreMarker' || colour === null || typeof colour !== 'object') {
+    return null;
+  }
+
+  const valid = typeof colour.background === 'string'
+    && ART_COLOUR.test(colour.background)
+    && ART_TEXT_COLOURS.includes(colour.text);
+
+  return valid ? colour : null;
+}
 
 /**
  * Sets one custom property to a whole-number value.
@@ -265,6 +293,11 @@ function drawArtCover(button, placement, art, lines) {
       image.remove();
       delete button.dataset.art;
       delete button.dataset.fit;
+
+      for (const [, property] of EDGE_PROPERTIES) {
+        button.style.removeProperty(property);
+      }
+
       drawGeneratedCover(button, placement, lines);
     },
     { once: true },
@@ -296,7 +329,7 @@ function buildPlacement(placement, copy, palette) {
   setNumber(button, '--w', placement.widthMm);
   setNumber(button, '--h', placement.heightMm);
 
-  const tone = palette[placement.toneIndex];
+  const tone = colourOf(placement) ?? palette[placement.toneIndex];
 
   if (tone !== undefined && placement.kind !== 'moreMarker') {
     button.style.setProperty('--bg', tone.background);

@@ -36,13 +36,22 @@ public sealed class CollectionState
 
     /// <summary>Creates the view of a stored collection: its items are mapped in a fixed order and its version is derived from them.</summary>
     /// <param name="snapshot">The stored collection.</param>
-    public static CollectionState FromSnapshot(CollectionSnapshot snapshot)
+    public static CollectionState FromSnapshot(CollectionSnapshot snapshot) => FromSnapshot(snapshot, ArtRules.Default);
+
+    /// <summary>
+    /// Creates the view of a stored collection as <see cref="FromSnapshot(CollectionSnapshot)"/> does, choosing each game's
+    /// picture with the given rules; the rules are part of the version, so a change of rules is a new collection version.
+    /// </summary>
+    /// <param name="snapshot">The stored collection.</param>
+    /// <param name="rules">The rules that choose each game's picture.</param>
+    public static CollectionState FromSnapshot(CollectionSnapshot snapshot, ArtRules rules)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(rules);
 
-        var items = SnapshotMapper.ToCabinetItems(snapshot);
+        var items = SnapshotMapper.ToCabinetItems(snapshot, rules);
 
-        return new CollectionState(items, SnapshotMapper.Version(items), snapshot.CapturedAtUtc, snapshot);
+        return new CollectionState(items, SnapshotMapper.Version(items, rules), snapshot.CapturedAtUtc, snapshot);
     }
 
     /// <summary>The view before any collection has been synced: no items and no version.</summary>

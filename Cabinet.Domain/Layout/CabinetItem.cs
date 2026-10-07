@@ -50,6 +50,7 @@ public sealed record ArtImage(IReadOnlyList<ArtVariant> Variants, ArtEdges? Edge
 /// <param name="Box">The box size in millimetres.</param>
 /// <param name="ExpansionOf">The base games this item expands; empty for a base game.</param>
 /// <param name="Art">The stored picture of the item, or null when it has none.</param>
+/// <param name="Colour">The background and text colours every box of the item takes from its picture, or null when it has none.</param>
 public sealed record CabinetItem(
     int BggId,
     long CollectionId,
@@ -57,4 +58,5 @@ public sealed record CabinetItem(
     ItemKind Kind,
     BoxDimensions Box,
     IReadOnlyList<BaseGameRef> ExpansionOf,
-    ArtImage? Art = null);
+    ArtImage? Art = null,
+    PaletteTone? Colour = null);

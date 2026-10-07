@@ -56,11 +56,21 @@ public sealed record ArtFile(int Width, int Height, string Name);
 /// <param name="Status">How the last attempt ended.</param>
 /// <param name="AttemptedAtUtc">When the last attempt was made.</param>
 /// <param name="Files">The stored sizes, widest first, when the status is <see cref="ImageStatus.Ok"/>; otherwise null.</param>
+/// <param name="Features">What the detector measured on the picture; null for a record written before the picture was measured.</param>
+/// <param name="MainColour">The picture's main colour as a lowercase hexadecimal colour, or null when it was not measured.</param>
+/// <param name="Colour">The background and text colours a box of this picture takes, or null when they were not worked out.</param>
+/// <param name="Edges">The colours along the four edges of the picture, or null when they were not measured.</param>
+/// <param name="AnalysisVersion">The version of the analysis that produced the measurements, or null when there are none.</param>
 public sealed record ImageRecord(
     string SourceUrl,
     ImageStatus Status,
     DateTimeOffset AttemptedAtUtc,
-    IReadOnlyList<ArtFile>? Files = null);
+    IReadOnlyList<ArtFile>? Files = null,
+    ArtFeatures? Features = null,
+    string? MainColour = null,
+    PaletteTone? Colour = null,
+    ArtEdges? Edges = null,
+    int? AnalysisVersion = null);
 
 /// <summary>The last good copy of the owned collection, as it is written to disk.</summary>
 /// <param name="SchemaVersion">The version of the stored shape; a reader refuses a version newer than it knows.</param>

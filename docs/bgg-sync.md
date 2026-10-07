@@ -329,11 +329,14 @@ app at start-up with a message naming the key.
 
 ## Box art
 
-Face-out boxes show their real box picture. The pictures come from the
-collection answer itself: each owned entry names a picture of the version you
-own and a main picture of the game, and the version picture is used first. The
-sync adds no request to BGG for this, and a game whose pictures are missing or
-cannot be used simply keeps its generated cover.
+Face-out boxes show their real box picture. Each game offers two pictures: the
+picture of the version you own, named by the collection answer, and the game's
+own main picture, named by its details (an expansion offers its own main
+picture, never the one of its base game). Until a game's details arrive, the
+picture the collection gave for the entry stands in for the main picture. Both are
+kept, and "Choosing the picture and the spine colour" below explains which one a
+box shows. The sync adds no request to BGG for this, and a game whose pictures
+are missing or cannot be used simply keeps its generated cover.
 
 After the collection is stored and shown, the same run fetches the pictures that
 are due. The server downloads them by itself, never a visitor:
@@ -385,6 +388,69 @@ Optional settings for the env file:
 In a settings file the same keys are written with a colon, for example
 `Images:MaxDownloadsPerRun`. An out-of-range or non-numeric value stops the app
 at start-up with a message naming the key.
+
+## Choosing the picture and the spine colour
+
+Every game offers two pictures: the one of the edition you own and the game's
+main picture. Both are downloaded once, each address a single time even when two
+games or both candidates share it, and measured once during the sync. What is
+stored per picture is the raw measurement, not a verdict: how much of the picture
+is plain backdrop, how well the subject fills its frame and how empty its corners
+are. The choice is worked out from those measurements every time the cabinet is
+built, so it can be tuned without downloading anything again.
+
+A photographed product shot, a slanted box standing on a plain backdrop, makes a
+poor cover. The measurements tell it apart from a flat cover: a flat cover fills
+its frame and has full corners, while a product shot leaves much of its frame
+empty and shows backdrop in at least two corners. A picture that is neither
+clearly one nor the other counts as unsure. The rules are:
+
+- when the picture of your edition is a flat cover, it is used;
+- when it is a product shot or unsure and the main picture is a flat cover, the
+  main picture is used instead;
+- when no flat cover exists, your own edition's picture is still used, even if it
+  is a product shot, because it is the box you actually own;
+- when your edition has no picture, the main picture is used;
+- the generated cover appears only for a game with no usable picture at all: its
+  pictures are missing, could not be fetched, were refused or could not be read.
+
+Every box of a game, whether it stands as a spine, faces out, lies flat, is an
+upright expansion, a layer in a stack or an expansion without its base game, is
+drawn in one solid colour taken from the chosen picture, with a title in white or
+black. The colour is worked out during the sync, never in the visitor's browser.
+Plain backdrops such as a white frame, a black border or a transparent surround
+are ignored, so a red box with a white frame gives a red spine. The colour is
+kept as it is except for its lightness: when neither white nor black reaches a
+contrast of 4.5 to 1 for the title, both with no shade and under the strongest
+shade the furniture lays across a box, the lightness moves by the smallest
+amount that lets one of them pass. Saturation and hue are never changed and the colour is never snapped
+to a fixed palette. A game without a usable picture keeps its palette colour.
+
+A picture that is shown whole inside a box front of another shape leaves bars on
+two sides. The bars are filled with the four colours measured along the
+picture's own edges, so a picture with a dark top and a light bottom sits in a
+dark bar above and a light bar below. A cover that is shown without bars needs
+no edge colours.
+
+The stored measurements carry the version of the analysis that made them. A
+release that changes the analysis raises that version, and every stored picture
+is then downloaded and measured again over the following syncs, within the
+per-run limit.
+
+Optional settings for the env file. They only change how stored measurements
+are read, so changing them needs a restart and no download:
+
+| Key | Default | Range | Meaning |
+| --- | --- | --- | --- |
+| `Art__FlatMinFillPercent` | `97` | 50 to 100 | The least share of its frame a subject must fill for the picture to count as a flat cover. |
+| `Art__FlatMaxCornerPercent` | `15` | 0 to 100 | The most backdrop a flat cover may show in its emptiest corner. |
+| `Art__ThreeDMaxFillPercent` | `93` | 0 to 100 | The most a product shot fills its frame. It must not be above `Art__FlatMinFillPercent`. |
+| `Art__ThreeDMinCornerPercent` | `40` | 0 to 100 | The least backdrop a product shot shows in its second emptiest corner. |
+
+In a settings file the same keys are written with a colon, for example
+`Art:FlatMinFillPercent`. An out-of-range or non-numeric value stops the app at
+start-up with a message naming the key, and so does a product-shot fill limit
+above the flat-cover fill minimum.
 
 ## Where the data lives
 

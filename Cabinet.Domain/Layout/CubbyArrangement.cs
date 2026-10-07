@@ -305,7 +305,8 @@ public static class CubbyArrangement
                 ToneIndex: SpinePalette.ToneFor(expansion.BggId),
                 PatternIndex: SpinePalette.PatternFor(expansion.BggId),
                 FamilyId: baseItem.BggId,
-                MoreCount: null));
+                MoreCount: null,
+                Colour: expansion.Colour));
             y += heights[index];
         }
 
@@ -373,5 +374,6 @@ public static class CubbyArrangement
             PatternIndex: SpinePalette.PatternFor(item.BggId),
             FamilyId: null,
             MoreCount: null,
-            Art: ArtFor(item, kind, width, height, design));
+            Art: ArtFor(item, kind, width, height, design),
+            Colour: item.Colour);
 }

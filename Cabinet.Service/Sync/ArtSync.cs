@@ -1,4 +1,5 @@
 using Cabinet.Domain.Collection;
+using Cabinet.Domain.Layout;
 using Cabinet.Repository.Images;
 
 namespace Cabinet.Service.Sync;
@@ -14,7 +15,8 @@ public sealed record ArtSyncResult(CollectionSnapshot Snapshot, int Stored, int 
 
 /// <summary>
 /// The picture step of a sync run. It walks the collection, fetches the pictures that are due one at a time on the
-/// picture pacer, resizes and stores them, and records how each attempt ended. It starts at most a fixed number of
+/// picture pacer, resizes and stores them, measures each one once, and records how each attempt ended and what was
+/// measured. Every game offers two pictures, the one of its owned edition and its main picture, each distinct address once. It starts at most a fixed number of
 /// downloads per run and none after the deadline, so a large collection fills in over several runs and a slow host cannot
 /// hold the run. A picture that goes wrong is only recorded; it never fails the run. It logs counts only, never an
 /// address, a title or an identifier.
@@ -59,7 +61,7 @@ public sealed class ArtSync(
 
         foreach (var item in snapshot.Items.OrderBy(item => item.CollectionId).ThenBy(item => item.GameId))
         {
-            foreach (var address in Candidates(item, images))
+            foreach (var address in Candidates(item, snapshot))
             {
                 if (!seen.Add(address) || !IsDue(address, images, now))
                 {
@@ -105,28 +107,23 @@ public sealed class ArtSync(
     }
 
     /// <summary>
-    /// The addresses an item offers, in the order they are tried. An item offers its version picture first; its main
-    /// picture is offered only when it has no version picture or the version picture has been tried and did not give one.
-    /// The records are read as each address is reached, so a version picture that has just failed offers the main picture
-    /// in the same run.
+    /// The addresses an item offers, in the order they are tried: the picture of its owned edition, then its main picture,
+    /// which is the one its details name, or the one the collection gave for the item until its details arrive. The same
+    /// address is offered once.
     /// </summary>
-    private static IEnumerable<string> Candidates(SnapshotItem item, Dictionary<string, ImageRecord> images)
+    private static IEnumerable<string> Candidates(SnapshotItem item, CollectionSnapshot snapshot)
     {
-        if (item.VersionImageUrl is { } version)
+        var version = item.VersionImageUrl;
+        var main = SnapshotMapper.MainPictureUrl(item, snapshot);
+
+        if (version is not null)
         {
             yield return version;
-
-            if (images.TryGetValue(version, out var record) && record.Status != ImageStatus.Ok && item.ImageUrl is { } main)
-            {
-                yield return main;
-            }
-
-            yield break;
         }
 
-        if (item.ImageUrl is { } only)
+        if (main is not null && main != version)
         {
-            yield return only;
+            yield return main;
         }
     }
 
@@ -142,7 +139,10 @@ public sealed class ArtSync(
             return record.AttemptedAtUtc + options.RetryFailedAfter <= now;
         }
 
-        return record.Files is not { Count: > 0 } files || files.Any(file => !cache.Has(file.Name));
+        return record.Files is not { Count: > 0 } files
+            || files.Any(file => !cache.Has(file.Name))
+            || record.Features is null
+            || record.AnalysisVersion != ArtProcessor.AnalysisVersion;
     }
 
     private async Task<ImageRecord> FetchAsync(IArtSource source, string address, Counts counts, CancellationToken cancellationToken)
@@ -208,7 +208,12 @@ public sealed class ArtSync(
                     address,
                     ImageStatus.Ok,
                     attemptedAt,
-                    [.. done.Variants.OrderByDescending(variant => variant.Width).Select(variant => new ArtFile(variant.Width, variant.Height, variant.Name))]);
+                    [.. done.Variants.OrderByDescending(variant => variant.Width).Select(variant => new ArtFile(variant.Width, variant.Height, variant.Name))],
+                    done.Facts.Features,
+                    done.Facts.Main.ToHex(),
+                    SpineColour.PairFor(done.Facts.Main),
+                    new ArtEdges(done.Facts.Top.ToHex(), done.Facts.Right.ToHex(), done.Facts.Bottom.ToHex(), done.Facts.Left.ToHex()),
+                    ArtProcessor.AnalysisVersion);
 
             default:
                 counts.Undecodable++;

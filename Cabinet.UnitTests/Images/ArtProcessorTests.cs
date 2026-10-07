@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
+using Cabinet.Domain.Collection;
+using Cabinet.FakeBgg;
 using Cabinet.Repository.Images;
 using FluentAssertions;
 using SkiaSharp;
@@ -105,6 +107,34 @@ public sealed class ArtProcessorTests
     {
         Variants(Png(800, 600, SKColors.Red))[0].Name.Should().NotBe(Variants(Png(800, 600, SKColors.Blue))[0].Name);
     }
+
+    [Fact]
+    public void A_flat_cover_is_measured_as_flat_with_a_red_main_colour()
+    {
+        var done = Done(SyntheticArt.Encode(SyntheticArtKind.FlatCover));
+
+        ArtVerdicts.Classify(done.Facts.Features, ArtThresholds.Default).Should().Be(ArtVerdict.Flat);
+        done.Facts.Main.R.Should().BeGreaterThan(done.Facts.Main.G).And.BeGreaterThan(done.Facts.Main.B);
+    }
+
+    [Fact]
+    public void A_photographed_box_on_white_is_measured_as_three_dimensional_with_near_white_edges()
+    {
+        var done = Done(SyntheticArt.Encode(SyntheticArtKind.BoxOnWhite));
+        var edges = new[] { done.Facts.Top, done.Facts.Right, done.Facts.Bottom, done.Facts.Left };
+
+        ArtVerdicts.Classify(done.Facts.Features, ArtThresholds.Default).Should().Be(ArtVerdict.ThreeD);
+        edges.Should().OnlyContain(edge => edge.R >= ArtAnalysis.NearWhiteMin && edge.G >= ArtAnalysis.NearWhiteMin && edge.B >= ArtAnalysis.NearWhiteMin);
+    }
+
+    [Fact]
+    public void The_analysis_version_is_a_positive_number_a_release_can_raise()
+    {
+        ArtProcessor.AnalysisVersion.Should().BePositive();
+    }
+
+    private static ArtProcessing.Done Done(byte[] picture) =>
+        ArtProcessor.Process(picture, Limits).Should().BeOfType<ArtProcessing.Done>().Which;
 
     private static IReadOnlyList<EncodedArt> Variants(byte[] picture) =>
         ArtProcessor.Process(picture, Limits).Should().BeOfType<ArtProcessing.Done>().Which.Variants;

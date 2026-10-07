@@ -71,7 +71,12 @@ public sealed class SnapshotMapperArtTests
         new(1, 2, "Invented Game", ItemKind.Base, null, null, null, versionImage, mainImage);
 
     private static ImageRecord Ok(string address, string hash, params int[] widths) =>
-        new(address, ImageStatus.Ok, Moment, [.. widths.Select(width => new ArtFile(width, width * 4 / 3, $"{hash}-{width}.webp"))]);
+        new(
+            address,
+            ImageStatus.Ok,
+            Moment,
+            [.. widths.Select(width => new ArtFile(width, width * 4 / 3, $"{hash}-{width}.webp"))],
+            new ArtFeatures(0.0, 1.0, 0.0, 0.0, 4));
 
     private static CollectionSnapshot Snapshot(SnapshotItem item, params ImageRecord[] records) =>
         new(CollectionSnapshot.CurrentSchemaVersion, Moment, [item], records.ToDictionary(record => record.SourceUrl, StringComparer.Ordinal));

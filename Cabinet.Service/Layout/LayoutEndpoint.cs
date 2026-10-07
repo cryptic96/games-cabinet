@@ -16,7 +16,7 @@ public static class LayoutEndpoint
     public const string Route = "/cabinet/layout";
 
     /// <summary>
-    /// Reads and validates the Layout settings now and registers them as a singleton, so a bad value stops the app at
+    /// Reads and validates the Layout and Art settings now and registers them as singletons, so a bad value stops the app at
     /// startup instead of failing the first request. It also registers the sample catalog, the sample layout cache and the
     /// store that holds the synced collection.
     /// </summary>
@@ -34,6 +34,7 @@ public static class LayoutEndpoint
 
         return services
             .AddSingleton(LayoutSettings.FromConfiguration(configuration))
+            .AddSingleton(ArtSettings.FromConfiguration(configuration))
             .AddSingleton(SampleCatalog.FromConfiguration(configuration, environment))
             .AddSingleton<LayoutCache>()
             .AddSingleton<CollectionStore>();
