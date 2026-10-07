@@ -82,6 +82,67 @@ state directory. It holds no secrets and can be deleted at any time: a missing,
 damaged or newer-format file is replaced by a fresh one (a damaged file is set
 aside as `sync-state.json.bad`), which only means the window starts closed.
 
+## When BGG misbehaves
+
+A sync that goes wrong never changes what visitors see. Whatever BGG answers,
+the collection that is already shown, the copy stored in `snapshot.json` and the
+layout stay exactly as they were; the sync only records how it ended. The hourly
+sync is the only retry, so there is nothing to restart or clear.
+
+How a sync ends when something is wrong:
+
+| BGG answers | The sync ends as |
+| --- | --- |
+| 401 (the token is missing or wrong) | an authentication problem, at once, with no retry and without reading the body |
+| 429 or 503 | throttled, at once; a `Retry-After` value is only noted |
+| 403, a redirect, or any other error status | unavailable |
+| a web page, an error document, the wrong kind of document, malformed XML, or a total that does not match the entries | a bad answer |
+| a connection error | unavailable |
+| no answer in time | a timeout |
+| "queued" answers that do not clear | queued, once the polite waiting is used up |
+
+A "queued" answer (HTTP 202) means BGG is still preparing the collection. The
+server asks again after 5, 10, 20 and then 30 seconds, at most six times for each
+call, and every ask goes through the same 5-second pacing as any other request.
+One sync sends at most 16 requests in total, and a whole sync is cancelled after
+10 minutes.
+
+Two kinds of answer are held back instead of applied, even though BGG answered
+properly:
+
+- **An empty collection while games are shown** is never accepted, however often
+  it repeats. It may be an error on BGG's side; see the next section for the one
+  case where it is real.
+- **A collection that lost more than half of the games** is held back once. When
+  the next sync, the hourly one or a press of "sync now" after the window, returns
+  exactly the same set of entries, the change is accepted and the cabinet
+  redraws. A different suspicious set replaces the held-back one and needs its own
+  confirmation. Losing exactly half or less is accepted at once.
+
+While an answer is held back, `sync-state.json` carries a record of it (what
+kind, a fingerprint of the entry identifiers, how many entries and when), the
+status route reports `heldBack`, the last synced time does not move and the last
+result reads `heldBack`. Visitors never see the held-back entries or their number.
+A good answer that is accepted removes the record; a failed sync leaves it in
+place.
+
+Pages show a calm note when there has been no good sync for 3 hours, and while a
+result is held back.
+
+## Showing a genuinely empty collection
+
+If you really did remove every game from your BGG collection, the guard above
+holds the empty answer back for good. To show the empty cabinet, clear the stored
+collection by hand on the server:
+
+1. stop the service: `sudo systemctl stop cabinet`
+2. delete the stored collection: `sudo rm /var/lib/cabinet/snapshot.json`
+3. start the service: `sudo systemctl start cabinet`
+
+With no stored collection the service counts the next sync as a first sync, and a
+first sync accepts whatever BGG says, including no games at all. The sync after
+the start runs on its own shortly after start-up, or you can press "sync now".
+
 ## Configuration
 
 Put these in the server env file, `/etc/cabinet/cabinet.env`, then restart the

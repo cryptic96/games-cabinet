@@ -145,7 +145,10 @@ public sealed class SyncCoordinator
         }
     }
 
-    /// <summary>Records that the accepted sync has finished, so the next request is accepted.</summary>
+    /// <summary>
+    /// Records that the accepted sync has finished, so the next request is accepted. A held-back result stores the held-back
+    /// record and does not move the last success; an accepted result clears the record; a failure keeps it.
+    /// </summary>
     /// <param name="result">How the sync ended.</param>
     public void Complete(SyncRunResult result)
     {
@@ -166,6 +169,7 @@ public sealed class SyncCoordinator
                     LastFailure = result.Failure,
                     ConsecutiveFailures = failures,
                     LastSuccessUtc = succeeded ? now : _state.LastSuccessUtc,
+                    HeldBack = succeeded ? null : result.Result == SyncResult.HeldBack ? result.HeldBack ?? _state.HeldBack : _state.HeldBack,
                 };
                 _lastResult = result;
                 _stateStore.Save(_state);

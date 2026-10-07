@@ -36,7 +36,7 @@ public sealed class SyncWorker(SyncCoordinator coordinator, SyncRunner runner, I
 
         try
         {
-            return await runner.RunAsync(limit.Token);
+            return await runner.RunAsync(coordinator.State.HeldBack, limit.Token);
         }
         catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
         {
