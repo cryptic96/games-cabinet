@@ -219,7 +219,7 @@ All resolved on 2026-10-07:
 
 ## Post-audit fixes (2026-10-07)
 
-Applied in one fix round on the milestone branch after this audit, merged and verified together (937 .NET tests on four runs, 75 page-script tests, all five lint checks, the access-check tests and both end-to-end scripts pass). They reach the server with the next release.
+Applied in two fix rounds on the milestone branch after this audit, each merged and verified together (latest: 989 .NET tests on four runs, 75 page-script tests, all five lint checks, the access-check and settings-check tests and both end-to-end scripts pass). They reach the server with the next release.
 
 | Item | Resolution | Commit |
 |------|------------|--------|
@@ -240,6 +240,10 @@ Applied in one fix round on the milestone branch after this audit, merged and ve
 | Observation 20 | Kept: the SSH alias is a local shortcut, not a resolvable hostname or IP, and is already in published history | owner decision |
 | Observation 21 | `noindex` meta tag on every page, tested for every Razor page | `9a385fd` |
 | UI review warnings | Footer centred, 40rem limits, stale press notes cleared, held-back press sentence covered while the older-sync note shows | `569b3de`, `5c76ca1`, `d95d9da` |
+| Observation 1, optional hardening (T-03-42) | A 429 or 503 without a usable `Retry-After` waits a 30-second floor before its single retry; a readable `Retry-After` up to 60 s is honoured as given; the longest possible waits are tested to fit well inside the whole-run limit | `deb85e6` |
+| Observation 9 (T-03-32, T-03-28) | Stored files reject integer or unknown enum names and missing required fields (malformed content is set aside); a loaded cooldown end is clamped to now plus the manual cooldown; a malformed held-back fingerprint is dropped. An empty title stays accepted because the parser keeps a blank BGG title as an empty string | `79eb3e6` |
+| Whole-run limit testability | The 10-minute whole-run limit now runs on the injected clock and is covered by automated tests (no manual-only checks remain in 03-VALIDATION) | `2672f05` |
+| Deferred to the go-public work | Connection-limit sizing, a hub origin allow-list and per-client limiters (observation 2, AR-03-02, AR-03-03) are parked as a pending todo; the actionlint label entry (UF-03-01) is parked until actionlint knows the label | `f259990` |
 
 ---
 
