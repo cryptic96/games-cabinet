@@ -17,6 +17,8 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
 {
     private const int MaxBindAttempts = 5;
 
+    private static readonly TimeSpan StartTimeout = TimeSpan.FromSeconds(30);
+
     private const string StorageDirectoryKey = "Storage:Directory";
 
     private const string BackgroundSyncKey = "Sync:BackgroundEnabled";
@@ -177,6 +179,7 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
             .Features.Get<IServerAddressesFeature>();
 
         testHost.Start();
+        WaitUntilApplicationStarted(testHost);
         var testHostAddresses = testHost.Services.GetRequiredService<IServer>()
             .Features.Get<IServerAddressesFeature>()!.Addresses;
         testHostAddresses.Clear();
@@ -186,6 +189,20 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
         }
 
         return testHost;
+    }
+
+    /// <summary>
+    /// Blocks until the host's own application has started, so the program has finished mapping its endpoints. Both
+    /// hosts come from one deferred builder that shares a single "started" signal; once the serving host has set it,
+    /// starting the in-memory host returns at once while its program may still be running on another thread.
+    /// </summary>
+    private static void WaitUntilApplicationStarted(IHost host)
+    {
+        var started = host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStarted;
+        if (!started.WaitHandle.WaitOne(StartTimeout))
+        {
+            throw new TimeoutException($"The in-memory test host did not finish starting within {StartTimeout.TotalSeconds} seconds.");
+        }
     }
 
     /// <inheritdoc />
