@@ -1,5 +1,5 @@
 {
-  "layoutVersion": 9,
+  "layoutVersion": 12,
   "profile": "phone",
   "optionsFingerprint": "09a03be9acd0723f",
   "palette": [
@@ -56,21 +56,34 @@
     {
       "index": 0,
       "widthMm": 640,
-      "heightMm": 2060,
+      "heightMm": 2160,
       "frameMm": 20,
       "cubbies": [
         {
           "index": 0,
           "xMm": 0,
           "yMm": 0,
-          "widthMm": 300,
-          "heightMm": 360,
+          "widthMm": 270,
+          "heightMm": 300,
           "placements": [
+            {
+              "gameId": 10132,
+              "entryId": 500144,
+              "kind": "spine",
+              "xMm": 0,
+              "yMm": 0,
+              "widthMm": 74,
+              "heightMm": 255,
+              "title": "Quaylo Tavfordwyn Heskwynquin: Orvquinford Kelford Orvvex",
+              "label": "Quaylo Tavfor\u2026",
+              "toneIndex": 5,
+              "patternIndex": 0
+            },
             {
               "gameId": 10025,
               "entryId": 500029,
               "kind": "flatBox",
-              "xMm": 0,
+              "xMm": 74,
               "yMm": 0,
               "widthMm": 183,
               "heightMm": 59,
@@ -83,7 +96,7 @@
               "gameId": 10131,
               "entryId": 500119,
               "kind": "flatBox",
-              "xMm": 0,
+              "xMm": 74,
               "yMm": 59,
               "widthMm": 139,
               "heightMm": 59,
@@ -91,28 +104,15 @@
               "label": "Drelfo\u2026",
               "toneIndex": 1,
               "patternIndex": 1
-            },
-            {
-              "gameId": 10000,
-              "entryId": 500000,
-              "kind": "spine",
-              "xMm": 183,
-              "yMm": 0,
-              "widthMm": 77,
-              "heightMm": 338,
-              "title": "Heskbar Zimwyn",
-              "label": "Heskbar Zimwyn",
-              "toneIndex": 10,
-              "patternIndex": 4
             }
           ]
         },
         {
           "index": 1,
-          "xMm": 320,
+          "xMm": 290,
           "yMm": 0,
-          "widthMm": 320,
-          "heightMm": 360,
+          "widthMm": 350,
+          "heightMm": 300,
           "placements": [
             {
               "gameId": 10064,
@@ -132,9 +132,9 @@
         {
           "index": 2,
           "xMm": 0,
-          "yMm": 380,
-          "widthMm": 200,
-          "heightMm": 300,
+          "yMm": 320,
+          "widthMm": 260,
+          "heightMm": 280,
           "placements": [
             {
               "gameId": 10116,
@@ -153,46 +153,45 @@
         },
         {
           "index": 3,
-          "xMm": 220,
-          "yMm": 380,
-          "widthMm": 200,
-          "heightMm": 300,
-          "placements": [
-            {
-              "gameId": 10132,
-              "entryId": 500144,
-              "kind": "spine",
-              "xMm": 0,
-              "yMm": 0,
-              "widthMm": 74,
-              "heightMm": 255,
-              "title": "Quaylo Tavfordwyn Heskwynquin: Orvquinford Kelford Orvvex",
-              "label": "Quaylo Tavfor\u2026",
-              "toneIndex": 5,
-              "patternIndex": 0
-            }
-          ]
+          "xMm": 280,
+          "yMm": 320,
+          "widthMm": 180,
+          "heightMm": 280,
+          "placements": []
         },
         {
           "index": 4,
-          "xMm": 440,
-          "yMm": 380,
-          "widthMm": 200,
-          "heightMm": 300,
+          "xMm": 480,
+          "yMm": 320,
+          "widthMm": 160,
+          "heightMm": 280,
           "placements": []
         },
         {
           "index": 5,
           "xMm": 0,
-          "yMm": 700,
-          "widthMm": 420,
-          "heightMm": 400,
+          "yMm": 620,
+          "widthMm": 290,
+          "heightMm": 380,
           "placements": [
+            {
+              "gameId": 10000,
+              "entryId": 500000,
+              "kind": "spine",
+              "xMm": 0,
+              "yMm": 0,
+              "widthMm": 77,
+              "heightMm": 338,
+              "title": "Heskbar Zimwyn",
+              "label": "Heskbar Zimwyn",
+              "toneIndex": 10,
+              "patternIndex": 4
+            },
             {
               "gameId": 10153,
               "entryId": 500168,
               "kind": "spine",
-              "xMm": 0,
+              "xMm": 77,
               "yMm": 0,
               "widthMm": 90,
               "heightMm": 373,
@@ -200,12 +199,21 @@
               "label": "Tarntor Wendskra Ya\u2026",
               "toneIndex": 11,
               "patternIndex": 2
-            },
+            }
+          ]
+        },
+        {
+          "index": 6,
+          "xMm": 310,
+          "yMm": 620,
+          "widthMm": 330,
+          "heightMm": 380,
+          "placements": [
             {
               "gameId": 10066,
               "entryId": 500051,
               "kind": "cover",
-              "xMm": 90,
+              "xMm": 0,
               "yMm": 0,
               "widthMm": 329,
               "heightMm": 366,
@@ -217,42 +225,10 @@
           ]
         },
         {
-          "index": 6,
-          "xMm": 440,
-          "yMm": 700,
-          "widthMm": 200,
-          "heightMm": 400,
-          "placements": []
-        },
-        {
           "index": 7,
           "xMm": 0,
-          "yMm": 1120,
-          "widthMm": 150,
-          "heightMm": 260,
-          "placements": []
-        },
-        {
-          "index": 8,
-          "xMm": 170,
-          "yMm": 1120,
-          "widthMm": 230,
-          "heightMm": 260,
-          "placements": []
-        },
-        {
-          "index": 9,
-          "xMm": 420,
-          "yMm": 1120,
-          "widthMm": 220,
-          "heightMm": 260,
-          "placements": []
-        },
-        {
-          "index": 10,
-          "xMm": 0,
-          "yMm": 1400,
-          "widthMm": 310,
+          "yMm": 1020,
+          "widthMm": 290,
           "heightMm": 340,
           "placements": [
             {
@@ -271,10 +247,10 @@
           ]
         },
         {
-          "index": 11,
-          "xMm": 330,
-          "yMm": 1400,
-          "widthMm": 310,
+          "index": 8,
+          "xMm": 310,
+          "yMm": 1020,
+          "widthMm": 330,
           "heightMm": 340,
           "placements": [
             {
@@ -293,45 +269,62 @@
           ]
         },
         {
-          "index": 12,
+          "index": 9,
           "xMm": 0,
-          "yMm": 1760,
-          "widthMm": 200,
-          "heightMm": 300,
+          "yMm": 1380,
+          "widthMm": 440,
+          "heightMm": 340,
+          "placements": [
+            {
+              "gameId": 10173,
+              "entryId": 500179,
+              "kind": "cover",
+              "xMm": 0,
+              "yMm": 0,
+              "widthMm": 251,
+              "heightMm": 314,
+              "title": "Cassquin Lumzelthan",
+              "label": "Cassquin Lumzelthan",
+              "toneIndex": 6,
+              "patternIndex": 1
+            }
+          ]
+        },
+        {
+          "index": 10,
+          "xMm": 460,
+          "yMm": 1380,
+          "widthMm": 180,
+          "heightMm": 340,
           "placements": []
         },
         {
-          "index": 13,
-          "xMm": 220,
-          "yMm": 1760,
-          "widthMm": 420,
-          "heightMm": 300,
+          "index": 11,
+          "xMm": 0,
+          "yMm": 1740,
+          "widthMm": 170,
+          "heightMm": 420,
+          "placements": []
+        },
+        {
+          "index": 12,
+          "xMm": 190,
+          "yMm": 1740,
+          "widthMm": 450,
+          "heightMm": 420,
           "placements": [
             {
               "gameId": 10213,
               "entryId": 500206,
-              "kind": "flatBox",
+              "kind": "cover",
               "xMm": 0,
               "yMm": 0,
-              "widthMm": 356,
-              "heightMm": 72,
+              "widthMm": 306,
+              "heightMm": 356,
               "title": "Quaythan Lummere Morra",
-              "label": "Quaythan Lummere M\u2026",
+              "label": "Quaythan Lummere Morra",
               "toneIndex": 4,
               "patternIndex": 4
-            },
-            {
-              "gameId": 10173,
-              "entryId": 500179,
-              "kind": "flatBox",
-              "xMm": 0,
-              "yMm": 72,
-              "widthMm": 314,
-              "heightMm": 70,
-              "title": "Cassquin Lumzelthan",
-              "label": "Cassquin Lumzelt\u2026",
-              "toneIndex": 6,
-              "patternIndex": 1
             }
           ]
         }

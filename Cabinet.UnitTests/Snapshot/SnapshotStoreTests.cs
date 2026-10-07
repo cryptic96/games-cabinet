@@ -45,7 +45,121 @@ public sealed class SnapshotStoreTests : IDisposable
 
         store.Load().Should().BeEquivalentTo(snapshot);
         var text = File.ReadAllText(SnapshotPath);
-        text.Should().Contain("\"schemaVersion\":1").And.Contain("\"kind\":\"expansion\"").And.Contain("\"collectionId\":7");
+        text.Should().Contain("\"schemaVersion\":2").And.Contain("\"kind\":\"expansion\"").And.Contain("\"collectionId\":7");
+    }
+
+    [Fact]
+    public void A_schema_2_file_round_trips_its_picture_addresses_and_image_records()
+    {
+        var moment = new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero);
+        var snapshot = new CollectionSnapshot(
+            CollectionSnapshot.CurrentSchemaVersion,
+            moment,
+            [new SnapshotItem(7, 11, "First Example", ItemKind.Base, null, null, null, "https://cf.example.org/v.jpg", "https://cf.example.org/m.jpg")],
+            new Dictionary<string, ImageRecord>
+            {
+                ["https://cf.example.org/v.jpg"] = new("https://cf.example.org/v.jpg", ImageStatus.Ok, moment, [new ArtFile(480, 640, "0123456789abcdef-480.webp"), new ArtFile(240, 320, "fedcba9876543210-240.webp")]),
+                ["https://cf.example.org/m.jpg"] = new("https://cf.example.org/m.jpg", ImageStatus.Undecodable, moment),
+            });
+        var store = CreateStore();
+
+        store.Save(snapshot);
+
+        var loaded = store.Load();
+        loaded.Should().BeEquivalentTo(snapshot, options => options.WithStrictOrdering());
+        File.ReadAllText(SnapshotPath).Should().Contain("\"images\"").And.Contain("\"status\":\"undecodable\"").And.Contain("\"versionImageUrl\"");
+    }
+
+    [Fact]
+    public void A_schema_2_file_round_trips_every_field_of_the_game_details()
+    {
+        var moment = new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero);
+        var snapshot = new CollectionSnapshot(
+            CollectionSnapshot.CurrentSchemaVersion,
+            moment,
+            [new SnapshotItem(7, 11, "First Example", ItemKind.Base, null, null, null)],
+            Games: new Dictionary<int, GameDetails>
+            {
+                [11] = new(
+                    moment,
+                    2,
+                    4,
+                    60,
+                    30,
+                    90,
+                    10,
+                    2.4375,
+                    7.123456,
+                    6.5,
+                    ["Invented Designer 1", "Invented Designer 2"],
+                    ["Example Mechanic A"],
+                    [new BaseGameRef(5, "Example Base")],
+                    "https://cf.example.org/main.jpg"),
+                [12] = new(moment, null, null, null, null, null, null, null, null, null, [], [], [], null),
+            });
+        var store = CreateStore();
+
+        store.Save(snapshot);
+
+        store.Load().Should().BeEquivalentTo(snapshot, options => options.WithStrictOrdering());
+        File.ReadAllText(SnapshotPath).Should().Contain("\"games\"").And.Contain("\"expandsGames\"").And.Contain("\"bayesAverage\":6.5");
+    }
+
+    [Fact]
+    public void A_file_without_games_loads_with_none()
+    {
+        File.WriteAllText(
+            SnapshotPath,
+            "{ \"schemaVersion\": 2, \"capturedAtUtc\": \"2026-01-01T00:00:00Z\", \"items\": [ { \"collectionId\": 5, \"gameId\": 9, \"title\": \"Example\", \"kind\": \"base\" } ] }");
+
+        var loaded = CreateStore().Load();
+
+        loaded.Should().NotBeNull();
+        loaded!.Games.Should().BeNull();
+        File.Exists(BadPath).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Game_details_without_their_lists_are_malformed_and_the_file_is_set_aside()
+    {
+        File.WriteAllText(
+            SnapshotPath,
+            "{ \"schemaVersion\": 2, \"capturedAtUtc\": \"2026-01-01T00:00:00Z\", \"items\": [], "
+            + "\"games\": { \"9\": { \"enrichedAtUtc\": \"2026-01-01T00:00:00Z\" } } }");
+
+        CreateStore().Load().Should().BeNull();
+
+        File.Exists(BadPath).Should().BeTrue();
+    }
+
+    [Fact]
+    public void A_schema_1_file_loads_with_its_items_and_no_images()
+    {
+        File.WriteAllText(
+            SnapshotPath,
+            "{ \"schemaVersion\": 1, \"capturedAtUtc\": \"2026-01-01T00:00:00Z\", \"items\": [ { \"collectionId\": 5, \"gameId\": 9, \"title\": \"Example\", \"kind\": \"base\" } ] }");
+
+        var loaded = CreateStore().Load();
+
+        loaded.Should().NotBeNull();
+        loaded!.SchemaVersion.Should().Be(1);
+        loaded.Items.Should().ContainSingle().Which.Should().BeEquivalentTo(new SnapshotItem(5, 9, "Example", ItemKind.Base, null, null, null));
+        loaded.Images.Should().BeNull();
+        File.Exists(BadPath).Should().BeFalse();
+    }
+
+    [Fact]
+    public void An_image_record_without_its_status_is_malformed_and_the_file_is_set_aside()
+    {
+        File.WriteAllText(
+            SnapshotPath,
+            "{ \"schemaVersion\": 2, \"capturedAtUtc\": \"2026-01-01T00:00:00Z\", \"items\": [], "
+            + "\"images\": { \"https://cf.example.org/a.jpg\": { \"sourceUrl\": \"https://cf.example.org/a.jpg\", \"attemptedAtUtc\": \"2026-01-01T00:00:00Z\" } } }");
+
+        CreateStore().Load().Should().BeNull();
+
+        File.Exists(SnapshotPath).Should().BeFalse();
+        File.Exists(BadPath).Should().BeTrue();
     }
 
     [Fact]
@@ -92,7 +206,7 @@ public sealed class SnapshotStoreTests : IDisposable
     [Fact]
     public void A_newer_schema_loads_as_no_snapshot_and_is_set_aside()
     {
-        File.WriteAllText(SnapshotPath, "{ \"schemaVersion\": 2, \"capturedAtUtc\": \"2026-01-01T00:00:00Z\", \"items\": [] }");
+        File.WriteAllText(SnapshotPath, "{ \"schemaVersion\": 3, \"capturedAtUtc\": \"2026-01-01T00:00:00Z\", \"items\": [] }");
 
         CreateStore().Load().Should().BeNull();
 

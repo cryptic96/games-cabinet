@@ -1243,13 +1243,17 @@ class FakeElement {
     this.dataset = {};
     this.attributes = new Map();
     this.properties = new Map();
-    this.style = { setProperty: (name, value) => this.properties.set(name, value) };
+    this.style = {
+      setProperty: (name, value) => this.properties.set(name, value),
+      removeProperty: (name) => this.properties.delete(name),
+    };
     this.children = [];
     this.parent = null;
     this.ownText = '';
     this.focusCalls = [];
     this.blurred = false;
     this.removed = false;
+    this.listeners = [];
   }
 
   get textContent() {
@@ -1294,8 +1298,8 @@ class FakeElement {
     this.attributes.delete(name);
   }
 
-  addEventListener() {
-    return undefined;
+  addEventListener(type, handler, options) {
+    this.listeners.push({ type, handler, options });
   }
 
   descendants() {
@@ -1423,8 +1427,8 @@ test('every drawn box carries its collection entry next to its game, and two cop
 
 test('an expansion whose base game is not known says it is an expansion in its name and on a second line, and a blank title reads as an untitled game', () => {
   const [orphan, blank, cover] = drawPlacements([
-    { kind: 'orphanExpansion', gameId: 9, entryId: 90, title: 'Invented Harbour Tides', label: 'Invented Harbour Tides', isExpansion: true },
-    { kind: 'orphanExpansion', gameId: 10, entryId: 100, title: '   ', label: '   ', isExpansion: true, xMm: 40 },
+    { kind: 'orphanExpansion', gameId: 9, entryId: 90, title: 'Invented Harbour Tides', label: 'Invented Harbour Tides', isExpansion: true, showBaseLine: true },
+    { kind: 'orphanExpansion', gameId: 10, entryId: 100, title: '   ', label: '   ', isExpansion: true, showBaseLine: true, xMm: 40 },
     { kind: 'cover', gameId: 11, entryId: 110, title: 'Invented Harbour Winds', label: 'Invented Harbour Winds', isExpansion: true, xMm: 80, widthMm: 220 },
   ]);
 
@@ -1442,12 +1446,47 @@ test('an expansion whose base game is not known says it is an expansion in its n
 
 test('an expansion whose base game is not owned names that game on its second line and in its name', () => {
   const [orphan] = drawPlacements([
-    { kind: 'orphanExpansion', gameId: 9, entryId: 90, title: 'Invented Harbour Tides', label: 'Invented Harbour Tides', isExpansion: true, baseTitle: 'Invented Harbour' },
+    { kind: 'orphanExpansion', gameId: 9, entryId: 90, title: 'Invented Harbour Tides', label: 'Invented Harbour Tides', isExpansion: true, baseTitle: 'Invented Harbour', showBaseLine: true },
   ]);
 
   assert.equal(orphan.querySelector('.placement-sub').textContent, 'Expansion for Invented Harbour');
   assert.equal(orphan.getAttribute('aria-label'), 'Invented Harbour Tides, expansion for Invented Harbour');
   assert.equal(orphan.title, 'Invented Harbour Tides, expansion for Invented Harbour');
+});
+
+test('an upright expansion draws its second line only when the layout says it has room, and keeps its full name either way', () => {
+  const base = { gameId: 9, entryId: 90, title: 'Invented Harbour Tides', label: 'Invented Harbour Tides', isExpansion: true, baseTitle: 'Invented Harbour', familyId: 1 };
+  const [thin, wide, undecided, loose] = drawPlacements([
+    { ...base, kind: 'expansionSpine', showBaseLine: false },
+    { ...base, kind: 'expansionSpine', showBaseLine: true, xMm: 40 },
+    { ...base, kind: 'expansionSpine', xMm: 80 },
+    { ...base, kind: 'expansionSpine', showBaseLine: 'true', xMm: 120 },
+  ]);
+
+  assert.equal(thin.querySelector('.placement-sub'), null);
+  assert.equal(thin.dataset.lines, '1');
+  assert.equal(thin.getAttribute('aria-label'), 'Invented Harbour Tides, expansion for Invented Harbour');
+  assert.equal(thin.title, 'Invented Harbour Tides, expansion for Invented Harbour');
+  assert.equal(thin.querySelector('.placement-label').textContent, 'Invented Harbour Tides');
+  assert.equal(wide.querySelector('.placement-sub').textContent, 'Expansion for Invented Harbour');
+  assert.equal(wide.dataset.lines, undefined);
+  assert.equal(undecided.querySelector('.placement-sub'), null);
+  assert.equal(undecided.dataset.lines, '1');
+  assert.equal(loose.querySelector('.placement-sub'), null, 'only the boolean true counts');
+});
+
+test('an orphan box draws its second line only when the layout says it has room, and keeps its full name either way', () => {
+  const orphan = { kind: 'orphanExpansion', gameId: 9, entryId: 90, title: 'Invented Harbour Tides', label: 'Invented Harbour Tides', isExpansion: true, baseTitle: 'Invented Harbour' };
+  const [thin, tall] = drawPlacements([
+    { ...orphan, showBaseLine: false },
+    { ...orphan, showBaseLine: true, xMm: 40 },
+  ]);
+
+  assert.equal(thin.querySelector('.placement-sub'), null);
+  assert.equal(thin.dataset.lines, '1');
+  assert.equal(thin.getAttribute('aria-label'), 'Invented Harbour Tides, expansion for Invented Harbour');
+  assert.equal(tall.querySelector('.placement-sub').textContent, 'Expansion for Invented Harbour');
+  assert.equal(tall.dataset.lines, undefined);
 });
 
 test('a base game is named by its title alone and draws no second line', () => {
@@ -1466,6 +1505,253 @@ test('markup in a title is shown as text, never read as markup', () => {
   assert.equal(spine.getAttribute('aria-label'), title);
   assert.equal(label.textContent, title);
   assert.equal(label.children.length, 0);
+});
+
+const ART_URL = '/art/0123456789abcdef-240.webp';
+
+/**
+ * Builds the art of a cover placement the way the layout route states it.
+ * @param {object} [overrides] Fields that replace the valid defaults.
+ * @returns {object} The art.
+ */
+function artWith(overrides = {}) {
+  return { url: ART_URL, width: 240, height: 320, fit: 'width', ...overrides };
+}
+
+test('a cover with valid art is one image and nothing else, with the title kept in its name', () => {
+  const [cover] = drawPlacements([
+    { kind: 'cover', gameId: 8, entryId: 80, title: 'Invented Orchard', label: 'Invented Orchard', widthMm: 220, heightMm: 300, art: artWith() },
+  ]);
+  const [image] = cover.children;
+
+  assert.equal(cover.dataset.art, 'true');
+  assert.equal(cover.dataset.fit, 'width');
+  assert.equal(cover.dataset.pattern, undefined);
+  assert.equal(cover.children.length, 1);
+  assert.equal(cover.querySelector('.cover-plate'), null);
+  assert.equal(cover.querySelector('.placement-label'), null);
+  assert.equal(cover.textContent, '');
+  assert.equal(image.tagName, 'IMG');
+  assert.equal(image.className, 'cover-art');
+  assert.equal(image.src, ART_URL);
+  assert.equal(image.width, 240);
+  assert.equal(image.height, 320);
+  assert.equal(image.alt, '');
+  assert.equal(image.loading, 'lazy');
+  assert.equal(image.decoding, 'async');
+  assert.equal(image.draggable, false);
+  assert.equal(cover.getAttribute('aria-label'), 'Invented Orchard');
+  assert.equal(cover.title, 'Invented Orchard');
+});
+
+test('edge colours are set only when all four are valid colours', () => {
+  const edges = { top: '#112233', right: '#223344', bottom: '#334455', left: '#445566' };
+  const [good, partial, bad] = drawPlacements([
+    { kind: 'cover', gameId: 1, entryId: 1, title: 'A', label: 'A', art: artWith({ edges }) },
+    { kind: 'cover', gameId: 2, entryId: 2, title: 'B', label: 'B', art: artWith({ edges: { top: '#112233' } }) },
+    { kind: 'cover', gameId: 3, entryId: 3, title: 'C', label: 'C', art: artWith({ edges: { ...edges, left: 'red; background: url(x)' } }) },
+  ]);
+
+  assert.equal(good.properties.get('--edge-t'), '#112233');
+  assert.equal(good.properties.get('--edge-r'), '#223344');
+  assert.equal(good.properties.get('--edge-b'), '#334455');
+  assert.equal(good.properties.get('--edge-l'), '#445566');
+  assert.equal(partial.properties.has('--edge-t'), false);
+  assert.equal(bad.properties.has('--edge-l'), false);
+  assert.equal(bad.properties.has('--edge-t'), false);
+});
+
+test('a picture that fails to load is swapped for the generated cover, keeping the colours and saying nothing', () => {
+  const [cover] = drawPlacements([
+    { kind: 'cover', gameId: 8, entryId: 80, title: 'Invented Orchard', label: 'Invented Orchard', patternIndex: 2, art: artWith({ fit: 'height' }) },
+  ]);
+  const image = cover.children[0];
+  const failure = image.listeners.find((listener) => listener.type === 'error');
+
+  assert.ok(failure);
+  assert.deepEqual(failure.options, { once: true });
+  assert.equal(cover.properties.get('--bg'), '#6b4f3a');
+  assert.equal(cover.properties.get('--fg'), '#ffffff');
+
+  const previous = globalThis.document;
+  globalThis.document = cover.page;
+
+  try {
+    failure.handler();
+  } finally {
+    globalThis.document = previous;
+  }
+
+  assert.equal(image.removed, true);
+  assert.equal(cover.dataset.art, undefined);
+  assert.equal(cover.dataset.fit, undefined);
+  assert.equal(cover.dataset.pattern, 'dots');
+  assert.equal(cover.querySelector('.cover-art'), null);
+  assert.equal(cover.querySelector('.cover-plate').querySelector('.placement-label').textContent, 'Invented Orchard');
+  assert.equal(cover.properties.get('--bg'), '#6b4f3a');
+  assert.equal(cover.properties.get('--fg'), '#ffffff');
+  assert.equal(cover.getAttribute('aria-label'), 'Invented Orchard');
+});
+
+test('art that is not on the site, not a stored file name or not well formed is ignored and the generated cover is drawn', () => {
+  const invalid = [
+    artWith({ url: 'https://cf.example.org/a.webp' }),
+    artWith({ url: '/' + '/example.org/art/0123456789abcdef-240.webp' }),
+    artWith({ url: '/art/../snapshot.json' }),
+    artWith({ url: '/art/0123456789ABCDEF-240.webp' }),
+    artWith({ url: '/art/0123456789abcdef-240.png' }),
+    artWith({ url: 7 }),
+    artWith({ width: 0 }),
+    artWith({ width: 4097 }),
+    artWith({ height: 12.5 }),
+    artWith({ height: '320' }),
+    artWith({ fit: 'cover' }),
+    null,
+    'text',
+  ];
+  const buttons = drawPlacements(invalid.map((art, index) => (
+    { kind: 'cover', gameId: index + 1, entryId: index + 1, title: `Invented ${index}`, label: `Invented ${index}`, art }
+  )));
+
+  assert.equal(buttons.length, invalid.length);
+
+  for (const button of buttons) {
+    assert.equal(button.dataset.art, undefined);
+    assert.equal(button.querySelector('.cover-art'), null);
+    assert.notEqual(button.querySelector('.cover-plate'), null);
+    assert.equal(button.dataset.pattern, 'stripes');
+  }
+});
+
+test('only a cover ever draws a picture', () => {
+  const [spine] = drawPlacements([
+    { kind: 'spine', gameId: 1, entryId: 1, title: 'Invented Spine', label: 'Invented Spine', art: artWith() },
+  ]);
+
+  assert.equal(spine.dataset.art, undefined);
+  assert.equal(spine.querySelector('.cover-art'), null);
+});
+
+const ART_COLOUR = Object.freeze({ background: '#bd1e28', text: '#ffffff' });
+const PALETTE_BACKGROUND = '#6b4f3a';
+const PALETTE_TEXT = '#ffffff';
+
+test('every kind of box except the marker takes the colour taken from its art', () => {
+  const kinds = ['spine', 'flatBox', 'expansionLayer', 'expansionSpine', 'orphanExpansion', 'cover'];
+  const buttons = drawPlacements(kinds.map((kind, index) => (
+    { kind, gameId: index + 1, entryId: index + 1, title: `Invented ${kind}`, label: `Invented ${kind}`, colour: ART_COLOUR }
+  )));
+
+  assert.equal(buttons.length, kinds.length);
+
+  for (const button of buttons) {
+    assert.equal(button.properties.get('--bg'), ART_COLOUR.background, button.dataset.kind);
+    assert.equal(button.properties.get('--fg'), ART_COLOUR.text, button.dataset.kind);
+  }
+});
+
+test('a black title is accepted next to an art colour', () => {
+  const [spine] = drawPlacements([
+    { kind: 'spine', gameId: 1, entryId: 1, title: 'Invented Lantern', label: 'Invented Lantern', colour: { background: '#f2c14e', text: '#000000' } },
+  ]);
+
+  assert.equal(spine.properties.get('--bg'), '#f2c14e');
+  assert.equal(spine.properties.get('--fg'), '#000000');
+});
+
+test('a colour that is not a lowercase hex background with a white or black title is ignored and the palette tone is kept', () => {
+  const invalid = [
+    { background: '#bd1e28', text: '#2a1a10' },
+    { background: '#bd1e28', text: '#FFFFFF' },
+    { background: 'red', text: '#ffffff' },
+    { background: 'url(x)', text: '#ffffff' },
+    { background: '#BD1E28', text: '#ffffff' },
+    { background: '#bd1', text: '#ffffff' },
+    { background: '#bd1e28; background: url(x)', text: '#ffffff' },
+    { background: '#bd1e28' },
+    { text: '#ffffff' },
+    null,
+    'text',
+  ];
+  const buttons = drawPlacements(invalid.map((colour, index) => (
+    { kind: 'spine', gameId: index + 1, entryId: index + 1, title: `Invented ${index}`, label: `Invented ${index}`, colour }
+  )));
+
+  assert.equal(buttons.length, invalid.length);
+
+  for (const button of buttons) {
+    assert.equal(button.properties.get('--bg'), PALETTE_BACKGROUND);
+    assert.equal(button.properties.get('--fg'), PALETTE_TEXT);
+  }
+});
+
+test('the marker ignores a colour and takes none of its own', () => {
+  const [marker] = drawPlacements([
+    { kind: 'moreMarker', gameId: 1, entryId: 1, title: 'Invented Lantern', label: '', moreCount: 3, colour: ART_COLOUR },
+  ]);
+
+  assert.equal(marker.properties.has('--bg'), false);
+  assert.equal(marker.properties.has('--fg'), false);
+});
+
+test('a cover with art takes the art colour and a failed picture keeps it while its edge bars go', () => {
+  const edges = { top: '#112233', right: '#223344', bottom: '#334455', left: '#445566' };
+  const [cover] = drawPlacements([
+    { kind: 'cover', gameId: 8, entryId: 80, title: 'Invented Orchard', label: 'Invented Orchard', colour: ART_COLOUR, art: artWith({ edges }) },
+  ]);
+  const image = cover.children[0];
+  const failure = image.listeners.find((listener) => listener.type === 'error');
+
+  assert.equal(cover.properties.get('--bg'), ART_COLOUR.background);
+  assert.equal(cover.properties.get('--fg'), ART_COLOUR.text);
+  assert.equal(cover.properties.get('--edge-t'), '#112233');
+
+  const previous = globalThis.document;
+  globalThis.document = cover.page;
+
+  try {
+    failure.handler();
+  } finally {
+    globalThis.document = previous;
+  }
+
+  assert.equal(cover.dataset.art, undefined);
+  assert.equal(cover.properties.get('--bg'), ART_COLOUR.background);
+  assert.equal(cover.properties.get('--fg'), ART_COLOUR.text);
+
+  for (const property of ['--edge-t', '--edge-r', '--edge-b', '--edge-l']) {
+    assert.equal(cover.properties.has(property), false, property);
+  }
+
+  assert.notEqual(cover.querySelector('.cover-plate'), null);
+});
+
+test('a generated cover of a game with a colour takes it, and one without keeps its palette tone', () => {
+  const [coloured, plain] = drawPlacements([
+    { kind: 'cover', gameId: 1, entryId: 1, title: 'Invented Lantern', label: 'Invented Lantern', colour: ART_COLOUR },
+    { kind: 'cover', gameId: 2, entryId: 2, title: 'Invented Quarry', label: 'Invented Quarry' },
+  ]);
+
+  assert.equal(coloured.properties.get('--bg'), ART_COLOUR.background);
+  assert.notEqual(coloured.querySelector('.cover-plate'), null);
+  assert.equal(plain.properties.get('--bg'), PALETTE_BACKGROUND);
+});
+
+test('the page scripts never write a style attribute or an inline handler', () => {
+  for (const name of ['render.js', 'cabinet.js', 'sync.js', 'status.js', 'live.js', 'copy.js']) {
+    const source = readFileSync(new URL('../../Cabinet.Service/wwwroot/js/' + name, import.meta.url), 'utf8');
+
+    assert.doesNotMatch(source, /setAttribute\(\s*['"]style['"]/);
+    assert.doesNotMatch(source, /\.style\.cssText|\.style\s*=|innerHTML|insertAdjacentHTML|setAttribute\(\s*['"]on/);
+  }
+
+  const [cover] = drawPlacements([
+    { kind: 'cover', gameId: 8, entryId: 80, title: 'Invented Orchard', label: 'Invented Orchard', colour: ART_COLOUR, art: artWith({ edges: { top: '#112233', right: '#223344', bottom: '#334455', left: '#445566' } }) },
+  ]);
+
+  for (const node of [cover, ...cover.descendants()]) {
+    assert.equal(node.attributes.has('style'), false);
+  }
 });
 
 const CABINET_LAYOUT_ROUTE = '/cabinet/layout?profile=desktop';
@@ -1710,5 +1996,53 @@ test('a hidden tab waits with the redraw until it is visible and then fetches th
     assert.equal(cabinet.layoutRequests.length, 0);
   } finally {
     leaveCabinetPage();
+  }
+});
+
+test('the marker names the hidden expansions with its visible text first, in the singular and the plural', () => {
+  assert.equal(COPY.moreName(3, 'Invented Harbour'), '+3 more expansions for Invented Harbour');
+  assert.equal(COPY.moreName(1, 'Invented Harbour'), '+1 more expansion for Invented Harbour');
+
+  for (let count = 1; count <= 20; count += 1) {
+    assert.ok(COPY.moreName(count, 'Invented Harbour').startsWith(COPY.moreLabel(count)), `the name for ${count} starts with the visible text`);
+  }
+});
+
+test('a drawn marker shows only its count and carries the full name as its accessible name and tooltip', () => {
+  const [marker] = drawPlacements([
+    { kind: 'moreMarker', gameId: 1, entryId: 1, title: 'Invented Harbour', label: '', baseTitle: 'Invented Harbour', moreCount: 4, familyId: 1 },
+  ]);
+
+  assert.equal(marker.querySelector('.placement-label').textContent, '+4 more');
+  assert.equal(marker.getAttribute('aria-label'), '+4 more expansions for Invented Harbour');
+  assert.equal(marker.title, '+4 more expansions for Invented Harbour');
+});
+
+const STYLESHEET = readFileSync(new URL('../../Cabinet.Service/wwwroot/css/cabinet.css', import.meta.url), 'utf8');
+
+test('the stylesheet carries the apron arch tokens, the length registration of the unit and the cover line steps', () => {
+  assert.equal(STYLESHEET.includes('--arch-shade-alpha'), false);
+  assert.match(STYLESHEET, /--arch-rise: 40;/);
+  assert.match(STYLESHEET, /--arch-radius: 110;/);
+  assert.match(STYLESHEET, /--arch-alpha-top: 0\.92;/);
+  assert.match(STYLESHEET, /--arch-alpha-bottom: 0\.72;/);
+  assert.match(STYLESHEET, /--arch-lit: 0\.14;/);
+  assert.match(STYLESHEET, /\.section-base::before \{[^}]*border-radius: calc\(var\(--arch-radius\) \* var\(--u\)\)/);
+  assert.match(STYLESHEET, /@property --u \{\s*syntax: '<length>';\s*inherits: true;\s*initial-value: 0px;\s*\}/);
+  assert.match(STYLESHEET, /\.placement\[data-kind="cover"\] \{\s*container-type: size;/);
+
+  const steps = [
+    ['@container \\(min-height: 64px\\)', 4],
+    ['@container \\(min-height: 50px\\) and \\(max-height: 63\\.99px\\)', 3],
+    ['@container \\(min-height: 36px\\) and \\(max-height: 49\\.99px\\)', 2],
+    ['@container \\(max-height: 35\\.99px\\)', 1],
+  ];
+
+  for (const [query, lines] of steps) {
+    assert.match(
+      STYLESHEET,
+      new RegExp(`${query} \\{[^}]*-webkit-line-clamp: ${lines};\\s*line-clamp: ${lines};`),
+      `${lines} lines`,
+    );
   }
 });

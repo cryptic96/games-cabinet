@@ -163,15 +163,33 @@ what the drawn width stands for. The results are:
 
 - A spine, a flat box, an expansion layer and the "+N more" marker are at
   least as wide or tall as a 24 pixel tap target at the narrowest phone, a
-  320 pixel screen with an 8 pixel gutter on each side. On desktop the floor is
-  a smaller starting value, because pointer users need no such target.
-- An expansion without an owned base game is tall enough for its two label
-  lines, and an upright expansion is wide enough for its two vertical lines.
+  320 pixel screen with an 8 pixel gutter on each side. That is 59
+  millimetres on a phone. On desktop the floor is a smaller starting value of
+  34 millimetres, because pointer users need no such target.
+- Every box that shows a title is at least tall or wide enough for one line of
+  it, 15 pixels: 34 millimetres on desktop and 37 on a phone. The phone's tap
+  floor is the larger of the two, so it governs there. The same one-line floor
+  is the least height of an expansion layer, so a layer on desktop may be drawn
+  as low as 34 millimetres and is never drawn above 70.
 
-A thin box therefore looks a little thicker than it is. That is the accepted
-trade for staying readable. If the page's gutters or the section grid change,
-the narrowest width recorded in the design changes with them and the floors
-follow.
+A box is drawn at the larger of its real thickness and the floor of its design,
+so a thin box looks as thin as it is until it reaches the floor. Only below the
+floor does it look a little thicker than it is, which is the accepted trade for
+staying readable.
+
+An upright expansion and an expansion without an owned base game normally show
+two lines: their own title and the game they expand. The second line needs more
+room than the first, so each design also states the size from which it fits: an
+upright expansion drawn at least 64 millimetres wide on desktop or 71 on a
+phone, and an expansion box drawn at least 80 millimetres tall on desktop or 89
+on a phone. The layout says per placement whether the second line is shown, as
+`showBaseLine`, worked out from those millimetres so it never depends on the
+visitor's screen. Below the threshold the box shows its title alone in the same
+style as a spine or flat box, ending in an ellipsis when it is long, and its
+accessible name and tooltip still carry both the title and the base game. No
+other kind of placement carries the value. If the page's gutters or the section
+grid change, the narrowest width recorded in the design changes with them and
+the floors and thresholds follow.
 
 Every design checks itself before the engine uses it. A row whose cubby widths
 and gaps do not fill the interior, a tall box that would not fit lying flat in
@@ -185,13 +203,63 @@ front is scaled down a little further. A base game that stands as a spine is
 never scaled for that reason, because only its depth shows: it is drawn as tall
 as it would be without expansions.
 
+### Keeping the phone cabinet dense
+
+The phone design has seven shelf rows across 640 millimetres, and its row
+heights and cubby widths are tuned to the real spread of box sizes: most rows
+are tall enough for a standard box of about 300 millimetres to stand with air
+above it, only one row is short, and the wide cubbies sit where a box that
+faces out needs them. Boxes whose size is not known are drawn at a standard
+size, which is the case that packs worst, so a design that stays dense with them
+stays dense with real sizes too.
+
+The rule is that no section but the last keeps more than one empty row, a shelf
+row in which no cubby holds anything, and that a collection of 400 games needs
+fewer than 12 phone sections. The layout tests measure it with a small helper
+that counts the sections and the empty rows of every section but the last. They
+run it on the samples of 65 and 400 games and on a seeded collection of 400
+games whose boxes follow the spread of sizes seen on real games, with part of
+the boxes at the standard size. When a collection starts to leave bare rows or
+the section count creeps up, retune the rows and cubby widths of the phone design
+first, then raise the layout version and record the layouts again. The last
+section is the only one that is ever drawn trimmed to its last used row, and no
+other section is, so the stability rules above stay the only exceptions.
+
+### Keeping the desktop cabinet dense
+
+The desktop design has five shelf rows across 1200 millimetres. Four rows are 330
+millimetres or taller, the shortest is 280, and no cubby is narrower than 180 or
+wider than 560. The largest box a design holds is taken from its tallest cubby,
+and larger boxes are scaled down to it, so the height of the tallest rows decides
+how many cubbies the biggest face-out boxes can go to. With only one tall row,
+those boxes crowded into a few cubbies, were left over after the shelves of
+earlier sections had filled with smaller games, and opened sections at the end
+that held only a handful of them. With several tall rows of similar height the
+biggest boxes spread over the cubbies and the end of the cabinet fills evenly.
+The cost is that the biggest boxes are drawn a little smaller: the largest box is
+370 millimetres tall instead of 400.
+
+The rules are that no section but the last keeps an empty row, that a collection
+of about sixty-five games has no empty row in the middle of any section, and that
+a large collection holds at least 30 games in every section but the last. The
+layout tests check them on the samples of 65 and 400 games and on seeded
+collections of both sizes whose boxes follow the spread of sizes seen on real
+games, including collections that were not used when the rows were chosen. The
+rows were found by a seeded search over valid designs, scored on exactly these
+measures, so retune them the same way when a collection starts to leave bare rows
+or a near-empty section: change the rows and cubby widths of the desktop design
+first, then raise the layout version and record the layouts again.
+
 ## Recorded layouts
 
 The tests keep the full layout of the samples of 0, 1, 5, 12 and 65 games on
 both designs, and a digest of the layout of the 400-game sample. They live in
 `Cabinet.UnitTests/Layout/Golden/`, next to a record of the layout version they
 were made at. Any change to the arrangement or to a section design shows up as
-a difference from those files, in the tests and in review.
+a difference from those files, in the tests and in review. Thin boxes being
+drawn at their real thickness, down to the one-line floors, is why the recorded
+layouts changed from the version before: those boxes are narrower or lower than
+they were, and where that lets a later box fit earlier it moved too.
 
 An intended change needs two steps. Raise `CabinetLayoutEngine.LayoutVersion`,
 then record the layouts again from the repository root:

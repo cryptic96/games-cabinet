@@ -303,6 +303,12 @@ expected_rendered=$'ASPNETCORE_ENVIRONMENT=Production\nReverseProxy__KnownProxie
 assert_eq "accounts_render_cabinet_env: renders exactly the two expected lines" \
   "$expected_rendered" "$rendered"
 
+if grep -Eq '^[[:space:]]+ca-certificates .* fonts-dejavu-core( |\\)' "${DEPLOY_DIR}/provision.d/10-packages.sh"; then
+  pass "10-packages.sh: the base packages include the font the review sheet draws with"
+else
+  failtest "10-packages.sh: the base packages include the font the review sheet draws with"
+fi
+
 host_calls="$(host_guard_calls)"
 assert_eq "host guard: no systemctl or pkexec call was recorded" "" "$host_calls"
 

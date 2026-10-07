@@ -41,6 +41,14 @@ else
   cat "$WORK_DIR/out.txt" >&2
 fi
 
+echo "=== art self-test ==="
+if [ "$(status_of python3 -I "$SCRIPT" --self-test --suite art)" = "0" ]; then
+  pass "the art self-test exits 0 in isolated mode"
+else
+  fail "the art self-test did not exit 0"
+  cat "$WORK_DIR/out.txt" >&2
+fi
+
 echo "=== plan ==="
 if [ "$(status_of python3 "$SCRIPT" --plan)" = "0" ]; then
   plan_ok=1
@@ -67,11 +75,49 @@ else
   fail "plan did not exit 0"
 fi
 
+echo "=== art plan ==="
+if [ "$(status_of python3 "$SCRIPT" --plan --suite art)" = "0" ]; then
+  art_plan_ok=1
+  for label in J K L M1 N; do
+    if ! grep -q "^$label " "$WORK_DIR/out.txt"; then
+      echo "art plan output is missing label $label" >&2
+      art_plan_ok=0
+    fi
+  done
+  if grep -q '=' "$WORK_DIR/out.txt"; then
+    echo "art plan output shows a parameter value" >&2
+    art_plan_ok=0
+  fi
+  if grep -qi 'http' "$WORK_DIR/out.txt"; then
+    echo "art plan output shows a URL" >&2
+    art_plan_ok=0
+  fi
+  if [ "$art_plan_ok" = "1" ]; then
+    pass "the art plan lists labels J, K, L, M1 and N with parameter names only"
+  else
+    fail "the art plan output is wrong"
+  fi
+else
+  fail "the art plan did not exit 0"
+fi
+
+if [ "$(status_of python3 "$SCRIPT" --plan)" = "0" ] && ! grep -q '^J ' "$WORK_DIR/out.txt" && grep -q '^I ' "$WORK_DIR/out.txt"; then
+  pass "the plan without a suite is still the access plan"
+else
+  fail "the plan without a suite is not the access plan"
+fi
+
 echo "=== usage ==="
 if [ "$(status_of python3 "$SCRIPT")" = "2" ]; then
   pass "no arguments exits 2"
 else
   fail "no arguments did not exit 2"
+fi
+
+if [ "$(status_of python3 "$SCRIPT" --plan --suite other)" = "2" ]; then
+  pass "an unknown suite exits 2"
+else
+  fail "an unknown suite did not exit 2"
 fi
 
 echo "=== not configured ==="
@@ -87,7 +133,7 @@ def refuse(*args, **kwargs):
 socket.socket = refuse
 socket.create_connection = refuse
 script, env_file = sys.argv[1], sys.argv[2]
-sys.argv = [script, "--run", "--env-file", env_file]
+sys.argv = [script, "--run", "--env-file", env_file] + sys.argv[3:]
 runpy.run_path(script, run_name="__main__")
 '
 
@@ -101,6 +147,18 @@ if [ "$(status_of python3 -c "$NO_NETWORK" "$SCRIPT" "$WORK_DIR/missing.env")" =
   pass "a missing env file exits 3 without network use"
 else
   fail "a missing env file did not exit 3 cleanly"
+fi
+
+if [ "$(status_of python3 -c "$NO_NETWORK" "$SCRIPT" "$EMPTY_ENV" --suite art)" = "3" ] && grep -q 'not configured' "$WORK_DIR/out.txt"; then
+  pass "an art run with an env file without the keys exits 3 without network use"
+else
+  fail "an art run with an env file without the keys did not exit 3 cleanly"
+fi
+
+if [ "$(status_of python3 -c "$NO_NETWORK" "$SCRIPT" "$WORK_DIR/missing.env" --suite art)" = "3" ]; then
+  pass "an art run with a missing env file exits 3 without network use"
+else
+  fail "an art run with a missing env file did not exit 3 cleanly"
 fi
 
 TOKEN_ONLY_ENV="$WORK_DIR/token-only.env"
@@ -131,8 +189,14 @@ if payload == "WRONG_TOKEN":
 def stub_calls(transport, username, collector, progress):
     return ["call A: status 200", payload], False
 
+def stub_art_calls(api, images, username, collector, progress):
+    collector.note_number("5000001")
+    collector.note("Example Game One")
+    return ["call J: status 200", payload], False
+
 module.run_calls = stub_calls
-sys.exit(module.main(["--run", "--env-file", env_file]))
+module.run_art_calls = stub_art_calls
+sys.exit(module.main(["--run", "--env-file", env_file] + sys.argv[4:]))
 '
 
 write_env() {
@@ -142,7 +206,8 @@ write_env() {
 expect_guard() {
   local name="$1" env_file="$2" payload="$3" expected="$4"
   local actual
-  actual="$(status_of python3 -c "$GUARD_DRIVER" "$SCRIPT" "$env_file" "$payload")"
+  shift 4
+  actual="$(status_of python3 -c "$GUARD_DRIVER" "$SCRIPT" "$env_file" "$payload" "$@")"
   if [ "$actual" = "$expected" ]; then
     pass "$name"
   else
@@ -168,6 +233,13 @@ PLAIN_CONTACT_ENV="$WORK_DIR/plain-contact.env"
 write_env "$PLAIN_CONTACT_ENV" "sentinel-token-value" "sentinel-user-name" "sentinel-contact-address"
 expect_guard "a report echoing the contact address is withheld" "$PLAIN_CONTACT_ENV" "see sentinel-contact-address here" 4
 expect_guard "a report echoing the fixed wrong token is withheld" "$LONG_ENV" "WRONG_TOKEN" 4
+
+expect_guard "an art report with only counts is printed" "$LONG_ENV" "items 4" 0 --suite art
+expect_guard "an art report echoing a collection id is withheld" "$LONG_ENV" "seen 5000001 here" 4 --suite art
+expect_guard "an art report with a longer number is printed" "$LONG_ENV" "seen 50000019 here" 0 --suite art
+expect_guard "an art report echoing a title is withheld" "$LONG_ENV" "see Example Game One here" 4 --suite art
+expect_guard "an art report echoing a web address is withheld" "$LONG_ENV" "see https://example.org/x here" 4 --suite art
+expect_guard "an art report echoing the token is withheld" "$LONG_ENV" "see sentinel-token-value here" 4 --suite art
 
 SHORT_ENV="$WORK_DIR/short-name.env"
 write_env "$SHORT_ENV" "sentinel-token-value" "us"

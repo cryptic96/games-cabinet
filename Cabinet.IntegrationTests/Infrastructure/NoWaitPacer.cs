@@ -1,9 +1,10 @@
 using Cabinet.Repository.Bgg;
+using Cabinet.Repository.Images;
 
 namespace Cabinet.IntegrationTests.Infrastructure;
 
-/// <summary>A pacer for tests that never waits, so a sync of two calls does not take the real gap between them.</summary>
-public sealed class NoWaitPacer : IRequestPacer
+/// <summary>A pacer for tests that never waits, so a sync of a few calls does not take the real gap between them.</summary>
+public sealed class NoWaitPacer : IRequestPacer, IImagePacer
 {
     /// <inheritdoc />
     public Task<IDisposable> WaitTurnAsync(CancellationToken cancellationToken) =>

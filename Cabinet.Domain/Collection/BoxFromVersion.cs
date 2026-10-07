@@ -29,11 +29,19 @@ public static class BoxFromVersion
     /// </summary>
     /// <param name="dimensions">The reported dimensions, or null when the source gave none.</param>
     /// <param name="kind">Whether the item is a standalone game or an expansion.</param>
-    public static BoxDimensions Map(VersionDimensions? dimensions, ItemKind kind)
+    public static BoxDimensions Map(VersionDimensions? dimensions, ItemKind kind) =>
+        TryMap(dimensions) ?? DefaultFor(kind);
+
+    /// <summary>
+    /// Maps a reported version to a box as <see cref="Map"/> does, but says so with null when the dimensions are absent, not
+    /// positive, or outside the believable range, instead of inventing a size.
+    /// </summary>
+    /// <param name="dimensions">The reported dimensions, or null when the source gave none.</param>
+    public static BoxDimensions? TryMap(VersionDimensions? dimensions)
     {
         if (dimensions is null || !IsPositive(dimensions.Width) || !IsPositive(dimensions.Length) || !IsPositive(dimensions.Depth))
         {
-            return DefaultFor(kind);
+            return null;
         }
 
         var first = ToMillimetres(dimensions.Width);
@@ -44,7 +52,7 @@ public static class BoxFromVersion
 
         return IsWithin(width, MinFrontMm, MaxFrontMm) && IsWithin(height, MinFrontMm, MaxFrontMm) && IsWithin(depth, MinDepthMm, MaxDepthMm)
             ? new BoxDimensions(width, height, depth)
-            : DefaultFor(kind);
+            : null;
     }
 
     /// <summary>The box size used for an item whose real size is not known.</summary>

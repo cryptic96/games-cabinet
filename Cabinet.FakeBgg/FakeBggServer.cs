@@ -18,6 +18,11 @@ public static class FakeBggServer
     private const string XmlContentType = "text/xml; charset=utf-8";
     private const string HtmlContentType = "text/html; charset=utf-8";
     private const int MaxThingIds = 20;
+    private const string MainSuffix = "-main.png";
+    private const string VersionSuffix = "-version.png";
+    private const string PngContentType = "image/png";
+
+    private static readonly ConcurrentDictionary<SyntheticArtKind, byte[]> ArtBytes = new();
 
     /// <summary>
     /// Builds the fake, bound to the loopback interface. Pass port 0 to let the system pick a free port, then read it
@@ -40,6 +45,7 @@ public static class FakeBggServer
 
         app.MapGet("/xmlapi2/collection", context => Collection(context, state));
         app.MapGet("/xmlapi2/thing", context => Thing(context, state));
+        app.MapGet($"{BggXml.ArtPath}{{file}}", (HttpContext context, string file) => Art(context, state, file));
         app.MapPost("/fake/scenario", context => SwitchScenario(context, state));
         return app;
     }
@@ -71,10 +77,10 @@ public static class FakeBggServer
         var query = CollectionQuery.Parse(context.Request.Query);
         var body = scenario.Name switch
         {
-            "mismatch" => BggXml.Collection(items, query, BggXml.Select(items, query).Count + 3),
-            "empty" => BggXml.Collection([], query),
-            "shrunk" => BggXml.Collection(FirstQuarter(BggXml.Select(items, query)), query),
-            _ => BggXml.Collection(items, query),
+            "mismatch" => BggXml.Collection(items, query, BggXml.Select(items, query).Count + 3, OriginOf(context)),
+            "empty" => BggXml.Collection([], query, artOrigin: OriginOf(context)),
+            "shrunk" => BggXml.Collection(FirstQuarter(BggXml.Select(items, query)), query, artOrigin: OriginOf(context)),
+            _ => BggXml.Collection(items, query, artOrigin: OriginOf(context)),
         };
         await Write(context, StatusCodes.Status200OK, XmlContentType, body);
     }
@@ -95,7 +101,56 @@ public static class FakeBggServer
         }
 
         var stats = context.Request.Query["stats"].ToString() == "1";
-        await Write(context, StatusCodes.Status200OK, XmlContentType, BggXml.Things(ids, items, stats));
+        await Write(context, StatusCodes.Status200OK, XmlContentType, BggXml.Things(ids, items, stats, OriginOf(context)));
+    }
+
+    private static string OriginOf(HttpContext context) => $"{context.Request.Scheme}://{context.Request.Host}";
+
+    private static async Task Art(HttpContext context, FakeBggState state, string file)
+    {
+        var (scenario, _, items) = state.Current;
+        if (await TryAnswerFailure(context, scenario))
+        {
+            return;
+        }
+
+        if (!TryChooseArt(items, file, out var kind))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        var bytes = ArtBytes.GetOrAdd(kind, SyntheticArt.Encode);
+        context.Response.StatusCode = StatusCodes.Status200OK;
+        context.Response.ContentType = PngContentType;
+        context.Response.ContentLength = bytes.Length;
+        await context.Response.Body.WriteAsync(bytes, context.RequestAborted);
+    }
+
+    private static bool TryChooseArt(IReadOnlyList<FakeBggItem> items, string file, out SyntheticArtKind kind)
+    {
+        kind = default;
+        var isVersion = file.EndsWith(VersionSuffix, StringComparison.Ordinal);
+        var suffix = isVersion ? VersionSuffix : MainSuffix;
+
+        if (!file.EndsWith(suffix, StringComparison.Ordinal)
+            || !int.TryParse(file.AsSpan(0, file.Length - suffix.Length), NumberStyles.None, CultureInfo.InvariantCulture, out var id))
+        {
+            return false;
+        }
+
+        var item = isVersion
+            ? items.FirstOrDefault(candidate => candidate.Version is not null && BggXml.VersionId(candidate) == id)
+            : items.FirstOrDefault(candidate => candidate.ObjectId == id);
+        var chosen = item is null ? null : SyntheticBggCollection.ArtFor(item, isVersion);
+
+        if (chosen is not { } found)
+        {
+            return false;
+        }
+
+        kind = found;
+        return true;
     }
 
     private static async Task SwitchScenario(HttpContext context, FakeBggState state)

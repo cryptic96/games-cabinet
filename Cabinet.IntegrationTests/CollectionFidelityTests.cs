@@ -68,8 +68,9 @@ public class CollectionFidelityTests
         var layoutJson = await SyncAndReadLayout(factory);
         var page = await client.GetStringAsync("/", TestContext.Current.CancellationToken);
 
-        handler.Requests.Should().HaveCount(2);
-        handler.Requests.Should().OnlyContain(request => HttpUtility.ParseQueryString(request.Uri.Query)["showprivate"] == "1");
+        handler.CollectionRequests().Should().HaveCount(2);
+        handler.CollectionRequests().Should().OnlyContain(request => HttpUtility.ParseQueryString(request.Uri.Query)["showprivate"] == "1");
+        handler.ThingRequests().Should().OnlyContain(request => HttpUtility.ParseQueryString(request.Uri.Query)["showprivate"] == null);
         var snapshot = await File.ReadAllTextAsync(Path.Combine(storage.FullPath, "snapshot.json"), TestContext.Current.CancellationToken);
         snapshot.Should().Contain("\"location\":\"Shelf A\"").And.Contain("\"location\":\"Shelf B\"");
         layoutJson.Should().NotContain("Shelf A").And.NotContain("Shelf B");
@@ -85,7 +86,7 @@ public class CollectionFidelityTests
 
         var layoutJson = await SyncAndReadLayout(factory);
 
-        handler.Requests.Should().HaveCount(2);
+        handler.CollectionRequests().Should().HaveCount(2);
         handler.Requests.Should().OnlyContain(request => HttpUtility.ParseQueryString(request.Uri.Query)["showprivate"] == null);
         var snapshot = await File.ReadAllTextAsync(Path.Combine(storage.FullPath, "snapshot.json"), TestContext.Current.CancellationToken);
         snapshot.Should().NotContain("Shelf A").And.NotContain("Shelf B");
@@ -125,6 +126,7 @@ public class CollectionFidelityTests
             {
                 services.AddSingleton<IRequestPacer>(new NoWaitPacer());
                 services.AddHttpClient<ICollectionSource, BggClient>().ConfigurePrimaryHttpMessageHandler(() => handler);
+                services.AddHttpClient<IEnrichmentSource, BggThingClient>().ConfigurePrimaryHttpMessageHandler(() => handler);
             });
 
     private static async Task<List<PlacementView>> SyncAndReadPlacements(CabinetWebApplicationFactory factory)

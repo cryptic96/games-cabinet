@@ -1,8 +1,10 @@
+using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using Cabinet.FakeBgg;
 using Cabinet.FakeBgg.Testing;
 using FluentAssertions;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Time.Testing;
 
 namespace Cabinet.IntegrationTests.Infrastructure;
@@ -74,11 +76,28 @@ public static class SyncRounds
         return new LayoutReading(response.Headers.ETag!.Tag, titles);
     }
 
-    /// <summary>Answers collection calls with the given entries, whatever the filters ask for.</summary>
+    /// <summary>
+    /// Answers collection calls with the given entries, whatever the filters ask for, and details calls with the details of
+    /// the games they name.
+    /// </summary>
     /// <param name="request">The request being answered.</param>
     /// <param name="items">The invented entries.</param>
-    public static ScriptedResponse Healthy(HttpRequestMessage request, IReadOnlyList<FakeBggItem> items) =>
-        ScriptedResponse.Xml(BggXml.Collection(items, CollectionQuery.Parse(request.RequestUri!.Query)));
+    public static ScriptedResponse Healthy(HttpRequestMessage request, IReadOnlyList<FakeBggItem> items)
+    {
+        var address = request.RequestUri!;
+
+        if (!address.AbsolutePath.EndsWith("/thing", StringComparison.Ordinal))
+        {
+            return ScriptedResponse.Xml(BggXml.Collection(items, CollectionQuery.Parse(address.Query)));
+        }
+
+        var query = QueryHelpers.ParseQuery(address.Query);
+        var ids = query["id"].ToString()
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(id => int.Parse(id, CultureInfo.InvariantCulture));
+
+        return ScriptedResponse.Xml(BggXml.Things(ids, items, query["stats"].ToString() == "1"));
+    }
 
     /// <summary>
     /// A handler whose answers a test can switch: it answers like a healthy BGG for the current entries until a failure is

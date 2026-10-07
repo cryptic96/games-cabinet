@@ -54,7 +54,8 @@ public class SyncNowTests
         body.RootElement.GetProperty("outcome").GetString().Should().Be("cooldown");
         body.RootElement.GetProperty("status").GetProperty("cooldownEndsUtc").GetDateTimeOffset()
             .Should().Be(SyncHarness.StartTime + Cooldown);
-        handler.Requests.Should().HaveCount(2);
+        handler.CollectionRequests().Should().HaveCount(2);
+        handler.ThingRequests().Should().ContainSingle();
     }
 
     [Fact]
@@ -94,7 +95,7 @@ public class SyncNowTests
         using var later = await client.PostAsync(SyncHarness.SyncRoute, content: null, TestContext.Current.CancellationToken);
 
         later.StatusCode.Should().Be(HttpStatusCode.Accepted);
-        await SyncHarness.WaitUntil(() => Task.FromResult(handler.Requests.Count == 4));
+        await SyncHarness.WaitUntil(() => Task.FromResult(handler.CollectionRequests().Count == 4));
     }
 
     [Fact]
@@ -124,8 +125,8 @@ public class SyncNowTests
         await SyncHarness.WaitForRunToEnd(client);
 
         press.StatusCode.Should().Be(HttpStatusCode.Accepted);
-        handler.Requests.Should().NotBeEmpty();
-        handler.Requests.Should().OnlyContain(request =>
+        handler.CollectionRequests().Should().NotBeEmpty();
+        handler.CollectionRequests().Should().OnlyContain(request =>
             request.Uri.Query.Contains("username=sentinel-user-name") && !request.Uri.Query.Contains("other-person"));
     }
 

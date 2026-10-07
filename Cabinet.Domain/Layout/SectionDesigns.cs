@@ -21,36 +21,47 @@ public static class SectionDesigns
     private const int PhoneSmallestRenderedWidthPx = 304;
     private const int DesktopMinBoxThicknessMm = 34;
 
-    /// <summary>The wide design: five shelf rows of irregular cubbies across 1200 mm.</summary>
+    /// <summary>
+    /// The wide design: five shelf rows of irregular cubbies across 1200 mm. Four rows are 330 mm or taller and no cubby is
+    /// narrower than 180 mm or wider than 560 mm, so a standard box stands with air above it in almost every cubby and the
+    /// largest face-out box has several cubbies to go to. The largest boxes therefore no longer pile up in a few cubbies and
+    /// open near-empty sections at the end, and no section but the last keeps a bare shelf row. The numbers came from a
+    /// seeded search over valid designs scored on the samples and on seeded collections with the measured size spread,
+    /// then confirmed on collections the search never saw.
+    /// </summary>
     public static readonly SectionDesign Desktop = new(
         DesktopName,
         InteriorWidthMm: DesktopInteriorWidthMm,
         FrameMm: FrameMm,
         Rows:
         [
-            new ShelfRow(360, [380, 220, 560]),
-            new ShelfRow(300, [260, 340, 200, 340]),
-            new ShelfRow(400, [460, 300, 400]),
-            new ShelfRow(260, [300, 220, 300, 320]),
-            new ShelfRow(330, [420, 340, 400]),
+            new ShelfRow(330, [250, 190, 260, 440]),
+            new ShelfRow(360, [260, 270, 430, 180]),
+            new ShelfRow(370, [360, 320, 230, 230]),
+            new ShelfRow(370, [260, 540, 360]),
+            new ShelfRow(280, [180, 220, 560, 180]),
         ])
     {
         MaxSpineHeightMm = 330,
         LabelCharPitchMm = 14,
         StackColumnWidthMm = 190,
-        MinLayerHeightMm = 40,
+        MinLayerHeightMm = ReadabilityFloor.Millimetres(ReadabilityFloor.OneLineLabelPx, DesktopSmallestRenderedWidthPx, RenderedWidthMm(DesktopInteriorWidthMm)),
         MaxLayerHeightMm = 70,
         MarkerHeightMm = 40,
         SmallestRenderedWidthPx = DesktopSmallestRenderedWidthPx,
         MinBoxThicknessMm = DesktopMinBoxThicknessMm,
-        MinOrphanHeightMm = ReadabilityFloor.Millimetres(ReadabilityFloor.TwoLineLabelPx, DesktopSmallestRenderedWidthPx, RenderedWidthMm(DesktopInteriorWidthMm)),
-        MinUprightExpansionWidthMm = ReadabilityFloor.Millimetres(ReadabilityFloor.TwoLineSpinePx, DesktopSmallestRenderedWidthPx, RenderedWidthMm(DesktopInteriorWidthMm)),
+        MinOrphanHeightMm = ReadabilityFloor.Millimetres(ReadabilityFloor.OneLineLabelPx, DesktopSmallestRenderedWidthPx, RenderedWidthMm(DesktopInteriorWidthMm)),
+        MinUprightExpansionWidthMm = ReadabilityFloor.Millimetres(ReadabilityFloor.OneLineLabelPx, DesktopSmallestRenderedWidthPx, RenderedWidthMm(DesktopInteriorWidthMm)),
+        TwoLineOrphanHeightMm = ReadabilityFloor.Millimetres(ReadabilityFloor.TwoLineLabelPx, DesktopSmallestRenderedWidthPx, RenderedWidthMm(DesktopInteriorWidthMm)),
+        TwoLineUprightWidthMm = ReadabilityFloor.Millimetres(ReadabilityFloor.TwoLineSpinePx, DesktopSmallestRenderedWidthPx, RenderedWidthMm(DesktopInteriorWidthMm)),
     };
 
     /// <summary>
-    /// The narrow design: six shelf rows of irregular cubbies across 640 mm, so a phone shows fewer cubbies side by
-    /// side and the sections stack. Its floors are derived from the narrowest phone, a 320 pixel screen with a gutter of
-    /// 8 pixels on each side.
+    /// The narrow design: seven shelf rows of irregular cubbies across 640 mm, so a phone shows fewer cubbies side by
+    /// side and the sections stack. The rows are tuned to real box heights: most are tall enough for a standard box to
+    /// stand with air above it, only one is short, and the wide cubbies sit where a face-out box needs them, so earlier
+    /// sections stay full instead of leaving whole rows bare. Its floors are derived from the narrowest phone, a 320
+    /// pixel screen with a gutter of 8 pixels on each side.
     /// </summary>
     public static readonly SectionDesign Phone = new(
         PhoneName,
@@ -58,24 +69,27 @@ public static class SectionDesigns
         FrameMm: FrameMm,
         Rows:
         [
-            new ShelfRow(360, [300, 320]),
-            new ShelfRow(300, [200, 200, 200]),
-            new ShelfRow(400, [420, 200]),
-            new ShelfRow(260, [150, 230, 220]),
-            new ShelfRow(340, [310, 310]),
-            new ShelfRow(300, [200, 420]),
+            new ShelfRow(300, [270, 350]),
+            new ShelfRow(280, [260, 180, 160]),
+            new ShelfRow(380, [290, 330]),
+            new ShelfRow(340, [290, 330]),
+            new ShelfRow(340, [440, 180]),
+            new ShelfRow(420, [170, 450]),
+            new ShelfRow(380, [420, 200]),
         ])
     {
         MaxSpineHeightMm = 340,
         LabelCharPitchMm = 18,
         StackColumnWidthMm = 190,
-        MinLayerHeightMm = 40,
+        MinLayerHeightMm = ReadabilityFloor.Millimetres(ReadabilityFloor.OneLineLabelPx, PhoneSmallestRenderedWidthPx, RenderedWidthMm(PhoneInteriorWidthMm)),
         MaxLayerHeightMm = 70,
         MarkerHeightMm = 40,
         SmallestRenderedWidthPx = PhoneSmallestRenderedWidthPx,
         MinBoxThicknessMm = ReadabilityFloor.Millimetres(ReadabilityFloor.TapTargetPx, PhoneSmallestRenderedWidthPx, RenderedWidthMm(PhoneInteriorWidthMm)),
-        MinOrphanHeightMm = ReadabilityFloor.Millimetres(ReadabilityFloor.TwoLineLabelPx, PhoneSmallestRenderedWidthPx, RenderedWidthMm(PhoneInteriorWidthMm)),
-        MinUprightExpansionWidthMm = ReadabilityFloor.Millimetres(ReadabilityFloor.TwoLineSpinePx, PhoneSmallestRenderedWidthPx, RenderedWidthMm(PhoneInteriorWidthMm)),
+        MinOrphanHeightMm = ReadabilityFloor.Millimetres(ReadabilityFloor.OneLineLabelPx, PhoneSmallestRenderedWidthPx, RenderedWidthMm(PhoneInteriorWidthMm)),
+        MinUprightExpansionWidthMm = ReadabilityFloor.Millimetres(ReadabilityFloor.OneLineLabelPx, PhoneSmallestRenderedWidthPx, RenderedWidthMm(PhoneInteriorWidthMm)),
+        TwoLineOrphanHeightMm = ReadabilityFloor.Millimetres(ReadabilityFloor.TwoLineLabelPx, PhoneSmallestRenderedWidthPx, RenderedWidthMm(PhoneInteriorWidthMm)),
+        TwoLineUprightWidthMm = ReadabilityFloor.Millimetres(ReadabilityFloor.TwoLineSpinePx, PhoneSmallestRenderedWidthPx, RenderedWidthMm(PhoneInteriorWidthMm)),
     };
 
     /// <summary>Every design the engine can build for.</summary>

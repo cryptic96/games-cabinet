@@ -22,14 +22,23 @@ public sealed class RequestPacer : IRequestPacer
     private readonly TimeProvider _time;
     private long? _lastEndTimestamp;
 
-    /// <summary>Creates a pacer.</summary>
+    /// <summary>Creates the pacer for the BGG API, whose gap is never below the API minimum.</summary>
     /// <param name="gap">The least time between two requests; raised to the API minimum when it is shorter.</param>
     /// <param name="time">The clock the gap is measured with, read through its monotonic timestamp so a change of the wall clock never lengthens a wait.</param>
     public RequestPacer(TimeSpan gap, TimeProvider time)
+        : this(gap, time, BggOptions.MinimumRequestGap)
+    {
+    }
+
+    /// <summary>Creates a pacer with its own floor.</summary>
+    /// <param name="gap">The least time between two requests; raised to the floor when it is shorter.</param>
+    /// <param name="time">The clock the gap is measured with, read through its monotonic timestamp so a change of the wall clock never lengthens a wait.</param>
+    /// <param name="floor">The shortest gap the pacer ever keeps, whatever gap was asked for.</param>
+    public RequestPacer(TimeSpan gap, TimeProvider time, TimeSpan floor)
     {
         ArgumentNullException.ThrowIfNull(time);
 
-        _gap = gap < BggOptions.MinimumRequestGap ? BggOptions.MinimumRequestGap : gap;
+        _gap = gap < floor ? floor : gap;
         _time = time;
     }
 

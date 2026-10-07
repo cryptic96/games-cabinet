@@ -200,6 +200,34 @@ public class BggCollectionParserTests
     }
 
     [Fact]
+    public void The_version_picture_and_the_main_picture_are_read_trimmed_and_made_canonical()
+    {
+        var parsed = Parse(Answer(
+            "<item objecttype=\"thing\" objectid=\"100\" collid=\"900\"><name>Pictured</name>"
+            + "<image>  " + ProtocolRelative + "\n</image>"
+            + "<status own=\"1\" />"
+            + "<version><item type=\"boardgameversion\" id=\"1\"><image> https://cf.example.org/version.jpg </image></item></version></item>"));
+
+        var item = parsed.Items.Single();
+
+        item.VersionImageUrl.Should().Be("https://cf.example.org/version.jpg");
+        item.ImageUrl.Should().Be("https://cf.example.org/main.jpg");
+    }
+
+    [Fact]
+    public void A_missing_or_blank_or_unusable_picture_address_is_null()
+    {
+        var parsed = Parse(Answer(
+            Entry(900, 100, "Bare"),
+            "<item objectid=\"101\" collid=\"901\"><name>Blank</name><image>   </image><status own=\"1\" />"
+            + "<version><item><image></image></item></version></item>",
+            "<item objectid=\"102\" collid=\"902\"><name>Odd</name><image>javascript:alert(1)</image><status own=\"1\" />"
+            + "<version><item><image>not an address</image></item></version></item>"));
+
+        parsed.Items.Should().OnlyContain(item => item.VersionImageUrl == null && item.ImageUrl == null);
+    }
+
+    [Fact]
     public void A_document_with_a_type_definition_and_an_answer_that_is_not_a_collection_are_rejected()
     {
         var withDtd = "<!DOCTYPE items [<!ENTITY x \"y\">]><items totalitems=\"0\" />";
@@ -210,6 +238,8 @@ public class BggCollectionParserTests
         dtd.Should().Throw<System.Xml.XmlException>();
         notACollection.Should().Throw<BggAnswerException>();
     }
+
+    private const string ProtocolRelative = "/" + "/cf.example.org/main.jpg";
 
     private static ParsedCollection Parse(string answer, bool includePrivateInfo = false) =>
         BggCollectionParser.Parse(new MemoryStream(Encoding.UTF8.GetBytes(answer)), ItemKind.Base, includePrivateInfo);

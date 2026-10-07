@@ -15,12 +15,16 @@ namespace Cabinet.Service.Sync;
 /// <param name="snapshots">The stored collection.</param>
 /// <param name="collection">The store visitors read from.</param>
 /// <param name="options">The BGG settings; only whether they are complete is looked at, never their values.</param>
+/// <param name="images">The picture settings; only whether the development origin was ignored is looked at.</param>
+/// <param name="artRules">The rules that choose each game's picture.</param>
 /// <param name="logger">Receives the start-up warnings.</param>
 public sealed class SyncStartup(
     StorageDirectory storage,
     ISnapshotStore snapshots,
     CollectionStore collection,
     BggOptions options,
+    ImageOptions images,
+    ArtRules artRules,
     ILogger<SyncStartup> logger) : IHostedService
 {
     /// <inheritdoc />
@@ -36,13 +40,18 @@ public sealed class SyncStartup(
             logger.LogWarning("Bgg:BaseUri is ignored outside Development.");
         }
 
+        if (images.DevelopmentOriginIgnored)
+        {
+            logger.LogWarning("Images:DevelopmentOrigin is ignored outside Development.");
+        }
+
         AtomicJsonFile.RemoveStrayTemporaryFiles(storage.Path);
 
         var stored = snapshots.Load();
 
         if (stored is not null)
         {
-            collection.Replace(CollectionState.FromSnapshot(stored));
+            collection.Replace(CollectionState.FromSnapshot(stored, artRules));
         }
 
         return Task.CompletedTask;

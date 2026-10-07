@@ -52,6 +52,17 @@
   align-self: flex-start;
 }
 
+/**
+ * Registering the unit as a length makes the browser work it out where it is declared, against the section, instead of
+ * passing the formula down to be worked out again against whatever container sits below. Size containers inside a
+ * section, such as the face-out covers, therefore cannot change what a millimetre is.
+ */
+@property --u {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}
+
 .section > * {
   --u: calc(100cqw / (var(--section-w) + 2 * var(--side-allowance)));
   position: absolute;
@@ -270,11 +281,13 @@
   overflow: hidden;
 }
 
+.placement[data-kind="cover"] {
+  container-type: size;
+}
+
 .placement[data-kind="cover"] .placement-label {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
-  line-clamp: 4;
   min-width: 0;
   max-width: 100%;
   text-align: center;
@@ -286,6 +299,73 @@
   word-break: normal;
   hyphens: manual;
   text-overflow: ellipsis;
+}
+
+/**
+ * A generated cover shows as many whole title lines as its own height has room for, and the last line shown carries the
+ * ellipsis, so no line is ever cut through the middle: four lines from 64 pixels tall, three from 50, two from 36 and one
+ * below.
+ */
+@container (min-height: 64px) {
+  .placement[data-kind="cover"] .placement-label {
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
+  }
+}
+
+@container (min-height: 50px) and (max-height: 63.99px) {
+  .placement[data-kind="cover"] .placement-label {
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+  }
+}
+
+@container (min-height: 36px) and (max-height: 49.99px) {
+  .placement[data-kind="cover"] .placement-label {
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+}
+
+@container (max-height: 35.99px) {
+  .placement[data-kind="cover"] .placement-label {
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+  }
+}
+
+/**
+ * A cover that shows a box picture holds one image and nothing else. The picture is shown whole and centred, never
+ * cropped, stretched or drawn over, and the box fills what it leaves with the colours along the picture's edges, falling
+ * back to the box colour when those are not known. The light inset edge is not drawn, only the outer contact shadow.
+ */
+.placement[data-art] {
+  background: var(--edge-t, var(--bg));
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.5);
+}
+
+.placement[data-art][data-fit="width"] {
+  background: linear-gradient(to bottom, var(--edge-t, var(--bg)) 50%, var(--edge-b, var(--bg)) 50%);
+}
+
+.placement[data-art][data-fit="height"] {
+  background: linear-gradient(to right, var(--edge-l, var(--bg)) 50%, var(--edge-r, var(--bg)) 50%);
+}
+
+.placement[data-kind="cover"][data-art]::before {
+  content: none;
+}
+
+.cover-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  pointer-events: none;
+  user-select: none;
 }
 
 .placement:is([data-kind="flatBox"], [data-kind="expansionLayer"], [data-kind="orphanExpansion"]) {
@@ -388,6 +468,35 @@
 }
 
 /**
+ * An upright expansion too thin for a second line shows its title alone in the spine title style: the same weight and
+ * size as a spine, one vertical line that ends in an ellipsis when the box is short.
+ */
+.placement[data-kind="expansionSpine"][data-lines="1"] {
+  flex-direction: row;
+}
+
+.placement[data-kind="expansionSpine"][data-lines="1"] .placement-label {
+  font-size: clamp(12px, calc(var(--w) * var(--u) * 0.5), 16px);
+  line-height: 1;
+  text-overflow: ellipsis;
+}
+
+/**
+ * An expansion box without an owned base game that is too thin for a second line shows its title alone in the flat box
+ * title style: one row that ends in an ellipsis.
+ */
+.placement[data-kind="orphanExpansion"][data-lines="1"] {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.placement[data-kind="orphanExpansion"][data-lines="1"] .placement-label {
+  flex: 1 1 auto;
+  line-height: 1;
+}
+
+/**
  * The marker on top of a full stack is a chip in the accent colour and the only element inside the cabinet that uses
  * it, so it reads at a glance as a count and not as another box.
  */
@@ -449,8 +558,11 @@
   --base-height: 80;
   --floor-margin: 24;
   --foot-width: 70;
-  --arch-rise: 30;
-  --arch-shade-alpha: 0.6;
+  --arch-rise: 40;
+  --arch-radius: 110;
+  --arch-alpha-top: 0.92;
+  --arch-alpha-bottom: 0.72;
+  --arch-lit: 0.14;
   --plank-width: 110;
   --shade-rgb: 20 10 4;
   --shade-alpha: 0.20;
@@ -683,12 +795,12 @@
   right: calc(var(--foot-width) * var(--u));
   bottom: 0;
   height: calc(var(--arch-rise) * var(--u));
-  background: radial-gradient(
-    ellipse 50% 100% at 50% 100%,
-    rgb(var(--shade-rgb) / var(--arch-shade-alpha)) 0 55%,
-    rgb(var(--shade-rgb) / calc(0.5 * var(--arch-shade-alpha))) 78%,
-    rgb(var(--shade-rgb) / 0) 100%
-  );
+  border-radius: calc(var(--arch-radius) * var(--u)) calc(var(--arch-radius) * var(--u)) 0 0 / 100% 100% 0 0;
+  background: linear-gradient(to bottom, rgb(8 4 2 / var(--arch-alpha-top)), rgb(30 16 8 / var(--arch-alpha-bottom)));
+  box-shadow:
+    inset 0 calc(6 * var(--u)) calc(8 * var(--u)) rgb(0 0 0 / 0.45),
+    inset var(--lw) var(--lw) 0 rgb(255 235 210 / var(--arch-lit)),
+    inset calc(-1 * var(--lw)) calc(-1 * var(--lw)) 0 rgb(10 5 2 / 0.5);
 }
 
 .section-base::after {

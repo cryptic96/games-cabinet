@@ -164,7 +164,9 @@ public static class CubbyArrangement
             var kind = box.IsOrphanExpansion ? PlacementKind.OrphanExpansion : PlacementKind.FlatBox;
             var placement = Place(box.Item, kind, x, y, box.Item.Box.HeightMm, height, design);
 
-            placements.Add(box.IsOrphanExpansion ? placement with { BaseTitle = box.BaseTitle } : placement);
+            placements.Add(box.IsOrphanExpansion
+                ? placement with { BaseTitle = box.BaseTitle, ShowBaseLine = height >= design.TwoLineOrphanHeightMm }
+                : placement);
             y += height;
         }
     }
@@ -186,7 +188,7 @@ public static class CubbyArrangement
 
     /// <summary>
     /// The width an upright expansion is drawn at: its depth, but never less than the design's least upright width, so
-    /// its two lines of text stay readable, nor less than its least box thickness.
+    /// one line of its title stays readable, nor less than its least box thickness.
     /// </summary>
     internal static int UprightWidthMm(SectionDesign design, CabinetItem expansion)
     {
@@ -238,7 +240,12 @@ public static class CubbyArrangement
             var uprightWidth = UprightWidthMm(design, upright);
 
             placements.Add(Place(upright, PlacementKind.ExpansionSpine, next, 0, uprightWidth, upright.Box.HeightMm, design)
-                with { BaseTitle = member.Item.Title, FamilyId = member.Item.BggId });
+                with
+                {
+                    BaseTitle = member.Item.Title,
+                    FamilyId = member.Item.BggId,
+                    ShowBaseLine = uprightWidth >= design.TwoLineUprightWidthMm,
+                });
             next += uprightWidth;
         }
 
@@ -298,7 +305,8 @@ public static class CubbyArrangement
                 ToneIndex: SpinePalette.ToneFor(expansion.BggId),
                 PatternIndex: SpinePalette.PatternFor(expansion.BggId),
                 FamilyId: baseItem.BggId,
-                MoreCount: null));
+                MoreCount: null,
+                Colour: expansion.Colour));
             y += heights[index];
         }
 
@@ -335,6 +343,20 @@ public static class CubbyArrangement
         };
     }
 
+    /// <summary>
+    /// The picture a placement shows. Only a face-out cover with a stored picture has one; every other kind of placement
+    /// is drawn from colour alone and never asks for an image.
+    /// </summary>
+    private static PlacementArt? ArtFor(CabinetItem item, PlacementKind kind, int width, int height, SectionDesign design)
+    {
+        if (kind != PlacementKind.Cover || item.Art is null || ArtFitting.Pick(item.Art, width, design) is not { } variant)
+        {
+            return null;
+        }
+
+        return new PlacementArt(variant.Url, variant.Width, variant.Height, ArtFitting.Fit(width, height, variant.Width, variant.Height), item.Art.Edges);
+    }
+
     private static Placement Place(CabinetItem item, PlacementKind kind, int x, int y, int width, int height, SectionDesign design) =>
         new(
             GameId: item.BggId,
@@ -351,5 +373,7 @@ public static class CubbyArrangement
             ToneIndex: SpinePalette.ToneFor(item.BggId),
             PatternIndex: SpinePalette.PatternFor(item.BggId),
             FamilyId: null,
-            MoreCount: null);
+            MoreCount: null,
+            Art: ArtFor(item, kind, width, height, design),
+            Colour: item.Colour);
 }

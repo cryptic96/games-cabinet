@@ -2,9 +2,11 @@ using System.Net;
 using System.Reflection;
 using Cabinet.Domain;
 using Cabinet.Repository.Images;
+using Cabinet.Service.Collection;
 using Cabinet.Service.Hosting;
 using Cabinet.Service.Layout;
 using Cabinet.Service.Live;
+using Cabinet.Service.Review;
 using Cabinet.Service.Sync;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -23,6 +25,11 @@ if (args.Length > 0 && args[0] == "image-smoke")
         Console.Error.WriteLine($"FAIL image-smoke {exception.Message}");
         return 1;
     }
+}
+
+if (args.Length > 0 && args[0] == "review-sheet")
+{
+    return ReviewSheetCommand.Run(args[1..], Console.Out, Console.Error);
 }
 
 var builder = WebApplication.CreateBuilder(args);
@@ -86,6 +93,8 @@ app.UseHealthChecks("/health", opsPort, new HealthCheckOptions
         });
     }
 });
+
+app.UseCabinetArt();
 
 app.UseRouting();
 

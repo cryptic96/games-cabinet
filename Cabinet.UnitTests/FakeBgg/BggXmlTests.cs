@@ -115,6 +115,148 @@ public class BggXmlTests
     }
 
     [Fact]
+    public void Things_carry_two_designers_two_mechanics_play_times_and_ratings_for_every_game()
+    {
+        var items = SyntheticBggCollection.Create(65);
+
+        var document = XDocument.Parse(BggXml.Things(items.Where(item => item.Owned).Select(item => item.ObjectId).Distinct(), items, stats: true));
+
+        foreach (var thing in document.Root!.Elements("item"))
+        {
+            LinksOf(thing, "boardgamedesigner").Select(link => (string?)link.Attribute("value")).Should().OnlyHaveUniqueItems().And.HaveCount(2);
+            LinksOf(thing, "boardgamemechanic").Select(link => (string?)link.Attribute("value")).Should().OnlyHaveUniqueItems().And.HaveCount(2);
+            thing.Element("minplaytime").Should().NotBeNull();
+            thing.Element("maxplaytime").Should().NotBeNull();
+            thing.Element("statistics")!.Element("ratings")!.Element("bayesaverage").Should().NotBeNull();
+        }
+    }
+
+    [Fact]
+    public void The_ranked_rating_is_zero_for_every_seventh_game_id_and_above_zero_for_the_rest()
+    {
+        var items = SyntheticBggCollection.Create(65);
+        var ids = items.Select(item => item.ObjectId).Distinct().ToList();
+
+        var document = XDocument.Parse(BggXml.Things(ids, items, stats: true));
+
+        foreach (var thing in document.Root!.Elements("item"))
+        {
+            var id = int.Parse((string)thing.Attribute("id")!);
+            var bayes = double.Parse((string)thing.Descendants("bayesaverage").Single().Attribute("value")!, System.Globalization.CultureInfo.InvariantCulture);
+
+            (id % 7 == 0 ? bayes == 0 : bayes > 0).Should().BeTrue($"game {id}");
+        }
+
+        ids.Should().Contain(id => id % 7 == 0);
+    }
+
+    [Fact]
+    public void An_expansion_lists_the_games_it_expands_as_inbound_links_and_a_base_game_lists_its_expansions_as_outbound_links()
+    {
+        var items = SyntheticBggCollection.Create(65);
+        var firstBase = SyntheticBggCollection.FirstObjectId;
+        var lanternExtras = firstBase + 3;
+
+        var document = XDocument.Parse(BggXml.Things([firstBase, lanternExtras], items, stats: false));
+
+        var baseGame = document.Root!.Elements("item").Single(thing => (string?)thing.Attribute("id") == firstBase.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        var expansion = document.Root!.Elements("item").Single(thing => (string?)thing.Attribute("id") == lanternExtras.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        LinksOf(baseGame, "boardgameexpansion").Should().NotBeEmpty().And.OnlyContain(link => link.Attribute("inbound") == null);
+        LinksOf(baseGame, "boardgameexpansion").Select(link => (string?)link.Attribute("id"))
+            .Should().Contain(lanternExtras.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        LinksOf(expansion, "boardgameexpansion").Should().HaveCount(2).And.OnlyContain(link => (string?)link.Attribute("inbound") == "true");
+    }
+
+    [Fact]
+    public void One_game_carries_an_inbound_link_that_is_not_an_expansion_link()
+    {
+        var items = SyntheticBggCollection.Create(65);
+
+        var document = XDocument.Parse(BggXml.Things(items.Where(item => item.Owned).Select(item => item.ObjectId).Distinct(), items, stats: false));
+
+        document.Descendants("link").Where(link => (string?)link.Attribute("type") == "boardgamecompilation").Should().ContainSingle()
+            .Which.Attribute("inbound")!.Value.Should().Be("true");
+    }
+
+    [Fact]
+    public void The_edge_cases_name_a_second_unowned_base_game_and_a_second_owned_one_without_changing_the_collection_shape()
+    {
+        var items = SyntheticBggCollection.Create(65);
+
+        items.Should().HaveCount(65);
+        items.Select(item => item.CollId).Should().BeInAscendingOrder();
+        var missing = items.Single(item => item.Title == "Distant Orchard: Wind Pack");
+        var lantern = items.Single(item => item.Title == "Example Game 1: Lantern Extras");
+        missing.AlsoExpands.Should().ContainSingle().Which.Should().NotBe(missing.BaseObjectId);
+        items.Select(item => item.ObjectId).Should().NotContain(missing.AlsoExpands!.Concat([missing.BaseObjectId!.Value]));
+        lantern.AlsoExpands.Should().ContainSingle();
+        items.Where(item => !item.IsExpansion && item.Owned).Select(item => item.ObjectId).Should().Contain(lantern.AlsoExpands!.Single());
+    }
+
+    [Fact]
+    public void Without_an_art_origin_every_picture_address_is_an_invented_example_address()
+    {
+        var items = SyntheticBggCollection.Create(5);
+
+        var collection = XDocument.Parse(BggXml.Collection(items, OwnedBaseGames));
+        var things = XDocument.Parse(BggXml.Things(items.Select(item => item.ObjectId), items, stats: false));
+
+        PictureAddresses(collection).Should().NotBeEmpty().And.OnlyContain(address => address.StartsWith("https://example.org/", StringComparison.Ordinal));
+        PictureAddresses(things).Should().NotBeEmpty().And.OnlyContain(address => address.StartsWith("https://example.org/", StringComparison.Ordinal));
+        PictureAddresses(collection).Should().Contain("https://example.org/images/version-900001.jpg");
+    }
+
+    [Fact]
+    public void With_an_art_origin_every_picture_address_points_at_the_fake_art_route()
+    {
+        const string Origin = "http://127.0.0.1:6190";
+        var items = SyntheticBggCollection.Create(65);
+
+        var collection = XDocument.Parse(BggXml.Collection(items, OwnedBaseGames, artOrigin: Origin));
+        var things = XDocument.Parse(BggXml.Things(items.Select(item => item.ObjectId), items, stats: false, artOrigin: Origin));
+
+        PictureAddresses(collection).Should().NotBeEmpty().And.OnlyContain(address => address.StartsWith($"{Origin}/fake-art/", StringComparison.Ordinal));
+        PictureAddresses(things).Should().NotBeEmpty().And.OnlyContain(address => address.StartsWith($"{Origin}/fake-art/", StringComparison.Ordinal));
+        PictureAddresses(collection).Should().Contain($"{Origin}/fake-art/900001-version.png").And.Contain($"{Origin}/fake-art/100001-main.png");
+    }
+
+    [Fact]
+    public void The_first_sixty_five_entries_assign_every_picture_case_the_review_needs()
+    {
+        var items = SyntheticBggCollection.Create(65);
+        var pairs = items.Select(item => (Version: SyntheticBggCollection.ArtFor(item, version: true), Main: SyntheticBggCollection.ArtFor(item, version: false))).ToList();
+
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.FlatCover && pair.Main == SyntheticArtKind.FlatCover);
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.FlatWide);
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.FlatNarrow);
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.BoxOnWhite && pair.Main == SyntheticArtKind.FlatCover);
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.BoxOnGreyGradient && pair.Main == SyntheticArtKind.BoxOnGreyGradient);
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.BoxOnBlack && pair.Main == null);
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.WhiteFramed);
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.AllWhite);
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.NearBlack);
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.MidGreen);
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.Banner);
+        pairs.Should().Contain(pair => pair.Version == SyntheticArtKind.Undecodable && pair.Main == SyntheticArtKind.Undecodable);
+        pairs.Should().Contain(pair => pair.Version == null && pair.Main == null);
+    }
+
+    [Fact]
+    public void The_picture_assignment_is_the_same_every_time()
+    {
+        var first = SyntheticBggCollection.Create(65).Select(item => (SyntheticBggCollection.ArtFor(item, true), SyntheticBggCollection.ArtFor(item, false)));
+        var second = SyntheticBggCollection.Create(65).Select(item => (SyntheticBggCollection.ArtFor(item, true), SyntheticBggCollection.ArtFor(item, false)));
+
+        first.Should().Equal(second);
+    }
+
+    private static IEnumerable<string> PictureAddresses(XDocument document) =>
+        document.Descendants().Where(element => element.Name == "image" || element.Name == "thumbnail").Select(element => element.Value);
+
+    private static IEnumerable<XElement> LinksOf(XElement thing, string type) =>
+        thing.Elements("link").Where(link => (string?)link.Attribute("type") == type);
+
+    [Fact]
     public void Synthetic_collections_have_the_offered_sizes_and_stay_the_same_between_calls()
     {
         foreach (var size in SyntheticBggCollection.Sizes)

@@ -2,9 +2,10 @@
  * Draws a cabinet layout as DOM. Geometry and colours reach the page only through custom properties set on element
  * styles and text only through text content; the script makes no layout decisions.
  *
- * Every box takes its background and text colour from the layout's palette table through --bg and --fg. A face-out box
- * is a generated cover: the palette colour, a pattern chosen from the game's own hash and a solid title plate. That
- * generated cover is also what stands in whenever a game has no usable box art.
+ * Every box takes its background and text colour through --bg and --fg: the pair taken from the game's box art when the
+ * placement carries a valid one, and the layout's palette table otherwise. A face-out box without a picture is a
+ * generated cover: that colour, a pattern chosen from the game's own hash and a solid title plate. That generated cover
+ * is also what stands in whenever a game has no usable box art.
  *
  * The three decorative elements of every section and the two attributes on every cubby carry no meaning of their own.
  * They exist only so the stylesheet can draw the furniture: the moulded top, the side boards, the plinth, a stable tone
@@ -13,6 +14,50 @@
 
 /** The cover pattern names in the order of the pattern index the layout carries. */
 const PATTERN_NAMES = ['stripes', 'chevrons', 'dots', 'rings', 'diagonal', 'plain'];
+
+/** The only address shape a box picture may have: a stored file on the site's own origin. */
+const ART_PATH = /^\/art\/[0-9a-f]{16}-[0-9]{1,4}\.webp$/;
+
+/** The fits the layout may state for a box picture. */
+const ART_FITS = ['width', 'height', 'exact'];
+
+/** A colour as the layout writes it: a hexadecimal triple. */
+const HEX_COLOUR = /^#[0-9a-fA-F]{6}$/;
+
+/** A colour taken from box art as the layout writes it: lowercase hexadecimal only. */
+const ART_COLOUR = /^#[0-9a-f]{6}$/;
+
+/** The only two text colours a colour taken from box art may carry. */
+const ART_TEXT_COLOURS = ['#ffffff', '#000000'];
+
+/** The custom properties the four edge colours of a picture are set on, as pairs of side name and property. */
+const EDGE_PROPERTIES = [
+  ['top', '--edge-t'],
+  ['right', '--edge-r'],
+  ['bottom', '--edge-b'],
+  ['left', '--edge-l'],
+];
+
+/**
+ * Returns the colour pair taken from the game's box art when the placement carries a valid one, and null otherwise. The
+ * background must be a lowercase six-digit hexadecimal colour and the text exactly white or black; anything else is
+ * ignored, so the box keeps its palette colour.
+ * @param {object} placement One placement from the layout.
+ * @returns {{background: string, text: string} | null}
+ */
+function colourOf(placement) {
+  const colour = placement.colour;
+
+  if (placement.kind === 'moreMarker' || colour === null || typeof colour !== 'object') {
+    return null;
+  }
+
+  const valid = typeof colour.background === 'string'
+    && ART_COLOUR.test(colour.background)
+    && ART_TEXT_COLOURS.includes(colour.text);
+
+  return valid ? colour : null;
+}
 
 /**
  * Sets one custom property to a whole-number value.
@@ -67,14 +112,27 @@ function namesBaseInName(placement) {
 }
 
 /**
+ * Tells whether a placement is one of the two kinds of expansion whose second line depends on how much room the layout
+ * drew it with: an upright expansion beside its base game and an expansion box without an owned base game.
+ * @param {object} placement One placement from the layout.
+ * @returns {boolean}
+ */
+function decidesSecondLine(placement) {
+  return placement.kind === 'expansionSpine' || placement.kind === 'orphanExpansion';
+}
+
+/**
  * Tells whether a placement draws a second line: an upright expansion beside its base game naming it, an expansion whose
- * base game is not owned naming it, and an expansion whose base game is not known saying only that it is an expansion. A
- * layer has no room for a second line.
+ * base game is not owned naming it, and an expansion whose base game is not known saying only that it is an expansion. An
+ * upright expansion or orphan box draws it only when the layout says it has room, which is decided from millimetres so it
+ * never depends on the visitor's screen. A layer has no room for a second line.
  * @param {object} placement One placement from the layout.
  * @returns {boolean}
  */
 function hasBaseLine(placement) {
-  return placement.kind === 'expansionSpine' || namesUnownedBase(placement) || isExpansionWithoutBase(placement);
+  const wanted = placement.kind === 'expansionSpine' || namesUnownedBase(placement) || isExpansionWithoutBase(placement);
+
+  return decidesSecondLine(placement) ? wanted && placement.showBaseLine === true : wanted;
 }
 
 /**
@@ -140,6 +198,114 @@ function labelText(placement, copy) {
 }
 
 /**
+ * Tells whether a value is a whole number from 1 to 4096, the sizes a stored picture can have.
+ * @param {unknown} value The value from the layout.
+ * @returns {boolean}
+ */
+function isPictureSize(value) {
+  return Number.isInteger(value) && value >= 1 && value <= 4096;
+}
+
+/**
+ * Returns the picture of a placement when the layout states a valid one, and null otherwise. The address must be a stored
+ * file on the site's own origin, the sizes whole numbers and the fit one of the three known fits; anything else is
+ * ignored, so a cover without a valid picture is drawn as a generated cover.
+ * @param {object} placement One placement from the layout.
+ * @returns {object | null}
+ */
+function artOf(placement) {
+  const art = placement.art;
+
+  if (placement.kind !== 'cover' || art === null || typeof art !== 'object') {
+    return null;
+  }
+
+  const valid = typeof art.url === 'string'
+    && ART_PATH.test(art.url)
+    && isPictureSize(art.width)
+    && isPictureSize(art.height)
+    && ART_FITS.includes(art.fit);
+
+  return valid ? art : null;
+}
+
+/**
+ * Sets the four edge colours of a picture on the button when the layout gives all four as valid colours.
+ * @param {HTMLElement} button The cover button.
+ * @param {object | undefined} edges The edge colours from the layout.
+ */
+function setEdgeColours(button, edges) {
+  if (edges === null || typeof edges !== 'object') {
+    return;
+  }
+
+  if (!EDGE_PROPERTIES.every(([side]) => typeof edges[side] === 'string' && HEX_COLOUR.test(edges[side]))) {
+    return;
+  }
+
+  for (const [side, property] of EDGE_PROPERTIES) {
+    button.style.setProperty(property, edges[side]);
+  }
+}
+
+/**
+ * Draws the generated cover into a button: the pattern chosen from the game's hash and a solid title plate holding the
+ * lines. It is the cover of every game without a usable picture and what stands in when a picture fails to load.
+ * @param {HTMLButtonElement} button The cover button.
+ * @param {object} placement One placement from the layout.
+ * @param {HTMLElement[]} lines The label lines to put on the plate.
+ */
+function drawGeneratedCover(button, placement, lines) {
+  button.dataset.pattern = PATTERN_NAMES[placement.patternIndex] ?? 'plain';
+
+  const plate = document.createElement('span');
+  plate.className = 'cover-plate';
+  plate.append(...lines);
+  button.append(plate);
+}
+
+/**
+ * Draws a box picture into a button: one image that is shown whole, with its stored size set so nothing moves while the
+ * file loads. When the browser cannot show the file the picture is taken away and the generated cover is drawn instead,
+ * silently, keeping the colours the button already has.
+ * @param {HTMLButtonElement} button The cover button.
+ * @param {object} placement One placement from the layout.
+ * @param {object} art The valid picture from the layout.
+ * @param {HTMLElement[]} lines The label lines the generated cover would hold.
+ */
+function drawArtCover(button, placement, art, lines) {
+  button.dataset.art = 'true';
+  button.dataset.fit = art.fit;
+  setEdgeColours(button, art.edges);
+
+  const image = document.createElement('img');
+  image.className = 'cover-art';
+  image.src = art.url;
+  image.width = art.width;
+  image.height = art.height;
+  image.alt = '';
+  image.loading = 'lazy';
+  image.decoding = 'async';
+  image.draggable = false;
+  image.addEventListener(
+    'error',
+    () => {
+      image.remove();
+      delete button.dataset.art;
+      delete button.dataset.fit;
+
+      for (const [, property] of EDGE_PROPERTIES) {
+        button.style.removeProperty(property);
+      }
+
+      drawGeneratedCover(button, placement, lines);
+    },
+    { once: true },
+  );
+  button.append(image);
+}
+
+/**
  * Builds the button for one placement.
  * @param {object} placement One placement from the layout.
  * @param {object} copy The visitor-facing strings.
@@ -163,7 +329,7 @@ function buildPlacement(placement, copy, palette) {
   setNumber(button, '--w', placement.widthMm);
   setNumber(button, '--h', placement.heightMm);
 
-  const tone = palette[placement.toneIndex];
+  const tone = colourOf(placement) ?? palette[placement.toneIndex];
 
   if (tone !== undefined && placement.kind !== 'moreMarker') {
     button.style.setProperty('--bg', tone.background);
@@ -182,13 +348,16 @@ function buildPlacement(placement, copy, palette) {
   const sub = buildSubLabel(placement, copy);
   const lines = sub === null ? [label] : [label, sub];
 
-  if (placement.kind === 'cover') {
-    button.dataset.pattern = PATTERN_NAMES[placement.patternIndex] ?? 'plain';
+  if (sub === null && decidesSecondLine(placement)) {
+    button.dataset.lines = '1';
+  }
 
-    const plate = document.createElement('span');
-    plate.className = 'cover-plate';
-    plate.append(...lines);
-    button.append(plate);
+  const art = artOf(placement);
+
+  if (art !== null) {
+    drawArtCover(button, placement, art, lines);
+  } else if (placement.kind === 'cover') {
+    drawGeneratedCover(button, placement, lines);
   } else {
     button.append(...lines);
   }

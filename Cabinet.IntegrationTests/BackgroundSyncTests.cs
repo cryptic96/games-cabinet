@@ -4,6 +4,7 @@ using Cabinet.IntegrationTests.Infrastructure;
 using Cabinet.Service.Sync;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Cabinet.IntegrationTests;
 
@@ -39,10 +40,30 @@ public class BackgroundSyncTests
         await using var factory = SyncHarness.CreateFactory(handler, clock, OptIn);
         using var client = factory.CreatePublicClient();
 
-        clock.Advance(TimeSpan.FromSeconds(120));
+        await AdvanceUntilARunStarts(clock, client);
         await SyncHarness.WaitForRunToEnd(client);
 
         (await SyncHarness.ReadStatus(client)).LastResult.Should().Be("changed");
-        handler.Requests.Should().HaveCount(2);
+        handler.CollectionRequests().Should().HaveCount(2);
+        handler.ThingRequests().Should().ContainSingle();
     }
+
+    /// <summary>
+    /// Moves the fake clock forward in small steps until the start-up sync has begun. The scheduler sets its start-up
+    /// delay on its own thread once the host has started, so one jump made before that delay exists would never wake it.
+    /// The steps stay far below the hourly interval, so no scheduled sync can join in.
+    /// </summary>
+    private static Task AdvanceUntilARunStarts(FakeTimeProvider clock, HttpClient client) =>
+        SyncHarness.WaitUntil(async () =>
+        {
+            var status = await SyncHarness.ReadStatus(client);
+            if (status.Running || status.LastResult is not null)
+            {
+                return true;
+            }
+
+            clock.Advance(TimeSpan.FromSeconds(5));
+
+            return false;
+        });
 }
