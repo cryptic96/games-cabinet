@@ -130,6 +130,7 @@ cabinet_restart_app() {
   (
     cd "${CABINET_DEPLOY_ROOT}/opt/cabinet/current/app"
     ASPNETCORE_ENVIRONMENT=Production \
+      STATE_DIRECTORY="${TMP}/state" \
       exec dotnet "${CABINET_DEPLOY_ROOT}/opt/cabinet/current/app/Cabinet.Service.dll"
   ) >>"${TMP}/app.log" 2>&1 &
   printf '%s' "$!" > "$APP_PID_FILE"
