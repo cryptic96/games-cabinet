@@ -11,7 +11,7 @@ public sealed class SnapshotStore : ISnapshotStore
     /// <summary>The name of the stored file.</summary>
     public const string FileName = "snapshot.json";
 
-    /// <summary>The name a damaged or too-new file is renamed to.</summary>
+    /// <summary>The name a damaged or too-new file is renamed to. A file that could not be read at all is left in place.</summary>
     public const string SetAsideFileName = "snapshot.json.bad";
 
     private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
@@ -21,7 +21,7 @@ public sealed class SnapshotStore : ISnapshotStore
 
     /// <summary>Creates a store over a directory.</summary>
     /// <param name="directory">The storage directory; it must exist.</param>
-    /// <param name="logger">Receives one line when a stored file has to be set aside.</param>
+    /// <param name="logger">Receives one line when a stored file has to be set aside or could not be read.</param>
     public SnapshotStore(string directory, ILogger<SnapshotStore> logger)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
@@ -47,7 +47,9 @@ public sealed class SnapshotStore : ISnapshotStore
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            return SetAside("unreadable");
+            _logger.LogWarning("The stored collection could not be read ({Reason}) and was left in place.", "unreadable");
+
+            return null;
         }
 
         return Parse(content);

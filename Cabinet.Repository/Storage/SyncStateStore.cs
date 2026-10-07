@@ -11,7 +11,7 @@ public sealed class SyncStateStore : ISyncStateStore
     /// <summary>The name of the stored file.</summary>
     public const string FileName = "sync-state.json";
 
-    /// <summary>The name a damaged or too-new file is renamed to.</summary>
+    /// <summary>The name a damaged or too-new file is renamed to. A file that could not be read at all is left in place.</summary>
     public const string SetAsideFileName = "sync-state.json.bad";
 
     private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
@@ -21,7 +21,7 @@ public sealed class SyncStateStore : ISyncStateStore
 
     /// <summary>Creates a store over a directory.</summary>
     /// <param name="directory">The storage directory; it must exist.</param>
-    /// <param name="logger">Receives one line when a stored file has to be set aside.</param>
+    /// <param name="logger">Receives one line when a stored file has to be set aside or could not be read.</param>
     public SyncStateStore(string directory, ILogger<SyncStateStore> logger)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
@@ -47,7 +47,9 @@ public sealed class SyncStateStore : ISyncStateStore
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            return SetAside("unreadable");
+            _logger.LogWarning("The stored sync state could not be read ({Reason}) and was left in place.", "unreadable");
+
+            return SyncState.Initial;
         }
 
         return Parse(content);
