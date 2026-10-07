@@ -24,7 +24,7 @@ public partial class HelloPageTests
         var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        response.Content.Headers.ContentType?.MediaType.Should().Be("text/html");
+        response.ShouldHaveMediaType("text/html");
         version.Should().NotBeNullOrWhiteSpace();
         html.Should().Contain($"Version {version}");
     }
@@ -44,7 +44,7 @@ public partial class HelloPageTests
         using var stylesheet = await publicClient.GetAsync(match.Groups["href"].Value, TestContext.Current.CancellationToken);
 
         stylesheet.StatusCode.Should().Be(HttpStatusCode.OK);
-        stylesheet.Content.Headers.ContentType?.MediaType.Should().Be("text/css");
+        stylesheet.ShouldHaveMediaType("text/css");
     }
 
     [GeneratedRegex("<link[^>]*rel=\"stylesheet\"[^>]*href=\"(?<href>[^\"]+)\"")]

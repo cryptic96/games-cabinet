@@ -86,7 +86,7 @@ public partial class CreditTests
         var body = await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        response.Content.Headers.ContentType?.MediaType.Should().StartWith("image/");
+        response.ShouldHaveMediaTypeStartingWith("image/");
         body.Should().NotBeEmpty();
     }
 

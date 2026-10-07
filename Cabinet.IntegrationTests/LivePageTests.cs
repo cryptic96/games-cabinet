@@ -44,7 +44,7 @@ public partial class LivePageTests
         using var response = await client.GetAsync(classic[0].Groups["src"].Value, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        response.Content.Headers.ContentType?.MediaType.Should().Be("text/javascript");
+        response.ShouldHaveMediaType("text/javascript");
     }
 
     private static async Task<string> GetScript(HttpClient client, string path)
@@ -52,7 +52,7 @@ public partial class LivePageTests
         using var response = await client.GetAsync(path, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, path);
-        response.Content.Headers.ContentType?.MediaType.Should().Be("text/javascript", path);
+        response.ShouldHaveMediaType("text/javascript", path);
 
         return await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
     }

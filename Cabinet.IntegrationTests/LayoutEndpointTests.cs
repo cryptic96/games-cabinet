@@ -31,7 +31,7 @@ public class LayoutEndpointTests
             placement.GetProperty("kind").GetString() == "moreMarker" ? placement.GetProperty("moreCount").GetInt32() : 1);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        response.Content.Headers.ContentType?.MediaType.Should().Be("application/json");
+        response.ShouldHaveMediaType("application/json");
         root.GetProperty("layoutVersion").GetInt32().Should().BeGreaterThanOrEqualTo(1);
         root.GetProperty("profile").GetString().Should().Be("desktop");
         sections.GetArrayLength().Should().BeGreaterThanOrEqualTo(1);
