@@ -91,10 +91,50 @@ public class SnapshotMapperTests
     }
 
     [Fact]
+    public void An_expansion_carries_the_games_its_details_say_it_expands_and_a_base_game_never_does()
+    {
+        var snapshot = Snapshot(Items) with { Games = Games((1, [new BaseGameRef(2, "Second Base")]), (2, [new BaseGameRef(1, "Loop")])) };
+
+        var mapped = SnapshotMapper.ToCabinetItems(snapshot);
+
+        mapped.Single(item => item.BggId == 1).ExpansionOf.Should().Equal(new BaseGameRef(2, "Second Base"));
+        mapped.Where(item => item.Kind == ItemKind.Base).Should().OnlyContain(item => item.ExpansionOf.Count == 0);
+    }
+
+    [Fact]
+    public void The_version_changes_when_an_expansions_references_change_and_not_when_other_details_change()
+    {
+        var plain = Snapshot(Items) with { Games = Games((1, [new BaseGameRef(2, "Second Base")])) };
+        var otherBase = Snapshot(Items) with { Games = Games((1, [new BaseGameRef(3, "Third")])) };
+        var renamedBase = Snapshot(Items) with { Games = Games((1, [new BaseGameRef(2, "Renamed Base")])) };
+        var richer = Snapshot(Items) with
+        {
+            Games = new Dictionary<int, GameDetails>
+            {
+                [1] = Details([new BaseGameRef(2, "Second Base")]) with { Designers = ["Invented Designer 1"], Average = 7.5, Weight = 3.1, MinPlayers = 2 },
+                [9] = Details([]) with { Mechanics = ["Example Mechanic A"], BayesAverage = 6 },
+            },
+        };
+
+        string Version(CollectionSnapshot snapshot) => SnapshotMapper.Version(SnapshotMapper.ToCabinetItems(snapshot));
+
+        Version(otherBase).Should().NotBe(Version(plain));
+        Version(renamedBase).Should().NotBe(Version(plain));
+        Version(richer).Should().Be(Version(plain));
+        Version(Snapshot(Items)).Should().NotBe(Version(plain));
+    }
+
+    [Fact]
     public void An_empty_collection_has_a_version_too()
     {
         SnapshotMapper.Version(SnapshotMapper.ToCabinetItems(Snapshot([]))).Should().MatchRegex("^[0-9a-f]{16}$");
     }
+
+    private static Dictionary<int, GameDetails> Games(params (int GameId, IReadOnlyList<BaseGameRef> Expands)[] games) =>
+        games.ToDictionary(entry => entry.GameId, entry => Details(entry.Expands));
+
+    private static GameDetails Details(IReadOnlyList<BaseGameRef> expands) =>
+        new(DateTimeOffset.UnixEpoch, null, null, null, null, null, null, null, null, null, [], [], expands, null);
 
     private static CollectionSnapshot Snapshot(IEnumerable<SnapshotItem> items) =>
         new(CollectionSnapshot.CurrentSchemaVersion, DateTimeOffset.UnixEpoch, [.. items]);

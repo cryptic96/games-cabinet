@@ -64,6 +64,8 @@ public static class BggXml
     private const string TermsOfUse = "https://boardgamegeek.com/xmlapi/termsofuse";
     private const string PublishedAt = "Thu, 01 Jan 2026 12:00:00 +0000";
     private const string LastModified = "2026-01-01 12:00:00";
+    private const int BigBoxObjectId = 880001;
+    private const int BigBoxContainedObjectId = SyntheticBggCollection.FirstObjectId + 3;
 
     /// <summary>Picks the entries a collection request asks for, the way BoardGameGeek does.</summary>
     /// <param name="items">Every entry in the invented collection.</param>
@@ -124,7 +126,10 @@ public static class BggXml
 
     /// <summary>
     /// Writes a single-game answer for each requested id: the matching collection entry when there is one,
-    /// otherwise an invented game.
+    /// otherwise an invented game. Every game carries two designers, two mechanics, its play times and its ratings (the ranked
+    /// rating is zero for every seventh game id); a base game also lists, without the inbound mark, the expansions the
+    /// collection holds for it; an expansion lists the games it expands with the inbound mark; and one game carries an
+    /// inbound link of a kind that is not an expansion link.
     /// </summary>
     /// <param name="ids">The requested game ids.</param>
     /// <param name="known">The invented collection, used to give known ids their real titles and links.</param>
@@ -139,8 +144,8 @@ public static class BggXml
             "items",
             new XAttribute("termsofuse", TermsOfUse),
             ids.Select(id => byId.TryGetValue(id, out var item)
-                ? ThingItem(item, stats)
-                : ThingItem(new FakeBggItem(id, 0, $"Example Thing {id}", false, true, 2000, null, null), stats)));
+                ? ThingItem(item, stats, byId)
+                : ThingItem(new FakeBggItem(id, 0, $"Example Thing {id}", false, true, 2000, null, null), stats, byId)));
         return Serialize(root);
     }
 
@@ -267,9 +272,10 @@ public static class BggXml
             new XAttribute("acquiredfrom", string.Empty),
             new XAttribute("inventorylocation", location));
 
-    private static XElement ThingItem(FakeBggItem item, bool stats)
+    private static XElement ThingItem(FakeBggItem item, bool stats, IReadOnlyDictionary<int, FakeBggItem> known)
     {
         var minPlayers = 1 + item.ObjectId % 3;
+        var playingTime = 30 + 10 * (item.ObjectId % 6);
         var element = new XElement(
             "item",
             new XAttribute("type", item.IsExpansion ? CollectionQuery.ExpansionSubtype : "boardgame"),
@@ -281,22 +287,41 @@ public static class BggXml
             new XElement("yearpublished", new XAttribute("value", Number(item.Year ?? 0))),
             new XElement("minplayers", new XAttribute("value", Number(minPlayers))),
             new XElement("maxplayers", new XAttribute("value", Number(minPlayers + 1 + item.ObjectId % 4))),
-            new XElement("playingtime", new XAttribute("value", Number(30 + 10 * (item.ObjectId % 6)))),
+            new XElement("playingtime", new XAttribute("value", Number(playingTime))),
+            new XElement("minplaytime", new XAttribute("value", Number(playingTime - 10))),
+            new XElement("maxplaytime", new XAttribute("value", Number(playingTime))),
             new XElement("minage", new XAttribute("value", Number(8 + item.ObjectId % 6))));
 
-        if (item.IsExpansion && item.BaseObjectId is { } baseObjectId)
+        element.Add(
+            Link("boardgamedesigner", 3000 + item.ObjectId % 5, $"Invented Designer {item.ObjectId % 5 + 1}", inbound: false),
+            Link("boardgamedesigner", 3010 + item.ObjectId % 4, $"Invented Designer {item.ObjectId % 4 + 6}", inbound: false),
+            Link("boardgamemechanic", 2000 + item.ObjectId % 3, $"Example Mechanic {(char)('A' + item.ObjectId % 3)}", inbound: false),
+            Link("boardgamemechanic", 2010 + item.ObjectId % 2, $"Example Mechanic {(char)('D' + item.ObjectId % 2)}", inbound: false));
+
+        foreach (var outbound in known.Values
+            .Where(other => other.IsExpansion && (other.BaseObjectId == item.ObjectId || other.AlsoExpands?.Contains(item.ObjectId) == true))
+            .OrderBy(other => other.ObjectId))
         {
-            element.Add(new XElement(
-                "link",
-                new XAttribute("type", CollectionQuery.ExpansionSubtype),
-                new XAttribute("id", Number(baseObjectId)),
-                new XAttribute("value", $"Example Game {baseObjectId - SyntheticBggCollection.FirstObjectId + 1}"),
-                new XAttribute("inbound", "true")));
+            element.Add(Link(CollectionQuery.ExpansionSubtype, outbound.ObjectId, outbound.Title, inbound: false));
+        }
+
+        if (item.IsExpansion)
+        {
+            foreach (var baseObjectId in (item.BaseObjectId is { } primary ? new[] { primary } : []).Concat(item.AlsoExpands ?? []))
+            {
+                element.Add(Link(CollectionQuery.ExpansionSubtype, baseObjectId, BaseTitle(baseObjectId, known), inbound: true));
+            }
+        }
+
+        if (item.ObjectId == BigBoxContainedObjectId)
+        {
+            element.Add(Link("boardgamecompilation", BigBoxObjectId, "Example Big Box", inbound: true));
         }
 
         if (stats)
         {
             var weight = 1.0 + item.ObjectId % 40 / 10.0;
+            var bayes = item.ObjectId % 7 == 0 ? 0 : 5.0 + item.ObjectId % 30 / 10.0;
             element.Add(new XElement(
                 "statistics",
                 new XAttribute("page", "1"),
@@ -304,10 +329,28 @@ public static class BggXml
                     "ratings",
                     new XElement("usersrated", new XAttribute("value", Number(50 + item.ObjectId % 500))),
                     new XElement("average", new XAttribute("value", Decimal(5.0 + item.ObjectId % 40 / 10.0))),
+                    new XElement("bayesaverage", new XAttribute("value", Decimal(bayes))),
                     new XElement("averageweight", new XAttribute("value", Decimal(weight))))));
         }
 
         return element;
+    }
+
+    private static string BaseTitle(int baseObjectId, IReadOnlyDictionary<int, FakeBggItem> known) =>
+        known.TryGetValue(baseObjectId, out var item)
+            ? item.Title
+            : $"Example Game {baseObjectId - SyntheticBggCollection.FirstObjectId + 1}";
+
+    private static XElement Link(string type, int id, string value, bool inbound)
+    {
+        var link = new XElement("link", new XAttribute("type", type), new XAttribute("id", Number(id)), new XAttribute("value", value));
+
+        if (inbound)
+        {
+            link.Add(new XAttribute("inbound", "true"));
+        }
+
+        return link;
     }
 
     private static string Number(long value) => value.ToString(CultureInfo.InvariantCulture);
