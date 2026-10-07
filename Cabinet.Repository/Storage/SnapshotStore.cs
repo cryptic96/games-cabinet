@@ -11,6 +11,9 @@ public sealed class SnapshotStore : ISnapshotStore
     /// <summary>The name of the stored file.</summary>
     public const string FileName = "snapshot.json";
 
+    /// <summary>The name a damaged or too-new file is renamed to.</summary>
+    public const string SetAsideFileName = "snapshot.json.bad";
+
     private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
 
     private readonly string _path;
@@ -31,12 +34,23 @@ public sealed class SnapshotStore : ISnapshotStore
     /// <inheritdoc />
     public CollectionSnapshot? Load()
     {
-        if (!File.Exists(_path))
+        byte[] content;
+
+        try
         {
-            return null;
+            if (!File.Exists(_path))
+            {
+                return null;
+            }
+
+            content = File.ReadAllBytes(_path);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return SetAside("unreadable");
         }
 
-        return JsonSerializer.Deserialize<CollectionSnapshot>(File.ReadAllBytes(_path), JsonOptions);
+        return Parse(content);
     }
 
     /// <inheritdoc />
@@ -45,6 +59,50 @@ public sealed class SnapshotStore : ISnapshotStore
         ArgumentNullException.ThrowIfNull(snapshot);
 
         AtomicJsonFile.WriteAtomically(_path, JsonSerializer.SerializeToUtf8Bytes(snapshot, JsonOptions));
+    }
+
+    private CollectionSnapshot? Parse(byte[] content)
+    {
+        CollectionSnapshot? snapshot;
+
+        try
+        {
+            snapshot = JsonSerializer.Deserialize<CollectionSnapshot>(content, JsonOptions);
+        }
+        catch (JsonException)
+        {
+            return SetAside("malformed");
+        }
+
+        if (snapshot is null || snapshot.Items is null || snapshot.Items.Any(item => item is null))
+        {
+            return SetAside("malformed");
+        }
+
+        if (snapshot.SchemaVersion > CollectionSnapshot.CurrentSchemaVersion)
+        {
+            return SetAside("newer schema");
+        }
+
+        return snapshot.SchemaVersion < 1 ? SetAside("malformed") : snapshot;
+    }
+
+    private CollectionSnapshot? SetAside(string reason)
+    {
+        try
+        {
+            File.Move(_path, Path.Combine(Path.GetDirectoryName(_path)!, SetAsideFileName), overwrite: true);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning("The stored collection could not be read ({Reason}) and could not be set aside.", reason);
+
+            return null;
+        }
+
+        _logger.LogWarning("The stored collection could not be read ({Reason}) and was set aside; the next sync rebuilds it.", reason);
+
+        return null;
     }
 
     private static JsonSerializerOptions CreateJsonOptions()

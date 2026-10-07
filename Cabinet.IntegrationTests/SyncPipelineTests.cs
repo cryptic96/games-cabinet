@@ -90,14 +90,64 @@ public class SyncPipelineTests
         handler.Requests.Should().HaveCount(2);
     }
 
+    [Fact]
+    public async Task A_restart_shows_the_same_cabinet_with_the_same_etag_before_any_new_sync()
+    {
+        using var storage = new TemporaryDirectory();
+        var storageSettings = new Dictionary<string, string?> { ["Storage:Directory"] = storage.FullPath };
+        var handler = ScriptedBggHandler.ForCollection(SyntheticBggCollection.Create(5));
+        string syncedETag;
+        List<string> syncedTitles;
+
+        await using (var first = CreateFactory(handler, storageSettings))
+        {
+            using var client = first.CreatePublicClient();
+            var initial = await ReadLayout(client);
+            using var press = await client.PostAsync(SyncEndpointRoute, content: null, TestContext.Current.CancellationToken);
+            await WaitUntil(async () => (await ReadLayout(client)).ETag != initial.ETag);
+            (syncedETag, syncedTitles) = await ReadLayout(client);
+        }
+
+        await using var second = CreateFactory(new ScriptedBggHandler(), storageSettings);
+        using var restarted = second.CreatePublicClient();
+        var afterRestart = await ReadLayout(restarted);
+
+        File.Exists(Path.Combine(storage.FullPath, "snapshot.json")).Should().BeTrue();
+        afterRestart.ETag.Should().Be(syncedETag);
+        afterRestart.Titles.Should().BeEquivalentTo(syncedTitles);
+        (await restarted.GetStringAsync("/", TestContext.Current.CancellationToken)).Should().NotContain(BeingFilled);
+    }
+
+    [Fact]
+    public async Task A_damaged_snapshot_is_set_aside_and_the_site_shows_the_being_filled_state_and_stays_healthy()
+    {
+        using var storage = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(storage.FullPath, "snapshot.json"), "{ not json");
+        File.WriteAllText(Path.Combine(storage.FullPath, ".snapshot.json.0123456789abcdef.tmp"), "partial");
+
+        await using var factory = CreateFactory(new ScriptedBggHandler(), new Dictionary<string, string?> { ["Storage:Directory"] = storage.FullPath });
+        using var client = factory.CreatePublicClient();
+        using var ops = factory.CreateOpsClient();
+
+        (await client.GetStringAsync("/", TestContext.Current.CancellationToken)).Should().Contain(BeingFilled);
+        using var health = await ops.GetAsync("/health", TestContext.Current.CancellationToken);
+        var healthBody = await health.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        health.StatusCode.Should().Be(HttpStatusCode.OK);
+        healthBody.Should().Contain("Healthy");
+        File.Exists(Path.Combine(storage.FullPath, "snapshot.json")).Should().BeFalse();
+        File.Exists(Path.Combine(storage.FullPath, "snapshot.json.bad")).Should().BeTrue();
+        Directory.EnumerateFiles(storage.FullPath, ".*.tmp").Should().BeEmpty();
+    }
+
     private static string SyncEndpointRoute => "/cabinet/sync";
 
     private static BggOptions Options(Uri? baseUri = null) =>
         new(baseUri ?? BggOptions.DefaultBaseUri, Username, Token, null, BggOptions.MinimumRequestGap, false, "0.0.0-test");
 
-    private static CabinetWebApplicationFactory CreateFactory(HttpMessageHandler handler) =>
+    private static CabinetWebApplicationFactory CreateFactory(HttpMessageHandler handler, IReadOnlyDictionary<string, string?>? settings = null) =>
         new(
-            new Dictionary<string, string?>(),
+            settings ?? new Dictionary<string, string?>(),
             services =>
             {
                 services.AddSingleton(Options());
@@ -144,6 +194,16 @@ public class SyncPipelineTests
             .ToList();
 
         return (response.Headers.ETag!.Tag, titles);
+    }
+
+    private sealed class TemporaryDirectory : IDisposable
+    {
+        public TemporaryDirectory() =>
+            Directory.CreateDirectory(FullPath = Path.Combine(Path.GetTempPath(), $"cabinet-sync-tests-{Guid.NewGuid():N}"));
+
+        public string FullPath { get; }
+
+        public void Dispose() => Directory.Delete(FullPath, recursive: true);
     }
 
     private static async Task WaitUntil(Func<Task<bool>> condition)
