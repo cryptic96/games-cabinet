@@ -175,6 +175,11 @@ public class SecretsStayServerSideTests
             (await Get(client, LayoutPath)).Status.Should().Be(HttpStatusCode.OK);
         }
 
+        var status = await SyncHarness.ReadStatus(client);
+
+        status.Running.Should().BeFalse("a visit must not start a sync");
+        status.CooldownEndsUtc.Should().BeNull("an accepted request opens the shared window at once");
+        status.LastResult.Should().BeNull();
         handler.Requests.Count.Should().Be(before);
     }
 
