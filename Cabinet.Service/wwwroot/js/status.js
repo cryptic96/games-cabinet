@@ -94,15 +94,6 @@ export function countdownText(remainingMs) {
 }
 
 /**
- * Whole minutes left in the window, rounded up.
- * @param {number} remainingMs Milliseconds left in the window.
- * @returns {number} Zero for zero or less.
- */
-export function wholeMinutesLeft(remainingMs) {
-  return remainingMs > 0 ? Math.ceil(remainingMs / 60000) : 0;
-}
-
-/**
  * Which of the four outcome sentences a finished press gets; anything unknown counts as a failure.
  * @param {string | null | undefined} lastResult The last result the status reports.
  * @returns {'changed' | 'unchanged' | 'failed' | 'heldBack'}

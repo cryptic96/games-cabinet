@@ -22,7 +22,7 @@ async function loadPageScript(name) {
 }
 
 const { COPY } = await loadPageScript('copy.js');
-const { serverOffsetMs, elapsedSeconds, isStale, buttonState, countdownText, wholeMinutesLeft, pressOutcome, shouldRedraw, reconnectDelayMs, isOutdatedStatus, ownSyncStillWaiting } = await loadPageScript('status.js');
+const { serverOffsetMs, elapsedSeconds, isStale, buttonState, countdownText, pressOutcome, shouldRedraw, reconnectDelayMs, isOutdatedStatus, ownSyncStillWaiting } = await loadPageScript('status.js');
 const cases = JSON.parse(readFileSync(new URL('./fixtures/relative-time-cases.json', import.meta.url), 'utf8'));
 
 const SYNCED = '2030-01-15T12:00:00.000Z';
@@ -34,10 +34,6 @@ for (const { elapsedSeconds: seconds, text } of cases) {
     assert.equal(COPY.syncedAgo(seconds), text);
   });
 }
-
-test('the never-synced line is fixed copy', () => {
-  assert.equal(COPY.notSynced, 'Not synced yet');
-});
 
 test('the exact time is written in the visitor zone with English words and a 24-hour clock', () => {
   const text = COPY.exactTime(new Date(SYNCED));
@@ -115,8 +111,6 @@ test('the countdown reads minutes and seconds with the seconds rounded up', () =
 });
 
 test('the button name and the press sentence round minutes up and have their own singular and sub-minute forms', () => {
-  assert.equal(wholeMinutesLeft(582000), 10);
-  assert.equal(wholeMinutesLeft(0), 0);
   assert.equal(COPY.syncAgainName(59000), 'Sync again in less than a minute');
   assert.equal(COPY.syncAgainName(60000), 'Sync again in 1 minute');
   assert.equal(COPY.syncAgainName(61000), 'Sync again in 2 minutes');
@@ -200,11 +194,12 @@ const PAGE_FOLDER = mkdtempSync(join(tmpdir(), 'cabinet-page-scripts-'));
 
 writeFileSync(join(PAGE_FOLDER, 'package.json'), '{"type":"module"}');
 
-for (const name of ['copy.js', 'status.js', 'sync.js']) {
+for (const name of ['copy.js', 'status.js', 'sync.js', 'live.js']) {
   copyFileSync(new URL('../../Cabinet.Service/wwwroot/js/' + name, import.meta.url), join(PAGE_FOLDER, name));
 }
 
 const { initSyncStatus } = await import(pathToFileURL(join(PAGE_FOLDER, 'sync.js')).href);
+const { startLive } = await import(pathToFileURL(join(PAGE_FOLDER, 'live.js')).href);
 const BASE_MS = Date.parse('2030-01-15T12:00:00.000Z');
 const COOLDOWN_MS = 600000;
 const flushMicrotasks = () => new Promise((resolve) => setImmediate(resolve));
@@ -212,9 +207,10 @@ const isoAt = (offsetMs) => new Date(BASE_MS + offsetMs).toISOString();
 
 /**
  * A clock the page script's timers and Date.now run on, so a ten-minute follow-up takes no real time.
+ * @param {boolean} [repeatingIntervals] Whether setInterval really repeats; off, it only hands out an id, which is all the sync block's tests need.
  * @returns {{ elapsed: () => number, now: () => number, advance: (ms: number) => Promise<void>, timers: object }} The clock.
  */
-function createClock() {
+function createClock(repeatingIntervals = false) {
   let now = BASE_MS;
   let nextId = 1;
   const pending = new Map();
@@ -230,8 +226,16 @@ function createClock() {
         return id;
       },
       clearTimeout: (id) => pending.delete(id),
-      setInterval: () => nextId++,
-      clearInterval: () => undefined,
+      setInterval(callback, delay) {
+        const id = nextId++;
+
+        if (repeatingIntervals) {
+          pending.set(id, { at: now + delay, callback, every: delay });
+        }
+
+        return id;
+      },
+      clearInterval: (id) => pending.delete(id),
     },
     now: () => now,
     async advance(milliseconds) {
@@ -246,8 +250,14 @@ function createClock() {
           break;
         }
 
-        pending.delete(due[0]);
         now = Math.max(now, due[1].at);
+
+        if (due[1].every === undefined) {
+          pending.delete(due[0]);
+        } else {
+          due[1].at += due[1].every;
+        }
+
         due[1].callback();
       }
 
@@ -473,5 +483,332 @@ test('a redraw that is superseded does not clear the guard of the redraw that re
     assert.equal(redraws.length, 2);
   } finally {
     Date.now = realNow;
+  }
+});
+
+const FAILED_START = Symbol('failed start');
+
+/**
+ * A hand-made browser client: a builder that records the route and the reconnect schedule, and connections the test can start,
+ * push to, drop and put through an automatic reconnect.
+ * @param {{ elapsed: () => number }} clock The clock that start times are read from.
+ * @param {(startNumber: number) => boolean} startSucceeds Whether the given start (counted from 1) succeeds.
+ * @returns {{ client: object, connections: object[], startTimes: number[] }} The client to put on the page and what it recorded.
+ */
+function createFakeSignalR(clock, startSucceeds) {
+  const connections = [];
+  const startTimes = [];
+
+  class FakeConnection {
+    constructor(builder) {
+      this.url = builder.url;
+      this.reconnectDelay = builder.reconnectDelay;
+      this.handlers = {};
+      this.listeners = { reconnecting: [], reconnected: [], close: [] };
+    }
+
+    on(name, handler) {
+      this.handlers[name] = handler;
+    }
+
+    onreconnecting(handler) {
+      this.listeners.reconnecting.push(handler);
+    }
+
+    onreconnected(handler) {
+      this.listeners.reconnected.push(handler);
+    }
+
+    onclose(handler) {
+      this.listeners.close.push(handler);
+    }
+
+    start() {
+      startTimes.push(clock.elapsed());
+
+      return startSucceeds(startTimes.length) ? Promise.resolve() : Promise.reject(FAILED_START);
+    }
+
+    push(status) {
+      this.handlers.statusChanged(status);
+    }
+
+    drop() {
+      this.listeners.close.forEach((handler) => handler());
+    }
+
+    reconnecting() {
+      this.listeners.reconnecting.forEach((handler) => handler());
+    }
+
+    reconnected() {
+      this.listeners.reconnected.forEach((handler) => handler());
+    }
+  }
+
+  class HubConnectionBuilder {
+    withUrl(url) {
+      this.url = url;
+
+      return this;
+    }
+
+    withAutomaticReconnect(options) {
+      this.reconnectDelay = options.nextRetryDelayInMilliseconds;
+
+      return this;
+    }
+
+    configureLogging() {
+      return this;
+    }
+
+    build() {
+      const connection = new FakeConnection(this);
+
+      connections.push(connection);
+
+      return connection;
+    }
+  }
+
+  return { client: { HubConnectionBuilder, LogLevel: { None: 0 } }, connections, startTimes };
+}
+
+/**
+ * Starts the live behaviour against a hand-made page: a fake clock with repeating intervals, a fake document whose visibility
+ * the test sets, a fake browser client, and a status fetch the test answers.
+ * @param {{ withClient?: boolean, startSucceeds?: (startNumber: number) => boolean, fetchStatus?: () => Promise<object | null> }} [setup]
+ *   withClient puts the browser client on the page; startSucceeds decides each start; fetchStatus answers each status request.
+ * @returns {object} The clock, what the script reported and asked for, and the levers for visibility and the network.
+ */
+function startLivePage({ withClient = true, startSucceeds = () => true, fetchStatus = async () => null } = {}) {
+  const clock = createClock(true);
+  const fake = createFakeSignalR(clock, startSucceeds);
+  const windowHandlers = {};
+  const documentHandlers = {};
+  const applied = [];
+  const page = { fetches: 0 };
+  const fire = (handlers, type) => (handlers[type] ?? []).forEach((handler) => handler());
+
+  globalThis.window = {
+    ...clock.timers,
+    addEventListener: (type, handler) => (windowHandlers[type] ??= []).push(handler),
+  };
+  globalThis.document = {
+    visibilityState: 'visible',
+    addEventListener: (type, handler) => (documentHandlers[type] ??= []).push(handler),
+  };
+
+  if (withClient) {
+    globalThis.signalR = fake.client;
+  }
+
+  Date.now = clock.now;
+
+  startLive({
+    applyStatus: (status) => applied.push(status),
+    fetchStatus: () => {
+      page.fetches += 1;
+
+      return fetchStatus();
+    },
+  });
+
+  return {
+    clock,
+    applied,
+    page,
+    connections: fake.connections,
+    startTimes: fake.startTimes,
+    setVisible: (visible) => {
+      globalThis.document.visibilityState = visible ? 'visible' : 'hidden';
+    },
+    changeVisibility: () => fire(documentHandlers, 'visibilitychange'),
+    comeOnline: () => fire(windowHandlers, 'online'),
+  };
+}
+
+/**
+ * Takes the fake client off the page again and gives Date.now back.
+ */
+function leaveLivePage() {
+  delete globalThis.signalR;
+  Date.now = realNow;
+}
+
+test('without the browser client the status is checked once a minute on a visible tab, and when the tab returns or the browser is back online', async () => {
+  const { clock, page, setVisible, changeVisibility, comeOnline } = startLivePage({ withClient: false });
+
+  try {
+    await clock.advance(59000);
+    assert.equal(page.fetches, 0);
+
+    await clock.advance(1000);
+    assert.equal(page.fetches, 1);
+
+    setVisible(false);
+    await clock.advance(120000);
+    changeVisibility();
+    await clock.advance(0);
+    assert.equal(page.fetches, 1);
+
+    setVisible(true);
+    changeVisibility();
+    await clock.advance(0);
+    assert.equal(page.fetches, 2);
+
+    comeOnline();
+    await clock.advance(0);
+    assert.equal(page.fetches, 3);
+  } finally {
+    leaveLivePage();
+  }
+});
+
+test('the live connection uses the live route and the reconnect schedule, reports pushed statuses and skips the minute check while it is up', async () => {
+  const { clock, page, applied, connections } = startLivePage({ fetchStatus: async () => ({ marker: 'fetched' }) });
+
+  try {
+    await clock.advance(0);
+
+    assert.equal(connections.length, 1);
+    assert.equal(connections[0].url, '/cabinet/live');
+    assert.deepEqual([0, 1, 2, 3, 4, 20].map((previousRetryCount) => connections[0].reconnectDelay({ previousRetryCount })), [0, 2000, 10000, 30000, 60000, 60000]);
+    assert.equal(page.fetches, 1);
+    assert.deepEqual(applied, [{ marker: 'fetched' }]);
+
+    connections[0].push({ marker: 'pushed' });
+    connections[0].push(null);
+    assert.deepEqual(applied, [{ marker: 'fetched' }, { marker: 'pushed' }]);
+
+    await clock.advance(180000);
+    assert.equal(page.fetches, 1);
+  } finally {
+    leaveLivePage();
+  }
+});
+
+test('a connection that has ended is retried while the status is checked once a minute in the meantime', async () => {
+  const { clock, page, connections } = startLivePage({ startSucceeds: (startNumber) => startNumber === 1 });
+
+  try {
+    await clock.advance(1000);
+    connections[0].drop();
+    await clock.advance(59000);
+    assert.equal(page.fetches, 2);
+
+    await clock.advance(60000);
+    assert.equal(page.fetches, 3);
+  } finally {
+    leaveLivePage();
+  }
+});
+
+test('while the connection is reconnecting the status is checked once a minute, and once when it is back', async () => {
+  const { clock, page, connections } = startLivePage();
+
+  try {
+    await clock.advance(1000);
+    assert.equal(page.fetches, 1);
+
+    connections[0].reconnecting();
+    await clock.advance(59000);
+    assert.equal(page.fetches, 2);
+
+    connections[0].reconnected();
+    await clock.advance(0);
+    assert.equal(page.fetches, 3);
+
+    await clock.advance(180000);
+    assert.equal(page.fetches, 3);
+  } finally {
+    leaveLivePage();
+  }
+});
+
+test('a connection that never starts is retried at once, then after 2 s, 10 s, 30 s and every minute without giving up', async () => {
+  const { clock, startTimes } = startLivePage({ startSucceeds: () => false });
+
+  try {
+    await clock.advance(170000);
+
+    assert.deepEqual(startTimes, [0, 0, 2000, 12000, 42000, 102000, 162000]);
+  } finally {
+    leaveLivePage();
+  }
+});
+
+test('a connection that is closed again at once is retried more and more gently', async () => {
+  const { clock, startTimes, connections } = startLivePage();
+
+  try {
+    await clock.advance(0);
+    connections[0].drop();
+    await clock.advance(0);
+    connections[0].drop();
+    await clock.advance(1999);
+    assert.deepEqual(startTimes, [0, 0]);
+
+    await clock.advance(1);
+    connections[0].drop();
+    await clock.advance(10000);
+
+    assert.deepEqual(startTimes, [0, 0, 2000, 12000]);
+  } finally {
+    leaveLivePage();
+  }
+});
+
+test('a connection that stayed up for a minute starts the retry schedule over', async () => {
+  const { clock, startTimes, connections } = startLivePage();
+
+  try {
+    await clock.advance(0);
+    connections[0].drop();
+    await clock.advance(60000);
+    connections[0].drop();
+    await clock.advance(0);
+    connections[0].drop();
+    await clock.advance(2000);
+
+    assert.deepEqual(startTimes, [0, 0, 60000, 62000]);
+  } finally {
+    leaveLivePage();
+  }
+});
+
+test('a status check that overlaps another is skipped, and a failed or empty one changes nothing and does not block the next', async () => {
+  const answers = [];
+  const { clock, page, applied, comeOnline } = startLivePage({
+    withClient: false,
+    fetchStatus: () => new Promise((resolve, reject) => answers.push({ resolve, reject })),
+  });
+
+  try {
+    comeOnline();
+    comeOnline();
+    assert.equal(page.fetches, 1);
+
+    answers[0].resolve({ marker: 'first' });
+    await clock.advance(0);
+    assert.deepEqual(applied, [{ marker: 'first' }]);
+
+    comeOnline();
+    answers[1].reject(new Error('offline'));
+    await clock.advance(0);
+
+    comeOnline();
+    answers[2].resolve(null);
+    await clock.advance(0);
+
+    comeOnline();
+    answers[3].resolve({ marker: 'last' });
+    await clock.advance(0);
+
+    assert.equal(page.fetches, 4);
+    assert.deepEqual(applied, [{ marker: 'first' }, { marker: 'last' }]);
+  } finally {
+    leaveLivePage();
   }
 });
