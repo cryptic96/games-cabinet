@@ -43,6 +43,7 @@ public class BackgroundSyncTests
         await SyncHarness.WaitForRunToEnd(client);
 
         (await SyncHarness.ReadStatus(client)).LastResult.Should().Be("changed");
-        handler.Requests.Should().HaveCount(2);
+        handler.CollectionRequests().Should().HaveCount(2);
+        handler.ThingRequests().Should().ContainSingle();
     }
 }

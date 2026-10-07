@@ -17,6 +17,8 @@ public class CommittedLogLevelTests
     [
         "System.Net.Http.HttpClient.ICollectionSource.LogicalHandler",
         "System.Net.Http.HttpClient.ICollectionSource.ClientHandler",
+        "System.Net.Http.HttpClient.IEnrichmentSource.LogicalHandler",
+        "System.Net.Http.HttpClient.IEnrichmentSource.ClientHandler",
     ];
 
     [Theory]

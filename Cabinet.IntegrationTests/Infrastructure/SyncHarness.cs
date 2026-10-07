@@ -71,6 +71,8 @@ public static class SyncHarness
                 services.AddSingleton(clock);
                 services.AddHttpClient<ICollectionSource, BggClient>()
                     .ConfigurePrimaryHttpMessageHandler(() => handler);
+                services.AddHttpClient<IEnrichmentSource, BggThingClient>()
+                    .ConfigurePrimaryHttpMessageHandler(() => handler);
 
                 if (imageHandler is not null)
                 {

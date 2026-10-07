@@ -16,9 +16,9 @@ public sealed record SyncRunResult(SyncResult Result, SyncFailure Failure, HeldB
 /// what visitors saw. A collection the guard holds back is neither stored nor shown. When a stored collection exists but
 /// could not be read, each run tries to read it again first; while it still cannot be read, the run does not treat itself as
 /// the first sync, so a stored file is never replaced by an empty answer or by one answer that nothing confirms. Once the
-/// collection is stored and shown, the run fetches the box pictures that are due, within a time limit of its own, and stores
-/// the records of how each went; a picture that goes wrong never fails the run. It logs the failure category only,
-/// never an address, an answer or a title.
+/// collection is stored and shown, the run fetches the game details that are due and then the box pictures that are due,
+/// within a time limit of its own, and stores the records of how each went; details or a picture that go wrong never fail
+/// the run. It logs the failure category only, never an address, an answer or a title.
 /// </summary>
 public sealed class SyncRunner
 {
@@ -33,6 +33,7 @@ public sealed class SyncRunner
     private readonly ArtSync? _art;
     private readonly ArtCache? _cache;
     private readonly ImageOptions? _images;
+    private readonly EnrichmentSync? _enrichment;
     private CollectionSnapshot? _stored;
 
     /// <summary>Creates the runner.</summary>
@@ -44,6 +45,7 @@ public sealed class SyncRunner
     /// <param name="art">Fetches the box pictures; null leaves the run without a picture step.</param>
     /// <param name="cache">The stored pictures, pruned after the run; null leaves them alone.</param>
     /// <param name="images">The picture rules; the picture step needs them.</param>
+    /// <param name="enrichment">Fetches the game details; null leaves the run without a details step.</param>
     public SyncRunner(
         Func<ICollectionSource> sourceFactory,
         ISnapshotStore snapshots,
@@ -52,7 +54,8 @@ public sealed class SyncRunner
         ILogger<SyncRunner> logger,
         ArtSync? art = null,
         ArtCache? cache = null,
-        ImageOptions? images = null)
+        ImageOptions? images = null,
+        EnrichmentSync? enrichment = null)
     {
         ArgumentNullException.ThrowIfNull(sourceFactory);
         ArgumentNullException.ThrowIfNull(snapshots);
@@ -68,6 +71,7 @@ public sealed class SyncRunner
         _art = art;
         _cache = cache;
         _images = images;
+        _enrichment = enrichment;
     }
 
     /// <summary>Fetches the collection and applies it when the guard accepts it and it changed, then fetches the box pictures that are due.</summary>
@@ -106,14 +110,16 @@ public sealed class SyncRunner
             CollectionSnapshot.CurrentSchemaVersion,
             _time.GetUtcNow(),
             collection.Items,
-            StillNamedImages(baseline, collection.Items));
+            StillNamedImages(baseline, collection.Items),
+            StillOwnedGames(baseline, collection.Items));
 
         if (ContentChanged(baseline, snapshot))
         {
             Commit(snapshot);
         }
 
-        await FetchPicturesAsync(snapshot, started + ExtrasDeadline, cancellationToken);
+        var enriched = await FetchDetailsAsync(snapshot, started + ExtrasDeadline, cancellationToken);
+        await FetchPicturesAsync(enriched, started + ExtrasDeadline, cancellationToken);
 
         return new SyncRunResult(
             _collection.Current.Version == versionAtStart ? SyncResult.Unchanged : SyncResult.Changed,
@@ -138,9 +144,22 @@ public sealed class SyncRunner
         return kept.Count == 0 ? null : kept;
     }
 
+    private static Dictionary<int, GameDetails>? StillOwnedGames(CollectionSnapshot? baseline, IReadOnlyList<SnapshotItem> items)
+    {
+        if (baseline?.Games is not { Count: > 0 } known)
+        {
+            return null;
+        }
+
+        var owned = items.Select(item => item.GameId).ToHashSet();
+        var kept = known.Where(pair => owned.Contains(pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value);
+
+        return kept.Count == 0 ? null : kept;
+    }
+
     private static bool ContentChanged(CollectionSnapshot? baseline, CollectionSnapshot next)
     {
-        if (baseline is null || !baseline.Items.SequenceEqual(next.Items))
+        if (baseline is null || !baseline.Items.SequenceEqual(next.Items) || !SameGames(baseline.Games, next.Games))
         {
             return true;
         }
@@ -150,6 +169,15 @@ public sealed class SyncRunner
 
         return before.Count != after.Count
             || before.Any(pair => !after.TryGetValue(pair.Key, out var record) || !SameRecord(pair.Value, record));
+    }
+
+    private static bool SameGames(IReadOnlyDictionary<int, GameDetails>? left, IReadOnlyDictionary<int, GameDetails>? right)
+    {
+        var before = left ?? new Dictionary<int, GameDetails>();
+        var after = right ?? new Dictionary<int, GameDetails>();
+
+        return before.Count == after.Count
+            && before.All(pair => after.TryGetValue(pair.Key, out var details) && pair.Value.SameAs(details));
     }
 
     private static bool SameRecord(ImageRecord left, ImageRecord right) =>
@@ -169,6 +197,38 @@ public sealed class SyncRunner
         {
             _collection.Replace(next);
         }
+    }
+
+    /// <summary>Fetches the game details that are due and returns the collection with every answer applied, or the one it was given when nothing changed.</summary>
+    private async Task<CollectionSnapshot> FetchDetailsAsync(CollectionSnapshot snapshot, DateTimeOffset deadline, CancellationToken cancellationToken)
+    {
+        if (_enrichment is null)
+        {
+            return snapshot;
+        }
+
+        var latest = snapshot;
+
+        try
+        {
+            await _enrichment.RunAsync(
+                snapshot,
+                deadline,
+                stored =>
+                {
+                    Commit(stored);
+                    latest = stored;
+
+                    return Task.CompletedTask;
+                },
+                cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logger.LogWarning("Game details stopped early: {ExceptionType}", exception.GetType().Name);
+        }
+
+        return latest;
     }
 
     private async Task FetchPicturesAsync(CollectionSnapshot snapshot, DateTimeOffset deadline, CancellationToken cancellationToken)

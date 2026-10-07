@@ -58,9 +58,11 @@ public class SyncFailureTests
         var snapshotPath = Path.Combine(storage.FullPath, "snapshot.json");
         var clock = SyncHarness.NewClock();
         var items = SyntheticBggCollection.Create(5);
-        var calls = 0;
+        var collectionCalls = 0;
         var handler = new ScriptedBggHandler(request =>
-            calls++ >= 2 && !request.RequestUri!.Query.Contains("excludesubtype", StringComparison.Ordinal)
+            request.RequestUri!.AbsolutePath.EndsWith("/collection", StringComparison.Ordinal)
+            && collectionCalls++ >= 2
+            && !request.RequestUri!.Query.Contains("excludesubtype", StringComparison.Ordinal)
                 ? ScriptedResponse.Empty(HttpStatusCode.InternalServerError)
                 : SyncRounds.Healthy(request, items));
         await using var factory = SyncHarness.CreateFactory(
@@ -77,7 +79,7 @@ public class SyncFailureTests
         (await SyncHarness.ReadStatus(client)).LastResult.Should().Be("failed");
         (await SyncRounds.ReadLayout(client)).Should().BeEquivalentTo(before);
         (await File.ReadAllBytesAsync(snapshotPath, TestContext.Current.CancellationToken)).Should().Equal(storedBefore);
-        handler.Requests.Should().HaveCount(5, "two for the first sync, then the base call, the failing expansion call and its one retry");
+        handler.CollectionRequests().Should().HaveCount(5, "two for the first sync, then the base call, the failing expansion call and its one retry");
     }
 
     [Fact]
