@@ -34,8 +34,19 @@ public sealed class BggClient(HttpClient http, BggOptions options, IRequestPacer
         var expansions = await GetCollectionAsync("subtype=boardgameexpansion", ItemKind.Expansion, cancellationToken);
 
         return expansions is CollectionFetchResult.Fetched expansionFetched
-            ? new CollectionFetchResult.Fetched([.. baseFetched.Items, .. expansionFetched.Items])
+            ? new CollectionFetchResult.Fetched(MergeByCollectionId(baseFetched.Items, expansionFetched.Items))
             : expansions;
+    }
+
+    /// <summary>
+    /// Joins the two answers. An entry that appears in both is one item, and it is the expansion, because the unfiltered
+    /// labelling is the one that is wrong. Two entries for the same game with different entry identifiers stay two items.
+    /// </summary>
+    private static IReadOnlyList<SnapshotItem> MergeByCollectionId(IReadOnlyList<SnapshotItem> baseGames, IReadOnlyList<SnapshotItem> expansions)
+    {
+        var expansionIds = expansions.Select(item => item.CollectionId).ToHashSet();
+
+        return [.. baseGames.Where(item => !expansionIds.Contains(item.CollectionId)), .. expansions];
     }
 
     private async Task<CollectionFetchResult> GetCollectionAsync(string subtypeFilter, ItemKind kind, CancellationToken cancellationToken)
@@ -55,9 +66,9 @@ public sealed class BggClient(HttpClient http, BggOptions options, IRequestPacer
             }
 
             await using var body = await response.Content.ReadAsStreamAsync(cancellationToken);
-            var parsed = BggCollectionParser.Parse(body, kind);
+            var parsed = BggCollectionParser.Parse(body, kind, options.IncludePrivateInfo);
 
-            return parsed.TotalItems is { } total && total != parsed.Items.Count
+            return parsed.TotalItems is { } total && total != parsed.Items.Count + parsed.SkippedItems
                 ? new CollectionFetchResult.Failed(SyncFailure.BadAnswer)
                 : new CollectionFetchResult.Fetched(parsed.Items);
         }

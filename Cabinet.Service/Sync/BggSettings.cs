@@ -29,14 +29,17 @@ public static class BggSettings
         ArgumentNullException.ThrowIfNull(environment);
         ArgumentException.ThrowIfNullOrWhiteSpace(productVersion);
 
+        var isDevelopment = environment.IsDevelopment();
+
         return new BggOptions(
-            environment.IsDevelopment() ? ReadBaseUri(configuration) : BggOptions.DefaultBaseUri,
+            isDevelopment ? ReadBaseUri(configuration) : BggOptions.DefaultBaseUri,
             ReadText(configuration, UsernameKey),
             ReadText(configuration, TokenKey),
             ReadText(configuration, ContactUrlKey),
             TimeSpan.FromSeconds(ReadGapSeconds(configuration)),
             ReadSwitch(configuration, PrivateInfoKey),
-            productVersion);
+            productVersion,
+            BaseUriOverrideIgnored: !isDevelopment && !string.IsNullOrWhiteSpace(configuration[BaseUriKey]));
     }
 
     private static string? ReadText(IConfiguration configuration, string key)

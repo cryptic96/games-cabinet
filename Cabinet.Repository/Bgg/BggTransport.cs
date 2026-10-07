@@ -11,6 +11,7 @@ namespace Cabinet.Repository.Bgg;
 /// <param name="MinRequestGap">The least time between two requests; anything below the minimum is raised to it.</param>
 /// <param name="IncludePrivateInfo">Whether collection requests also ask for private inventory information.</param>
 /// <param name="ProductVersion">The running build's version, for the User-Agent.</param>
+/// <param name="BaseUriOverrideIgnored">Whether a configured base address was left unused because it is only honoured in development.</param>
 public sealed record BggOptions(
     Uri BaseUri,
     string? Username,
@@ -18,7 +19,8 @@ public sealed record BggOptions(
     string? ContactUrl,
     TimeSpan MinRequestGap,
     bool IncludePrivateInfo,
-    string ProductVersion)
+    string ProductVersion,
+    bool BaseUriOverrideIgnored = false)
 {
     /// <summary>The only host the token may be sent to.</summary>
     public const string ApiHost = "boardgamegeek.com";
