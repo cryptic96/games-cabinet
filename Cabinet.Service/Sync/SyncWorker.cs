@@ -1,4 +1,5 @@
 using Cabinet.Domain.Collection;
+using Cabinet.Service.Live;
 
 namespace Cabinet.Service.Sync;
 
@@ -8,8 +9,15 @@ namespace Cabinet.Service.Sync;
 /// </summary>
 /// <param name="coordinator">Supplies the accepted requests and learns when a run has finished.</param>
 /// <param name="runner">Runs one sync.</param>
+/// <param name="status">Reads the status that is sent to open pages.</param>
+/// <param name="live">Tells open pages when a run starts and when it ends.</param>
 /// <param name="logger">Receives the type of an unexpected exception, never its message.</param>
-public sealed class SyncWorker(SyncCoordinator coordinator, SyncRunner runner, ILogger<SyncWorker> logger) : BackgroundService
+public sealed class SyncWorker(
+    SyncCoordinator coordinator,
+    SyncRunner runner,
+    SyncStatusService status,
+    ILiveNotifier live,
+    ILogger<SyncWorker> logger) : BackgroundService
 {
     private static readonly TimeSpan RunLimit = TimeSpan.FromMinutes(10);
 
@@ -20,7 +28,9 @@ public sealed class SyncWorker(SyncCoordinator coordinator, SyncRunner runner, I
         {
             await foreach (var _ in coordinator.Requests.ReadAllAsync(stoppingToken))
             {
+                await live.PublishAsync(status.Current(), stoppingToken);
                 coordinator.Complete(await RunOnceAsync(stoppingToken));
+                await live.PublishAsync(status.Current(), stoppingToken);
             }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
