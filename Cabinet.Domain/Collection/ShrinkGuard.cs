@@ -21,7 +21,9 @@ public abstract record GuardDecision
 /// Decides whether a freshly fetched collection may replace the one that is shown. A collection that is empty when games
 /// were shown is never accepted. A collection that lost more than half of the shown entries is accepted only when the next
 /// fetch returns exactly the same set of entries, which tells a real clear-out from a partial answer. Everything else is
-/// accepted. The guard is pure: it looks at counts and identifiers and nothing else.
+/// accepted. When a stored collection exists but could not be read, there is nothing known to compare with: an empty answer
+/// is never accepted, and any other answer is accepted only when the next fetch returns exactly the same set of entries. The
+/// guard is pure: it looks at counts and identifiers and nothing else.
 /// </summary>
 public static class ShrinkGuard
 {
@@ -29,9 +31,19 @@ public static class ShrinkGuard
     /// <param name="previousCount">How many entries the shown collection holds; zero when none was ever shown.</param>
     /// <param name="candidateEntryIds">The collection entry identifiers of the fetched collection, each once.</param>
     /// <param name="heldBack">The collection set aside by the previous sync, or null when none is.</param>
-    public static GuardDecision Evaluate(int previousCount, IReadOnlyCollection<long> candidateEntryIds, HeldBackRecord? heldBack)
+    /// <param name="storedCollectionUnreadable">True when a stored collection exists but could not be read, so the shown one is not a reliable baseline.</param>
+    public static GuardDecision Evaluate(
+        int previousCount,
+        IReadOnlyCollection<long> candidateEntryIds,
+        HeldBackRecord? heldBack,
+        bool storedCollectionUnreadable = false)
     {
         ArgumentNullException.ThrowIfNull(candidateEntryIds);
+
+        if (storedCollectionUnreadable)
+        {
+            return EvaluateWithoutBaseline(candidateEntryIds, heldBack);
+        }
 
         if (previousCount <= 0)
         {
@@ -55,6 +67,20 @@ public static class ShrinkGuard
         return heldBack is { Kind: HeldBackKind.Shrunk } && heldBack.Fingerprint == fingerprint
             ? new GuardDecision.Accept()
             : new GuardDecision.HeldBack(HeldBackKind.Shrunk, fingerprint, candidateEntryIds.Count);
+    }
+
+    private static GuardDecision EvaluateWithoutBaseline(IReadOnlyCollection<long> candidateEntryIds, HeldBackRecord? heldBack)
+    {
+        var fingerprint = Fingerprint(candidateEntryIds);
+
+        if (candidateEntryIds.Count == 0)
+        {
+            return new GuardDecision.HeldBack(HeldBackKind.Empty, fingerprint, 0);
+        }
+
+        return heldBack is { Kind: HeldBackKind.Unverified } && heldBack.Fingerprint == fingerprint
+            ? new GuardDecision.Accept()
+            : new GuardDecision.HeldBack(HeldBackKind.Unverified, fingerprint, candidateEntryIds.Count);
     }
 
     /// <summary>

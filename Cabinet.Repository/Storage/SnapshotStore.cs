@@ -18,6 +18,7 @@ public sealed class SnapshotStore : ISnapshotStore
 
     private readonly string _path;
     private readonly ILogger<SnapshotStore> _logger;
+    private volatile bool _unread;
 
     /// <summary>Creates a store over a directory.</summary>
     /// <param name="directory">The storage directory; it must exist.</param>
@@ -32,6 +33,9 @@ public sealed class SnapshotStore : ISnapshotStore
     }
 
     /// <inheritdoc />
+    public bool HasUnreadStoredCollection => _unread;
+
+    /// <inheritdoc />
     public CollectionSnapshot? Load()
     {
         byte[] content;
@@ -40,6 +44,8 @@ public sealed class SnapshotStore : ISnapshotStore
         {
             if (!File.Exists(_path))
             {
+                _unread = false;
+
                 return null;
             }
 
@@ -47,12 +53,17 @@ public sealed class SnapshotStore : ISnapshotStore
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
+            _unread = true;
             _logger.LogWarning("The stored collection could not be read ({Reason}) and was left in place.", "unreadable");
 
             return null;
         }
 
-        return Parse(content);
+        var snapshot = Parse(content);
+
+        _unread = snapshot is null && File.Exists(_path);
+
+        return snapshot;
     }
 
     /// <inheritdoc />
@@ -61,6 +72,7 @@ public sealed class SnapshotStore : ISnapshotStore
         ArgumentNullException.ThrowIfNull(snapshot);
 
         AtomicJsonFile.WriteAtomically(_path, JsonSerializer.SerializeToUtf8Bytes(snapshot, JsonOptions));
+        _unread = false;
     }
 
     private CollectionSnapshot? Parse(byte[] content)

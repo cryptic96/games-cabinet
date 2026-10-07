@@ -118,6 +118,44 @@ public sealed class SnapshotStoreTests : IDisposable
     }
 
     [Fact]
+    public void A_stored_file_that_cannot_be_read_is_reported_until_it_is_read_or_replaced()
+    {
+        var store = CreateStore();
+        store.Save(Snapshot());
+        store.HasUnreadStoredCollection.Should().BeFalse();
+
+        var locked = new FileStream(SnapshotPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        store.Load().Should().BeNull();
+        store.HasUnreadStoredCollection.Should().BeTrue();
+        store.Load().Should().BeNull();
+        store.HasUnreadStoredCollection.Should().BeTrue();
+
+        locked.Dispose();
+        store.Load().Should().NotBeNull();
+        store.HasUnreadStoredCollection.Should().BeFalse();
+
+        locked = new FileStream(SnapshotPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        store.Load().Should().BeNull();
+        store.Save(Snapshot());
+        locked.Dispose();
+        store.HasUnreadStoredCollection.Should().BeFalse("the file was replaced with a readable one");
+    }
+
+    [Fact]
+    public void A_missing_or_set_aside_file_is_not_reported_as_unread()
+    {
+        var store = CreateStore();
+        store.Load().Should().BeNull();
+        store.HasUnreadStoredCollection.Should().BeFalse();
+
+        File.WriteAllText(SnapshotPath, "damaged");
+        store.Load().Should().BeNull();
+
+        store.HasUnreadStoredCollection.Should().BeFalse("a damaged file is moved aside, so nothing readable is at risk");
+        File.Exists(SnapshotPath).Should().BeFalse();
+    }
+
+    [Fact]
     public void Setting_a_file_aside_replaces_an_older_bad_file()
     {
         File.WriteAllText(BadPath, "older damaged content");
