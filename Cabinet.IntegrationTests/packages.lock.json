@@ -473,6 +473,7 @@
       "cabinet.repository": {
         "type": "Project",
         "dependencies": {
+          "Cabinet.Domain": "[1.0.0, )",
           "SkiaSharp": "[4.153.1, )",
           "SkiaSharp.NativeAssets.Linux.NoDependencies": "[4.153.1, )"
         }

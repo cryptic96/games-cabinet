@@ -4,6 +4,7 @@ using Cabinet.Domain;
 using Cabinet.Repository.Images;
 using Cabinet.Service.Hosting;
 using Cabinet.Service.Layout;
+using Cabinet.Service.Sync;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
@@ -37,6 +38,7 @@ builder.Services.AddHealthChecks();
 
 builder.Services.AddRazorPages();
 builder.Services.AddCabinetLayout(builder.Configuration, builder.Environment);
+builder.Services.AddCabinetSync(builder.Configuration, builder.Environment);
 
 var buildInfo = BuildInfo.Parse(
     typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
@@ -88,6 +90,7 @@ app.UseRouting();
 app.MapStaticAssets();
 app.MapRazorPages().WithStaticAssets();
 app.MapCabinetLayout();
+app.MapCabinetSync();
 
 await app.RunAsync();
 
