@@ -34,6 +34,16 @@ public sealed class ReviewSheetTests : IDisposable
     }
 
     [Fact]
+    public void Seventeen_games_make_three_pages()
+    {
+        var (regular, bold) = InstalledFont();
+        AddGames(17);
+        var rows = ReviewSheetModel.Build(_fixture.Snapshot(), ArtRules.Default, _fixture.ArtPath);
+
+        ReviewSheet.Draw(rows, ArtRules.Default, regular, bold).Should().HaveCount(3);
+    }
+
+    [Fact]
     public void A_page_with_text_is_not_a_blank_page()
     {
         var (regular, bold) = InstalledFont();
@@ -76,7 +86,7 @@ public sealed class ReviewSheetTests : IDisposable
         {
             var version = _fixture.Picture($"version-{number}", kinds[number % kinds.Length]);
             var main = _fixture.Picture($"main-{number}", SyntheticArtKind.FlatNarrow);
-            _fixture.Game(number, $"Invented Lighthouse {number}", version, main, new VersionDimensions(300, 300, 70));
+            _fixture.Game(number, $"Invented Lighthouse {number}", version, main, new VersionDimensions(7.5, 10, 2.5));
         }
     }
 

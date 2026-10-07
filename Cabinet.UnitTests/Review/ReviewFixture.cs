@@ -60,6 +60,14 @@ internal sealed class ReviewFixture : IDisposable
         return url;
     }
 
+    public string MeasuredPicture(string name, SyntheticArtKind kind, ArtFeatures features)
+    {
+        var url = Picture(name, kind);
+        _images[url] = _images[url] with { Features = features };
+
+        return url;
+    }
+
     public string FailedPicture(string name)
     {
         var url = $"https://cf.example.org/{name}.jpg";
