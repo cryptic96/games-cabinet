@@ -19,7 +19,7 @@ async function loadPageScript(name) {
 }
 
 const { COPY } = await loadPageScript('copy.js');
-const { serverOffsetMs, elapsedSeconds, isStale } = await loadPageScript('status.js');
+const { serverOffsetMs, elapsedSeconds, isStale, buttonState, countdownText, wholeMinutesLeft, pressOutcome } = await loadPageScript('status.js');
 const cases = JSON.parse(readFileSync(new URL('./fixtures/relative-time-cases.json', import.meta.url), 'utf8'));
 
 const SYNCED = '2030-01-15T12:00:00.000Z';
@@ -88,4 +88,67 @@ test('the stale notes carry no digit beyond the date they are given', () => {
 
   assert.doesNotMatch(COPY.staleRecent(exact), /\d/);
   assert.doesNotMatch(COPY.staleHeldBack(exact), /\d/);
+});
+
+const NOW_MS = Date.parse(SYNCED);
+const inSeconds = (seconds) => new Date(NOW_MS + seconds * 1000).toISOString();
+
+test('a running sync wins over a cooldown, a future end is a cooldown, and no or a past end is idle', () => {
+  assert.deepEqual(buttonState({ running: true, cooldownEndsUtc: inSeconds(300) }, NOW_MS), { kind: 'running', remainingMs: 300000 });
+  assert.deepEqual(buttonState({ running: false, cooldownEndsUtc: inSeconds(582) }, NOW_MS), { kind: 'cooldown', remainingMs: 582000 });
+  assert.equal(buttonState({ running: false, cooldownEndsUtc: null }, NOW_MS).kind, 'idle');
+  assert.equal(buttonState({ running: false, cooldownEndsUtc: inSeconds(-5) }, NOW_MS).kind, 'idle');
+  assert.equal(buttonState({ running: false, cooldownEndsUtc: inSeconds(0) }, NOW_MS).kind, 'idle');
+  assert.equal(buttonState({}, NOW_MS).kind, 'idle');
+});
+
+test('the countdown reads minutes and seconds with the seconds rounded up', () => {
+  assert.equal(countdownText(582000), '9:42');
+  assert.equal(countdownText(7000), '0:07');
+  assert.equal(countdownText(200), '0:01');
+  assert.equal(countdownText(0), '0:00');
+  assert.equal(countdownText(-4000), '0:00');
+  assert.equal(countdownText(600000), '10:00');
+});
+
+test('the button name and the press sentence round minutes up and have their own singular and sub-minute forms', () => {
+  assert.equal(wholeMinutesLeft(582000), 10);
+  assert.equal(wholeMinutesLeft(0), 0);
+  assert.equal(COPY.syncAgainName(59000), 'Sync again in less than a minute');
+  assert.equal(COPY.syncAgainName(60000), 'Sync again in 1 minute');
+  assert.equal(COPY.syncAgainName(61000), 'Sync again in 2 minutes');
+  assert.equal(COPY.syncAgainName(120000), 'Sync again in 2 minutes');
+  assert.equal(COPY.syncAgainName(582000), 'Sync again in 10 minutes');
+  assert.equal(COPY.youCanSyncAgain(59000), 'You can sync again in less than a minute.');
+  assert.equal(COPY.youCanSyncAgain(60000), 'You can sync again in 1 minute.');
+  assert.equal(COPY.youCanSyncAgain(121000), 'You can sync again in 3 minutes.');
+  assert.equal(COPY.youCanSyncAgain(582000), 'You can sync again in 10 minutes.');
+  assert.equal(COPY.syncAgainIn('9:42'), 'Sync again in 9:42');
+});
+
+test('a finished press maps to its outcome and anything unknown counts as a failure', () => {
+  assert.equal(pressOutcome('changed'), 'changed');
+  assert.equal(pressOutcome('unchanged'), 'unchanged');
+  assert.equal(pressOutcome('failed'), 'failed');
+  assert.equal(pressOutcome('heldBack'), 'heldBack');
+  assert.equal(pressOutcome(null), 'failed');
+  assert.equal(pressOutcome(undefined), 'failed');
+  assert.equal(pressOutcome('surprise'), 'failed');
+});
+
+test('every note and button string equals the copy contract and uses plain dots', () => {
+  assert.equal(COPY.syncNow, 'Sync now');
+  assert.equal(COPY.syncing, 'Syncing...');
+  assert.equal(COPY.noteChanged, 'Collection updated. BGG can take a few minutes to show recent edits.');
+  assert.equal(COPY.noteUnchanged, 'No changes found. BGG can take a few minutes to show recent edits.');
+  assert.equal(COPY.noteFailed, "BGG didn't respond. The last collection is still showing.");
+  assert.equal(COPY.noteHeldBack, 'BGG returned far fewer games than before, so the last collection is still showing.');
+  assert.equal(COPY.noteRunning, 'A sync is already running.');
+  assert.equal(COPY.noteOffline, "Couldn't start the sync. Check your connection and try again.");
+
+  const strings = [COPY.syncNow, COPY.syncing, COPY.noteChanged, COPY.noteUnchanged, COPY.noteFailed, COPY.noteHeldBack, COPY.noteRunning, COPY.noteOffline];
+
+  for (const text of strings) {
+    assert.doesNotMatch(text, /\u2026/);
+  }
 });
