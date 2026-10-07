@@ -5,6 +5,7 @@
 import { renderCabinet } from './render.js';
 import { COPY } from './copy.js';
 import { initSyncStatus } from './sync.js';
+import { startLive } from './live.js';
 
 const mount = document.getElementById('cabinet');
 const syncRoot = document.querySelector('.sync');
@@ -181,8 +182,29 @@ function abandonRedraw() {
   return false;
 }
 
+/**
+ * Asks the server for the current sync status.
+ * @returns {Promise<object | null>} The status, or null when it could not be had; a failure is never shown.
+ */
+async function fetchStatus() {
+  try {
+    const response = await fetch('/cabinet/status');
+
+    return response.ok ? await response.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+let live = null;
+
 if (syncRoot !== null) {
-  initSyncStatus(syncRoot, { onCollectionChanged: redraw });
+  const sync = initSyncStatus(syncRoot, {
+    onCollectionChanged: redraw,
+    isLiveConnected: () => live !== null && live.isConnected(),
+  });
+
+  live = startLive({ applyStatus: sync.applyStatus, fetchStatus });
 }
 
 if (mount !== null) {

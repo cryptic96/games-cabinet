@@ -19,7 +19,7 @@ async function loadPageScript(name) {
 }
 
 const { COPY } = await loadPageScript('copy.js');
-const { serverOffsetMs, elapsedSeconds, isStale, buttonState, countdownText, wholeMinutesLeft, pressOutcome } = await loadPageScript('status.js');
+const { serverOffsetMs, elapsedSeconds, isStale, buttonState, countdownText, wholeMinutesLeft, pressOutcome, shouldRedraw, reconnectDelayMs } = await loadPageScript('status.js');
 const cases = JSON.parse(readFileSync(new URL('./fixtures/relative-time-cases.json', import.meta.url), 'utf8'));
 
 const SYNCED = '2030-01-15T12:00:00.000Z';
@@ -151,4 +151,24 @@ test('every note and button string equals the copy contract and uses plain dots'
   for (const text of strings) {
     assert.doesNotMatch(text, /\u2026/);
   }
+});
+
+test('a redraw is wanted only for a version other than the one on screen', () => {
+  assert.equal(shouldRedraw('v1', { snapshotVersion: 'v1' }), false);
+  assert.equal(shouldRedraw('v1', { snapshotVersion: 'v2' }), true);
+  assert.equal(shouldRedraw('', { snapshotVersion: 'v2' }), true);
+  assert.equal(shouldRedraw(null, { snapshotVersion: 'v2' }), true);
+  assert.equal(shouldRedraw('v1', { snapshotVersion: null }), false);
+  assert.equal(shouldRedraw('v1', { snapshotVersion: '' }), false);
+  assert.equal(shouldRedraw('v1', {}), false);
+  assert.equal(shouldRedraw('v1', null), false);
+});
+
+test('the reconnect delays are at once, 2 s, 10 s, 30 s and then every minute', () => {
+  assert.equal(reconnectDelayMs(0), 0);
+  assert.equal(reconnectDelayMs(1), 2000);
+  assert.equal(reconnectDelayMs(2), 10000);
+  assert.equal(reconnectDelayMs(3), 30000);
+  assert.equal(reconnectDelayMs(4), 60000);
+  assert.equal(reconnectDelayMs(50), 60000);
 });

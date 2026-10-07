@@ -5,7 +5,7 @@
  * whatever fetches one. Only the visitor's own press ever writes to the note; a failed status fetch simply leaves the last values.
  */
 import { COPY } from './copy.js';
-import { serverOffsetMs, elapsedSeconds, isStale, buttonState, countdownText, pressOutcome } from './status.js';
+import { serverOffsetMs, elapsedSeconds, isStale, buttonState, countdownText, pressOutcome, shouldRedraw } from './status.js';
 
 const REFRESH_INTERVAL_MS = 30000;
 const POLL_INTERVAL_MS = 5000;
@@ -21,8 +21,10 @@ const OUTCOME_NOTES = Object.freeze({
 /**
  * Starts the sync block behaviour.
  * @param {HTMLElement} root The element carrying the first-paint state as data attributes.
- * @param {{ onCollectionChanged?: () => Promise<boolean | void> | void }} [options] Called when the status shows a collection version
- *   that is not the one on screen; a result of false means the redraw did not happen and the next status tries again.
+ * @param {{ onCollectionChanged?: () => Promise<boolean | void> | void, isLiveConnected?: () => boolean }} [options] onCollectionChanged is
+ *   called when the status shows a collection version that is not the one on screen; a result of false means the redraw did not
+ *   happen and the next status tries again. isLiveConnected tells whether pushed statuses are arriving, so this page only checks
+ *   the status itself after its own press while they are not.
  * @returns {{ applyStatus: (status: object, options?: { ownPress?: boolean }) => void, refresh: () => void }} The status takers other scripts call.
  */
 export function initSyncStatus(root, options = {}) {
@@ -44,6 +46,7 @@ export function initSyncStatus(root, options = {}) {
   let previousKind = null;
   let ticker = null;
   let pressing = false;
+  let ownSyncPending = false;
   let pollTimer = null;
 
   /**
@@ -196,7 +199,7 @@ export function initSyncStatus(root, options = {}) {
    * @param {string | null | undefined} version The version the status reports.
    */
   async function redrawIfChanged(version) {
-    if (typeof options.onCollectionChanged !== 'function' || typeof version !== 'string' || version === '' || version === shownVersion || version === redrawingVersion) {
+    if (typeof options.onCollectionChanged !== 'function' || !shouldRedraw(shownVersion, { snapshotVersion: version }) || version === redrawingVersion) {
       return;
     }
 
@@ -218,7 +221,8 @@ export function initSyncStatus(root, options = {}) {
    * asks for a redraw of the cabinet when the collection version changed. For the visitor's own finished press it also writes
    * the one outcome sentence.
    * @param {object} status The status; missing fields leave the last values in place.
-   * @param {{ ownPress?: boolean }} [context] ownPress is true only for the status that ends this visitor's own sync.
+   * @param {{ ownPress?: boolean }} [context] ownPress is true only for the status that ends this visitor's own sync. A page that
+   *   started a sync also treats the first status that finds nothing running as the end of it, wherever that status came from.
    */
   function applyStatus(status, context = {}) {
     if (typeof status.serverTimeUtc === 'string') {
@@ -258,7 +262,10 @@ export function initSyncStatus(root, options = {}) {
     refresh();
     renderButton();
 
-    if (context.ownPress === true && !running) {
+    if ((context.ownPress === true || ownSyncPending) && !running) {
+      ownSyncPending = false;
+      window.clearTimeout(pollTimer);
+      pollTimer = null;
       say(OUTCOME_NOTES[pressOutcome(status.lastResult)]);
     }
 
@@ -289,16 +296,30 @@ export function initSyncStatus(root, options = {}) {
   }
 
   /**
-   * Checks the status every few seconds after this page's accepted press, until the sync ends or the longest plausible sync has
-   * passed, so the button can never stay on "Syncing..." for good.
+   * Whether pushed statuses are arriving right now.
+   * @returns {boolean}
+   */
+  function liveConnected() {
+    return typeof options.isLiveConnected === 'function' && options.isLiveConnected();
+  }
+
+  /**
+   * Follows this page's accepted press until the sync ends or the longest plausible sync has passed, so the button can never stay
+   * on "Syncing..." for good. While pushed statuses arrive they end it; while they do not, the status is checked every few seconds.
    */
   function pollOwnSync() {
     const deadline = Date.now() + POLL_LIMIT_MS;
 
+    ownSyncPending = true;
     window.clearTimeout(pollTimer);
 
     const step = async () => {
-      if (await fetchStatus(true) || Date.now() >= deadline) {
+      if (!liveConnected()) {
+        await fetchStatus(true);
+      }
+
+      if (!ownSyncPending || Date.now() >= deadline) {
+        ownSyncPending = false;
         pollTimer = null;
         return;
       }

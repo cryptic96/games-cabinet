@@ -110,3 +110,28 @@ export function wholeMinutesLeft(remainingMs) {
 export function pressOutcome(lastResult) {
   return lastResult === 'changed' || lastResult === 'unchanged' || lastResult === 'heldBack' ? lastResult : 'failed';
 }
+
+/**
+ * Whether a status shows a collection version other than the one on screen. A status without a version never asks for a redraw.
+ * @param {string | null | undefined} onScreenVersion The snapshot version the cabinet on screen was drawn from; empty before anything was synced.
+ * @param {{ snapshotVersion?: string | null }} status The status that arrived.
+ * @returns {boolean}
+ */
+export function shouldRedraw(onScreenVersion, status) {
+  const version = status === null || typeof status !== 'object' ? null : status.snapshotVersion;
+
+  return typeof version === 'string' && version !== '' && version !== (onScreenVersion ?? '');
+}
+
+const RECONNECT_DELAYS_MS = Object.freeze([0, 2000, 10000, 30000]);
+const STEADY_RECONNECT_DELAY_MS = 60000;
+
+/**
+ * How long to wait before the next try to reach the live connection: at once, then 2 s, 10 s, 30 s, and every 60 s after that
+ * without ever giving up.
+ * @param {number} previousRetryCount How many tries have already failed since the connection was last up.
+ * @returns {number} Milliseconds to wait.
+ */
+export function reconnectDelayMs(previousRetryCount) {
+  return RECONNECT_DELAYS_MS[previousRetryCount] ?? STEADY_RECONNECT_DELAY_MS;
+}
