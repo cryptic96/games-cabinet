@@ -165,6 +165,20 @@ check_deploy_environment_tag_policy() {
   fi
 }
 
+check_deploy_environment_no_admin_bypass() {
+  local label="deploy environment does not let administrators bypass its protection rules"
+  local detail
+  if ! detail="$(gh api "repos/$REPO/environments/deploy" 2>/dev/null)"; then
+    fail "$label (environment 'deploy' not found)"
+    return
+  fi
+  if printf '%s' "$detail" | jq -e '.can_admins_bypass == false' >/dev/null; then
+    pass "$label"
+  else
+    fail "$label"
+  fi
+}
+
 check_fork_pr_approval() {
   local label="approval is required for every outside contributor's workflow run"
   local detail
@@ -283,6 +297,7 @@ check_merge_methods
 check_tag_ruleset
 check_deploy_environment_reviewer
 check_deploy_environment_tag_policy
+check_deploy_environment_no_admin_bypass
 check_fork_pr_approval
 check_default_workflow_permissions
 check_sha_pinning_required
