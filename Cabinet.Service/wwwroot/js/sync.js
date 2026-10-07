@@ -216,8 +216,12 @@ export function initSyncStatus(root, options = {}) {
       if (drawn !== false) {
         shownVersion = version;
       }
+    } catch {
+      return;
     } finally {
-      redrawingVersion = null;
+      if (redrawingVersion === version) {
+        redrawingVersion = null;
+      }
     }
   }
 
