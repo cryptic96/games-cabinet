@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+using Cabinet.Domain.Collection;
 
 namespace Cabinet.Service.Sync;
 
@@ -30,17 +31,54 @@ public abstract record SyncRequestResult
 }
 
 /// <summary>
-/// Lets only one sync exist at a time. A request is accepted only when none is running; the accepted request travels over a
-/// channel with room for one, and the single worker that reads it reports back when the run has finished.
+/// Lets only one sync exist at a time and keeps the shared window. A request is accepted only when none is running; every
+/// accepted request opens a window of the manual cooldown, written to disk before the request is queued, during which a
+/// visitor's request is refused. The accepted request travels over a channel with room for one, and the single worker that
+/// reads it reports back when the run has finished.
 /// </summary>
 public sealed class SyncCoordinator
 {
     private readonly Channel<SyncTrigger> _channel = Channel.CreateBounded<SyncTrigger>(
         new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.Wait, SingleReader = true });
 
+    private readonly ISyncStateStore _stateStore;
+    private readonly SyncOptions _options;
+    private readonly TimeProvider _time;
+    private readonly ILogger<SyncCoordinator>? _logger;
     private readonly object _gate = new();
+    private SyncState _state;
     private bool _running;
     private SyncRunResult? _lastResult;
+
+    /// <summary>Creates the coordinator and loads the stored bookkeeping, so a restart keeps the shared window.</summary>
+    /// <param name="stateStore">Keeps the bookkeeping on disk.</param>
+    /// <param name="options">The timing rules.</param>
+    /// <param name="time">The clock every window is measured on.</param>
+    /// <param name="logger">Receives a line when the bookkeeping cannot be written after a run; optional.</param>
+    public SyncCoordinator(ISyncStateStore stateStore, SyncOptions options, TimeProvider time, ILogger<SyncCoordinator>? logger = null)
+    {
+        ArgumentNullException.ThrowIfNull(stateStore);
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(time);
+
+        _stateStore = stateStore;
+        _options = options;
+        _time = time;
+        _logger = logger;
+        _state = stateStore.Load();
+    }
+
+    /// <summary>The bookkeeping as it stands now.</summary>
+    public SyncState State
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _state;
+            }
+        }
+    }
 
     /// <summary>Whether a sync has been accepted and has not finished yet.</summary>
     public bool IsRunning
@@ -69,8 +107,12 @@ public sealed class SyncCoordinator
     /// <summary>The accepted requests, for the one worker that runs them.</summary>
     public ChannelReader<SyncTrigger> Requests => _channel.Reader;
 
-    /// <summary>Asks for a sync. Nothing is queued while one is running.</summary>
+    /// <summary>
+    /// Asks for a sync. Nothing is queued while one is running, and a visitor's request is refused inside the shared window.
+    /// Every accepted request, whatever asked, opens a new window that is stored before the request is queued.
+    /// </summary>
     /// <param name="trigger">What asked.</param>
+    /// <exception cref="IOException">The window could not be stored; nothing was queued.</exception>
     public SyncRequestResult TryRequest(SyncTrigger trigger)
     {
         lock (_gate)
@@ -80,6 +122,16 @@ public sealed class SyncCoordinator
                 return new SyncRequestResult.AlreadyRunning();
             }
 
+            var now = _time.GetUtcNow();
+
+            if (trigger == SyncTrigger.Manual && _state.CooldownEndsUtc is { } until && now < until)
+            {
+                return new SyncRequestResult.CoolingDown(until);
+            }
+
+            var opened = _state with { LastStartedUtc = now, CooldownEndsUtc = now + _options.ManualCooldown };
+            _stateStore.Save(opened);
+            _state = opened;
             _running = true;
 
             if (!_channel.Writer.TryWrite(trigger))
@@ -101,8 +153,31 @@ public sealed class SyncCoordinator
 
         lock (_gate)
         {
-            _lastResult = result;
-            _running = false;
+            try
+            {
+                var now = _time.GetUtcNow();
+                var succeeded = result.Result is SyncResult.Changed or SyncResult.Unchanged;
+                var failures = succeeded ? 0 : _state.ConsecutiveFailures + (result.Result == SyncResult.Failed ? 1 : 0);
+
+                _state = _state with
+                {
+                    LastFinishedUtc = now,
+                    LastResult = result.Result,
+                    LastFailure = result.Failure,
+                    ConsecutiveFailures = failures,
+                    LastSuccessUtc = succeeded ? now : _state.LastSuccessUtc,
+                };
+                _lastResult = result;
+                _stateStore.Save(_state);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                _logger?.LogWarning("The sync state could not be stored after a run: {ExceptionType}", exception.GetType().Name);
+            }
+            finally
+            {
+                _running = false;
+            }
         }
     }
 }
