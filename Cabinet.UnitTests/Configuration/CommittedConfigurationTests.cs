@@ -1,3 +1,4 @@
+using Cabinet.UnitTests.Infrastructure;
 using System.Text.Json;
 using FluentAssertions;
 
@@ -12,7 +13,7 @@ public class CommittedConfigurationTests
     [Trait("Category", "Configuration")]
     public void Every_committed_appsettings_file_parses_and_has_no_non_empty_secret_values()
     {
-        var serviceDirectory = FindServiceDirectory();
+        var serviceDirectory = RepositoryPaths.ServiceDirectory();
         var appsettingsFiles = Directory.GetFiles(serviceDirectory, "appsettings*.json", SearchOption.TopDirectoryOnly);
 
         appsettingsFiles.Should().NotBeEmpty();
@@ -80,22 +81,4 @@ public class CommittedConfigurationTests
             JsonValueKind.Null => false,
             _ => true
         };
-
-    private static string FindServiceDirectory()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-
-        while (directory is not null)
-        {
-            var candidate = Path.Combine(directory.FullName, "Cabinet.Service");
-            if (File.Exists(Path.Combine(candidate, "Cabinet.Service.csproj")))
-            {
-                return candidate;
-            }
-
-            directory = directory.Parent;
-        }
-
-        throw new InvalidOperationException("Could not locate Cabinet.Service above the test output directory.");
-    }
 }

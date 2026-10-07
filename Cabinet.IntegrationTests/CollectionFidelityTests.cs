@@ -151,22 +151,15 @@ public class CollectionFidelityTests
         using var press = await client.PostAsync(SyncPath, content: null, TestContext.Current.CancellationToken);
         press.StatusCode.Should().Be(System.Net.HttpStatusCode.Accepted);
 
-        var deadline = DateTime.UtcNow.AddSeconds(15);
-        while (true)
+        var changed = initial;
+        await SyncHarness.WaitUntil(async () =>
         {
-            var current = await ReadLayout(client);
-            if (current.ETag != initial.ETag)
-            {
-                return current.Json;
-            }
+            changed = await ReadLayout(client);
 
-            if (DateTime.UtcNow > deadline)
-            {
-                throw new TimeoutException("The layout did not change within fifteen seconds.");
-            }
+            return changed.ETag != initial.ETag;
+        });
 
-            await Task.Delay(TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken);
-        }
+        return changed.Json;
     }
 
     private static async Task<(string? ETag, string Json)> ReadLayout(HttpClient client)
@@ -177,14 +170,4 @@ public class CollectionFidelityTests
     }
 
     private sealed record PlacementView(int GameId, long EntryId, bool IsExpansion);
-
-    private sealed class TemporaryDirectory : IDisposable
-    {
-        public TemporaryDirectory() =>
-            Directory.CreateDirectory(FullPath = Path.Combine(Path.GetTempPath(), $"cabinet-fidelity-tests-{Guid.NewGuid():N}"));
-
-        public string FullPath { get; }
-
-        public void Dispose() => Directory.Delete(FullPath, recursive: true);
-    }
 }
