@@ -6,17 +6,22 @@ namespace Cabinet.UnitTests.Layout;
 
 /// <summary>
 /// Pins the narrow section design used on phones and the readability floors derived from the real gutters and frame:
-/// nothing a visitor can tap is smaller than a tap target at the narrowest supported screen, orphan boxes keep room for
-/// their two lines of text, and the append stability the desktop design has holds on the phone design too.
+/// nothing a visitor can tap is smaller than a tap target at the narrowest supported screen, thin boxes are drawn at
+/// their real thickness down to a one-line floor with a threshold for the second line, and the append stability the
+/// desktop design has holds on the phone design too.
 /// </summary>
 public class PhoneProfileTests
 {
     private const int PhoneMinBoxThicknessMm = 59;
-    private const int PhoneMinOrphanHeightMm = 89;
-    private const int PhoneMinUprightWidthMm = 71;
-    private const int DesktopMinOrphanHeightMm = 80;
+    private const int PhoneMinOrphanHeightMm = 37;
+    private const int PhoneMinUprightWidthMm = 37;
+    private const int PhoneTwoLineOrphanHeightMm = 89;
+    private const int PhoneTwoLineUprightWidthMm = 71;
+    private const int DesktopMinOrphanHeightMm = 34;
     private const int DesktopMinBoxThicknessMm = 34;
-    private const int DesktopMinUprightWidthMm = 64;
+    private const int DesktopMinUprightWidthMm = 34;
+    private const int DesktopTwoLineOrphanHeightMm = 80;
+    private const int DesktopTwoLineUprightWidthMm = 64;
     private const int RandomSeeds = 100;
     private const int StabilitySeeds = 50;
     private const int StabilityCollectionSize = 120;
@@ -39,6 +44,8 @@ public class PhoneProfileTests
         { 36, 592, 1304, 80 },
         { 29, 592, 1304, 64 },
         { 29, 304, 744, 71 },
+        { 15, 592, 1304, 34 },
+        { 15, 304, 744, 37 },
     };
 
     [Theory]
@@ -76,6 +83,9 @@ public class PhoneProfileTests
         Phone.MinBoxThicknessMm.Should().Be(PhoneMinBoxThicknessMm);
         Phone.MinOrphanHeightMm.Should().Be(PhoneMinOrphanHeightMm);
         Phone.MinUprightExpansionWidthMm.Should().Be(PhoneMinUprightWidthMm);
+        Phone.MinLayerHeightMm.Should().Be(PhoneMinOrphanHeightMm);
+        Phone.TwoLineOrphanHeightMm.Should().Be(PhoneTwoLineOrphanHeightMm);
+        Phone.TwoLineUprightWidthMm.Should().Be(PhoneTwoLineUprightWidthMm);
         Phone.InteriorHeightMm.Should().Be(2060);
         Phone.Name.Should().Be(SectionDesigns.PhoneName);
     }
@@ -90,6 +100,9 @@ public class PhoneProfileTests
         Desktop.MinBoxThicknessMm.Should().Be(DesktopMinBoxThicknessMm);
         Desktop.MinOrphanHeightMm.Should().Be(DesktopMinOrphanHeightMm);
         Desktop.MinUprightExpansionWidthMm.Should().Be(DesktopMinUprightWidthMm);
+        Desktop.MinLayerHeightMm.Should().Be(DesktopMinOrphanHeightMm);
+        Desktop.TwoLineOrphanHeightMm.Should().Be(DesktopTwoLineOrphanHeightMm);
+        Desktop.TwoLineUprightWidthMm.Should().Be(DesktopTwoLineUprightWidthMm);
     }
 
     [Fact]
@@ -264,7 +277,8 @@ public class PhoneProfileTests
                     placement.WidthMm.Should().BeGreaterThanOrEqualTo(design.MinBoxThicknessMm, "spine {0} in {1}", placement.GameId, what);
                     break;
                 case PlacementKind.ExpansionSpine:
-                    placement.WidthMm.Should().BeGreaterThanOrEqualTo(design.MinUprightExpansionWidthMm, "upright {0} in {1}", placement.GameId, what);
+                    placement.WidthMm.Should().BeGreaterThanOrEqualTo(Math.Max(design.MinUprightExpansionWidthMm, design.MinBoxThicknessMm), "upright {0} in {1}", placement.GameId, what);
+                    placement.ShowBaseLine.Should().Be(placement.WidthMm >= design.TwoLineUprightWidthMm, "upright {0} in {1}", placement.GameId, what);
                     break;
                 case PlacementKind.FlatBox:
                 case PlacementKind.ExpansionLayer:
@@ -272,7 +286,8 @@ public class PhoneProfileTests
                     placement.HeightMm.Should().BeGreaterThanOrEqualTo(design.MinBoxThicknessMm, "{0} {1} in {2}", placement.Kind, placement.GameId, what);
                     break;
                 case PlacementKind.OrphanExpansion:
-                    placement.HeightMm.Should().BeGreaterThanOrEqualTo(design.MinOrphanHeightMm, "orphan {0} in {1}", placement.GameId, what);
+                    placement.HeightMm.Should().BeGreaterThanOrEqualTo(Math.Max(design.MinOrphanHeightMm, design.MinBoxThicknessMm), "orphan {0} in {1}", placement.GameId, what);
+                    placement.ShowBaseLine.Should().Be(placement.HeightMm >= design.TwoLineOrphanHeightMm, "orphan {0} in {1}", placement.GameId, what);
                     break;
                 default:
                     break;
