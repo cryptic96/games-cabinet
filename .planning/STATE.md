@@ -2,35 +2,35 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 02
-current_phase_name: layout-engine-cabinet-prototype
+current_phase: 03
+current_phase_name: BGG Access Spike, Real Sync & Snapshot
 status: executing
-stopped_at: Phase 2 UI-SPEC approved
-last_updated: "2026-10-06T08:33:23.644Z"
-last_activity: 2026-10-05
-last_activity_desc: Phase 02 execution started
+stopped_at: Phase 3 UI-SPEC approved
+last_updated: "2026-10-06T18:00:56.954Z"
+last_activity: 2026-10-06
+last_activity_desc: Phase 2 complete, transitioned to Phase 3
 progress:
-  total_phases: 2
-  completed_phases: 1
-  total_plans: 24
-  completed_plans: 23
+  total_phases: 3
+  completed_phases: 2
+  total_plans: 39
+  completed_plans: 26
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-03)
+See: .planning/PROJECT.md (updated 2026-10-06)
 
 **Core value:** Anyone with the link sees an up-to-date, good-looking cabinet of exactly the games the owner owns on BGG, with no manual data entry in the app.
-**Current focus:** Phase 02 — layout-engine-cabinet-prototype
+**Current focus:** Phase 03 — BGG Access Spike, Real Sync & Snapshot
 
 ## Current Position
 
-Phase: 02 (layout-engine-cabinet-prototype) — EXECUTING
-Plan: 8 of 8
-Status: Ready to execute
-Last activity: 2026-10-05 — Phase 02 execution started
+Phase: 03 (BGG Access Spike, Real Sync & Snapshot) — EXECUTING
+Plan: 1 of 15
+Status: Executing Phase 03
+Last activity: 2026-10-06 — Phase 03 execution started
 
 Progress: [██████████] 100%
 
@@ -38,7 +38,7 @@ Progress: [██████████] 100%
 
 **Velocity:**
 
-- Total plans completed: 15
+- Total plans completed: 24
 - Average duration: - min
 - Total execution time: 0.0 hours
 
@@ -47,6 +47,7 @@ Progress: [██████████] 100%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01 | 15 | - | - |
+| 2 | 9 | - | - |
 
 **Recent Trend:**
 
@@ -72,16 +73,24 @@ Recent decisions affecting current work:
 - [Roadmap]: Mobile reflow (CAB-07) and expansion layout (EXP-01..03) are mapped to the layout phase because they are layout-engine outputs the owner must review early.
 - [Roadmap]: SEC-05 (token and username server-side only) is mapped to the sync phase where it is built; SEC-06 (resource caps) stays in hardening so caps are sized from real load.
 - [Phase ?]: Phase 01-01: history rewritten with replace-text only; backup mirror kept under XDG state until go-live scan passes
+- [Phase 2]: Cabinet look approved and shipped as v0.2.0 (classic wooden finish, piles widest-first, big boxes may lie flat, thick expansions upright, last section trimmed, layout version 8); owner walked the deployed build on desktop and phone.
+- [Phase 2]: Layout is a pure versioned function guarded by golden files; later visual changes are a version bump plus a release, with no stored state to migrate.
+- [Phase 2]: Remaining taste calls deferred as todos to Phases 4, 5 and 7; selectable finishes stay an unscheduled todo.
+- [Phase 2]: Front-end work in GSD agents uses the owner's personal senior-frontend skill via agent_skills (planner, executor, UI agents).
 
 ### Pending Todos
 
 - [Phase 3] Add dev-only fake BGG host for the sync phase (minor, tooling): `.planning/todos/pending/2026-10-05-add-dev-only-fake-bgg-host-for-the-sync-phase.md`
+- [Phase 4] Box look polish for the box images phase (cosmetic, ui): `.planning/todos/pending/2026-10-06-box-look-polish-for-the-box-images-phase.md`
+- [Phase 5] Cabinet accessibility notes for the detail phase (minor, ui): `.planning/todos/pending/2026-10-06-cabinet-accessibility-notes-for-the-detail-phase.md`
+- [Phase 7] Phone cabinet density for the filters and locations phase (cosmetic, ui): `.planning/todos/pending/2026-10-06-phone-cabinet-density-for-the-filters-phase.md`
+- [Phase 8] Turn off prototype mode and add noindex before go-public (major, security): `.planning/todos/pending/2026-10-06-turn-off-prototype-mode-and-add-noindex-before-go-public.md`
 - [Unscheduled] Selectable cabinet finishes and lit-cubbies toggle (minor, ui), needs discussion, possibly its own phase: `.planning/todos/pending/2026-10-06-selectable-cabinet-finishes-and-lit-cubbies-toggle.md`
 
 ### Blockers/Concerns
 
-- [Phase 1]: Owner must register the BGG application (non-commercial) on day one; approval may take a week or more and gates Phase 3.
-- [Phase 2]: Packing quality is subjective; the owner's visual review is the acceptance gate and may take several rounds.
+- [Resolved 2026-10-06]: The BGG application (non-commercial) is approved and the owner has the API token, so Phase 3 is unblocked. The token goes only into the server env file (and `dotnet user-secrets` locally), never into the repository, logs or chat. Phase 3 also adds the linked "Powered by BGG" logo to every public page (SYNC-08), taken from BGG's official usage page.
+- [Resolved 2026-10-06]: Plan 03-04 finished with the official reversed "Powered by BGG" SVG from the owner's download, served from the site with no plate; the exact BGG source page URL is still to be confirmed by the owner for the provenance record.
 - [Phase 3]: Location spike outcome decides whether LOC-03 and LOC-04 are built in Phase 6. BGG throttle numbers are unpublished; treat all rates as unconfirmed.
 - [Phase 4]: Coverage and units of BGG version dimensions are unconfirmed; image resizing under BGG terms is ambiguous (downscale only, never crop, keep the credit).
 - [Phase 8]: DNS, TLS and router port-forward are owner actions; the router stays LAN-only until the go-public checklist passes.
@@ -92,6 +101,8 @@ Recent decisions affecting current work:
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 261004-vqo | Make out-of-date provisioning visible on the server (poll warning + selfcheck per-file check) | 2026-10-04 | fa25c8f | [261004-vqo-make-out-of-date-provisioning-visible-on](./quick/261004-vqo-make-out-of-date-provisioning-visible-on/) |
+| 2 | Move CI and release workflows to ubuntu-26.04 (actionlint label config added) | 2026-10-06 | 7d802a1 | — |
+| 3 | Fix flaky port race in integration tests (retry host start on fresh ports) | 2026-10-06 | 3376015 | — |
 
 ## Deferred Items
 
@@ -103,6 +114,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-05T16:07:52.748Z
-Stopped at: Phase 2 UI-SPEC approved
-Resume file: .planning/phases/02-layout-engine-cabinet-prototype/02-UI-SPEC.md
+Last session: 2026-10-06T14:29:13.833Z
+Stopped at: Phase 3 UI-SPEC approved
+Resume file: .planning/phases/03-bgg-access-spike-real-sync-snapshot/03-UI-SPEC.md

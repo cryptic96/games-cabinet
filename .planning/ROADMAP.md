@@ -16,7 +16,7 @@ Every phase is a vertical slice: it ends with something the owner can see or do 
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Repo, Guardrails & Walking-Skeleton Deploy** - Public repo with enforced guardrails and a hello page proven through release, deploy and rollback (completed 2026-10-04)
-- [ ] **Phase 2: Layout Engine & Cabinet Prototype** - Deterministic, natural-looking cabinet on synthetic data, approved visually by the owner
+- [x] **Phase 2: Layout Engine & Cabinet Prototype** - Deterministic, natural-looking cabinet on synthetic data, approved visually by the owner (completed 2026-10-06)
 - [ ] **Phase 3: BGG Access Spike, Real Sync & Snapshot** - The owner's real collection appears automatically in the deployed cabinet, resilient to BGG outages
 - [ ] **Phase 4: Enrichment, Box Images & Shape** - Real box art, art-coloured spines, true box proportions and full game details, all served from the site
 - [ ] **Phase 5: Game Detail, Accessibility & Language** - Pull-out animation, detail card, keyboard and screen-reader access, English and Dutch labels
@@ -98,11 +98,11 @@ Plans:
 
   1. The owner opens the deployed prototype with synthetic collections and approves that it reads as a real wooden cubby cabinet: face-out covers mixed with spines, packed full in irregular cubbies rather than a uniform grid.
   2. The cabinet grows with the collection: synthetic collections of 0, 1, 5, about 65 and 400 games all render without overlap or overflow, and empty or near-empty collections look intentional (a minimum cabinet, boxes facing out when there are few).
-  3. The same collection always renders the same cabinet, and adding a game does not move any existing box (verified by automated tests).
-  4. Each expansion appears as a thin sideways spine with its name beside its base game; an expansion whose base game is absent stands alone, labelled with the game it expands; a base game with many expansions collapses the extras into a "+N more" stack that never overflows its shelf.
+  3. The same collection always renders the same cabinet, and adding a plain game, or an expansion to an existing stack, changes at most one cubby (verified by automated tests); the documented exceptions (switching out of the few-games look, a base game's first expansion, an expansion that widens its family) are tested as their own cases (D-09, D-19, D-23).
+  4. Each expansion appears with its name beside its base game: thick (big-box) expansions stand upright next to it and thin ones lie as thin sideways spines in a stack, thickest at the bottom (D-23, D-24); an expansion whose base game is absent stands alone, labelled with the game it expands; a base game with many expansions collapses the extras into a "+N more" stack that never overflows its shelf.
   5. On a phone-width screen the cabinet reflows into a narrower, taller cabinet that still looks like a cabinet, with spines readable and large enough to tap.
 
-**Plans:** 8/9 plans executed
+**Plans:** 9/9 plans complete
 
 Plans:
 **Wave 1**
@@ -136,7 +136,7 @@ Plans:
 
 **Wave 8** *(blocked on Wave 7 completion)*
 
-- [ ] 02-08-PLAN.md — Release through the existing pipeline and the owner's deployed check on desktop and phone (owner-gated)
+- [x] 02-08-PLAN.md — Release through the existing pipeline and the owner's deployed check on desktop and phone (owner-gated)
 
 **UI hint**: yes
 
@@ -156,7 +156,51 @@ Plans:
   4. Before the first successful sync, visitors see an intentional "cabinet is being filled" state instead of an error, and every public page carries the linked "Powered by BGG" credit.
   5. The location spike has been run with the real token from the LXC and its outcome recorded: either BGG exposes the private inventory location and the synced data carries each game's location, or it does not and Phase 6 builds the owner location tools.
 
-**Plans**: TBD
+**Plans:** 14/15 plans executed
+
+Plans:
+**Wave 1**
+
+- [x] 03-01-PLAN.md — Shape-only BGG access check script and the owner's go-ahead (locations set, keys in the env file, run approved) (owner-gated)
+- [x] 03-03-PLAN.md — Layout data for real games: entry id per copy, "Expansion" label without a known base, layout version 9
+- [x] 03-04-PLAN.md — Shared page layout with the linked official "Powered by BGG" credit on every page (owner supplies the logo)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 03-02-PLAN.md — Access check run from the container, shape-only outcome signed off by the owner and committed (owner-gated)
+- [x] 03-05-PLAN.md — Page reads the synced collection store; "being filled" state; invented samples only in local development
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 03-06-PLAN.md — Local fake BGG, synthetic BGG-shaped XML and a scripted transport for tests
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [x] 03-07-PLAN.md — Tracer: sync now fetches the owned collection from BGG, stores it atomically and shows it in the cabinet
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [x] 03-08-PLAN.md — Shared persisted cooldown, hourly and start-up runs, status endpoint
+- [x] 03-09-PLAN.md — Faithful copies, expansions, box sizes and locations; token and username provably server-side
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [x] 03-10-PLAN.md — Failure classification, polite 202 polling, empty and shrunken results held back
+- [x] 03-11-PLAN.md — "Synced ... ago" status line, stale note, node --test checks in CI
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [x] 03-12-PLAN.md — Sync now button, countdown, own-press notes and quiet in-place redraw
+- [x] 03-13-PLAN.md — Broadcast-only SignalR hub with transport and connection limits
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [x] 03-14-PLAN.md — Live page updates through the vendored official SignalR client, three-engine CSP checks and screenshots (owner approves downloads)
+
+**Wave 9** *(blocked on Wave 8 completion)*
+
+- [ ] 03-15-PLAN.md — Release and the owner's check of the real collection in the deployed cabinet (owner-gated)
+
 **UI hint**: yes
 
 ### Phase 4: Enrichment, Box Images & Shape
@@ -252,8 +296,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Repo, Guardrails & Walking-Skeleton Deploy | 15/15 | Complete    | 2026-10-04 |
-| 2. Layout Engine & Cabinet Prototype | 8/9 | In Progress|  |
-| 3. BGG Access Spike, Real Sync & Snapshot | 0/0 | Not started | - |
+| 2. Layout Engine & Cabinet Prototype | 9/9 | Complete    | 2026-10-06 |
+| 3. BGG Access Spike, Real Sync & Snapshot | 14/15 | In Progress|  |
 | 4. Enrichment, Box Images & Shape | 0/0 | Not started | - |
 | 5. Game Detail, Accessibility & Language | 0/0 | Not started | - |
 | 6. Owner Tools & Persistence | 0/0 | Not started | - |

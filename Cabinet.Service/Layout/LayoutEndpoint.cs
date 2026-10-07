@@ -1,11 +1,13 @@
 using Cabinet.Domain.Layout;
+using Cabinet.Service.Collection;
 using Cabinet.Service.Prototype;
 using Microsoft.Net.Http.Headers;
 
 namespace Cabinet.Service.Layout;
 
 /// <summary>
-/// The undocumented endpoint the cabinet page reads. It only builds layouts for sample and profile names on fixed
+/// The undocumented endpoint the cabinet page reads. It serves the synced collection's layout, and an invented
+/// collection only when the catalog honours the requested sample. Profile and sample names are checked against fixed
 /// allowlists, so a visitor cannot ask for an arbitrary collection size, and it sends no cross-origin headers.
 /// </summary>
 public static class LayoutEndpoint
@@ -15,20 +17,29 @@ public static class LayoutEndpoint
 
     /// <summary>
     /// Reads and validates the Layout settings now and registers them as a singleton, so a bad value stops the app at
-    /// startup instead of failing the first request.
+    /// startup instead of failing the first request. It also registers the sample catalog, the sample layout cache and the
+    /// store that holds the synced collection.
     /// </summary>
-    public static IServiceCollection AddCabinetLayout(this IServiceCollection services, IConfiguration configuration)
+    /// <param name="services">The service collection to add to.</param>
+    /// <param name="configuration">The configuration the Layout and Prototype settings are read from.</param>
+    /// <param name="environment">The hosting environment the app runs in.</param>
+    public static IServiceCollection AddCabinetLayout(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(environment);
 
         return services
             .AddSingleton(LayoutSettings.FromConfiguration(configuration))
-            .AddSingleton(SampleCatalog.FromConfiguration(configuration))
-            .AddSingleton<LayoutCache>();
+            .AddSingleton(SampleCatalog.FromConfiguration(configuration, environment))
+            .AddSingleton<LayoutCache>()
+            .AddSingleton<CollectionStore>();
     }
 
-    /// <summary>Maps the layout route; it answers 404 while the prototype is off and for unknown sample or profile names.</summary>
+    /// <summary>Maps the layout route; it answers 404 for an unknown or missing profile name.</summary>
     public static IEndpointRouteBuilder MapCabinetLayout(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
@@ -39,25 +50,27 @@ public static class LayoutEndpoint
     }
 
     /// <summary>
-    /// Answers one layout request. The query is checked against the allowlists only, which costs nothing; the sample is
-    /// generated and laid out only when the layout cache does not hold it yet, so a repeated request or a revalidation
-    /// answered with 304 never rebuilds anything.
+    /// Answers one layout request. The query is checked against the allowlists only, which costs nothing. A sample the
+    /// catalog honours is laid out from the sample cache; anything else, including an unknown or ignored sample value,
+    /// gets the synced collection's layout, which is built once per collection version and profile. A repeated request or
+    /// a revalidation answered with 304 never rebuilds anything, and the sample value is never echoed.
     /// </summary>
-    /// <param name="sample">The requested sample name.</param>
+    /// <param name="sample">The requested sample name; ignored unless the catalog honours it.</param>
     /// <param name="profile">The requested screen profile.</param>
     /// <param name="context">The request, whose services supply the catalog and the layout cache.</param>
     public static IResult Handle(string? sample, string? profile, HttpContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        var catalog = context.RequestServices.GetRequiredService<SampleCatalog>();
-
-        if (!catalog.Enabled || !catalog.IsKnown(sample) || !SectionDesigns.TryGet(profile, out var design))
+        if (!SectionDesigns.TryGet(profile, out var design))
         {
             return Results.NotFound();
         }
 
-        var cached = context.RequestServices.GetRequiredService<LayoutCache>().Get(sample!, design);
+        var services = context.RequestServices;
+        var cached = services.GetRequiredService<SampleCatalog>().TryResolve(sample, out var sampleName)
+            ? services.GetRequiredService<LayoutCache>().Get(sampleName, design)
+            : services.GetRequiredService<CollectionStore>().Current.LayoutFor(design, services.GetRequiredService<LayoutOptions>());
 
         context.Response.Headers.ETag = cached.ETag;
         context.Response.Headers.CacheControl = "no-cache";

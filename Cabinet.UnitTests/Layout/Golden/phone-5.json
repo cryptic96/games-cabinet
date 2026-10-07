@@ -1,5 +1,5 @@
 {
-  "layoutVersion": 8,
+  "layoutVersion": 9,
   "profile": "phone",
   "optionsFingerprint": "09a03be9acd0723f",
   "palette": [
@@ -68,6 +68,7 @@
           "placements": [
             {
               "gameId": 10000,
+              "entryId": 500000,
               "kind": "cover",
               "xMm": 0,
               "yMm": 0,
@@ -80,6 +81,7 @@
             },
             {
               "gameId": 10037,
+              "entryId": 500019,
               "kind": "cover",
               "xMm": 159,
               "yMm": 0,
@@ -101,6 +103,7 @@
           "placements": [
             {
               "gameId": 10060,
+              "entryId": 500038,
               "kind": "cover",
               "xMm": 0,
               "yMm": 0,
@@ -146,6 +149,7 @@
           "placements": [
             {
               "gameId": 10044,
+              "entryId": 500029,
               "kind": "cover",
               "xMm": 0,
               "yMm": 0,
@@ -279,6 +283,7 @@
           "placements": [
             {
               "gameId": 10100,
+              "entryId": 500042,
               "kind": "cover",
               "xMm": 0,
               "yMm": 0,

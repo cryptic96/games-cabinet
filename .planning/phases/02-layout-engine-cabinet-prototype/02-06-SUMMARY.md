@@ -100,7 +100,7 @@ Phone design: 14 cubbies (rows of 2, 3, 2, 3, 2, 2), interior height 2060 mm, an
 
 ## Review screenshots (Critic pass at phone width)
 
-In `/tmp/claude-1000/-mnt-Data-repos-games-cabinet/24b04b23-0b88-44c6-87df-78464803922b/scratchpad/02-06-shots/`: `final65-390.png` (full page, scale 2), `final400-390.png` (full page), `final65-320.png` (full page, scale 2), `final65-1440.png` (full page), crops of phone cubbies `final65-390-crop-upright.png` (cubby with an upright expansion and a stack with "+4 more"), `final65-390-crop-stack.png` (same cubby), `final65-390-crop-pile.png` (a pile with an orphan on top of it), `final65-390-crop-orphan.png`, plus `phone-check.mjs`, `contrast-check.mjs`, `shots.mjs`, and `skill/skill65-*.png` with the helper report.
+In `<scratch>/02-06-shots/`: `final65-390.png` (full page, scale 2), `final400-390.png` (full page), `final65-320.png` (full page, scale 2), `final65-1440.png` (full page), crops of phone cubbies `final65-390-crop-upright.png` (cubby with an upright expansion and a stack with "+4 more"), `final65-390-crop-stack.png` (same cubby), `final65-390-crop-pile.png` (a pile with an orphan on top of it), `final65-390-crop-orphan.png`, plus `phone-check.mjs`, `contrast-check.mjs`, `shots.mjs`, and `skill/skill65-*.png` with the helper report.
 
 Critic notes (taste calls for the owner):
 - The 59 mm spine floor makes phone spines clearly wider than the real boxes (a 25 mm box reads 59 mm); the 65 sample's second section has several nearly empty cubbies. Both are the accepted readability trade.

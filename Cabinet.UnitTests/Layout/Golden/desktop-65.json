@@ -1,5 +1,5 @@
 {
-  "layoutVersion": 8,
+  "layoutVersion": 9,
   "profile": "desktop",
   "optionsFingerprint": "09a03be9acd0723f",
   "palette": [
@@ -68,6 +68,7 @@
           "placements": [
             {
               "gameId": 10096,
+              "entryId": 500080,
               "kind": "spine",
               "xMm": 0,
               "yMm": 0,
@@ -80,6 +81,7 @@
             },
             {
               "gameId": 10033,
+              "entryId": 500027,
               "kind": "cover",
               "xMm": 60,
               "yMm": 0,
@@ -92,6 +94,7 @@
             },
             {
               "gameId": 10000,
+              "entryId": 500000,
               "kind": "spine",
               "xMm": 256,
               "yMm": 0,
@@ -104,6 +107,7 @@
             },
             {
               "gameId": 10023,
+              "entryId": 500026,
               "kind": "spine",
               "xMm": 309,
               "yMm": 0,
@@ -125,6 +129,7 @@
           "placements": [
             {
               "gameId": 11000,
+              "entryId": 500762,
               "kind": "flatBox",
               "xMm": 0,
               "yMm": 0,
@@ -137,6 +142,7 @@
             },
             {
               "gameId": 11089,
+              "entryId": 500826,
               "kind": "flatBox",
               "xMm": 0,
               "yMm": 35,
@@ -149,6 +155,7 @@
             },
             {
               "gameId": 10272,
+              "entryId": 500227,
               "kind": "flatBox",
               "xMm": 0,
               "yMm": 69,
@@ -161,6 +168,7 @@
             },
             {
               "gameId": 10170,
+              "entryId": 500131,
               "kind": "spine",
               "xMm": 145,
               "yMm": 0,
@@ -173,6 +181,7 @@
             },
             {
               "gameId": 10146,
+              "entryId": 500123,
               "kind": "spine",
               "xMm": 186,
               "yMm": 0,
@@ -194,6 +203,7 @@
           "placements": [
             {
               "gameId": 10175,
+              "entryId": 500147,
               "kind": "orphanExpansion",
               "xMm": 0,
               "yMm": 0,
@@ -202,11 +212,13 @@
               "title": "Sulmere Orvmont Keldle",
               "label": "Sulmere Orvmont Kel\u2026",
               "baseTitle": "Sulbar Jorthan: Orvbar Noxtor Heskdis Quaydle",
+              "isExpansion": true,
               "toneIndex": 10,
               "patternIndex": 2
             },
             {
               "gameId": 10633,
+              "entryId": 500464,
               "kind": "orphanExpansion",
               "xMm": 0,
               "yMm": 80,
@@ -215,11 +227,13 @@
               "title": "Yardle Casslo",
               "label": "Yardle Casslo",
               "baseTitle": "Noxquinley Morzel Vossven Zimmontsk Tarnford Lumniaven Jorley",
+              "isExpansion": true,
               "toneIndex": 4,
               "patternIndex": 5
             },
             {
               "gameId": 10865,
+              "entryId": 500683,
               "kind": "flatBox",
               "xMm": 0,
               "yMm": 160,
@@ -232,6 +246,7 @@
             },
             {
               "gameId": 10618,
+              "entryId": 500446,
               "kind": "flatBox",
               "xMm": 0,
               "yMm": 194,
@@ -244,6 +259,7 @@
             },
             {
               "gameId": 10113,
+              "entryId": 500108,
               "kind": "spine",
               "xMm": 281,
               "yMm": 0,
@@ -257,6 +273,7 @@
             },
             {
               "gameId": 10762,
+              "entryId": 500564,
               "kind": "expansionLayer",
               "xMm": 319,
               "yMm": 0,
@@ -265,12 +282,14 @@
               "title": "Belnia",
               "label": "Belnia",
               "baseTitle": "Tarnzel Mordlesk",
+              "isExpansion": true,
               "toneIndex": 10,
               "patternIndex": 4,
               "familyId": 10113
             },
             {
               "gameId": 10326,
+              "entryId": 500269,
               "kind": "spine",
               "xMm": 509,
               "yMm": 0,
@@ -292,6 +311,7 @@
           "placements": [
             {
               "gameId": 10199,
+              "entryId": 500156,
               "kind": "cover",
               "xMm": 0,
               "yMm": 0,
@@ -304,6 +324,7 @@
             },
             {
               "gameId": 11084,
+              "entryId": 500813,
               "kind": "spine",
               "xMm": 220,
               "yMm": 0,
@@ -325,6 +346,7 @@
           "placements": [
             {
               "gameId": 10731,
+              "entryId": 500525,
               "kind": "spine",
               "xMm": 0,
               "yMm": 0,
@@ -337,6 +359,7 @@
             },
             {
               "gameId": 10411,
+              "entryId": 500319,
               "kind": "spine",
               "xMm": 46,
               "yMm": 0,
@@ -350,6 +373,7 @@
             },
             {
               "gameId": 10730,
+              "entryId": 500503,
               "kind": "expansionSpine",
               "xMm": 80,
               "yMm": 0,
@@ -358,12 +382,14 @@
               "title": "Jorley",
               "label": "Jorley",
               "baseTitle": "Sulley Morvexnia",
+              "isExpansion": true,
               "toneIndex": 6,
               "patternIndex": 4,
               "familyId": 10411
             },
             {
               "gameId": 10351,
+              "entryId": 500281,
               "kind": "expansionLayer",
               "xMm": 144,
               "yMm": 0,
@@ -372,6 +398,7 @@
               "title": "Tavdis Dreldis Yardis",
               "label": "Tavdis Dreld\u2026",
               "baseTitle": "Sulley Morvexnia",
+              "isExpansion": true,
               "toneIndex": 11,
               "patternIndex": 5,
               "familyId": 10411
@@ -387,6 +414,7 @@
           "placements": [
             {
               "gameId": 10529,
+              "entryId": 500382,
               "kind": "spine",
               "xMm": 0,
               "yMm": 0,
@@ -399,6 +427,7 @@
             },
             {
               "gameId": 10431,
+              "entryId": 500339,
               "kind": "spine",
               "xMm": 53,
               "yMm": 0,
@@ -411,6 +440,7 @@
             },
             {
               "gameId": 10788,
+              "entryId": 500568,
               "kind": "spine",
               "xMm": 118,
               "yMm": 0,
@@ -432,6 +462,7 @@
           "placements": [
             {
               "gameId": 10828,
+              "entryId": 500648,
               "kind": "spine",
               "xMm": 0,
               "yMm": 0,
@@ -444,6 +475,7 @@
             },
             {
               "gameId": 10450,
+              "entryId": 500350,
               "kind": "cover",
               "xMm": 44,
               "yMm": 0,
@@ -465,6 +497,7 @@
           "placements": [
             {
               "gameId": 10068,
+              "entryId": 500053,
               "kind": "cover",
               "xMm": 0,
               "yMm": 0,
@@ -477,6 +510,7 @@
             },
             {
               "gameId": 10829,
+              "entryId": 500675,
               "kind": "spine",
               "xMm": 409,
               "yMm": 0,
@@ -498,6 +532,7 @@
           "placements": [
             {
               "gameId": 10233,
+              "entryId": 500175,
               "kind": "cover",
               "xMm": 0,
               "yMm": 0,
@@ -519,6 +554,7 @@
           "placements": [
             {
               "gameId": 11056,
+              "entryId": 500779,
               "kind": "spine",
               "xMm": 0,
               "yMm": 0,
@@ -531,6 +567,7 @@
             },
             {
               "gameId": 10208,
+              "entryId": 500169,
               "kind": "spine",
               "xMm": 47,
               "yMm": 0,
@@ -544,6 +581,7 @@
             },
             {
               "gameId": 11063,
+              "entryId": 500808,
               "kind": "expansionSpine",
               "xMm": 143,
               "yMm": 0,
@@ -552,12 +590,14 @@
               "title": "Quayra Yarford: Raxven Wendquin",
               "label": "Quayra Yar\u2026",
               "baseTitle": "Quaywynley Orvthan Jorbar",
+              "isExpansion": true,
               "toneIndex": 7,
               "patternIndex": 5,
               "familyId": 10208
             },
             {
               "gameId": 10381,
+              "entryId": 500309,
               "kind": "expansionLayer",
               "xMm": 207,
               "yMm": 0,
@@ -566,12 +606,14 @@
               "title": "Morley: Wendtor Cassven Noxmere",
               "label": "Morley",
               "baseTitle": "Quaywynley Orvthan Jorbar",
+              "isExpansion": true,
               "toneIndex": 9,
               "patternIndex": 5,
               "familyId": 10208
             },
             {
               "gameId": 10298,
+              "entryId": 500243,
               "kind": "expansionLayer",
               "xMm": 207,
               "yMm": 46,
@@ -580,12 +622,14 @@
               "title": "Kelvenquin: Heskdle Tarnnia Orvnia",
               "label": "Kelvenquin",
               "baseTitle": "Quaywynley Orvthan Jorbar",
+              "isExpansion": true,
               "toneIndex": 8,
               "patternIndex": 3,
               "familyId": 10208
             },
             {
               "gameId": 10238,
+              "entryId": 500195,
               "kind": "expansionLayer",
               "xMm": 207,
               "yMm": 91,
@@ -594,12 +638,14 @@
               "title": "Quaydle",
               "label": "Quaydle",
               "baseTitle": "Quaywynley Orvthan Jorbar",
+              "isExpansion": true,
               "toneIndex": 8,
               "patternIndex": 1,
               "familyId": 10208
             },
             {
               "gameId": 10462,
+              "entryId": 500363,
               "kind": "expansionLayer",
               "xMm": 207,
               "yMm": 131,
@@ -608,12 +654,14 @@
               "title": "Yarzel: Raxvex Tavmont Wendtor",
               "label": "Yarzel",
               "baseTitle": "Quaywynley Orvthan Jorbar",
+              "isExpansion": true,
               "toneIndex": 2,
               "patternIndex": 3,
               "familyId": 10208
             },
             {
               "gameId": 10498,
+              "entryId": 500379,
               "kind": "expansionLayer",
               "xMm": 207,
               "yMm": 171,
@@ -622,12 +670,14 @@
               "title": "Eldquindis Noxdis",
               "label": "Eldquindis N\u2026",
               "baseTitle": "Quaywynley Orvthan Jorbar",
+              "isExpansion": true,
               "toneIndex": 3,
               "patternIndex": 4,
               "familyId": 10208
             },
             {
               "gameId": 10669,
+              "entryId": 500475,
               "kind": "expansionLayer",
               "xMm": 207,
               "yMm": 211,
@@ -636,12 +686,14 @@
               "title": "Kelloven Eldtor: and and",
               "label": "Kelloven Eld\u2026",
               "baseTitle": "Quaywynley Orvthan Jorbar",
+              "isExpansion": true,
               "toneIndex": 10,
               "patternIndex": 1,
               "familyId": 10208
             },
             {
               "gameId": 10208,
+              "entryId": 500169,
               "kind": "moreMarker",
               "xMm": 207,
               "yMm": 251,
@@ -666,6 +718,7 @@
           "placements": [
             {
               "gameId": 11050,
+              "entryId": 500767,
               "kind": "orphanExpansion",
               "xMm": 0,
               "yMm": 0,
@@ -674,11 +727,13 @@
               "title": "Drelsk Pellmere",
               "label": "Drelsk Pell\u2026",
               "baseTitle": "Wendsk Vossbar",
+              "isExpansion": true,
               "toneIndex": 2,
               "patternIndex": 2
             },
             {
               "gameId": 11113,
+              "entryId": 500919,
               "kind": "spine",
               "xMm": 171,
               "yMm": 0,
@@ -691,6 +746,7 @@
             },
             {
               "gameId": 11106,
+              "entryId": 500875,
               "kind": "spine",
               "xMm": 218,
               "yMm": 0,
@@ -712,6 +768,7 @@
           "placements": [
             {
               "gameId": 11137,
+              "entryId": 500926,
               "kind": "spine",
               "xMm": 0,
               "yMm": 0,
@@ -724,6 +781,7 @@
             },
             {
               "gameId": 11227,
+              "entryId": 501022,
               "kind": "spine",
               "xMm": 53,
               "yMm": 0,
@@ -745,6 +803,7 @@
           "placements": [
             {
               "gameId": 11181,
+              "entryId": 500978,
               "kind": "cover",
               "xMm": 0,
               "yMm": 0,
@@ -774,6 +833,7 @@
           "placements": [
             {
               "gameId": 10352,
+              "entryId": 500308,
               "kind": "flatBox",
               "xMm": 0,
               "yMm": 0,
@@ -786,6 +846,7 @@
             },
             {
               "gameId": 11206,
+              "entryId": 500998,
               "kind": "flatBox",
               "xMm": 0,
               "yMm": 62,
@@ -798,6 +859,7 @@
             },
             {
               "gameId": 10245,
+              "entryId": 500207,
               "kind": "flatBox",
               "xMm": 0,
               "yMm": 131,
@@ -810,6 +872,7 @@
             },
             {
               "gameId": 11109,
+              "entryId": 500895,
               "kind": "spine",
               "xMm": 365,
               "yMm": 0,
@@ -831,6 +894,7 @@
           "placements": [
             {
               "gameId": 10638,
+              "entryId": 500469,
               "kind": "spine",
               "xMm": 0,
               "yMm": 0,
@@ -843,6 +907,7 @@
             },
             {
               "gameId": 10795,
+              "entryId": 500622,
               "kind": "spine",
               "xMm": 106,
               "yMm": 0,
@@ -855,6 +920,7 @@
             },
             {
               "gameId": 10567,
+              "entryId": 500405,
               "kind": "spine",
               "xMm": 210,
               "yMm": 0,
@@ -876,6 +942,7 @@
           "placements": [
             {
               "gameId": 10980,
+              "entryId": 500753,
               "kind": "spine",
               "xMm": 0,
               "yMm": 0,
@@ -888,6 +955,7 @@
             },
             {
               "gameId": 10943,
+              "entryId": 500734,
               "kind": "spine",
               "xMm": 70,
               "yMm": 0,
@@ -900,6 +968,7 @@
             },
             {
               "gameId": 11100,
+              "entryId": 500853,
               "kind": "cover",
               "xMm": 140,
               "yMm": 0,
@@ -929,6 +998,7 @@
           "placements": [
             {
               "gameId": 10904,
+              "entryId": 500706,
               "kind": "spine",
               "xMm": 0,
               "yMm": 0,
@@ -941,6 +1011,7 @@
             },
             {
               "gameId": 11144,
+              "entryId": 500953,
               "kind": "cover",
               "xMm": 90,
               "yMm": 0,
@@ -970,6 +1041,7 @@
           "placements": [
             {
               "gameId": 10596,
+              "entryId": 500434,
               "kind": "cover",
               "xMm": 0,
               "yMm": 0,
@@ -983,6 +1055,7 @@
             },
             {
               "gameId": 10800,
+              "entryId": 500646,
               "kind": "expansionLayer",
               "xMm": 270,
               "yMm": 0,
@@ -991,6 +1064,7 @@
               "title": "Cassthan Wendmereley Ulmthan",
               "label": "Cassthan Wen\u2026",
               "baseTitle": "Morvendle Noxtor Raxzel: Noxbarmont Hesklo Yarthan Heskvenzel",
+              "isExpansion": true,
               "toneIndex": 7,
               "patternIndex": 5,
               "familyId": 10596
@@ -1038,6 +1112,7 @@
           "placements": [
             {
               "gameId": 10701,
+              "entryId": 500496,
               "kind": "cover",
               "xMm": 0,
               "yMm": 0,
@@ -1050,6 +1125,7 @@
             },
             {
               "gameId": 10737,
+              "entryId": 500537,
               "kind": "spine",
               "xMm": 301,
               "yMm": 0,
@@ -1071,6 +1147,7 @@
           "placements": [
             {
               "gameId": 11012,
+              "entryId": 500764,
               "kind": "cover",
               "xMm": 0,
               "yMm": 0,
@@ -1092,6 +1169,7 @@
           "placements": [
             {
               "gameId": 11156,
+              "entryId": 500955,
               "kind": "cover",
               "xMm": 0,
               "yMm": 0,

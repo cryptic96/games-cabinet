@@ -1,8 +1,11 @@
 using Cabinet.Domain.Layout;
 using Cabinet.Domain.Samples;
+using Cabinet.Service.Collection;
 using Cabinet.Service.Layout;
 using Cabinet.Service.Pages;
 using Cabinet.Service.Prototype;
+using Cabinet.Service.Sync;
+using Cabinet.UnitTests.Sync;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -33,15 +36,15 @@ public class SampleGenerationTests
     }
 
     [Fact]
-    public void An_unknown_name_counts_as_the_default_sample_and_is_never_generated()
+    public void An_unknown_name_is_not_honoured_and_never_generated()
     {
         var generator = new CountingGenerator();
         var catalog = new SampleCatalog(true, generator.Generate);
 
-        catalog.ItemCount("64").Should().Be(65);
+        catalog.TryResolve("64", out _).Should().BeFalse();
         catalog.Invoking(known => known.ItemsOf("64")).Should().Throw<ArgumentException>();
 
-        generator.Names.Should().Equal(SampleCatalog.DefaultName);
+        generator.Names.Should().BeEmpty();
     }
 
     [Fact]
@@ -50,9 +53,14 @@ public class SampleGenerationTests
         var generator = new CountingGenerator();
         var catalog = new SampleCatalog(true, generator.Generate);
 
+        var store = new CollectionStore();
+        var options = new SyncOptions(false, TimeSpan.FromHours(1), TimeSpan.FromMinutes(10), TimeSpan.FromSeconds(120), TimeSpan.FromHours(3));
+        var coordinator = new SyncCoordinator(new InMemorySyncStateStore(), options, TimeProvider.System);
+        var status = new SyncStatusService(coordinator, store, options, TimeProvider.System);
+
         for (var view = 0; view < 3; view++)
         {
-            var page = new IndexModel(catalog);
+            var page = new IndexModel(catalog, store, status);
             page.OnGet("400");
             page.ItemCount.Should().Be(400);
         }
@@ -61,10 +69,10 @@ public class SampleGenerationTests
     }
 
     [Theory]
-    [InlineData("64", "desktop")]
     [InlineData("65", "tablet")]
-    [InlineData(null, "desktop")]
-    public void A_request_outside_the_allowlists_is_refused_without_generating_anything(string? sample, string profile)
+    [InlineData(null, "tablet")]
+    [InlineData("65", null)]
+    public void A_request_with_a_bad_profile_is_refused_without_generating_anything(string? sample, string? profile)
     {
         var generator = new CountingGenerator();
         var services = Services(new SampleCatalog(true, generator.Generate));
@@ -72,6 +80,35 @@ public class SampleGenerationTests
         var result = LayoutEndpoint.Handle(sample, profile, Request(services));
 
         result.Should().BeOfType<NotFound>();
+        generator.Names.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("64")]
+    [InlineData(null)]
+    [InlineData("")]
+    public void A_request_without_an_honoured_sample_gets_the_synced_layout_without_generating_anything(string? sample)
+    {
+        var generator = new CountingGenerator();
+        var services = Services(new SampleCatalog(true, generator.Generate));
+
+        var result = LayoutEndpoint.Handle(sample, SectionDesigns.DesktopName, Request(services));
+
+        result.Should().BeOfType<ContentHttpResult>();
+        generator.Names.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_disabled_catalog_ignores_a_known_sample_and_generates_nothing()
+    {
+        var generator = new CountingGenerator();
+        var services = Services(new SampleCatalog(false, generator.Generate));
+        var request = Request(services);
+
+        var result = LayoutEndpoint.Handle("65", SectionDesigns.DesktopName, request);
+
+        result.Should().BeOfType<ContentHttpResult>();
+        request.Response.Headers.ETag.ToString().Should().Contain("-collection-empty-desktop");
         generator.Names.Should().BeEmpty();
     }
 
@@ -102,6 +139,7 @@ public class SampleGenerationTests
             .AddSingleton(LayoutOptions.Default)
             .AddSingleton(catalog)
             .AddSingleton<LayoutCache>()
+            .AddSingleton<CollectionStore>()
             .BuildServiceProvider();
 
     private static DefaultHttpContext Request(IServiceProvider services) => new() { RequestServices = services };

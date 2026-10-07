@@ -81,6 +81,80 @@ Run it before the first push of a new remote and after any history rewrite. It u
 - Shell: `#` comments are fine.
 - Planning identifiers (requirement keys, phase or plan numbers, planning document names) never appear in code, docs, comments, strings or tests. Commit messages are the only place outside the planning directory where they may appear.
 
+## Running against a fake BGG
+
+`Cabinet.FakeBgg` is a small local web app that looks like BoardGameGeek's XML API. It exists so the sync, the "sync now" cooldown, live updates and every failure state can be exercised without touching BGG and without a real token. It lives under the `Tools` folder of the solution, is referenced only by the test projects, and is never part of a release: the release script publishes `Cabinet.Service` alone.
+
+Start it from the repository root:
+
+```
+dotnet run --project Cabinet.FakeBgg -- --port 6190 --scenario normal --size 65
+```
+
+It prints one line with its address, `http://127.0.0.1:6190/xmlapi2/`, and runs until you stop it. Point whatever should talk to BGG at that address instead of the real host.
+
+What it answers:
+
+- `GET /xmlapi2/collection` honours `own`, `subtype`, `excludesubtype`, `version`, `showprivate` and `stats`. Like the real service, a request with no subtype filter labels expansions as base games, which is why the sync asks for base games and expansions in two calls.
+- `GET /xmlapi2/thing` answers one invented game for each requested id, and refuses more than 20 ids.
+- `POST /fake/scenario?name=<scenario>&size=<n>` switches the behaviour while it runs. Either parameter may be left out to keep its current value.
+
+Scenarios:
+
+| Scenario | What the fake does |
+| --- | --- |
+| `normal` | Answers every request with the collection. |
+| `queued=N` | Answers `202` with a "try again later" message N times for each distinct request, then answers normally. |
+| `throttle` | Answers `429` with no `Retry-After` header. |
+| `slow=ms` | Waits the given number of milliseconds, then answers normally. |
+| `broken` | Answers `200` with a web page instead of XML. |
+| `malformed` | Answers `200` with XML that stops in the middle of an entry. |
+| `errors` | Answers `200` with an `errors` document. |
+| `mismatch` | Declares three more items than it writes. |
+| `empty` | Answers a collection with no items. |
+| `shrunk` | Answers only the first quarter of the items. |
+| `unauthorized` | Answers `401` with an empty body. |
+| `unavailable` | Answers `503`. |
+
+Collection sizes are 0, 1, 5, 65 and 400 entries; any other number is rounded to the nearest of these. Collections of five entries or more include the awkward cases a sync has to handle: a game owned twice, an entry that is not owned, expansions whose base game is and is not in the collection, titles with an ampersand, a non-Latin script and no text at all, and boxes with and without dimensions.
+
+Switch scenarios from another terminal:
+
+```
+curl -X POST 'http://127.0.0.1:6190/fake/scenario?name=throttle'
+curl -X POST 'http://127.0.0.1:6190/fake/scenario?name=queued=2&size=400'
+```
+
+Things worth knowing:
+
+- It binds to the loopback interface only and refuses scenario changes from anywhere else.
+- It never reads, logs or echoes an `Authorization` header, so a token you put in front of it goes nowhere.
+- Every title, id and image address is invented. It never serves a recorded BGG response.
+- It cannot tell you how the real service behaves. Rate limits, redirects and authentication are only as faithful as the shapes written down from real checks.
+
+Tests that need to script BGG's answers without a network use `ScriptedBggHandler` from the same project. It is an `HttpMessageHandler` that answers from a queue (status, content type, body, optional delay, extra headers) and records every request's address, authorization scheme and parameter, and User-Agent, so a test can prove where a token was and was not sent.
+
+## Using a BGG token locally
+
+The BGG username and API token are configuration only. They never go in the repository, in `appsettings.json`, or in a test. For local development keep them in user secrets, which live in your home directory outside the repository and are loaded only when the app runs in the Development environment:
+
+```
+dotnet user-secrets --project Cabinet.Service set "Bgg:Username" "your-bgg-username"
+dotnet user-secrets --project Cabinet.Service set "Bgg:Token" "your-bgg-api-token"
+```
+
+On a server the same two values come from the environment file instead, as `Bgg__Username` and `Bgg__Token`.
+
+Without both values the app still starts: it logs one warning, serves the being-filled page, reports healthy, and every sync ends as not configured without contacting BGG.
+
+To run against the fake instead of the real service, start the fake as described above and set the base address for the app:
+
+```
+Bgg__BaseUri=http://127.0.0.1:6190/xmlapi2/ dotnet run --project Cabinet.Service
+```
+
+Use any dummy username and token. The base address override is honoured only in Development; in any other environment it is ignored and the app logs a warning. The token is sent only over HTTPS to the BGG API host, so a dummy token never reaches the fake, and nothing a visitor sends can change the username or the address the app calls.
+
 ## Running the checks
 
 - Lint and script tests: `build/lint.sh`

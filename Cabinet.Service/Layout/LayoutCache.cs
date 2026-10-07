@@ -10,7 +10,8 @@ namespace Cabinet.Service.Layout;
 public sealed record CachedLayout(string Json, string ETag);
 
 /// <summary>
-/// Keeps every layout that has been asked for, built once per process. Callers only pass names from the fixed sample and
+/// Keeps every invented-collection layout that has been asked for, built once per process. The real collection's layouts
+/// live with the collection itself. Callers only pass names from the fixed sample and
 /// profile allowlists, so the number of entries is bounded and a visitor cannot grow the cache. A sample's items are only
 /// asked for when its layout is built, so a request answered from the cache costs no sample generation. A layout that
 /// fails to build is remembered as failed, so the same request keeps failing until the process restarts; the engine only

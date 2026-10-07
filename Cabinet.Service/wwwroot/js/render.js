@@ -45,6 +45,18 @@ function namesUnownedBase(placement) {
 }
 
 /**
+ * Tells whether a placement is an expansion drawn on its own whose base game is not known: an orphan box, or an orphan
+ * facing out in a small collection, without a base title.
+ * @param {object} placement One placement from the layout.
+ * @returns {boolean}
+ */
+function isExpansionWithoutBase(placement) {
+  return placement.isExpansion === true
+    && placement.baseTitle === undefined
+    && (placement.kind === 'orphanExpansion' || placement.kind === 'cover');
+}
+
+/**
  * Tells whether the accessible name of a placement says which game it is an expansion for: a layer in a stack, an
  * upright expansion beside its base game, and an expansion whose base game is not owned.
  * @param {object} placement One placement from the layout.
@@ -55,19 +67,20 @@ function namesBaseInName(placement) {
 }
 
 /**
- * Tells whether a placement draws a second line naming the game it expands: an upright expansion beside its base game
- * and an expansion whose base game is not owned. A layer has no room for a second line.
+ * Tells whether a placement draws a second line: an upright expansion beside its base game naming it, an expansion whose
+ * base game is not owned naming it, and an expansion whose base game is not known saying only that it is an expansion. A
+ * layer has no room for a second line.
  * @param {object} placement One placement from the layout.
  * @returns {boolean}
  */
 function hasBaseLine(placement) {
-  return placement.kind === 'expansionSpine' || namesUnownedBase(placement);
+  return placement.kind === 'expansionSpine' || namesUnownedBase(placement) || isExpansionWithoutBase(placement);
 }
 
 /**
  * Returns the accessible name and tooltip of a placement. A layer, an upright expansion or an orphan names its base
- * game, the marker says how many expansions it stands for, and every other placement is named by its full title. An
- * orphan without a base title is named by its title alone.
+ * game, an expansion whose base game is not known says that it is an expansion, the marker says how many expansions it
+ * stands for, and every other placement is named by its full title.
  * @param {object} placement One placement from the layout.
  * @param {object} copy The visitor-facing strings.
  * @returns {string}
@@ -75,6 +88,10 @@ function hasBaseLine(placement) {
 function accessibleName(placement, copy) {
   const title = textOrFallback(placement.title, copy.untitled);
   const baseTitle = textOrFallback(placement.baseTitle, copy.untitled);
+
+  if (isExpansionWithoutBase(placement)) {
+    return copy.expansionName(title);
+  }
 
   if (namesBaseInName(placement)) {
     return copy.layerName(title, baseTitle);
@@ -88,8 +105,8 @@ function accessibleName(placement, copy) {
 }
 
 /**
- * Builds the second line of an upright expansion or an orphan, naming the game it expands, or returns null when the
- * placement has none.
+ * Builds the second line of an upright expansion or an orphan, naming the game it expands or, when that game is not
+ * known, saying that it is an expansion, or returns null when the placement has none.
  * @param {object} placement One placement from the layout.
  * @param {object} copy The visitor-facing strings.
  * @returns {HTMLSpanElement | null}
@@ -102,7 +119,9 @@ function buildSubLabel(placement, copy) {
   const sub = document.createElement('span');
   sub.className = 'placement-sub';
   sub.setAttribute('dir', 'auto');
-  sub.textContent = copy.expansionFor(textOrFallback(placement.baseTitle, copy.untitled));
+  sub.textContent = isExpansionWithoutBase(placement)
+    ? copy.expansionLabel
+    : copy.expansionFor(textOrFallback(placement.baseTitle, copy.untitled));
 
   return sub;
 }
@@ -133,6 +152,7 @@ function buildPlacement(placement, copy, palette) {
   button.className = 'placement';
   button.dataset.kind = placement.kind;
   button.dataset.gameId = String(placement.gameId);
+  button.dataset.entryId = String(placement.entryId);
 
   if (placement.familyId !== undefined) {
     button.dataset.familyId = String(placement.familyId);

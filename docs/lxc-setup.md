@@ -129,6 +129,30 @@ Host cabinet
   IdentityFile {path-to-your-private-key-file}
 ```
 
+## 5a. Add the BoardGameGeek keys
+
+The site needs access to the BoardGameGeek API to fetch the collection.
+Provisioning writes `/etc/cabinet/cabinet.env` once and never rewrites it, so
+add the keys by hand:
+
+```text
+Bgg__Username={your-bgg-username}
+Bgg__Token={your-bgg-api-token}
+Bgg__ContactUrl={optional-contact-url}
+```
+
+`Bgg__ContactUrl` is optional; when set it is added to the `User-Agent` the
+server sends to BoardGameGeek. Keep the file at mode `640` owned by
+`root:cabinet`, then restart the application:
+
+```bash
+sudo systemctl restart cabinet
+```
+
+[The sync guide](bgg-sync.md) explains each setting and what the server does
+with them. Without the keys the application starts and logs a warning that sync
+is not configured.
+
 ## 6. Install the Traefik route
 
 On the Traefik container, copy `deploy/traefik/cabinet.yml.example` into its

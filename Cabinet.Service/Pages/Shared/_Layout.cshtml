@@ -1,0 +1,19 @@
+@inject BuildInfo Build
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Games Cabinet</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/cabinet.css" asp-append-version="true" />
+</head>
+<body>
+    @RenderBody()
+    <footer>
+        <p class="version">Version @Build.Version (@Build.ShortCommit)</p>
+        <a class="bgg-credit" href="https://boardgamegeek.com" rel="noopener"><img src="~/img/powered-by-bgg.svg" alt="Powered by BGG" width="342" height="76" asp-append-version="true" /></a>
+    </footer>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

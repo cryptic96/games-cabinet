@@ -285,6 +285,7 @@ public static class CubbyArrangement
 
             placements.Add(new Placement(
                 GameId: expansion.BggId,
+                EntryId: expansion.CollectionId,
                 Kind: PlacementKind.ExpansionLayer,
                 XMm: columnX,
                 YMm: y,
@@ -293,6 +294,7 @@ public static class CubbyArrangement
                 Title: expansion.Title,
                 Label: SpineLabel.Shorten(expansion.Title, design.StackColumnWidthMm / pitch),
                 BaseTitle: baseItem.Title,
+                IsExpansion: true,
                 ToneIndex: SpinePalette.ToneFor(expansion.BggId),
                 PatternIndex: SpinePalette.PatternFor(expansion.BggId),
                 FamilyId: baseItem.BggId,
@@ -304,6 +306,7 @@ public static class CubbyArrangement
         {
             placements.Add(new Placement(
                 GameId: baseItem.BggId,
+                EntryId: baseItem.CollectionId,
                 Kind: PlacementKind.MoreMarker,
                 XMm: columnX,
                 YMm: y,
@@ -312,6 +315,7 @@ public static class CubbyArrangement
                 Title: baseItem.Title,
                 Label: string.Empty,
                 BaseTitle: baseItem.Title,
+                IsExpansion: null,
                 ToneIndex: SpinePalette.ToneFor(baseItem.BggId),
                 PatternIndex: SpinePalette.PatternFor(baseItem.BggId),
                 FamilyId: baseItem.BggId,
@@ -334,6 +338,7 @@ public static class CubbyArrangement
     private static Placement Place(CabinetItem item, PlacementKind kind, int x, int y, int width, int height, SectionDesign design) =>
         new(
             GameId: item.BggId,
+            EntryId: item.CollectionId,
             Kind: kind,
             XMm: x,
             YMm: y,
@@ -342,6 +347,7 @@ public static class CubbyArrangement
             Title: item.Title,
             Label: LabelFor(design, item, kind, width, height),
             BaseTitle: null,
+            IsExpansion: item.Kind == ItemKind.Expansion ? true : null,
             ToneIndex: SpinePalette.ToneFor(item.BggId),
             PatternIndex: SpinePalette.PatternFor(item.BggId),
             FamilyId: null,

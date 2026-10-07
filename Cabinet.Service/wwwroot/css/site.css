@@ -5,6 +5,8 @@
   --ink: #2a1a10;
   --wood-edge: #8c5d38;
   --wall-text: #efe3c2;
+  --chrome-line: color-mix(in srgb, var(--wall-text) 60%, var(--wood-dark));
+  --chrome-muted: color-mix(in srgb, var(--wall-text) 70%, var(--wood-dark));
 }
 
 * {
@@ -89,6 +91,18 @@ footer {
   font-size: 14px;
 }
 
+.bgg-credit {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.bgg-credit img {
+  height: 32px;
+  width: auto;
+  max-width: 100%;
+}
+
 main .cabinet-message {
   font-size: 16px;
   color: var(--wall-text);
@@ -96,6 +110,13 @@ main .cabinet-message {
 
 .cabinet-message-heading {
   font-weight: 600;
+}
+
+.cabinet-filling {
+  max-width: 40rem;
+  margin-inline: auto;
+  margin-bottom: 24px;
+  text-align: center;
 }
 
 .cabinet-retry {
@@ -109,6 +130,86 @@ main .cabinet-message {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+}
+
+.sync {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  min-height: 44px;
+  margin-top: 4px;
+}
+
+.sync-time,
+.sync-time-text {
+  font: inherit;
+  font-size: 16px;
+  color: var(--wall-text);
+  white-space: nowrap;
+}
+
+.sync-time-text {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.sync-time {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-decoration: underline dotted;
+  cursor: pointer;
+}
+
+.sync-button {
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--wall-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .sync-button:hover {
+    text-decoration: underline;
+  }
+}
+
+.sync-button[aria-disabled="true"] {
+  border-style: dashed;
+  color: var(--chrome-muted);
+  cursor: default;
+  text-decoration: none;
+}
+
+.sync-exact {
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+.sync-note,
+.sync-stale {
+  max-width: 40rem;
+  margin-top: 8px;
+  font-size: 16px;
+}
+
+.sync-stale {
+  padding-inline-start: 8px;
+  border-inline-start: 4px solid var(--chrome-line);
+}
+
+.sync-note:empty {
+  margin-top: 0;
 }
 
 a:focus-visible,

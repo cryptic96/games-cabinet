@@ -72,7 +72,7 @@ two underscores.
 | `Layout:ExpansionStackMax` | 6 | 1 to 20 | The most expansions drawn in one stack before the rest are summed up as "+N more". |
 | `Layout:FewGamesThreshold` | 12 | 0 to 100 | Below this many top-level games, every box faces out, so a small collection fills the cabinet with covers instead of a few lonely spines. |
 | `Layout:LieFlatBeforeNewSection` | `true` | `true` or `false` | Lets a game that fits no existing cubby standing lie flat in the first cubby that can take it lying down, instead of opening a new section for it. Turning it off keeps every game standing the way it was chosen, but may add sections that are mostly empty. |
-| `Prototype:Enabled` | `true` in the committed settings | `true` or `false` | Shows the invented sample collections and their switcher. See "Invented collections" below. |
+| `Prototype:Enabled` | `false` in the committed settings; `true` in the development settings | `true` or `false` | Shows the invented sample collections and their switcher while running locally in development. The deployed site ignores it. See "Invented collections" below. |
 
 ### Changing a setting on the server
 
@@ -82,7 +82,6 @@ Put the setting in `/etc/cabinet/cabinet.env`, one per line, for example:
 Layout__CoverSharePercent=30
 Layout__CoverStrategy=Random
 Layout__LieFlatBeforeNewSection=true
-Prototype__Enabled=false
 ```
 
 Then restart the service so it reads the file:
@@ -145,7 +144,7 @@ A few changes rearrange more than that, and these are accepted:
 The layout carries a version number. It changes whenever the arrangement rules
 or the section designs change on purpose, so it is easy to tell a deliberate
 rearrangement from an unexpected one. Layouts are served with an entity tag
-built from that version, the settings, the sample and the screen profile, so
+built from that version, the settings, the collection (or the invented sample) and the screen profile, so
 browsers revalidate cheaply and pick up a new arrangement as soon as any of
 those change.
 
@@ -206,21 +205,42 @@ not, so a rearrangement is always a conscious one. Look at the changed files
 before committing them. The switch is for local use only and is never set in
 the automated workflows.
 
+## What the page shows
+
+The deployed site always draws the owner's synced collection. Layouts for it
+are built once per collection version and screen profile and kept with that
+collection, so a visit costs no layout work, and the entity tag changes when the
+collection or the arrangement rules do.
+
+Before the first sync has ever finished, the page shows the message "The
+cabinet is being filled." with a second line explaining that the games are being
+copied over, above a cabinet of two rows of bare cubbies with nothing in it. The
+layout address answers normally with that empty cabinet. When a sync finishes
+with no games at all, the bare cabinet stays and the message goes, because the
+collection really is empty.
+
 ## Invented collections
 
-While `Prototype:Enabled` is `true`, the page shows an invented collection
-instead of a real one, so the cabinet can be judged at every size. A row of
-links under the heading switches between collections of 0, 1, 5, 12, 65 and
-400 games and a small set of awkward titles marked "Edge cases". The line
-above the links states the size of the collection on screen. The links are
-plain links, so they work without JavaScript.
+The invented collections exist only for judging the cabinet at every size while
+running locally in development. The development settings file switches
+`Prototype:Enabled` on; the committed default is off, and the deployed site
+ignores the setting whatever the server's env file says, so no invented
+collection, switcher or `sample` value can ever reach a visitor.
 
-The collections are made from invented syllables and mirror nothing real. An
-unknown or missing choice shows the 65-game collection, and the value that was
-asked for is never repeated back into the page.
+With the switch on, a row of links under the heading, labelled "Collection to
+show", picks what the page draws. "Synced" is first and shows the real
+collection; the links after it switch to invented collections of 0, 1, 5, 12, 65
+and 400 games and a small set of awkward titles marked "Edge cases". While an
+invented collection is shown, a line above the links states its size, and the
+being-filled message is not shown. The links are plain links, so they work
+without JavaScript.
 
-When `Prototype:Enabled` is `false`, none of this exists: no switcher, no
-status line, no cabinet, and the layout address answers "not found". The page
-shows only a message that the cabinet is being built. The switch and everything
-behind it live in one folder of the service project, and they are removed
-together once the real collection is shown.
+The collections are made from invented syllables and mirror nothing real. A
+missing or unknown choice shows the synced collection, and the value that was
+asked for is never repeated back into the page. When the switch is off or the
+site runs in production, there is no switcher and no status line, and a `sample`
+value in the address is ignored.
+
+A value for `Prototype:Enabled` that is neither `true` nor `false` stops the app
+at startup in every environment. The switch and everything behind it live in one
+folder of the service project.

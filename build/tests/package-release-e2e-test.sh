@@ -81,6 +81,7 @@ echo "$SMOKE_OUTPUT"
 (
   cd "$TMP/current/app"
   ASPNETCORE_ENVIRONMENT=Production \
+    STATE_DIRECTORY="$TMP/state" \
     Kestrel__Endpoints__Web__Url="http://127.0.0.1:$WEB_PORT" \
     Kestrel__Endpoints__Ops__Url="http://127.0.0.1:$OPS_PORT" \
     exec dotnet "$TMP/current/app/Cabinet.Service.dll"
