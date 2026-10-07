@@ -169,7 +169,11 @@
         "type": "Project"
       },
       "cabinet.fakebgg": {
-        "type": "Project"
+        "type": "Project",
+        "dependencies": {
+          "SkiaSharp": "[4.153.1, )",
+          "SkiaSharp.NativeAssets.Linux.NoDependencies": "[4.153.1, )"
+        }
       },
       "cabinet.repository": {
         "type": "Project",
