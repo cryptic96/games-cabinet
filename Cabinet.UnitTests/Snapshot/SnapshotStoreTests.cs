@@ -49,6 +49,58 @@ public sealed class SnapshotStoreTests : IDisposable
     }
 
     [Fact]
+    public void A_schema_2_file_round_trips_its_picture_addresses_and_image_records()
+    {
+        var moment = new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero);
+        var snapshot = new CollectionSnapshot(
+            CollectionSnapshot.CurrentSchemaVersion,
+            moment,
+            [new SnapshotItem(7, 11, "First Example", ItemKind.Base, null, null, null, "https://cf.example.org/v.jpg", "https://cf.example.org/m.jpg")],
+            new Dictionary<string, ImageRecord>
+            {
+                ["https://cf.example.org/v.jpg"] = new("https://cf.example.org/v.jpg", ImageStatus.Ok, moment, [new ArtFile(480, 640, "0123456789abcdef-480.webp"), new ArtFile(240, 320, "fedcba9876543210-240.webp")]),
+                ["https://cf.example.org/m.jpg"] = new("https://cf.example.org/m.jpg", ImageStatus.Undecodable, moment),
+            });
+        var store = CreateStore();
+
+        store.Save(snapshot);
+
+        var loaded = store.Load();
+        loaded.Should().BeEquivalentTo(snapshot, options => options.WithStrictOrdering());
+        File.ReadAllText(SnapshotPath).Should().Contain("\"images\"").And.Contain("\"status\":\"undecodable\"").And.Contain("\"versionImageUrl\"");
+    }
+
+    [Fact]
+    public void A_schema_1_file_loads_with_its_items_and_no_images()
+    {
+        File.WriteAllText(
+            SnapshotPath,
+            "{ \"schemaVersion\": 1, \"capturedAtUtc\": \"2026-01-01T00:00:00Z\", \"items\": [ { \"collectionId\": 5, \"gameId\": 9, \"title\": \"Example\", \"kind\": \"base\" } ] }");
+
+        var loaded = CreateStore().Load();
+
+        loaded.Should().NotBeNull();
+        loaded!.SchemaVersion.Should().Be(1);
+        loaded.Items.Should().ContainSingle().Which.Should().BeEquivalentTo(new SnapshotItem(5, 9, "Example", ItemKind.Base, null, null, null));
+        loaded.Images.Should().BeNull();
+        File.Exists(BadPath).Should().BeFalse();
+    }
+
+    [Fact]
+    public void An_image_record_without_its_status_is_malformed_and_the_file_is_set_aside()
+    {
+        File.WriteAllText(
+            SnapshotPath,
+            "{ \"schemaVersion\": 2, \"capturedAtUtc\": \"2026-01-01T00:00:00Z\", \"items\": [], "
+            + "\"images\": { \"https://cf.example.org/a.jpg\": { \"sourceUrl\": \"https://cf.example.org/a.jpg\", \"attemptedAtUtc\": \"2026-01-01T00:00:00Z\" } } }");
+
+        CreateStore().Load().Should().BeNull();
+
+        File.Exists(SnapshotPath).Should().BeFalse();
+        File.Exists(BadPath).Should().BeTrue();
+    }
+
+    [Fact]
     public void A_save_leaves_no_temporary_file_behind()
     {
         var store = CreateStore();

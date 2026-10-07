@@ -21,6 +21,9 @@ public sealed class ScriptedImageHandler : HttpMessageHandler
     private readonly List<RecordedImageRequest> _requests = [];
     private readonly object _gate = new();
 
+    /// <summary>Runs once for every request, after it is recorded and before it is answered; a test uses it to move the clock mid-run.</summary>
+    public Action<Uri>? OnRequest { get; set; }
+
     /// <summary>Every request received so far, oldest first.</summary>
     public IReadOnlyList<RecordedImageRequest> Requests
     {
@@ -51,17 +54,19 @@ public sealed class ScriptedImageHandler : HttpMessageHandler
     /// <param name="address">The absolute address.</param>
     /// <param name="width">The width in pixels.</param>
     /// <param name="height">The height in pixels.</param>
-    public ScriptedImageHandler ServePicture(string address, int width, int height) => Serve(address, Png(width, height));
+    /// <param name="fill">The colour to fill it with; a fixed reddish colour when null.</param>
+    public ScriptedImageHandler ServePicture(string address, int width, int height, SKColor? fill = null) => Serve(address, Png(width, height, fill));
 
     /// <summary>Draws a solid-colour PNG in code, so no captured picture is ever needed.</summary>
     /// <param name="width">The width in pixels.</param>
     /// <param name="height">The height in pixels.</param>
-    public static byte[] Png(int width, int height)
+    /// <param name="fill">The colour to fill it with; a fixed reddish colour when null.</param>
+    public static byte[] Png(int width, int height, SKColor? fill = null)
     {
         using var bitmap = new SKBitmap(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Opaque));
         using (var canvas = new SKCanvas(bitmap))
         {
-            canvas.Clear(new SKColor(170, 60, 40));
+            canvas.Clear(fill ?? new SKColor(170, 60, 40));
         }
 
         using var image = SKImage.FromBitmap(bitmap);
@@ -87,6 +92,8 @@ public sealed class ScriptedImageHandler : HttpMessageHandler
                 userAgent.Length == 0 ? null : userAgent));
             found = _bodies.TryGetValue(uri.AbsoluteUri, out body);
         }
+
+        OnRequest?.Invoke(uri);
 
         if (!found)
         {

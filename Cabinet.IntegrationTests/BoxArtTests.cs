@@ -79,7 +79,7 @@ public sealed class BoxArtTests
 
         await SyncRounds.PressAndWait(client, clock, advance: false);
         using var document = JsonDocument.Parse(await ReadLayoutBody(client));
-        var withArt = Placements(document).Where(placement => placement.TryGetProperty("art", out _)).ToList();
+        var withArt = Placements(document).Where(HasArt).ToList();
 
         withArt.Should().NotBeEmpty();
         withArt.Should().OnlyContain(placement => placement.GetProperty("kind").GetString() == "cover");
@@ -128,6 +128,144 @@ public sealed class BoxArtTests
         status.Should().Contain(" 404 ");
     }
 
+    [Fact]
+    public async Task A_picture_address_that_changes_is_downloaded_again_and_the_old_file_goes_only_after_the_grace_period()
+    {
+        using var storage = new TemporaryDirectory();
+        var images = new ScriptedImageHandler()
+            .ServePicture(FirstVersionImage, 600, 800)
+            .ServePicture("https://example.org/images/version-changed.jpg", 600, 800, new SkiaSharp.SKColor(20, 60, 180));
+        string? replacement = null;
+        var bgg = new ScriptedBggHandler(request => ScriptedResponse.Xml(Swap(
+            BggXml.Collection(SyntheticBggCollection.Create(5), CollectionQuery.Parse(request.RequestUri!.Query)),
+            replacement)));
+        var clock = SyncHarness.NewClock();
+        await using var factory = SyncHarness.CreateFactory(bgg, clock, WithStorage(storage), images);
+        using var client = factory.CreatePublicClient();
+        var artDirectory = Path.Combine(storage.FullPath, "art");
+
+        await SyncRounds.PressAndWait(client, clock, advance: false);
+        var first = ArtOf(await ReadLayoutBody(client), FirstEntryId).GetProperty("url").GetString()!;
+        var firstFiles = StoredFiles(artDirectory);
+        foreach (var file in Directory.EnumerateFiles(artDirectory))
+        {
+            File.SetLastWriteTimeUtc(file, clock.GetUtcNow().UtcDateTime);
+        }
+
+        replacement = "version-changed.jpg";
+        await SyncRounds.PressAndWait(client, clock);
+        var second = ArtOf(await ReadLayoutBody(client), FirstEntryId).GetProperty("url").GetString()!;
+
+        second.Should().NotBe(first);
+        images.Requests.Count(request => request.Uri.AbsoluteUri == FirstVersionImage).Should().Be(1);
+        images.Requests.Count(request => request.Uri.AbsoluteUri.EndsWith("version-changed.jpg", StringComparison.Ordinal)).Should().Be(1);
+        StoredFiles(artDirectory).Should().Contain(firstFiles, "the old files stay until the grace period is over");
+
+        clock.Advance(TimeSpan.FromDays(8));
+        await SyncRounds.PressAndWait(client, clock);
+
+        StoredFiles(artDirectory).Should().NotContain(firstFiles).And.Contain(Path.GetFileName(second));
+    }
+
+    [Fact]
+    public async Task A_missing_picture_is_not_requested_again_until_the_retry_time_has_passed()
+    {
+        var images = new ScriptedImageHandler();
+        var clock = SyncHarness.NewClock();
+        await using var factory = SyncHarness.CreateFactory(
+            ScriptedBggHandler.ForCollection(SyntheticBggCollection.Create(5)),
+            clock,
+            AllowExampleHost,
+            images);
+        using var client = factory.CreatePublicClient();
+
+        await SyncRounds.PressAndWait(client, clock, advance: false);
+        var afterFirst = images.Requests.Count;
+        await SyncRounds.PressAndWait(client, clock);
+        var afterSecond = images.Requests.Count;
+        clock.Advance(TimeSpan.FromHours(24));
+        await SyncRounds.PressAndWait(client, clock);
+
+        afterFirst.Should().BeGreaterThan(0);
+        afterSecond.Should().Be(afterFirst, "a picture that failed is not asked for again inside the retry time");
+        images.Requests.Count.Should().Be(2 * afterFirst, "after the retry time every failed picture is asked for once more");
+    }
+
+    [Fact]
+    public async Task A_run_downloads_at_most_the_configured_number_and_the_next_run_takes_the_following_ones()
+    {
+        var images = new ScriptedImageHandler();
+        foreach (var version in Enumerable.Range(900001, 65))
+        {
+            images.ServePicture($"https://example.org/images/version-{version}.jpg", 600, 800);
+        }
+
+        var clock = SyncHarness.NewClock();
+        var settings = new Dictionary<string, string?>(AllowExampleHost) { ["Images:MaxDownloadsPerRun"] = "2" };
+        await using var factory = SyncHarness.CreateFactory(
+            ScriptedBggHandler.ForCollection(SyntheticBggCollection.Create(65)),
+            clock,
+            settings,
+            images);
+        using var client = factory.CreatePublicClient();
+
+        await SyncRounds.PressAndWait(client, clock, advance: false);
+        var firstRun = images.Requests.Select(request => request.Uri.AbsoluteUri).ToList();
+        await SyncRounds.PressAndWait(client, clock);
+        var secondRun = images.Requests.Select(request => request.Uri.AbsoluteUri).Skip(firstRun.Count).ToList();
+
+        firstRun.Should().Equal(
+            "https://example.org/images/version-900001.jpg",
+            "https://example.org/images/version-900002.jpg");
+        secondRun.Should().Equal(
+            "https://example.org/images/version-900003.jpg",
+            "https://example.org/images/version-900004.jpg");
+        (await SyncHarness.ReadStatus(client)).LastResult.Should().Be("changed");
+    }
+
+    [Fact]
+    public async Task A_run_that_passes_its_picture_deadline_starts_no_further_download_and_does_not_fail()
+    {
+        var clock = SyncHarness.NewClock();
+        var images = new ScriptedImageHandler { OnRequest = _ => clock.Advance(TimeSpan.FromMinutes(7)) };
+        await using var factory = SyncHarness.CreateFactory(
+            ScriptedBggHandler.ForCollection(SyntheticBggCollection.Create(65)),
+            clock,
+            AllowExampleHost,
+            images);
+        using var client = factory.CreatePublicClient();
+
+        await SyncRounds.PressAndWait(client, clock, advance: false);
+
+        images.Requests.Should().ContainSingle();
+        (await SyncHarness.ReadStatus(client)).LastResult.Should().Be("changed");
+        (await SyncRounds.ReadLayout(client)).Titles.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public async Task Pictures_that_are_refused_or_unreadable_never_fail_the_sync_and_the_covers_stay_generated()
+    {
+        var images = new ScriptedImageHandler()
+            .Serve(FirstVersionImage, [1, 2, 3], "text/html")
+            .Serve("https://example.org/images/version-900002.jpg", [1, 2, 3, 4], "image/png");
+        var clock = SyncHarness.NewClock();
+        await using var factory = SyncHarness.CreateFactory(
+            ScriptedBggHandler.ForCollection(SyntheticBggCollection.Create(5)),
+            clock,
+            AllowExampleHost,
+            images);
+        using var client = factory.CreatePublicClient();
+
+        await SyncRounds.PressAndWait(client, clock, advance: false);
+        var requests = images.Requests.Count;
+        using var document = JsonDocument.Parse(await ReadLayoutBody(client));
+
+        (await SyncHarness.ReadStatus(client)).LastResult.Should().Be("changed");
+        Placements(document).Should().NotBeEmpty().And.OnlyContain(placement => !HasArt(placement));
+        await SyncRounds.PressAndWait(client, clock);
+        images.Requests.Count.Should().Be(requests);
+    }
+
     private static async Task<string> RawStatusLine(int port, string target)
     {
         using var tcp = new TcpClient();
@@ -139,6 +277,17 @@ public sealed class BoxArtTests
 
         return await reader.ReadLineAsync(TestContext.Current.CancellationToken) ?? string.Empty;
     }
+
+    private static bool HasArt(JsonElement placement) => placement.TryGetProperty("art", out _);
+
+    private static Dictionary<string, string?> WithStorage(TemporaryDirectory storage) =>
+        new(AllowExampleHost) { ["Storage:Directory"] = storage.FullPath };
+
+    private static string Swap(string xml, string? replacement) =>
+        replacement is null ? xml : xml.Replace("version-900001.jpg", replacement, StringComparison.Ordinal);
+
+    private static List<string> StoredFiles(string directory) =>
+        [.. Directory.EnumerateFiles(directory).Select(path => Path.GetFileName(path))];
 
     private static async Task<string> ReadLayoutBody(HttpClient client) =>
         await client.GetStringAsync(LayoutPath, TestContext.Current.CancellationToken);
