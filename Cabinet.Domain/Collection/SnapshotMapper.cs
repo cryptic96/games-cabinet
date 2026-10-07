@@ -5,6 +5,27 @@ using Cabinet.Domain.Layout;
 
 namespace Cabinet.Domain.Collection;
 
+/// <summary>Every decision the mapper made for one stored item, kept so a review can show exactly what the cabinet does.</summary>
+/// <param name="Item">The stored item.</param>
+/// <param name="VersionImage">The record of the owned edition's picture when it is usable, otherwise null.</param>
+/// <param name="VersionVerdict">The verdict for the owned edition's picture, or null when it is unusable.</param>
+/// <param name="VersionScore">The detector's score for the owned edition's picture, or null when it is unusable.</param>
+/// <param name="MainImage">The record of the game's main picture when it is usable, otherwise null.</param>
+/// <param name="MainVerdict">The verdict for the main picture, or null when it is unusable.</param>
+/// <param name="Pick">Which picture the item is drawn from.</param>
+/// <param name="Shape">The box that is drawn, with where its size came from.</param>
+/// <param name="Mapped">The item the layout engine draws.</param>
+public sealed record MappedItemTrace(
+    SnapshotItem Item,
+    ImageRecord? VersionImage,
+    ArtVerdict? VersionVerdict,
+    double? VersionScore,
+    ImageRecord? MainImage,
+    ArtVerdict? MainVerdict,
+    ArtPick Pick,
+    ShapedBox Shape,
+    CabinetItem Mapped);
+
 /// <summary>Turns the stored collection into the items the layout engine draws, in an order that does not depend on the source.</summary>
 public static class SnapshotMapper
 {
@@ -29,7 +50,17 @@ public static class SnapshotMapper
     /// </summary>
     /// <param name="snapshot">The stored collection.</param>
     /// <param name="rules">The rules that turn stored measurements into a choice.</param>
-    public static IReadOnlyList<CabinetItem> ToCabinetItems(CollectionSnapshot snapshot, ArtRules rules)
+    public static IReadOnlyList<CabinetItem> ToCabinetItems(CollectionSnapshot snapshot, ArtRules rules) =>
+        [.. Explain(snapshot, rules).Select(trace => trace.Mapped)];
+
+    /// <summary>
+    /// Maps every stored item as <see cref="ToCabinetItems(CollectionSnapshot, ArtRules)"/> does and keeps each decision with
+    /// the item: the usable records of both candidate pictures, their verdicts, the pick and the shaped box. The items come in
+    /// mapped order, and the mapping itself is built on this method, so a review can never disagree with the cabinet.
+    /// </summary>
+    /// <param name="snapshot">The stored collection.</param>
+    /// <param name="rules">The rules that turn stored measurements into a choice.</param>
+    public static IReadOnlyList<MappedItemTrace> Explain(CollectionSnapshot snapshot, ArtRules rules)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(rules);
@@ -44,7 +75,7 @@ public static class SnapshotMapper
                 .Select(entry => entry.FirstOrDefault(item => item.Kind == ItemKind.Expansion) ?? entry.First())
                 .OrderBy(item => item.CollectionId)
                 .ThenBy(item => item.GameId)
-                .Select(item => ToCabinetItem(item, snapshot, images, pairing, rules)),
+                .Select(item => Trace(item, snapshot, images, pairing, rules)),
         ];
     }
 
@@ -93,18 +124,28 @@ public static class SnapshotMapper
         return Convert.ToHexStringLower(hash)[..VersionLength];
     }
 
-    private static CabinetItem ToCabinetItem(
+    private static MappedItemTrace Trace(
         SnapshotItem item,
         CollectionSnapshot snapshot,
         IReadOnlyDictionary<string, ImageRecord> images,
         IReadOnlyDictionary<long, IReadOnlyList<BaseGameRef>> pairing,
         ArtRules rules)
     {
-        var chosen = ChosenRecord(item, snapshot, images, rules);
+        var version = UsableRecord(item.VersionImageUrl, images);
+        var main = UsableRecord(MainPictureUrl(item, snapshot), images);
+        var versionVerdict = VerdictOf(version, rules);
+        var mainVerdict = VerdictOf(main, rules);
+        var pick = ArtChooser.Choose(versionVerdict, mainVerdict);
+        var chosen = pick switch
+        {
+            ArtPick.VersionImage => version,
+            ArtPick.MainImage => main,
+            _ => null,
+        };
         var details = snapshot.Games is not null && snapshot.Games.TryGetValue(item.GameId, out var known) ? known : null;
         var shaped = BoxShape.Resolve(item, details, FlatCoverOf(chosen, rules), rules);
 
-        return new CabinetItem(
+        var mapped = new CabinetItem(
             item.GameId,
             item.CollectionId,
             item.Title,
@@ -114,27 +155,21 @@ public static class SnapshotMapper
             chosen is null ? null : ArtOf(chosen),
             chosen is not null && SpineColour.IsValidPair(chosen.Colour) ? chosen.Colour : null,
             shaped.PoseHeightMm);
+
+        return new MappedItemTrace(
+            item,
+            version,
+            versionVerdict,
+            version?.Features is { } features ? ArtVerdicts.Score(features) : null,
+            main,
+            mainVerdict,
+            pick,
+            shaped,
+            mapped);
     }
 
     private static ArtFile? FlatCoverOf(ImageRecord? chosen, ArtRules rules) =>
         VerdictOf(chosen, rules) == ArtVerdict.Flat ? chosen!.Files!.OrderByDescending(file => file.Width).First() : null;
-
-    private static ImageRecord? ChosenRecord(
-        SnapshotItem item,
-        CollectionSnapshot snapshot,
-        IReadOnlyDictionary<string, ImageRecord> images,
-        ArtRules rules)
-    {
-        var version = UsableRecord(item.VersionImageUrl, images);
-        var main = UsableRecord(MainPictureUrl(item, snapshot), images);
-
-        return ArtChooser.Choose(VerdictOf(version, rules), VerdictOf(main, rules)) switch
-        {
-            ArtPick.VersionImage => version,
-            ArtPick.MainImage => main,
-            _ => null,
-        };
-    }
 
     private static ImageRecord? UsableRecord(string? url, IReadOnlyDictionary<string, ImageRecord> images) =>
         url is not null
