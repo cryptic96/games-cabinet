@@ -21,11 +21,12 @@ function pause(milliseconds) {
 
 /**
  * Starts the live behaviour. Without the browser client on the page it runs the status checks alone.
- * @param {{ applyStatus: (status: object) => void, fetchStatus: () => Promise<object | null> }} handlers applyStatus takes every
- *   pushed or fetched status; fetchStatus asks the server for the current one and answers null when it cannot be had.
+ * @param {{ applyStatus: (status: object) => void, fetchStatus: () => Promise<object | null>, random?: () => number }} handlers
+ *   applyStatus takes every pushed or fetched status; fetchStatus asks the server for the current one and answers null when it
+ *   cannot be had; random is the source of numbers in [0, 1) that spreads the reconnect waits (Math.random unless a test hands in its own).
  * @returns {void}
  */
-export function startLive({ applyStatus, fetchStatus }) {
+export function startLive({ applyStatus, fetchStatus, random = Math.random }) {
   let connected = false;
   let catchingUp = false;
 
@@ -54,9 +55,10 @@ export function startLive({ applyStatus, fetchStatus }) {
   }
 
   /**
-   * Connects, and when the connection ends or never starts, tries again on the schedule: at once, then 2 s, 10 s, 30 s, then every
-   * 60 s. The count starts over only after a connection has stayed up for a minute, so a channel that opens and is closed at once
-   * is retried gently instead of in a tight loop.
+   * Connects, and when the connection ends or never starts, tries again on the schedule: a moment later, then about 2 s, 10 s,
+   * 30 s, then about every 60 s, each spread at random. The count starts over only after a connection has stayed up for a minute,
+   * so a channel that opens and is closed at once (a page the server turned away) is retried more and more gently instead of in a
+   * tight loop.
    * @param {object} signalR The browser client.
    * @returns {Promise<void>}
    */
@@ -64,7 +66,7 @@ export function startLive({ applyStatus, fetchStatus }) {
     let closed = null;
     const connection = new signalR.HubConnectionBuilder()
       .withUrl(LIVE_ROUTE)
-      .withAutomaticReconnect({ nextRetryDelayInMilliseconds: (context) => reconnectDelayMs(context.previousRetryCount) })
+      .withAutomaticReconnect({ nextRetryDelayInMilliseconds: (context) => reconnectDelayMs(context.previousRetryCount, random) })
       .configureLogging(signalR.LogLevel.None)
       .build();
 
@@ -111,7 +113,7 @@ export function startLive({ applyStatus, fetchStatus }) {
         connected = false;
       }
 
-      await pause(reconnectDelayMs(failures));
+      await pause(reconnectDelayMs(failures, random));
       failures += 1;
     }
   }
