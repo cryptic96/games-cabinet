@@ -129,6 +129,7 @@ Plan IDs collide: `T-03-SC` appears in 03-07, 03-08, 03-13 and 03-14 with differ
 | T-03-SC (03-08) | 03-08 | Tampering | NuGet `Microsoft.Extensions.TimeProvider.Testing` 10.10.0 (integration tests) | high | mitigate | `Cabinet.IntegrationTests.csproj:13`; lock file at 32-35; same locked restore | closed |
 | T-03-SC (03-13) | 03-13 | Tampering | NuGet `Microsoft.AspNetCore.SignalR.Client` 10.0.12 (test only) | high | mitigate | `Cabinet.IntegrationTests.csproj:12`; lock file at 22-25. The package and its transitive dependencies appear only in the integration-test lock file; the service does not reference it | closed |
 | T-03-SC (03-14) | 03-14 | Tampering | npm tarball and scratch Playwright | high | mitigate | No npm manifest, lock file or `node_modules` anywhere in history. Owner decision before download: SUMMARY claim. Legitimacy: SignalR in 03-RESEARCH; Playwright 1.63.0 in 02-RESEARCH (citation drift, observation 19) | closed |
+| T-03-SC (03-14, Playwright) | 03-14 | Tampering | scratch `playwright@1.63.0` from npm and its Chromium, Firefox and WebKit builds from Playwright's download host | medium | mitigate | Installed only in the session scratchpad, never in the repository or on the server, and used only to drive local pages against the fake BGG and take screenshots; no credential or real data was given to the browsers. The npm package is covered by npm's registry integrity; the browser builds are not, which is acceptable for a throwaway local check. Legitimacy: 02-RESEARCH. Reuse rule: install a pinned version into a fresh scratch folder and never vendor it | closed |
 
 *Status: open · closed · open — below high threshold (non-blocking)*
 *Severity: critical > high > medium > low — only open threats at or above workflow.security_block_on count toward threats_open*
@@ -199,7 +200,7 @@ Release, process and supply chain:
     - Nothing technical stops an agent session that holds the owner's login from merging, tagging or approving the deployment.
 17. **T-03-48:** the runner's Node version is not pinned. This is within the declared mitigation.
 18. **T-03-66, fixes not yet released.** The deployed `v0.3.0` still has the wall-clock pacer (review WR-03) and arms the timer before the start-up delay (IN-04). Both are fixed at HEAD but not released. Neither affects the 5 s floor or single flight.
-19. **T-03-SC (03-14), citation drift.** The mitigation cites 03-RESEARCH for both downloads, but that table lists only the SignalR package; Playwright's verdict is in 02-RESEARCH. Playwright's browser binaries come from its CDN and are not covered by npm integrity. Add a Playwright row when it is reused.
+19. **T-03-SC (03-14), citation drift.** The mitigation cites 03-RESEARCH for both downloads, but that table lists only the SignalR package; Playwright's verdict is in 02-RESEARCH. Playwright's browser binaries come from its CDN and are not covered by npm integrity. Add a Playwright row when it is reused. **Resolved 2026-10-07:** a separate Playwright row is now in the register.
 20. **Privacy hygiene.** The container's SSH alias appears in committed planning files (this phase's 03-01, 03-02 and 03-15 plans and earlier phases' plans), while the docs use `<container>`. It is a generic alias, not a resolvable hostname, with no denylist hit. Optional: replace it with the placeholder.
 21. **Carry-forward from the previous phase (AR-02-04).** The prototype switch is handled: it is off in committed settings and forced off in Production (`SampleCatalog.cs:111`). `noindex` is not handled: there is no robots meta tag, no `X-Robots-Tag` and no `robots.txt`. The site now shows the real collection, so whether it may be indexed is an owner decision before public exposure.
 22. **T-03-14 (no fix needed).** The credit link has no `target="_blank"`, so `rel="noopener"` has no effect; reverse-tabnabbing exposure is nil either way.
@@ -247,7 +248,7 @@ Applied in one fix round on the milestone branch after this audit, merged and ve
 | Audit Date | Threats Total | Closed | Open | Run By |
 |------------|---------------|--------|------|--------|
 | 2026-10-07 | 70 | 68 (65 mitigated, 3 accepted) | 2 (both medium, below the high threshold; 0 blocking) | gsd-security-auditor ×3, split by area (ASVS L2, block_on high) |
-| 2026-10-07 (post-fix) | 70 | 70 (67 mitigated, 3 accepted; AR-03-04 records an accepted residual) | 0 | orchestrator, from the fix round's evidence |
+| 2026-10-07 (post-fix) | 71 | 71 (68 mitigated, 3 accepted; AR-03-04 records an accepted residual) | 0 | orchestrator, from the fix round's evidence |
 
 ## Security Audit 2026-10-07
 | Metric | Count |
