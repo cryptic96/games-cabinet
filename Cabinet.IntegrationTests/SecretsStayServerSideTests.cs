@@ -6,6 +6,7 @@ using Cabinet.FakeBgg.Testing;
 using Cabinet.IntegrationTests.Infrastructure;
 using Cabinet.Repository.Bgg;
 using FluentAssertions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -80,7 +81,42 @@ public class SecretsStayServerSideTests
     }
 
     [Fact]
-    public async Task A_redirect_to_the_www_host_is_not_followed_and_ends_the_sync_as_a_failure()
+    public async Task The_production_transport_does_not_follow_a_redirect_to_another_address()
+    {
+        await using var target = await LoopbackListener.Start(context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status200OK;
+
+            return Task.CompletedTask;
+        });
+        await using var redirector = await LoopbackListener.Start(context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status301MovedPermanently;
+            context.Response.Headers.Location = target.BaseAddress + "xmlapi2/collection";
+
+            return Task.CompletedTask;
+        });
+        var options = SyncHarness.Options() with { BaseUri = redirector.BaseAddress };
+        await using var factory = new CabinetWebApplicationFactory(
+            new Dictionary<string, string?>(),
+            services =>
+            {
+                services.AddSingleton(options);
+                services.AddSingleton<IRequestPacer>(new NoWaitPacer());
+            });
+        using var client = factory.CreatePublicClient();
+
+        using var press = await client.PostAsync(SyncPath, content: null, TestContext.Current.CancellationToken);
+        await SyncHarness.WaitForRunToEnd(client);
+
+        press.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        (await SyncHarness.ReadStatus(client)).LastResult.Should().Be("failed");
+        redirector.RequestCount.Should().Be(1);
+        target.RequestCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task A_redirect_answer_ends_the_sync_as_a_failure_and_the_client_does_not_chase_it()
     {
         var logs = new CapturingLoggerProvider();
         var handler = new ScriptedBggHandler(_ => new ScriptedResponse(
@@ -139,6 +175,11 @@ public class SecretsStayServerSideTests
             (await Get(client, LayoutPath)).Status.Should().Be(HttpStatusCode.OK);
         }
 
+        var status = await SyncHarness.ReadStatus(client);
+
+        status.Running.Should().BeFalse("a visit must not start a sync");
+        status.CooldownEndsUtc.Should().BeNull("an accepted request opens the shared window at once");
+        status.LastResult.Should().BeNull();
         handler.Requests.Count.Should().Be(before);
     }
 

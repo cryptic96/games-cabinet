@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Net;
 using System.Text.Json;
 using Cabinet.Domain.Collection;
 using Cabinet.FakeBgg;
@@ -56,7 +57,7 @@ public class LiveHubTests
         var invocation = () => page.Connection.InvokeAsync(method, cancellationToken: TestContext.Current.CancellationToken);
 
         (await invocation.Should().ThrowAsync<HubException>()).Which.Message.Should().Contain("Method does not exist");
-        handler.Requests.Should().BeEmpty();
+        await AssertNoSyncWasRequested(factory, handler);
     }
 
     [Fact]
@@ -69,7 +70,23 @@ public class LiveHubTests
         var invocation = () => page.Connection.InvokeAsync("StatusChanged", new { running = true }, TestContext.Current.CancellationToken);
 
         (await invocation.Should().ThrowAsync<HubException>()).Which.Message.Should().Contain("Method does not exist");
-        handler.Requests.Should().BeEmpty();
+        await AssertNoSyncWasRequested(factory, handler);
+    }
+
+    [Fact]
+    public async Task The_negotiation_offers_websockets_and_server_sent_events_but_not_long_polling()
+    {
+        await using var factory = SyncHarness.CreateFactory(new ScriptedBggHandler(), SyncHarness.NewClock());
+        using var client = factory.CreatePublicClient();
+
+        using var response = await client.PostAsync($"{LiveRoute}/negotiate?negotiateVersion=1", content: null, TestContext.Current.CancellationToken);
+        using var negotiation = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var offered = negotiation.RootElement.GetProperty("availableTransports").EnumerateArray()
+            .Select(transport => transport.GetProperty("transport").GetString())
+            .ToList();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        offered.Should().BeEquivalentTo(["WebSockets", "ServerSentEvents"]);
     }
 
     [Fact]
@@ -80,7 +97,11 @@ public class LiveHubTests
 
         var start = () => page.Connection.StartAsync(TestContext.Current.CancellationToken);
 
-        await start.Should().ThrowAsync<Exception>();
+        var failure = await start.Should().ThrowAsync<AggregateException>();
+
+        failure.Which.InnerExceptions.Should().NotBeEmpty().And.OnlyContain(
+            inner => inner.Message.Contains("disabled by the client", StringComparison.Ordinal),
+            "the only transports the server offers are the two the client switched off");
     }
 
     [Fact]
@@ -110,18 +131,18 @@ public class LiveHubTests
         await using var first = await LivePage.ConnectAsync(factory, transport);
         await using var second = await LivePage.ConnectAsync(factory, transport);
 
-        var refused = await TryConnectAsync(factory, transport);
+        await ExpectRefusedAsync(factory, transport);
 
-        refused.Should().BeNull("the third connection is not held open");
+        limiter.Count.Should().Be(2, "the refused connection took no place");
         using var press = await client.PostAsync(SyncHarness.SyncRoute, content: null, TestContext.Current.CancellationToken);
         await SyncHarness.WaitUntil(() => Task.FromResult(first.Received.Count >= 2 && second.Received.Count >= 2));
 
         await first.Connection.StopAsync(TestContext.Current.CancellationToken);
         await SyncHarness.WaitUntil(() => Task.FromResult(limiter.Count == 1));
-        var admitted = await TryConnectAsync(factory, transport);
+        await using var admitted = await LivePage.ConnectAsync(factory, transport);
+        await SyncHarness.WaitUntil(() => Task.FromResult(limiter.Count == 2));
 
-        admitted.Should().NotBeNull("a place was freed");
-        await admitted!.DisposeAsync();
+        admitted.Closed.IsCompleted.Should().BeFalse("a place was freed, so the connection is held open");
     }
 
     [Fact]
@@ -150,9 +171,20 @@ public class LiveHubTests
             .Should().BeEquivalentTo(status.Json.EnumerateObject().Select(property => property.Name));
     }
 
-    private static async Task<LivePage?> TryConnectAsync(CabinetWebApplicationFactory factory, HttpTransportType transport)
+    private static async Task AssertNoSyncWasRequested(CabinetWebApplicationFactory factory, ScriptedBggHandler handler)
     {
-        var page = LivePage.Create(factory, transport);
+        using var client = factory.CreatePublicClient();
+        var status = await SyncHarness.ReadStatus(client);
+
+        status.Running.Should().BeFalse("a sync that was accepted would be running");
+        status.CooldownEndsUtc.Should().BeNull("an accepted request opens the shared window at once");
+        status.LastResult.Should().BeNull();
+        handler.Requests.Should().BeEmpty();
+    }
+
+    private static async Task ExpectRefusedAsync(CabinetWebApplicationFactory factory, HttpTransportType transport)
+    {
+        await using var page = LivePage.Create(factory, transport);
 
         try
         {
@@ -160,20 +192,10 @@ public class LiveHubTests
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            await page.DisposeAsync();
-
-            return null;
+            return;
         }
 
-        var closedFirst = await Task.WhenAny(page.Closed, Task.Delay(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken));
-        if (closedFirst == page.Closed)
-        {
-            await page.DisposeAsync();
-
-            return null;
-        }
-
-        return page;
+        await page.Closed.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
     }
 
     /// <summary>A hub connection that keeps every status it is sent.</summary>

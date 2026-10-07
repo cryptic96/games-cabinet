@@ -110,7 +110,7 @@ echo "$HEALTH"
 PAGE="$(curl -fsS --max-time 5 "http://127.0.0.1:$WEB_PORT/")" || fail "hello page did not return 200"
 grep -q "$VERSION" <<<"$PAGE" || fail "hello page does not mention version $VERSION"
 
-STYLESHEET="$(grep -oE '<link[^>]*rel="stylesheet"[^>]*>' <<<"$PAGE" | grep -oE 'href="[^"]+"' | head -n 1 | sed -e 's/^href="//' -e 's/"$//')"
+STYLESHEET="$({ grep -oE '<link[^>]*rel="stylesheet"[^>]*>' <<<"$PAGE" || true; } | sed -nE 's/.*href="([^"]+)".*/\1/p' | sed -n '1p')"
 [ -n "$STYLESHEET" ] || fail "hello page has no stylesheet link"
 grep -qE '\?v=|\.[A-Za-z0-9_-]{6,}\.css' <<<"$STYLESHEET" || fail "stylesheet href is not fingerprinted: $STYLESHEET"
 

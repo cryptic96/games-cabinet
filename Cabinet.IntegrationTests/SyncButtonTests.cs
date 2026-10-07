@@ -83,7 +83,7 @@ public partial class SyncButtonTests
         using var response = await client.GetAsync(path, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, path);
-        response.Content.Headers.ContentType?.MediaType.Should().Be("text/javascript", path);
+        response.ShouldHaveMediaType("text/javascript", path);
 
         return await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
     }

@@ -4,6 +4,7 @@ using System.Xml.Linq;
 using Cabinet.FakeBgg;
 using Cabinet.FakeBgg.Testing;
 using FluentAssertions;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Cabinet.UnitTests.FakeBgg;
 
@@ -209,21 +210,23 @@ public class BggXmlTests
     [Fact]
     public async Task Handler_holds_an_answer_back_until_its_delay_has_passed()
     {
-        var time = new ManualTimeProvider();
-        var handler = new ScriptedBggHandler(time).Enqueue(
+        var start = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var fake = new FakeTimeProvider(start);
+        var clock = new TimerCountingClock(fake);
+        var handler = new ScriptedBggHandler(clock).Enqueue(
             new ScriptedResponse(HttpStatusCode.OK, "text/xml", "<items />", TimeSpan.FromSeconds(5)));
         using var client = new HttpClient(handler);
 
         var pending = client.GetAsync("https://bgg.example.org/xmlapi2/collection", TestContext.Current.CancellationToken);
-        SpinWait.SpinUntil(() => time.TimerCount > 0, TimeSpan.FromSeconds(5)).Should().BeTrue();
-        pending.IsCompleted.Should().BeFalse();
-        time.Advance(TimeSpan.FromSeconds(4));
-        pending.IsCompleted.Should().BeFalse();
-        time.Advance(TimeSpan.FromSeconds(1));
-        using var response = await pending;
+        await clock.WaitForTimersAsync(1, TestContext.Current.CancellationToken);
+        fake.Advance(TimeSpan.FromSeconds(4));
+        var earlyFinish = await Task.WhenAny(pending, Task.Delay(TimeSpan.FromMilliseconds(250), TestContext.Current.CancellationToken));
+        earlyFinish.Should().NotBeSameAs(pending, "the answer is held back for five seconds");
+        fake.Advance(TimeSpan.FromSeconds(1));
+        using var response = await pending.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        handler.Requests.Single().At.Should().Be(time.Start);
+        handler.Requests.Single().At.Should().Be(start);
     }
 
     [Fact]
@@ -289,57 +292,5 @@ public class BggXmlTests
     public void Scenario_text_that_is_not_a_scenario_is_refused(string text)
     {
         FakeBggScenario.TryParse(text, out _).Should().BeFalse();
-    }
-
-    private sealed class ManualTimeProvider : TimeProvider
-    {
-        private readonly List<ManualTimer> _timers = [];
-        private DateTimeOffset _now = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
-
-        public DateTimeOffset Start { get; } = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
-
-        public int TimerCount => _timers.Count;
-
-        public override DateTimeOffset GetUtcNow() => _now;
-
-        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
-        {
-            var timer = new ManualTimer(callback, state, _now + dueTime);
-            _timers.Add(timer);
-            return timer;
-        }
-
-        public void Advance(TimeSpan amount)
-        {
-            _now += amount;
-            foreach (var timer in _timers.Where(timer => timer.IsDueAt(_now)).ToList())
-            {
-                timer.Fire();
-            }
-        }
-
-        private sealed class ManualTimer(TimerCallback callback, object? state, DateTimeOffset dueAt) : ITimer
-        {
-            private bool _fired;
-            private bool _disposed;
-
-            public bool IsDueAt(DateTimeOffset now) => !_fired && !_disposed && now >= dueAt;
-
-            public void Fire()
-            {
-                _fired = true;
-                callback(state);
-            }
-
-            public bool Change(TimeSpan dueTime, TimeSpan period) => !_disposed;
-
-            public void Dispose() => _disposed = true;
-
-            public ValueTask DisposeAsync()
-            {
-                _disposed = true;
-                return ValueTask.CompletedTask;
-            }
-        }
     }
 }

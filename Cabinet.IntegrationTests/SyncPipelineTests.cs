@@ -86,7 +86,7 @@ public class SyncPipelineTests
         first.StatusCode.Should().Be(HttpStatusCode.Accepted);
         second.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await second.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).Should().Contain("\"running\"");
-        second.Headers.CacheControl?.NoStore.Should().BeTrue();
+        second.ShouldBeNoStore();
         handler.Requests.Should().HaveCount(2);
     }
 
