@@ -138,6 +138,7 @@ main .cabinet-message {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 16px;
+  max-width: 40rem;
   min-height: 44px;
   margin-top: 4px;
 }
@@ -193,6 +194,7 @@ main .cabinet-message {
 }
 
 .sync-exact {
+  max-width: 40rem;
   margin-top: 8px;
   font-size: 14px;
 }
