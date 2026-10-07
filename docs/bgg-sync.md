@@ -452,6 +452,61 @@ In a settings file the same keys are written with a colon, for example
 start-up with a message naming the key, and so does a product-shot fill limit
 above the flat-cover fill minimum.
 
+## Box sizes
+
+Every box is drawn at its own proportions, taken from the first of these that
+applies:
+
+1. **Real sizes.** The width, length and depth of the edition you own, when they
+   look like a game box: a front side from 50 to 700 mm and a depth from 5 to
+   300 mm, both ends included.
+2. **A flat cover's shape.** A game without usable sizes takes the shape of its
+   cover when the chosen picture is a flat cover. The longer front side comes
+   from the estimate in the next step and the other side follows the cover.
+3. **An estimate.** A game with details but no sizes and no flat cover gets a
+   size class from its weight, playing time and player count: compact, small,
+   standard, large or extra large. Heavier and longer games get bigger, deeper
+   boxes, and small card games stay small. Anything unknown counts as the
+   middle of its band.
+4. **A default.** A game with no details at all is drawn at one ordinary size
+   for its kind: 225 by 300 mm and 60 mm deep, or 200 by 260 mm and 40 mm deep
+   for an expansion.
+
+BGG sizes are entered by people and are sometimes wrong. When the real sizes
+are given and the chosen picture is a flat cover, their shape (shorter side over
+longer side) is compared with the cover's. If they differ by more than the
+margin, the front is rebuilt from the cover's shape, keeping the same front area
+and the same depth; at or below the margin the real sizes are used as they are.
+A rebuilt front that would fall outside the believable range is not used, and
+the real sizes stay.
+
+A slanted product shot, a picture that is not clearly flat, and a picture that
+is not used never shape a box. Pictures that do not match their box never get
+cropped: bars fill the gap instead.
+
+Small changes in BGG data never change a box. The size class is kept until the
+game's score has moved clear of that class's band, so a weight moving from 2.74
+to 2.76 or a playing time from 59 to 61 minutes changes nothing, while a
+genuinely different game gets a different box. A release that changes how
+classes are estimated starts every game over once.
+
+How a box stands, facing out, upright or lying flat, never depends on its
+picture. It is decided from the real height, or else the estimated height, so
+changing how pictures are judged can reshape boxes but never rearranges how they
+stand.
+
+Optional settings for the env file; they need a restart and no download:
+
+| Key | Default | Range | Meaning |
+| --- | --- | --- | --- |
+| `Art__ShapeMarginPercent` | `12` | 1 to 50 | How far, as a percentage of the cover's shape, the real sizes' shape may differ from a flat cover before the front is rebuilt from the cover. |
+| `Art__OrientFromCover` | `true` | `true` or `false` | Whether a flat landscape cover makes the front landscape, with its width as the longer side. When `false` the longer side always stands as the height. |
+
+In a settings file the same keys are written with a colon, for example
+`Art:ShapeMarginPercent`. An out-of-range value, a value that is not a whole
+number, or an `Art:OrientFromCover` that is not `true` or `false` stops the app
+at start-up with a message naming the key.
+
 ## Where the data lives
 
 The synced collection is stored as `snapshot.json` in the service's state

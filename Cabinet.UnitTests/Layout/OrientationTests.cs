@@ -90,6 +90,46 @@ public class OrientationTests
         }
     }
 
+    [Theory]
+    [InlineData(150, 400, BoxPose.Cover)]
+    [InlineData(400, 150, BoxPose.Spine)]
+    [Trait("Category", "Layout")]
+    public void The_oversize_rule_reads_the_pose_height_and_not_the_drawn_height(int drawnHeightMm, int poseHeightMm, BoxPose expected)
+    {
+        var options = new LayoutOptions(0, CoverStrategy.OversizeOnly, 6, 0);
+        var item = ItemOf(77, drawnHeightMm) with { PoseHeightMm = poseHeightMm };
+
+        Orientation.Decide(item, options, Design, fewGames: false).Should().Be(expected);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void An_item_without_a_pose_height_behaves_as_if_its_pose_height_were_its_drawn_height()
+    {
+        var options = new LayoutOptions(25, CoverStrategy.SizeWeighted, 6, 0);
+
+        for (var id = 1; id <= 200; id++)
+        {
+            var plain = ItemOf(id, heightMm: 150 + (id % 200));
+
+            Orientation.Decide(plain, options, Design, false)
+                .Should().Be(Orientation.Decide(plain with { PoseHeightMm = plain.Box.HeightMm }, options, Design, false), "game {0}", id);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void The_size_weighted_chance_and_the_lie_flat_eligibility_read_the_pose_height()
+    {
+        var neverCover = new LayoutOptions(0, CoverStrategy.Random, 6, 0);
+        var ids = Enumerable.Range(1, 300).ToList();
+        var standing = ids.Select(id => Orientation.Decide(ItemOf(id, 300, depthMm: 60), neverCover, Design, false)).ToList();
+        var shortPose = ids.Select(id => Orientation.Decide(ItemOf(id, 300, depthMm: 60) with { PoseHeightMm = 150 }, neverCover, Design, false)).ToList();
+
+        standing.Should().OnlyContain(pose => pose == BoxPose.Spine, "a tall deep box cannot lie flat");
+        shortPose.Should().Contain(BoxPose.Flat, "a box whose pose height is small may lie flat");
+    }
+
     private static CabinetItem ItemOf(int bggId, int heightMm, int depthMm = 60) =>
         new(bggId, bggId, $"Invented Title {bggId}", ItemKind.Base, new BoxDimensions(heightMm * 3 / 4, heightMm, depthMm), []);
 }

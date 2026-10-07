@@ -21,6 +21,8 @@ namespace Cabinet.Domain.Collection;
 /// <param name="Mechanics">The names of the mechanics.</param>
 /// <param name="ExpandsGames">The games this game is an expansion of; empty for a game that expands nothing.</param>
 /// <param name="MainImageUrl">The canonical address of the game's main picture, or null when the source gave none.</param>
+/// <param name="EstimatedSize">The box size class worked out from these details, or null when it has not been worked out.</param>
+/// <param name="EstimateModelVersion">The version of the estimate that produced <paramref name="EstimatedSize"/>, or null when there is none.</param>
 public sealed record GameDetails(
     DateTimeOffset EnrichedAtUtc,
     int? MinPlayers,
@@ -35,7 +37,9 @@ public sealed record GameDetails(
     IReadOnlyList<string> Designers,
     IReadOnlyList<string> Mechanics,
     IReadOnlyList<BaseGameRef> ExpandsGames,
-    string? MainImageUrl)
+    string? MainImageUrl,
+    BoxSizeClass? EstimatedSize = null,
+    int? EstimateModelVersion = null)
 {
     /// <summary>Whether another set of details says exactly the same, comparing the lists by their contents.</summary>
     /// <param name="other">The details to compare with; null is never the same.</param>
@@ -52,6 +56,8 @@ public sealed record GameDetails(
         && Average == other.Average
         && BayesAverage == other.BayesAverage
         && MainImageUrl == other.MainImageUrl
+        && EstimatedSize == other.EstimatedSize
+        && EstimateModelVersion == other.EstimateModelVersion
         && Designers.SequenceEqual(other.Designers)
         && Mechanics.SequenceEqual(other.Mechanics)
         && ExpandsGames.SequenceEqual(other.ExpandsGames);

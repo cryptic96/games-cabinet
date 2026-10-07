@@ -24,7 +24,8 @@ public static class SnapshotMapper
     /// game's picture from the stored measurements with the given rules: the picture of the owned edition when it is a flat
     /// cover, the game's main picture when the owned edition's picture is a photographed box and the main picture is flat,
     /// and the owned edition's picture otherwise. The chosen picture also supplies the colour pair and the edge colours the
-    /// item carries; a game with no usable picture carries neither.
+    /// item carries; a game with no usable picture carries neither. A chosen picture that is a flat cover may also give the
+    /// box its shape; see <see cref="BoxShape"/>.
     /// </summary>
     /// <param name="snapshot">The stored collection.</param>
     /// <param name="rules">The rules that turn stored measurements into a choice.</param>
@@ -85,7 +86,7 @@ public static class SnapshotMapper
         var lines = items
             .Select(item => string.Create(
                 CultureInfo.InvariantCulture,
-                $"{item.CollectionId}|{item.BggId}|{item.Kind}|{item.Title}|{item.Box.WidthMm}|{item.Box.HeightMm}|{item.Box.DepthMm}|{VariantUrls(item.Art)}|{ExpansionRefs(item.ExpansionOf)}|{ColourText(item.Colour)}|{EdgeText(item.Art?.Edges)}"))
+                $"{item.CollectionId}|{item.BggId}|{item.Kind}|{item.Title}|{item.Box.WidthMm}|{item.Box.HeightMm}|{item.Box.DepthMm}|{item.PoseHeightMm}|{VariantUrls(item.Art)}|{ExpansionRefs(item.ExpansionOf)}|{ColourText(item.Colour)}|{EdgeText(item.Art?.Edges)}"))
             .Prepend(rules.Fingerprint);
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', lines)));
 
@@ -100,17 +101,23 @@ public static class SnapshotMapper
         ArtRules rules)
     {
         var chosen = ChosenRecord(item, snapshot, images, rules);
+        var details = snapshot.Games is not null && snapshot.Games.TryGetValue(item.GameId, out var known) ? known : null;
+        var shaped = BoxShape.Resolve(item, details, FlatCoverOf(chosen, rules), rules);
 
         return new CabinetItem(
             item.GameId,
             item.CollectionId,
             item.Title,
             item.Kind,
-            BoxFromVersion.Map(item.Dimensions, item.Kind),
+            shaped.Box,
             pairing.TryGetValue(item.CollectionId, out var expansionOf) && item.Kind == ItemKind.Expansion ? expansionOf : [],
             chosen is null ? null : ArtOf(chosen),
-            chosen is not null && SpineColour.IsValidPair(chosen.Colour) ? chosen.Colour : null);
+            chosen is not null && SpineColour.IsValidPair(chosen.Colour) ? chosen.Colour : null,
+            shaped.PoseHeightMm);
     }
+
+    private static ArtFile? FlatCoverOf(ImageRecord? chosen, ArtRules rules) =>
+        VerdictOf(chosen, rules) == ArtVerdict.Flat ? chosen!.Files!.OrderByDescending(file => file.Width).First() : null;
 
     private static ImageRecord? ChosenRecord(
         SnapshotItem item,

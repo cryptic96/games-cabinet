@@ -72,4 +72,15 @@ public class BoxFromVersionTests
         BoxFromVersion.Map(null, ItemKind.Base).Should().Be(BaseDefault);
         BoxFromVersion.Map(null, ItemKind.Expansion).Should().Be(ExpansionDefault);
     }
+
+    [Fact]
+    public void Try_map_gives_the_same_box_as_map_when_it_is_believable_and_nothing_otherwise()
+    {
+        var believable = new VersionDimensions(9.5, 11.75, 3.1);
+
+        BoxFromVersion.TryMap(believable).Should().Be(BoxFromVersion.Map(believable, ItemKind.Base));
+        BoxFromVersion.TryMap(null).Should().BeNull();
+        BoxFromVersion.TryMap(new VersionDimensions(0, 0, 0)).Should().BeNull();
+        BoxFromVersion.TryMap(new VersionDimensions(40, 60, 3)).Should().BeNull();
+    }
 }

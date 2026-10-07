@@ -107,6 +107,44 @@ public class ArtSettingsTests
         act.Should().NotThrow();
     }
 
+    [Fact]
+    public void The_shape_settings_bind_and_change_the_fingerprint()
+    {
+        var rules = ArtSettings.FromConfiguration(Configure(("Art:ShapeMarginPercent", "20"), ("Art:OrientFromCover", "false")));
+
+        rules.ShapeMarginPercent.Should().Be(20);
+        rules.OrientFromCover.Should().BeFalse();
+        rules.Fingerprint.Should().NotBe(ArtRules.Default.Fingerprint);
+        ArtSettings.FromConfiguration(Configure(("Art:ShapeMarginPercent", "20"))).Fingerprint.Should().NotBe(ArtRules.Default.Fingerprint);
+        ArtSettings.FromConfiguration(Configure(("Art:OrientFromCover", "false"))).Fingerprint.Should().NotBe(ArtRules.Default.Fingerprint);
+    }
+
+    [Theory]
+    [InlineData("Art:ShapeMarginPercent", "0")]
+    [InlineData("Art:ShapeMarginPercent", "51")]
+    [InlineData("Art:ShapeMarginPercent", "twelve")]
+    [InlineData("Art:ShapeMarginPercent", "12.5")]
+    [InlineData("Art:ShapeMarginPercent", "")]
+    [InlineData("Art:OrientFromCover", "yes")]
+    [InlineData("Art:OrientFromCover", "")]
+    [InlineData("Art:OrientFromCover", "1")]
+    public void A_bad_shape_setting_stops_startup_naming_the_key(string key, string text)
+    {
+        var act = () => ArtSettings.FromConfiguration(Configure((key, text)));
+
+        act.Should().Throw<InvalidOperationException>().WithMessage($"*{key}*");
+    }
+
+    [Theory]
+    [InlineData("1")]
+    [InlineData("50")]
+    public void The_edges_of_the_shape_margin_range_are_accepted(string text)
+    {
+        var act = () => ArtSettings.FromConfiguration(Configure(("Art:ShapeMarginPercent", text)));
+
+        act.Should().NotThrow();
+    }
+
     private static IConfiguration Configure(params (string Key, string Value)[] values) =>
         new ConfigurationBuilder()
             .AddInMemoryCollection(values.Select(pair => new KeyValuePair<string, string?>(pair.Key, pair.Value)))

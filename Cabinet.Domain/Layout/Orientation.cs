@@ -30,7 +30,8 @@ public enum SizeClass
 /// Decides how each game is chosen to stand. A decision depends only on that game, the settings and the design, never on
 /// the other games, so adding a game never changes the pose it is chosen for. The one exception is the few-games switch,
 /// which looks at how many games there are and is accepted as a single global rearrangement. The engine may still lay a
-/// game flat when no cubby has room for it in the pose it was chosen for.
+/// game flat when no cubby has room for it in the pose it was chosen for. The choice reads the item's pose height and never
+/// the shape its picture gives the drawn box, so changing how a picture is judged never changes how a box stands.
 /// </summary>
 public static class Orientation
 {
@@ -115,10 +116,13 @@ public static class Orientation
             return BoxPose.Cover;
         }
 
-        return CanLieFlat(item.Box) && StableHash.Bucket(item.BggId, StableHash.FlatSalt, BasisPoints) < FlatChanceBasisPoints
+        return CanLieFlat(PoseBox(item)) && StableHash.Bucket(item.BggId, StableHash.FlatSalt, BasisPoints) < FlatChanceBasisPoints
             ? BoxPose.Flat
             : BoxPose.Spine;
     }
+
+    private static BoxDimensions PoseBox(CabinetItem item) =>
+        item.PoseHeightMm is { } height ? item.Box with { HeightMm = height } : item.Box;
 
     private static bool CanLieFlat(BoxDimensions box) =>
         SizeClassOf(box) == SizeClass.Small || box.DepthMm <= FlatDepthLimitMm;
@@ -127,12 +131,12 @@ public static class Orientation
     {
         if (options.CoverStrategy == CoverStrategy.OversizeOnly)
         {
-            return item.Box.HeightMm > design.MaxSpineHeightMm;
+            return PoseBox(item).HeightMm > design.MaxSpineHeightMm;
         }
 
         var chance = options.CoverStrategy == CoverStrategy.Random
             ? options.CoverSharePercent * BasisPointsPerPercent
-            : CoverChanceBasisPoints(options.CoverSharePercent, SizeClassOf(item.Box));
+            : CoverChanceBasisPoints(options.CoverSharePercent, SizeClassOf(PoseBox(item)));
 
         return StableHash.Bucket(item.BggId, StableHash.CoverSalt, BasisPoints) < chance;
     }
