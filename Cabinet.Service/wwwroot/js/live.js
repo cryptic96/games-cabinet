@@ -23,7 +23,7 @@ function pause(milliseconds) {
  * Starts the live behaviour. Without the browser client on the page it runs the status checks alone.
  * @param {{ applyStatus: (status: object) => void, fetchStatus: () => Promise<object | null> }} handlers applyStatus takes every
  *   pushed or fetched status; fetchStatus asks the server for the current one and answers null when it cannot be had.
- * @returns {{ isConnected: () => boolean }} Whether the live connection is up right now.
+ * @returns {void}
  */
 export function startLive({ applyStatus, fetchStatus }) {
   let connected = false;
@@ -131,6 +131,4 @@ export function startLive({ applyStatus, fetchStatus }) {
   if (globalThis.signalR !== undefined) {
     keepConnected(globalThis.signalR);
   }
-
-  return { isConnected: () => connected };
 }

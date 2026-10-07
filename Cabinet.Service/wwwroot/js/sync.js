@@ -20,6 +20,20 @@ const OUTCOME_NOTES = Object.freeze({
 });
 
 /**
+ * Asks the server for the current sync status.
+ * @returns {Promise<object | null>} The status, or null when it could not be had; a failure is never shown.
+ */
+export async function fetchStatus() {
+  try {
+    const response = await fetch('/cabinet/status');
+
+    return response.ok ? await response.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Starts the sync block behaviour.
  * @param {HTMLElement} root The element carrying the first-paint state as data attributes.
  * @param {{ onCollectionChanged?: () => Promise<boolean | void> | void }} [options] onCollectionChanged is called when the status
@@ -292,22 +306,16 @@ export function initSyncStatus(root, options = {}) {
    * @param {boolean} ownPress Whether this status may end the visitor's own press cycle.
    * @returns {Promise<boolean>} True when the status arrived and no sync is running any more.
    */
-  async function fetchStatus(ownPress) {
-    try {
-      const response = await fetch('/cabinet/status');
+  async function fetchAndApplyStatus(ownPress) {
+    const status = await fetchStatus();
 
-      if (!response.ok) {
-        return false;
-      }
-
-      const status = await response.json();
-
-      applyStatus(status, { ownPress });
-
-      return status.running !== true;
-    } catch {
+    if (status === null || typeof status !== 'object') {
       return false;
     }
+
+    applyStatus(status, { ownPress });
+
+    return status.running !== true;
   }
 
   /**
@@ -327,7 +335,7 @@ export function initSyncStatus(root, options = {}) {
 
     const step = async () => {
       pollTimer = null;
-      await fetchStatus(ownSyncPending);
+      await fetchAndApplyStatus(ownSyncPending);
 
       if (generation !== pollGeneration) {
         return;

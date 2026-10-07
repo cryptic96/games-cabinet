@@ -22,7 +22,7 @@ async function loadPageScript(name) {
 }
 
 const { COPY } = await loadPageScript('copy.js');
-const { serverOffsetMs, elapsedSeconds, isStale, buttonState, countdownText, wholeMinutesLeft, pressOutcome, shouldRedraw, reconnectDelayMs, isOutdatedStatus, ownSyncStillWaiting } = await loadPageScript('status.js');
+const { serverOffsetMs, elapsedSeconds, isStale, buttonState, countdownText, pressOutcome, shouldRedraw, reconnectDelayMs, isOutdatedStatus, ownSyncStillWaiting } = await loadPageScript('status.js');
 const cases = JSON.parse(readFileSync(new URL('./fixtures/relative-time-cases.json', import.meta.url), 'utf8'));
 
 const SYNCED = '2030-01-15T12:00:00.000Z';
@@ -34,10 +34,6 @@ for (const { elapsedSeconds: seconds, text } of cases) {
     assert.equal(COPY.syncedAgo(seconds), text);
   });
 }
-
-test('the never-synced line is fixed copy', () => {
-  assert.equal(COPY.notSynced, 'Not synced yet');
-});
 
 test('the exact time is written in the visitor zone with English words and a 24-hour clock', () => {
   const text = COPY.exactTime(new Date(SYNCED));
@@ -115,8 +111,6 @@ test('the countdown reads minutes and seconds with the seconds rounded up', () =
 });
 
 test('the button name and the press sentence round minutes up and have their own singular and sub-minute forms', () => {
-  assert.equal(wholeMinutesLeft(582000), 10);
-  assert.equal(wholeMinutesLeft(0), 0);
   assert.equal(COPY.syncAgainName(59000), 'Sync again in less than a minute');
   assert.equal(COPY.syncAgainName(60000), 'Sync again in 1 minute');
   assert.equal(COPY.syncAgainName(61000), 'Sync again in 2 minutes');

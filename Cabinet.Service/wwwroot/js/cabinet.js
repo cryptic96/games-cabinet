@@ -4,7 +4,7 @@
  */
 import { renderCabinet } from './render.js';
 import { COPY } from './copy.js';
-import { initSyncStatus } from './sync.js';
+import { initSyncStatus, fetchStatus } from './sync.js';
 import { startLive } from './live.js';
 
 const mount = document.getElementById('cabinet');
@@ -19,6 +19,16 @@ let latestLoad = 0;
  */
 function currentProfile() {
   return phoneQuery.matches ? 'phone' : 'desktop';
+}
+
+/**
+ * Builds the layout address for the current profile and the mount's sample, if it carries one.
+ * @returns {string}
+ */
+function layoutUrl() {
+  const sample = mount.dataset.sample;
+
+  return '/cabinet/layout?profile=' + currentProfile() + (sample ? '&sample=' + encodeURIComponent(sample) : '');
 }
 
 /**
@@ -65,9 +75,7 @@ async function load() {
   showLoading();
 
   try {
-    const sample = mount.dataset.sample;
-    const url = '/cabinet/layout?profile=' + currentProfile() + (sample ? '&sample=' + encodeURIComponent(sample) : '');
-    const response = await fetch(url);
+    const response = await fetch(layoutUrl());
 
     if (thisLoad !== latestLoad) {
       return;
@@ -97,9 +105,7 @@ async function load() {
  * @returns {Promise<object | null>} The layout, or null when the answer is not a success.
  */
 async function fetchLayout() {
-  const sample = mount.dataset.sample;
-  const url = '/cabinet/layout?profile=' + currentProfile() + (sample ? '&sample=' + encodeURIComponent(sample) : '');
-  const response = await fetch(url);
+  const response = await fetch(layoutUrl());
 
   return response.ok ? response.json() : null;
 }
@@ -179,20 +185,6 @@ function abandonRedraw() {
   }
 
   return false;
-}
-
-/**
- * Asks the server for the current sync status.
- * @returns {Promise<object | null>} The status, or null when it could not be had; a failure is never shown.
- */
-async function fetchStatus() {
-  try {
-    const response = await fetch('/cabinet/status');
-
-    return response.ok ? await response.json() : null;
-  } catch {
-    return null;
-  }
 }
 
 if (syncRoot !== null) {
