@@ -32,6 +32,12 @@ CS_BLOCK_COMMENT_PATTERN='(^|[[:space:];{}()])/\*'
 JS_LINE_COMMENT_PATTERN='(^|[^:])//'
 JS_PLAIN_BLOCK_COMMENT_PATTERN='/\*([^*]|$)'
 
+PAGE_SCRIPT_PATTERN='^Cabinet\.Service/wwwroot/js/'
+
+# Page scripts build the DOM from elements and text nodes only. The APIs that parse markup or
+# style text from a string are refused so a visitor-controlled value can never become markup.
+JS_MARKUP_API_PATTERN='\b(inner|outer)HTM[L]\b|insertAdjacentHTM[L]|document\.writ[e]|\.cssTex[t]'
+
 RUNS_ON_ALLOWED='ubuntu-26.04'
 
 LICENSE_FIRST_LINE='MIT License'
@@ -86,6 +92,19 @@ assert_clean_js_comments() {
     violations=1
   fi
   [ "$violations" -eq 0 ]
+}
+
+filter_page_scripts() {
+  grep -E "$PAGE_SCRIPT_PATTERN" || true
+}
+
+assert_no_markup_apis() {
+  local -a files=("$@")
+  [ "${#files[@]}" -eq 0 ] && return 0
+  if grep -nE "$JS_MARKUP_API_PATTERN" "${files[@]}" 2>/dev/null; then
+    return 1
+  fi
+  return 0
 }
 
 assert_clean_runs_on() {
@@ -317,6 +336,28 @@ self_test() {
     failed=1
   fi
 
+  local markup_api
+  for markup_api in 'el.innerHTML' 'el.outerHTML' 'el.insertAdjacentHTML' 'document.write' 'el.style.cssText'; do
+    printf 'const value = %s;\n' "$markup_api" >"$tmp/markup.js"
+    if assert_no_markup_apis "$tmp/markup.js" >/dev/null 2>&1; then
+      echo "self-test failed: the markup-building API '${markup_api}' was not detected" >&2
+      failed=1
+    fi
+  done
+
+  printf 'const node = document.createElement("div");\nnode.textContent = "plain";\nnode.style.setProperty("--x", "1");\n' >"$tmp/clean.js"
+  if ! assert_no_markup_apis "$tmp/clean.js" >/dev/null 2>&1; then
+    echo "self-test failed: a script that builds elements and text nodes was incorrectly flagged" >&2
+    failed=1
+  fi
+
+  local page_scripts
+  page_scripts="$(printf '%s\n' 'Cabinet.Service/wwwroot/js/render.js' 'Cabinet.Service/wwwroot/lib/signalr/signalr.min.js' 'Cabinet.Service/other/tool.js' | filter_page_scripts)"
+  if [ "$page_scripts" != "Cabinet.Service/wwwroot/js/render.js" ]; then
+    echo "self-test failed: the vendored folder was not ignored, or a page script was dropped, in the markup-API file list" >&2
+    failed=1
+  fi
+
   mkdir -p "$tmp/workflows"
   printf 'jobs:\n  build:\n    runs-on: %s\n' "$RUNS_ON_ALLOWED" >"$tmp/workflows/good.yml"
   printf 'jobs:\n  build:\n    runs-on: self-hosted\n' >"$tmp/workflows/bad.yml"
@@ -387,6 +428,11 @@ if ! assert_clean_cs_comments "${cs_files[@]}"; then
 fi
 
 if ! assert_clean_js_comments "${js_files[@]}"; then
+  overall_ok=0
+fi
+
+mapfile -t page_script_files < <(git ls-files '*.js' '*.mjs' | filter_page_scripts || true)
+if ! assert_no_markup_apis "${page_script_files[@]}"; then
   overall_ok=0
 fi
 
