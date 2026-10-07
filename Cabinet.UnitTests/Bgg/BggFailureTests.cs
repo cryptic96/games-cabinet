@@ -92,15 +92,16 @@ public class BggFailureTests
     }
 
     [Fact]
-    public async Task A_cancelled_caller_gets_a_timeout_and_no_collection()
+    public async Task A_cancelled_caller_gets_the_cancellation_and_not_a_failure_category()
     {
         using var cancelled = new CancellationTokenSource();
         await cancelled.CancelAsync();
         var handler = new ScriptedBggHandler(request => BggTestKit.Good(Items, request));
 
-        var result = await BggTestKit.Client(handler).FetchOwnedAsync(cancelled.Token);
+        var fetch = () => BggTestKit.Client(handler).FetchOwnedAsync(cancelled.Token);
 
-        result.Should().BeOfType<CollectionFetchResult.Failed>().Which.Failure.Should().Be(SyncFailure.Timeout);
+        await fetch.Should().ThrowAsync<OperationCanceledException>();
+        handler.Requests.Should().BeEmpty();
     }
 
     [Fact]
