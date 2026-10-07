@@ -422,6 +422,35 @@
 }
 
 /**
+ * An upright expansion too thin for a second line shows its title alone in the spine title style: the same weight and
+ * size as a spine, one vertical line that ends in an ellipsis when the box is short.
+ */
+.placement[data-kind="expansionSpine"][data-lines="1"] {
+  flex-direction: row;
+}
+
+.placement[data-kind="expansionSpine"][data-lines="1"] .placement-label {
+  font-size: clamp(12px, calc(var(--w) * var(--u) * 0.5), 16px);
+  line-height: 1;
+  text-overflow: ellipsis;
+}
+
+/**
+ * An expansion box without an owned base game that is too thin for a second line shows its title alone in the flat box
+ * title style: one row that ends in an ellipsis.
+ */
+.placement[data-kind="orphanExpansion"][data-lines="1"] {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.placement[data-kind="orphanExpansion"][data-lines="1"] .placement-label {
+  flex: 1 1 auto;
+  line-height: 1;
+}
+
+/**
  * The marker on top of a full stack is a chip in the accent colour and the only element inside the cabinet that uses
  * it, so it reads at a glance as a count and not as another box.
  */

@@ -55,8 +55,11 @@ public sealed record SectionDesign(string Name, int InteriorWidthMm, int FrameMm
     /// </summary>
     public int StackColumnWidthMm { get; init; } = 190;
 
-    /// <summary>The least height one expansion layer is drawn at, in millimetres.</summary>
-    public int MinLayerHeightMm { get; init; } = 40;
+    /// <summary>
+    /// The least height one expansion layer is drawn at, in millimetres: the height that one line of title needs at the
+    /// smallest width the section is shown at.
+    /// </summary>
+    public int MinLayerHeightMm { get; init; } = 34;
 
     /// <summary>The most height one expansion layer is drawn at, in millimetres.</summary>
     public int MaxLayerHeightMm { get; init; } = 70;
@@ -65,16 +68,29 @@ public sealed record SectionDesign(string Name, int InteriorWidthMm, int FrameMm
     public int MarkerHeightMm { get; init; } = 40;
 
     /// <summary>
-    /// The least height an expansion box without an owned base game is drawn at, in millimetres, so its two label lines
-    /// stay readable at the smallest width the section is shown at.
+    /// The least height an expansion box without an owned base game is drawn at, in millimetres, so one line of its title
+    /// stays readable at the smallest width the section is shown at. A box thicker than this is drawn at its real
+    /// thickness.
     /// </summary>
-    public int MinOrphanHeightMm { get; init; } = 80;
+    public int MinOrphanHeightMm { get; init; } = 34;
 
     /// <summary>
-    /// The least width an upright expansion is drawn at, in millimetres, so its title and the line naming its base game
-    /// fit side by side at the smallest width the section is shown at.
+    /// The least width an upright expansion is drawn at, in millimetres, so one line of its title stays readable at the
+    /// smallest width the section is shown at. A box thicker than this is drawn at its real thickness.
     /// </summary>
-    public int MinUprightExpansionWidthMm { get; init; } = 64;
+    public int MinUprightExpansionWidthMm { get; init; } = 34;
+
+    /// <summary>
+    /// The drawn width, in millimetres, from which an upright expansion has room for a second line naming its base game
+    /// beside its title. Below it the box shows its title alone.
+    /// </summary>
+    public int TwoLineUprightWidthMm { get; init; } = 64;
+
+    /// <summary>
+    /// The drawn height, in millimetres, from which an expansion box without an owned base game has room for a second
+    /// line naming its base game under its title. Below it the box shows its title alone.
+    /// </summary>
+    public int TwoLineOrphanHeightMm { get; init; } = 80;
 
     /// <summary>
     /// The space, in millimetres, that the stylesheet reserves beside the frame on each side of a section for the side
@@ -175,6 +191,8 @@ public sealed record SectionDesign(string Name, int InteriorWidthMm, int FrameMm
             ("marker height", MarkerHeightMm),
             ("minimum orphan height", MinOrphanHeightMm),
             ("minimum upright width", MinUprightExpansionWidthMm),
+            ("two-line upright width", TwoLineUprightWidthMm),
+            ("two-line orphan height", TwoLineOrphanHeightMm),
             ("minimum box thickness", MinBoxThicknessMm),
             ("label character pitch", LabelCharPitchMm),
             ("smallest rendered width", SmallestRenderedWidthPx),
@@ -251,6 +269,16 @@ public sealed record SectionDesign(string Name, int InteriorWidthMm, int FrameMm
         if (MinLayerHeightMm > MaxLayerHeightMm)
         {
             problems.Add($"the minimum layer height of {MinLayerHeightMm} mm is above the maximum layer height of {MaxLayerHeightMm} mm");
+        }
+
+        if (TwoLineUprightWidthMm < MinUprightExpansionWidthMm)
+        {
+            problems.Add($"the two-line upright width of {TwoLineUprightWidthMm} mm is below the minimum upright width of {MinUprightExpansionWidthMm} mm");
+        }
+
+        if (TwoLineOrphanHeightMm < MinOrphanHeightMm)
+        {
+            problems.Add($"the two-line orphan height of {TwoLineOrphanHeightMm} mm is below the minimum orphan height of {MinOrphanHeightMm} mm");
         }
 
         var shortest = Cubbies.Min(cubby => cubby.HeightMm);

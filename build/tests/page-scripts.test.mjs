@@ -1424,8 +1424,8 @@ test('every drawn box carries its collection entry next to its game, and two cop
 
 test('an expansion whose base game is not known says it is an expansion in its name and on a second line, and a blank title reads as an untitled game', () => {
   const [orphan, blank, cover] = drawPlacements([
-    { kind: 'orphanExpansion', gameId: 9, entryId: 90, title: 'Invented Harbour Tides', label: 'Invented Harbour Tides', isExpansion: true },
-    { kind: 'orphanExpansion', gameId: 10, entryId: 100, title: '   ', label: '   ', isExpansion: true, xMm: 40 },
+    { kind: 'orphanExpansion', gameId: 9, entryId: 90, title: 'Invented Harbour Tides', label: 'Invented Harbour Tides', isExpansion: true, showBaseLine: true },
+    { kind: 'orphanExpansion', gameId: 10, entryId: 100, title: '   ', label: '   ', isExpansion: true, showBaseLine: true, xMm: 40 },
     { kind: 'cover', gameId: 11, entryId: 110, title: 'Invented Harbour Winds', label: 'Invented Harbour Winds', isExpansion: true, xMm: 80, widthMm: 220 },
   ]);
 
@@ -1443,12 +1443,47 @@ test('an expansion whose base game is not known says it is an expansion in its n
 
 test('an expansion whose base game is not owned names that game on its second line and in its name', () => {
   const [orphan] = drawPlacements([
-    { kind: 'orphanExpansion', gameId: 9, entryId: 90, title: 'Invented Harbour Tides', label: 'Invented Harbour Tides', isExpansion: true, baseTitle: 'Invented Harbour' },
+    { kind: 'orphanExpansion', gameId: 9, entryId: 90, title: 'Invented Harbour Tides', label: 'Invented Harbour Tides', isExpansion: true, baseTitle: 'Invented Harbour', showBaseLine: true },
   ]);
 
   assert.equal(orphan.querySelector('.placement-sub').textContent, 'Expansion for Invented Harbour');
   assert.equal(orphan.getAttribute('aria-label'), 'Invented Harbour Tides, expansion for Invented Harbour');
   assert.equal(orphan.title, 'Invented Harbour Tides, expansion for Invented Harbour');
+});
+
+test('an upright expansion draws its second line only when the layout says it has room, and keeps its full name either way', () => {
+  const base = { gameId: 9, entryId: 90, title: 'Invented Harbour Tides', label: 'Invented Harbour Tides', isExpansion: true, baseTitle: 'Invented Harbour', familyId: 1 };
+  const [thin, wide, undecided, loose] = drawPlacements([
+    { ...base, kind: 'expansionSpine', showBaseLine: false },
+    { ...base, kind: 'expansionSpine', showBaseLine: true, xMm: 40 },
+    { ...base, kind: 'expansionSpine', xMm: 80 },
+    { ...base, kind: 'expansionSpine', showBaseLine: 'true', xMm: 120 },
+  ]);
+
+  assert.equal(thin.querySelector('.placement-sub'), null);
+  assert.equal(thin.dataset.lines, '1');
+  assert.equal(thin.getAttribute('aria-label'), 'Invented Harbour Tides, expansion for Invented Harbour');
+  assert.equal(thin.title, 'Invented Harbour Tides, expansion for Invented Harbour');
+  assert.equal(thin.querySelector('.placement-label').textContent, 'Invented Harbour Tides');
+  assert.equal(wide.querySelector('.placement-sub').textContent, 'Expansion for Invented Harbour');
+  assert.equal(wide.dataset.lines, undefined);
+  assert.equal(undecided.querySelector('.placement-sub'), null);
+  assert.equal(undecided.dataset.lines, '1');
+  assert.equal(loose.querySelector('.placement-sub'), null, 'only the boolean true counts');
+});
+
+test('an orphan box draws its second line only when the layout says it has room, and keeps its full name either way', () => {
+  const orphan = { kind: 'orphanExpansion', gameId: 9, entryId: 90, title: 'Invented Harbour Tides', label: 'Invented Harbour Tides', isExpansion: true, baseTitle: 'Invented Harbour' };
+  const [thin, tall] = drawPlacements([
+    { ...orphan, showBaseLine: false },
+    { ...orphan, showBaseLine: true, xMm: 40 },
+  ]);
+
+  assert.equal(thin.querySelector('.placement-sub'), null);
+  assert.equal(thin.dataset.lines, '1');
+  assert.equal(thin.getAttribute('aria-label'), 'Invented Harbour Tides, expansion for Invented Harbour');
+  assert.equal(tall.querySelector('.placement-sub').textContent, 'Expansion for Invented Harbour');
+  assert.equal(tall.dataset.lines, undefined);
 });
 
 test('a base game is named by its title alone and draws no second line', () => {

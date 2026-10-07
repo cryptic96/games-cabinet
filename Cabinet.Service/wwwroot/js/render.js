@@ -84,14 +84,27 @@ function namesBaseInName(placement) {
 }
 
 /**
+ * Tells whether a placement is one of the two kinds of expansion whose second line depends on how much room the layout
+ * drew it with: an upright expansion beside its base game and an expansion box without an owned base game.
+ * @param {object} placement One placement from the layout.
+ * @returns {boolean}
+ */
+function decidesSecondLine(placement) {
+  return placement.kind === 'expansionSpine' || placement.kind === 'orphanExpansion';
+}
+
+/**
  * Tells whether a placement draws a second line: an upright expansion beside its base game naming it, an expansion whose
- * base game is not owned naming it, and an expansion whose base game is not known saying only that it is an expansion. A
- * layer has no room for a second line.
+ * base game is not owned naming it, and an expansion whose base game is not known saying only that it is an expansion. An
+ * upright expansion or orphan box draws it only when the layout says it has room, which is decided from millimetres so it
+ * never depends on the visitor's screen. A layer has no room for a second line.
  * @param {object} placement One placement from the layout.
  * @returns {boolean}
  */
 function hasBaseLine(placement) {
-  return placement.kind === 'expansionSpine' || namesUnownedBase(placement) || isExpansionWithoutBase(placement);
+  const wanted = placement.kind === 'expansionSpine' || namesUnownedBase(placement) || isExpansionWithoutBase(placement);
+
+  return decidesSecondLine(placement) ? wanted && placement.showBaseLine === true : wanted;
 }
 
 /**
@@ -301,6 +314,10 @@ function buildPlacement(placement, copy, palette) {
 
   const sub = buildSubLabel(placement, copy);
   const lines = sub === null ? [label] : [label, sub];
+
+  if (sub === null && decidesSecondLine(placement)) {
+    button.dataset.lines = '1';
+  }
 
   const art = artOf(placement);
 

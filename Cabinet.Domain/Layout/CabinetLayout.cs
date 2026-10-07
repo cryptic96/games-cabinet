@@ -63,6 +63,11 @@ public sealed record PlacementArt(string Url, int Width, int Height, ArtFit Fit,
 /// <param name="FamilyId">The base game identifier when the item belongs to a family; otherwise absent.</param>
 /// <param name="MoreCount">The hidden expansion count on a marker; otherwise absent.</param>
 /// <param name="Art">The picture of a face-out cover that has one; absent for every other placement.</param>
+/// <param name="ShowBaseLine">
+/// On an upright expansion or an expansion without an owned base game: whether the drawn size has room for the second
+/// line naming the base game. Decided from millimetres, so it never depends on the visitor's screen; absent for every
+/// other placement.
+/// </param>
 public sealed record Placement(
     int GameId,
     long EntryId,
@@ -79,7 +84,8 @@ public sealed record Placement(
     int PatternIndex,
     int? FamilyId,
     int? MoreCount,
-    PlacementArt? Art = null);
+    PlacementArt? Art = null,
+    bool? ShowBaseLine = null);
 
 /// <summary>A compartment of a section. Position is measured from the top-left corner of the section interior.</summary>
 /// <param name="Index">The cubby's reading-order index within its section, counted from zero.</param>

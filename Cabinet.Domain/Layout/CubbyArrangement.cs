@@ -164,7 +164,9 @@ public static class CubbyArrangement
             var kind = box.IsOrphanExpansion ? PlacementKind.OrphanExpansion : PlacementKind.FlatBox;
             var placement = Place(box.Item, kind, x, y, box.Item.Box.HeightMm, height, design);
 
-            placements.Add(box.IsOrphanExpansion ? placement with { BaseTitle = box.BaseTitle } : placement);
+            placements.Add(box.IsOrphanExpansion
+                ? placement with { BaseTitle = box.BaseTitle, ShowBaseLine = height >= design.TwoLineOrphanHeightMm }
+                : placement);
             y += height;
         }
     }
@@ -186,7 +188,7 @@ public static class CubbyArrangement
 
     /// <summary>
     /// The width an upright expansion is drawn at: its depth, but never less than the design's least upright width, so
-    /// its two lines of text stay readable, nor less than its least box thickness.
+    /// one line of its title stays readable, nor less than its least box thickness.
     /// </summary>
     internal static int UprightWidthMm(SectionDesign design, CabinetItem expansion)
     {
@@ -238,7 +240,12 @@ public static class CubbyArrangement
             var uprightWidth = UprightWidthMm(design, upright);
 
             placements.Add(Place(upright, PlacementKind.ExpansionSpine, next, 0, uprightWidth, upright.Box.HeightMm, design)
-                with { BaseTitle = member.Item.Title, FamilyId = member.Item.BggId });
+                with
+                {
+                    BaseTitle = member.Item.Title,
+                    FamilyId = member.Item.BggId,
+                    ShowBaseLine = uprightWidth >= design.TwoLineUprightWidthMm,
+                });
             next += uprightWidth;
         }
 
