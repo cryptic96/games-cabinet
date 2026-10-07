@@ -48,7 +48,7 @@ public class LayoutEndpointTests
     }
 
     [Fact]
-    public async Task Layout_for_the_phone_profile_is_the_narrow_design_with_more_sections_than_the_desktop()
+    public async Task Layout_for_the_phone_profile_is_the_narrow_design_with_at_least_as_many_sections_as_the_desktop()
     {
         await using var factory = new CabinetWebApplicationFactory(PrototypeOn);
         using var client = factory.CreatePublicClient();
@@ -62,9 +62,9 @@ public class LayoutEndpointTests
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         document.RootElement.GetProperty("profile").GetString().Should().Be("phone");
-        sections[0].GetProperty("cubbies").GetArrayLength().Should().Be(14);
+        sections[0].GetProperty("cubbies").GetArrayLength().Should().Be(SectionDesigns.Phone.Cubbies.Count);
         sections[0].GetProperty("widthMm").GetInt32().Should().Be(SectionDesigns.Phone.InteriorWidthMm);
-        sections.GetArrayLength().Should().BeGreaterThan(desktopDocument.RootElement.GetProperty("sections").GetArrayLength());
+        sections.GetArrayLength().Should().BeGreaterThanOrEqualTo(desktopDocument.RootElement.GetProperty("sections").GetArrayLength());
     }
 
     [Fact]

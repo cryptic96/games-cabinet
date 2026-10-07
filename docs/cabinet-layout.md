@@ -203,6 +203,28 @@ front is scaled down a little further. A base game that stands as a spine is
 never scaled for that reason, because only its depth shows: it is drawn as tall
 as it would be without expansions.
 
+### Keeping the phone cabinet dense
+
+The phone design has seven shelf rows across 640 millimetres, and its row
+heights and cubby widths are tuned to the real spread of box sizes: most rows
+are tall enough for a standard box of about 300 millimetres to stand with air
+above it, only one row is short, and the wide cubbies sit where a box that
+faces out needs them. Boxes whose size is not known are drawn at a standard
+size, which is the case that packs worst, so a design that stays dense with them
+stays dense with real sizes too.
+
+The rule is that no section but the last keeps more than one empty row, a shelf
+row in which no cubby holds anything, and that a collection of 400 games needs
+fewer than 12 phone sections. The layout tests measure it with a small helper
+that counts the sections and the empty rows of every section but the last. They
+run it on the samples of 65 and 400 games and on a seeded collection of 400
+games whose boxes follow the spread of sizes seen on real games, with part of
+the boxes at the standard size. When a collection starts to leave bare rows or
+the section count creeps up, retune the rows and cubby widths of the phone design
+first, then raise the layout version and record the layouts again. The last
+section is the only one that is ever drawn trimmed to its last used row, and no
+other section is, so the stability rules above stay the only exceptions.
+
 ## Recorded layouts
 
 The tests keep the full layout of the samples of 0, 1, 5, 12 and 65 games on

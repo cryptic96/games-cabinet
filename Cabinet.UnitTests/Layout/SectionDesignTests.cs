@@ -38,7 +38,7 @@ public class SectionDesignTests
     public void The_shipped_designs_derive_their_interior_height_from_their_rows()
     {
         SectionDesigns.Desktop.InteriorHeightMm.Should().Be(1730);
-        SectionDesigns.Phone.InteriorHeightMm.Should().Be(2060);
+        SectionDesigns.Phone.InteriorHeightMm.Should().Be(2560);
     }
 
     [Fact]

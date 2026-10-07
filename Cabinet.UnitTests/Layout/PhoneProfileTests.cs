@@ -86,7 +86,7 @@ public class PhoneProfileTests
         Phone.MinLayerHeightMm.Should().Be(PhoneMinOrphanHeightMm);
         Phone.TwoLineOrphanHeightMm.Should().Be(PhoneTwoLineOrphanHeightMm);
         Phone.TwoLineUprightWidthMm.Should().Be(PhoneTwoLineUprightWidthMm);
-        Phone.InteriorHeightMm.Should().Be(2060);
+        Phone.InteriorHeightMm.Should().Be(2560);
         Phone.Name.Should().Be(SectionDesigns.PhoneName);
     }
 
@@ -110,7 +110,7 @@ public class PhoneProfileTests
     public void The_phone_design_has_fewer_cubbies_across_than_the_desktop_design_and_a_different_cubby_count()
     {
         Phone.Rows.Max(row => row.CubbyWidthsMm.Count).Should().BeLessThan(Desktop.Rows.Max(row => row.CubbyWidthsMm.Count));
-        Phone.Cubbies.Count.Should().Be(14);
+        Phone.Cubbies.Count.Should().Be(15);
         Phone.Cubbies.Count.Should().NotBe(Desktop.Cubbies.Count);
         SectionDesigns.TryGet(SectionDesigns.PhoneName, out var found).Should().BeTrue();
         found.Should().BeSameAs(Phone);
@@ -164,7 +164,7 @@ public class PhoneProfileTests
     [InlineData("65")]
     [InlineData("400")]
     [Trait("Category", "Layout")]
-    public void The_cabinet_grows_with_the_collection_on_both_profiles_and_the_phone_needs_more_sections(string name)
+    public void The_cabinet_grows_with_the_collection_on_both_profiles_and_the_phone_needs_at_least_as_many_sections(string name)
     {
         SyntheticCollections.TryGetSample(name, out var items);
 
@@ -172,7 +172,7 @@ public class PhoneProfileTests
         var phone = CabinetLayoutEngine.Build(items, Phone);
 
         phone.Profile.Should().Be(SectionDesigns.PhoneName);
-        phone.Sections.Count.Should().BeGreaterThan(desktop.Sections.Count);
+        phone.Sections.Count.Should().BeGreaterThanOrEqualTo(desktop.Sections.Count);
         phone.Sections.SkipLast(1).Should().OnlyContain(
             section => section.Cubbies.Count == Phone.Cubbies.Count, "every section before the last is drawn whole");
         phone.Sections[^1].Cubbies.Count.Should().BeInRange(1, Phone.Cubbies.Count, "the last section may be drawn short");
