@@ -3,10 +3,11 @@ phase: 3
 slug: bgg-access-spike-real-sync-snapshot
 # status lifecycle: draft (seeded by plan-phase) → validated (set by validate-phase §6)
 # audit-milestone §5.5 distinguishes NOT-VALIDATED (draft) from PARTIAL (validated + nyquist_compliant: false) (#2117)
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: validated
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-10-06
+validated: 2026-10-07
 ---
 
 # Phase 3 — Validation Strategy
@@ -44,19 +45,21 @@ Task IDs are filled in by the planner and executor; the requirement-level map be
 
 | Req ID | Behavior | Test Type | Automated Command | File Exists | Status |
 |--------|----------|-----------|-------------------|-------------|--------|
-| SYNC-01 | Start-up run after jitter only when snapshot missing/old; hourly tick enqueues one run; two collection calls with expected query strings; ≥5 s between requests (fake clock) | unit + stub handler | quick, `Category=Sync` | ❌ W0 | ⬜ pending |
-| SYNC-01 | End-to-end sync of a synthetic collection (base + expansion, duplicate collid, non-owned filtered) through the real handler chain against the fake host | integration | `dotnet test --project Cabinet.IntegrationTests/Cabinet.IntegrationTests.csproj --no-restore` | ❌ W0 | ⬜ pending |
-| SYNC-02 | One manual sync per window, persisted across restart; press while running → `running`; cooldown refusal → 429 + `Retry-After`; failed manual sync consumes the window | unit + integration | quick + integration | ❌ W0 | ⬜ pending |
-| SYNC-03 | `lastSyncedUtc` moves only on success; first-paint `<time datetime>` and relative text match the shared case table | unit + integration | `Category=Sync` | ❌ W0 | ⬜ pending |
-| SYNC-04 | Every failure category leaves snapshot, in-memory state and layout ETag unchanged; empty held back (even twice); halved held back then accepted on same set; small removal accepted; stale rule at 3 h and while held back | unit + integration | `Category=Sync`, `Category=Snapshot` | ❌ W0 | ⬜ pending |
-| SYNC-05 | Fresh host: `/` 200 with "being filled" block, layout 200 with one bare section, `/health` healthy; block gone after first success; zero-game first sync shows no block | integration | integration | ❌ W0 | ⬜ pending |
-| SYNC-08 | Every Razor page renders `a.bgg-credit` → `https://boardgamegeek.com` with logo `img`; logo served from own origin with image content type; no third-party origin | integration | integration | ❌ W0 | ⬜ pending |
-| LOC-02 | Parser reads `privateinfo`/`inventorylocation` when present, `null` when absent; `showprivate=1` only when configured; outcome document exists, shape only, passes repo lint | unit + lint | `Category=Bgg`; `build/lint.sh repo-rules` | ❌ W0 (outcome doc: manual sign-off) | ⬜ pending |
-| SEC-05 | Sentinel token/username never in any public response, header, log, status or hub payload; token only to host `boardgamegeek.com`, redirects not followed; visitor input cannot change username; visitor GETs cause zero BGG calls; `Bgg:BaseUri` ignored outside Development | unit + integration | `Category=Bgg`, `Category=Configuration`, integration | ❌ W0 (config test exists) | ⬜ pending |
-| Live updates | Hub delivers status changes, rejects every invocation, enforces the connection cap, WebSockets/SSE only; vendored client matches pinned SHA-256 and is served as JavaScript; CSP unchanged | integration + unit | integration | ❌ W0 | ⬜ pending |
-| Layout data | `entryId` on every placement, `isExpansion` flag; two copies → two placements; goldens at the new layout version | unit (goldens) + integration | `Category=Layout` | partial (re-record) | ⬜ pending |
-| Dev switcher | Production ignores `Prototype:Enabled=true`; default config off; Development file on; `?sample=` never echoed | unit + integration | `Category=Configuration`, integration | partial | ⬜ pending |
-| Cross-cutting | No `style=` or inline script bodies; JS comment lint passes with vendored exclusion; planning-reference lint passes | integration + lint | integration, `build/lint.sh` | exists, extend | ⬜ pending |
+| SYNC-01 | Start-up run after jitter only when snapshot missing/old; hourly tick enqueues one run; two collection calls with expected query strings; ≥5 s between requests (fake clock) | unit + stub handler | quick, `Category=Sync`, `Category=Bgg` | ✅ `SyncSchedulerTests`, `RequestPacerTests`, `QueuedAnswerTests`, `BggRetryTests` | ✅ green |
+| SYNC-01 | End-to-end sync of a synthetic collection (base + expansion, duplicate collid, non-owned filtered) through the real handler chain against the fake host | integration | `dotnet test --project Cabinet.IntegrationTests/Cabinet.IntegrationTests.csproj --no-restore` | ✅ `SyncPipelineTests`, `CollectionFidelityTests`, `BackgroundSyncTests`, `FakeBggServerTests` | ✅ green |
+| SYNC-01 | Storage directory order (configured, then service manager, then Development only), start-up failure naming the key; snapshot load, corrupt and newer-schema files set aside | unit + integration | `Category=Sync`, `Category=Snapshot` | ✅ `StorageLocationTests` (added by audit), `SnapshotStoreTests`, `SyncPipelineTests` | ✅ green |
+| SYNC-02 | One manual sync per window, persisted across restart; press while running → `running`; cooldown refusal → 429 + `Retry-After` in whole seconds rounded up; failed manual sync consumes the window | unit + integration | quick + integration | ✅ `SyncCoordinatorTests`, `SyncNowTests` (rounding cases added by audit), `RejectedTokenBackoffTests` | ✅ green |
+| SYNC-02 | Button states, countdown and accessible name, no native disable, no request while not pressable, one sentence per own-press outcome (changed, unchanged, failed, held back, running, cooldown, offline), note cleared at window end, tick only while visible | node | `node --test build/tests/page-scripts.test.mjs` | ✅ `page-scripts.test.mjs` (button and outcome cases added by audit) | ✅ green |
+| SYNC-03 | `lastSyncedUtc` moves only on success; first-paint `<time datetime>` and relative text match the shared case table | unit + integration + node | `Category=Sync`, node | ✅ `SyncStatusTextTests`, `SyncStatusLineTests`, `StatusEndpointTests`, `page-scripts.test.mjs` | ✅ green |
+| SYNC-04 | Every failure category leaves snapshot, in-memory state and layout ETag unchanged; empty held back (even twice); halved held back then accepted on same set; small removal accepted; stale rule at 3 h and while held back; a run cancelled without a stop is a timeout; an unexpected exception is recorded by type only | unit + integration | `Category=Sync`, `Category=Bgg`, `Category=Snapshot` | ✅ `BggFailureTests`, `BggDeclaredTotalTests`, `ShrinkGuardTests`, `SyncFailureTests`, `HeldBackTests`, `SyncWorkerTests` (cases added by audit) | ✅ green |
+| SYNC-05 | Fresh host: `/` 200 with "being filled" block, layout 200 with one bare section, `/health` healthy; block gone after first success (quiet in-place redraw removes it); zero-game first sync shows no block | integration + node | integration, node | ✅ `CabinetPageTests`, `LayoutEndpointTests`, `HealthEndpointTests`, `HeldBackTests`, `page-scripts.test.mjs` (redraw cases added by audit) | ✅ green |
+| SYNC-08 | Every Razor page renders `a.bgg-credit` → `https://boardgamegeek.com` with logo `img`; logo served from own origin with image content type; no third-party origin | integration | integration | ✅ `CreditTests`, `ContentSecurityPolicyTests` | ✅ green |
+| LOC-02 | Parser reads `privateinfo`/`inventorylocation` when present, `null` when absent; `showprivate=1` only when configured; outcome document exists, shape only, passes repo lint | unit + lint | `Category=Bgg`; `build/lint.sh repo-rules`; `bash build/tests/bgg-access-check-test.sh` | ✅ `BggCollectionParserTests`, `CollectionFidelityTests`, `bgg-access-check-test.sh` (outcome doc: manual sign-off, done) | ✅ green |
+| SEC-05 | Sentinel token/username never in any public response, header, log, status or hub payload; token only to host `boardgamegeek.com`, redirects not followed; visitor input cannot change username; visitor GETs cause zero BGG calls; `Bgg:BaseUri` ignored outside Development; committed config holds no BGG account and the env example only placeholders; shipped projects never reference the fake BGG | unit + integration + e2e | `Category=Bgg`, `Category=Configuration`, `Category=Secrets`, `CABINET_E2E=1 bash build/tests/package-release-e2e-test.sh` | ✅ `SecretsStayServerSideTests`, `BggTransportTests`, `BggSettingsTests`, `CommittedConfigurationTests` and `ShippedProjectTests` (added by audit), package e2e zip check (added by audit) | ✅ green |
+| Live updates | Hub delivers status changes, rejects every invocation, enforces the connection cap, WebSockets/SSE only, small buffers and message size, short timeouts, detailed errors off, Kestrel upgraded-connection cap; vendored client matches pinned SHA-256 and is served as JavaScript; CSP unchanged | integration + unit + node | integration `Category=Live`, unit `Category=Configuration`, node | ✅ `LiveHubTests` (options case added by audit), `LiveLimitsTests` (added by audit), `HubLiveNotifierTests`, `LivePageTests`, `VendoredAssetTests`, `ContentSecurityPolicyTests`, `page-scripts.test.mjs` | ✅ green |
+| Layout data | `entryId` on every placement, `isExpansion` flag; two copies → two placements; goldens at the new layout version; renderer writes `data-entry-id` and names unknown-base expansions "{title}, expansion" | unit (goldens) + integration + node | `Category=Layout`, node | ✅ `PlacementIdentityTests`, `LayoutGoldenTests`, `page-scripts.test.mjs` (renderer cases added by audit) | ✅ green |
+| Dev switcher | Production ignores `Prototype:Enabled=true`; default config off; Development file on; `?sample=` never echoed | unit + integration | `Category=Configuration`, integration | ✅ `SampleCatalogTests`, `CabinetPageTests`, `LayoutEndpointTests` | ✅ green |
+| Cross-cutting | No `style=` or inline script bodies; JS comment lint passes with vendored exclusion; planning-reference lint passes | integration + lint | integration, `build/lint.sh` | ✅ `CabinetPageTests`, `build/lint/checks/10-repo-rules.sh` self-tests | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -105,13 +108,13 @@ Task IDs are filled in by the planner and executor; the requirement-level map be
 
 ## Wave 0 Requirements
 
-- [ ] `Cabinet.UnitTests`: add `Microsoft.Extensions.TimeProvider.Testing`; new test folders `Bgg/`, `Sync/`, `Snapshot/`, `Collection/` (guard, cooldown, mapper, box mapping, relative-time case fixture)
-- [ ] `Cabinet.IntegrationTests`: add `TimeProvider.Testing` and `SignalR.Client`; extend the factory (background sync off by default, service-injection overload, unique state directory per factory)
-- [ ] Shared test support: scripted HTTP handler, synthetic BGG XML builder, sync harness, wait-until helper
-- [ ] `Cabinet.FakeBgg` project + `Cabinet.slnx` entry + committed `packages.lock.json`
-- [ ] Updated `packages.lock.json` for every project whose references change
-- [ ] Re-recorded layout goldens and bumped layout version
-- [ ] Spike script (and, manually, the signed-off outcome file)
+- [x] `Cabinet.UnitTests`: add `Microsoft.Extensions.TimeProvider.Testing`; new test folders `Bgg/`, `Sync/`, `Snapshot/`, `Collection/` (guard, cooldown, mapper, box mapping, relative-time case fixture)
+- [x] `Cabinet.IntegrationTests`: add `TimeProvider.Testing` and `SignalR.Client`; extend the factory (background sync off by default, service-injection overload, unique state directory per factory)
+- [x] Shared test support: scripted HTTP handler, synthetic BGG XML builder, sync harness, wait-until helper
+- [x] `Cabinet.FakeBgg` project + `Cabinet.slnx` entry + committed `packages.lock.json`
+- [x] Updated `packages.lock.json` for every project whose references change
+- [x] Re-recorded layout goldens and bumped layout version
+- [x] Spike script (and, manually, the signed-off outcome file)
 
 ---
 
@@ -123,16 +126,43 @@ Task IDs are filled in by the planner and executor; the requirement-level map be
 | Live redraw, countdown, button states, no CSP violation in Chromium/Firefox/WebKit | SYNC-02, SYNC-03 | Real browser engines; scratch Playwright kept outside the repo | Scratch Playwright rounds against the fake BGG plus one look on the owner's phone |
 | Credit legibility and no layout shift at 320/390/1440 px; header stacking with the dev switcher | SYNC-08 | Visual judgement (UI-SPEC backstops) | Screenshot rounds reviewed by the owner |
 | Real collection appears in the deployed cabinet | SYNC-01 | Needs the deployed release and the owner's BGG account | Owner marks a game owned on BGG, then checks the site after a manual sync or within the hour |
+| The whole-run limit is 10 minutes | SYNC-04 | `SyncWorker` arms the limit with `CancellationTokenSource.CancelAfter` on the system clock, so the duration cannot be driven by a fake clock without a production change (arm it through the injected `TimeProvider`). What happens when the limit fires (recorded as a timeout, worker frees up, next request runs) is automated in `SyncWorkerTests` | Code review: `RunLimit` in `Cabinet.Service/Sync/SyncWorker.cs` is `TimeSpan.FromMinutes(10)` |
 
 ---
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 60s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 60s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** validated 2026-10-07 (Nyquist audit)
+
+---
+
+## Validation Audit 2026-10-07
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 9 |
+| Resolved | 9 |
+| Escalated | 1 (residual of one gap: the 10-minute run-limit duration, see Manual-Only) |
+
+Baseline before the audit: 877 .NET tests and 47 page-script tests green, lint green. After: 906 .NET tests, 65 page-script tests, lint green, package end-to-end test green. Tests committed in `c7cae25`.
+
+| # | Gap | Requirement | Type | Resolution |
+|---|-----|-------------|------|------------|
+| 1 | Storage directory resolution order and start-up failure had no test | SYNC-01 | unit | `Cabinet.UnitTests/Sync/StorageLocationTests.cs` |
+| 2 | Committed config could carry the BGG username or contact address unnoticed; env example not checked | SEC-05 | unit | `CommittedConfigurationTests` (account keys, env example placeholders and documentation addresses) |
+| 3 | Nothing proved the fake BGG never ships | SYNC-01, SEC-05 | unit + e2e | `Cabinet.UnitTests/Configuration/ShippedProjectTests.cs`; zip listing check in `build/tests/package-release-e2e-test.sh` |
+| 4 | Run cancelled without a stop and unexpected exception in a run were untested | SYNC-04 | unit | `SyncWorkerTests` (timeout and type-only log, next request still runs); duration escalated |
+| 5 | Retry-After rounding only tested at the full window | SYNC-02 | integration | `SyncNowTests` theory (0, 10.4, 195, 599, 599.6 s into the window, raw header) |
+| 6 | Hub message size, timeouts, detailed errors, Kestrel cap and connection buffers untested | SEC-05 | unit + integration | `Cabinet.UnitTests/Live/LiveLimitsTests.cs`; `LiveHubTests` connection options case |
+| 7 | Renderer `data-entry-id` and unknown-base expansion names only checked by eye | SYNC-01 | node | `page-scripts.test.mjs` renderer cases on a fake DOM |
+| 8 | Button states, no request while not pressable, running/cooldown/held-back/Retry-After sentences, name-change and tick rules untested | SYNC-02 | node | `page-scripts.test.mjs` sync button cases |
+| 9 | Quiet in-place redraw (one swap, being-filled block removed, focus kept by entry, silent failure, hidden tab) only checked in browser rounds | SYNC-05, SYNC-03 | node | `page-scripts.test.mjs` cabinet page cases (fresh module per test) |
+
+The new JavaScript cases were checked against deliberate faults in mutated copies of the page scripts in a scratch folder (entry id not written, expansion name dropped, name re-set every tick, tick ignoring visibility, note not cleared, press posting during the window, Retry-After ignored, loading line during a redraw, no focus restore, being-filled block kept, no visibility wait, error shown on a failed redraw, no blur); each fault turned at least one new case red. The C# cases were not mutation-run (production code stays untouched in this checkout); their inputs are chosen to discriminate, for example the 10.4 s Retry-After case, where floor rounding would answer 589 instead of 590.
