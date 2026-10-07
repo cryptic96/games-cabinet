@@ -28,6 +28,7 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
     private readonly Func<(int Public, int Ops)> _pickPorts;
     private readonly string? _ownedStorageDirectory;
     private readonly bool _backgroundSyncOnServingHost;
+    private readonly RealNetworkGuard _networkGuard = new();
     private IHost? _realHost;
 
     /// <summary>Creates the factory and picks two free loopback ports so clients can be built before the host starts.</summary>
@@ -120,6 +121,12 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
         }
     }
 
+    /// <summary>
+    /// The guard that keeps both hosts off the real network. Disposing the factory throws when it refused any request,
+    /// so a client a test forgot to script fails the test instead of quietly calling BGG or its image host.
+    /// </summary>
+    internal RealNetworkGuard NetworkGuard => _networkGuard;
+
     /// <summary>An HttpClient bound to the public listener.</summary>
     public HttpClient CreatePublicClient() => new() { BaseAddress = new Uri($"http://127.0.0.1:{PublicPort}") };
 
@@ -141,6 +148,8 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
         });
 
         builder.UseSetting(BackgroundSyncKey, "false");
+
+        builder.ConfigureTestServices(services => services.AddSingleton(_networkGuard.Filter()));
 
         foreach (var (key, value) in _settings)
         {
@@ -237,6 +246,7 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
         if (disposing)
         {
             DeleteOwnedStorageDirectory();
+            _networkGuard.ThrowIfAnyRefused();
         }
     }
 
@@ -251,6 +261,7 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
 
         await base.DisposeAsync();
         DeleteOwnedStorageDirectory();
+        _networkGuard.ThrowIfAnyRefused();
     }
 
     private void DeleteOwnedStorageDirectory()
