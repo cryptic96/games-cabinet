@@ -1,1 +1,2 @@
 Cabinet.Service/wwwroot/lib/** -text
+Cabinet.Service/wwwroot/img/*.svg -text
