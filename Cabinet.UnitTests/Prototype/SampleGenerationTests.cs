@@ -4,6 +4,8 @@ using Cabinet.Service.Collection;
 using Cabinet.Service.Layout;
 using Cabinet.Service.Pages;
 using Cabinet.Service.Prototype;
+using Cabinet.Service.Sync;
+using Cabinet.UnitTests.Sync;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -51,9 +53,14 @@ public class SampleGenerationTests
         var generator = new CountingGenerator();
         var catalog = new SampleCatalog(true, generator.Generate);
 
+        var store = new CollectionStore();
+        var options = new SyncOptions(false, TimeSpan.FromHours(1), TimeSpan.FromMinutes(10), TimeSpan.FromSeconds(120), TimeSpan.FromHours(3));
+        var coordinator = new SyncCoordinator(new InMemorySyncStateStore(), options, TimeProvider.System);
+        var status = new SyncStatusService(coordinator, store, options, TimeProvider.System);
+
         for (var view = 0; view < 3; view++)
         {
-            var page = new IndexModel(catalog, new CollectionStore());
+            var page = new IndexModel(catalog, store, status);
             page.OnGet("400");
             page.ItemCount.Should().Be(400);
         }

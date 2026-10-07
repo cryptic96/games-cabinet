@@ -1,0 +1,17 @@
+[
+  { "elapsedSeconds": -30, "text": "Synced just now" },
+  { "elapsedSeconds": 0, "text": "Synced just now" },
+  { "elapsedSeconds": 59, "text": "Synced just now" },
+  { "elapsedSeconds": 60, "text": "Synced 1 minute ago" },
+  { "elapsedSeconds": 61, "text": "Synced 1 minute ago" },
+  { "elapsedSeconds": 119, "text": "Synced 1 minute ago" },
+  { "elapsedSeconds": 120, "text": "Synced 2 minutes ago" },
+  { "elapsedSeconds": 3599, "text": "Synced 59 minutes ago" },
+  { "elapsedSeconds": 3600, "text": "Synced 1 hour ago" },
+  { "elapsedSeconds": 7199, "text": "Synced 1 hour ago" },
+  { "elapsedSeconds": 86399, "text": "Synced 23 hours ago" },
+  { "elapsedSeconds": 86400, "text": "Synced yesterday" },
+  { "elapsedSeconds": 172799, "text": "Synced yesterday" },
+  { "elapsedSeconds": 172800, "text": "Synced 2 days ago" },
+  { "elapsedSeconds": 259200, "text": "Synced 3 days ago" }
+]

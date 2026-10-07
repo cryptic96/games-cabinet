@@ -42,6 +42,9 @@ jobs:
         env:
           CI: true
 
+      - name: Run page script tests
+        run: node --test build/tests/page-scripts.test.mjs
+
       - name: Run release layout end-to-end test
         run: bash build/tests/package-release-e2e-test.sh
         env:
