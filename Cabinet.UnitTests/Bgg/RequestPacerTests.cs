@@ -102,6 +102,21 @@ public class RequestPacerTests
         abandoned.IsCanceled.Should().BeTrue();
     }
 
+    [Fact]
+    public async Task A_wall_clock_step_backwards_does_not_lengthen_the_wait()
+    {
+        var clock = new SteppableWallClock();
+        var pacer = new RequestPacer(Gap, clock);
+        (await pacer.WaitTurnAsync(TestContext.Current.CancellationToken)).Dispose();
+        clock.StepWallClockBack(TimeSpan.FromHours(1));
+
+        var second = pacer.WaitTurnAsync(TestContext.Current.CancellationToken);
+        await StaysPending(second);
+        clock.Advance(Gap);
+
+        await FinishesPromptly(second);
+    }
+
     private static async Task FinishesPromptly(Task task)
     {
         var deadline = DateTime.UtcNow.AddSeconds(5);
@@ -119,5 +134,14 @@ public class RequestPacerTests
         await Task.Delay(TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken);
 
         task.IsCompleted.Should().BeFalse();
+    }
+
+    private sealed class SteppableWallClock : FakeTimeProvider
+    {
+        private TimeSpan _stepBack = TimeSpan.Zero;
+
+        public override DateTimeOffset GetUtcNow() => base.GetUtcNow() - _stepBack;
+
+        public void StepWallClockBack(TimeSpan step) => _stepBack += step;
     }
 }
