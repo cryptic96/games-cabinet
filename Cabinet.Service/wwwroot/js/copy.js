@@ -181,12 +181,13 @@ export const COPY = Object.freeze({
   },
 
   /**
-   * Accessible name of the marker that counts hidden expansions.
+   * Accessible name of the marker that counts hidden expansions. It starts with the text the marker shows, so a
+   * visitor who speaks what they see finds it.
    * @param {number} n How many expansions are hidden.
    * @param {string} base The base game title.
    * @returns {string}
    */
   moreName(n, base) {
-    return n === 1 ? `1 more expansion for ${base}` : `${n} more expansions for ${base}`;
+    return n === 1 ? `+${n} more expansion for ${base}` : `+${n} more expansions for ${base}`;
   },
 });

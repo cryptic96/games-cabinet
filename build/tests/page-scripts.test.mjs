@@ -1890,3 +1890,51 @@ test('a hidden tab waits with the redraw until it is visible and then fetches th
     leaveCabinetPage();
   }
 });
+
+test('the marker names the hidden expansions with its visible text first, in the singular and the plural', () => {
+  assert.equal(COPY.moreName(3, 'Invented Harbour'), '+3 more expansions for Invented Harbour');
+  assert.equal(COPY.moreName(1, 'Invented Harbour'), '+1 more expansion for Invented Harbour');
+
+  for (let count = 1; count <= 20; count += 1) {
+    assert.ok(COPY.moreName(count, 'Invented Harbour').startsWith(COPY.moreLabel(count)), `the name for ${count} starts with the visible text`);
+  }
+});
+
+test('a drawn marker shows only its count and carries the full name as its accessible name and tooltip', () => {
+  const [marker] = drawPlacements([
+    { kind: 'moreMarker', gameId: 1, entryId: 1, title: 'Invented Harbour', label: '', baseTitle: 'Invented Harbour', moreCount: 4, familyId: 1 },
+  ]);
+
+  assert.equal(marker.querySelector('.placement-label').textContent, '+4 more');
+  assert.equal(marker.getAttribute('aria-label'), '+4 more expansions for Invented Harbour');
+  assert.equal(marker.title, '+4 more expansions for Invented Harbour');
+});
+
+const STYLESHEET = readFileSync(new URL('../../Cabinet.Service/wwwroot/css/cabinet.css', import.meta.url), 'utf8');
+
+test('the stylesheet carries the apron arch tokens, the length registration of the unit and the cover line steps', () => {
+  assert.equal(STYLESHEET.includes('--arch-shade-alpha'), false);
+  assert.match(STYLESHEET, /--arch-rise: 40;/);
+  assert.match(STYLESHEET, /--arch-radius: 110;/);
+  assert.match(STYLESHEET, /--arch-alpha-top: 0\.92;/);
+  assert.match(STYLESHEET, /--arch-alpha-bottom: 0\.72;/);
+  assert.match(STYLESHEET, /--arch-lit: 0\.14;/);
+  assert.match(STYLESHEET, /\.section-base::before \{[^}]*border-radius: calc\(var\(--arch-radius\) \* var\(--u\)\)/);
+  assert.match(STYLESHEET, /@property --u \{\s*syntax: '<length>';\s*inherits: true;\s*initial-value: 0px;\s*\}/);
+  assert.match(STYLESHEET, /\.placement\[data-kind="cover"\] \{\s*container-type: size;/);
+
+  const steps = [
+    ['@container \\(min-height: 64px\\)', 4],
+    ['@container \\(min-height: 50px\\) and \\(max-height: 63\\.99px\\)', 3],
+    ['@container \\(min-height: 36px\\) and \\(max-height: 49\\.99px\\)', 2],
+    ['@container \\(max-height: 35\\.99px\\)', 1],
+  ];
+
+  for (const [query, lines] of steps) {
+    assert.match(
+      STYLESHEET,
+      new RegExp(`${query} \\{[^}]*-webkit-line-clamp: ${lines};\\s*line-clamp: ${lines};`),
+      `${lines} lines`,
+    );
+  }
+});
