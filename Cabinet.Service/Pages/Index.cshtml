@@ -2,6 +2,23 @@
 @model Cabinet.Service.Pages.IndexModel
 <header>
     <h1>Games Cabinet</h1>
+    @if (Model.ShowSyncBlock)
+    {
+        <div class="sync" data-server-time="@Model.ServerTimeIso" data-last-synced="@Model.LastSyncedIso" data-cooldown-ends="@Model.CooldownEndsIso" data-running="@(Model.Status.Running ? "true" : "false")" data-held-back="@(Model.Status.HeldBack ? "true" : "false")" data-stale-after="@Model.Status.StaleAfterSeconds" data-snapshot-version="@Model.SnapshotVersion">
+            @if (Model.HasSyncTime)
+            {
+                <button type="button" class="sync-time" aria-expanded="false" aria-controls="sync-exact" title="@Model.ExactText"><time datetime="@Model.LastSyncedIso">@Model.RelativeText</time></button>
+            }
+            else
+            {
+                <span class="sync-time-text">@Model.RelativeText</span>
+            }
+            <button type="button" class="sync-button" aria-disabled="false" hidden>Sync now</button>
+        </div>
+        <p id="sync-exact" class="sync-exact" hidden>@(Model.HasSyncTime ? "Last synced " + Model.ExactText : string.Empty)</p>
+        <p id="sync-note" class="sync-note" role="status" aria-atomic="true"></p>
+        <p class="sync-stale" hidden="@(!Model.StaleNoteVisible)">@Model.StaleNoteText</p>
+    }
     @if (Model.ShowingSample)
     {
         <p class="status">Invented collection of @Model.ItemCount @(Model.ItemCount == 1 ? "item" : "items").</p>

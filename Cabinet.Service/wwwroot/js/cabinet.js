@@ -4,8 +4,10 @@
  */
 import { renderCabinet } from './render.js';
 import { COPY } from './copy.js';
+import { initSyncStatus } from './sync.js';
 
 const mount = document.getElementById('cabinet');
+const syncRoot = document.querySelector('.sync');
 const phoneQuery = window.matchMedia('(max-width: 40rem)');
 
 let latestLoad = 0;
@@ -88,6 +90,10 @@ async function load() {
       showError();
     }
   }
+}
+
+if (syncRoot !== null) {
+  initSyncStatus(syncRoot);
 }
 
 if (mount !== null) {
