@@ -269,10 +269,10 @@ expect_failure "deploy environment without a required reviewer" "deploy environm
 expect_failure "deploy environment without the tag policy" "deployment policy" \
   environments__deploy__deployment-branch-policies.json '.branch_policies = []'
 
-expect_failure "deploy environment lets administrators bypass" "administrators to bypass" \
+expect_failure "deploy environment lets administrators bypass" "let administrators bypass" \
   environments__deploy.json '.can_admins_bypass = true'
 
-expect_failure "deploy environment does not report the bypass setting" "administrators to bypass" \
+expect_failure "deploy environment does not report the bypass setting" "let administrators bypass" \
   environments__deploy.json 'del(.can_admins_bypass)'
 
 expect_failure "a self-hosted runner is registered" "self-hosted runners" \
