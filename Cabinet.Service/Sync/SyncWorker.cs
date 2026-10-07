@@ -4,7 +4,7 @@ using Cabinet.Service.Live;
 namespace Cabinet.Service.Sync;
 
 /// <summary>
-/// The one consumer of sync requests. It runs each accepted request to the end, with a limit on how long a run may take,
+/// The one consumer of sync requests. It runs each accepted request to the end, with a limit on how long a run may take (measured on the injected clock),
 /// and always reports back, so a failed or stuck run never blocks the next request. A run that the limit ends is recorded
 /// as a timeout; a run that a service stop interrupts is not recorded at all, because it did not fail.
 /// </summary>
@@ -12,12 +12,14 @@ namespace Cabinet.Service.Sync;
 /// <param name="runner">Runs one sync.</param>
 /// <param name="status">Reads the status that is sent to open pages.</param>
 /// <param name="live">Tells open pages when a run starts and when it ends.</param>
+/// <param name="time">The clock the whole-run limit runs on.</param>
 /// <param name="logger">Receives the type of an unexpected exception, never its message.</param>
 public sealed class SyncWorker(
     SyncCoordinator coordinator,
     SyncRunner runner,
     SyncStatusService status,
     ILiveNotifier live,
+    TimeProvider time,
     ILogger<SyncWorker> logger) : BackgroundService
 {
     /// <summary>The longest one whole run may take before it is ended and recorded as a timeout.</summary>
@@ -43,12 +45,12 @@ public sealed class SyncWorker(
 
     private async Task<SyncRunResult> RunOnceAsync(CancellationToken stoppingToken)
     {
-        using var limit = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-        limit.CancelAfter(RunLimit);
+        using var limit = new CancellationTokenSource(RunLimit, time);
+        using var stoppedOrLimited = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, limit.Token);
 
         try
         {
-            return await runner.RunAsync(coordinator.State.HeldBack, limit.Token);
+            return await runner.RunAsync(coordinator.State.HeldBack, stoppedOrLimited.Token);
         }
         catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
         {

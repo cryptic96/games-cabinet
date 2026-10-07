@@ -43,6 +43,50 @@ public class SyncWorkerTests
     }
 
     [Fact]
+    public async Task A_stalled_run_is_recorded_as_a_timeout_once_the_clock_passes_the_whole_run_limit()
+    {
+        var store = new InMemorySyncStateStore();
+        var source = new WaitingSource();
+        using var harness = Harness(store, source);
+        await harness.Worker.StartAsync(TestContext.Current.CancellationToken);
+        harness.Coordinator.TryRequest(SyncTrigger.Manual).Should().BeOfType<SyncRequestResult.Started>();
+        await source.Started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        harness.Clock.Advance(SyncWorker.RunLimit - TimeSpan.FromSeconds(1));
+        await Task.Delay(TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken);
+
+        harness.Coordinator.IsRunning.Should().BeTrue();
+        store.Stored.LastResult.Should().BeNull();
+
+        harness.Clock.Advance(TimeSpan.FromSeconds(1));
+        await WaitForFinishAsync(harness.Coordinator);
+
+        SyncWorker.RunLimit.Should().Be(TimeSpan.FromMinutes(10));
+        store.Stored.LastResult.Should().Be(SyncResult.Failed);
+        store.Stored.LastFailure.Should().Be(SyncFailure.Timeout);
+        store.Stored.ConsecutiveFailures.Should().Be(1);
+        await harness.Worker.StopAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task A_stop_is_still_not_recorded_when_the_clock_passes_the_whole_run_limit_afterwards()
+    {
+        var store = new InMemorySyncStateStore();
+        var source = new WaitingSource();
+        using var harness = Harness(store, source);
+        await harness.Worker.StartAsync(TestContext.Current.CancellationToken);
+        harness.Coordinator.TryRequest(SyncTrigger.Manual).Should().BeOfType<SyncRequestResult.Started>();
+        await source.Started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        await harness.Worker.StopAsync(TestContext.Current.CancellationToken);
+        harness.Clock.Advance(SyncWorker.RunLimit * 2);
+
+        store.Stored.LastResult.Should().BeNull();
+        store.Stored.LastFailure.Should().Be(SyncFailure.None);
+        store.Stored.ConsecutiveFailures.Should().Be(0);
+    }
+
+    [Fact]
     public async Task A_run_that_fails_on_its_own_is_still_recorded_as_a_failure()
     {
         var store = new InMemorySyncStateStore();
@@ -116,9 +160,9 @@ public class SyncWorkerTests
         var collection = new CollectionStore();
         var runner = new SyncRunner(() => source, new NullSnapshotStore(), collection, clock, NullLogger<SyncRunner>.Instance);
         var status = new SyncStatusService(coordinator, collection, Options, clock);
-        var worker = new SyncWorker(coordinator, runner, status, new SilentNotifier(), logger ?? NullLogger<SyncWorker>.Instance);
+        var worker = new SyncWorker(coordinator, runner, status, new SilentNotifier(), clock, logger ?? NullLogger<SyncWorker>.Instance);
 
-        return new WorkerHarness(coordinator, worker);
+        return new WorkerHarness(coordinator, worker, clock);
     }
 
     private static async Task WaitForFinishAsync(SyncCoordinator coordinator)
@@ -136,7 +180,7 @@ public class SyncWorkerTests
         }
     }
 
-    private sealed record WorkerHarness(SyncCoordinator Coordinator, SyncWorker Worker) : IDisposable
+    private sealed record WorkerHarness(SyncCoordinator Coordinator, SyncWorker Worker, FakeTimeProvider Clock) : IDisposable
     {
         public void Dispose() => Worker.Dispose();
     }
