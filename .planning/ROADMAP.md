@@ -156,7 +156,7 @@ Plans:
   4. Before the first successful sync, visitors see an intentional "cabinet is being filled" state instead of an error, and every public page carries the linked "Powered by BGG" credit.
   5. The location spike has been run with the real token from the LXC and its outcome recorded: either BGG exposes the private inventory location and the synced data carries each game's location, or it does not and Phase 6 builds the owner location tools.
 
-**Plans:** 9/15 plans executed
+**Plans:** 11/15 plans executed
 
 Plans:
 **Wave 1**
@@ -185,8 +185,8 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 03-10-PLAN.md — Failure classification, polite 202 polling, empty and shrunken results held back
-- [ ] 03-11-PLAN.md — "Synced ... ago" status line, stale note, node --test checks in CI
+- [x] 03-10-PLAN.md — Failure classification, polite 202 polling, empty and shrunken results held back
+- [x] 03-11-PLAN.md — "Synced ... ago" status line, stale note, node --test checks in CI
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
@@ -297,7 +297,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 |-------|----------------|--------|-----------|
 | 1. Repo, Guardrails & Walking-Skeleton Deploy | 15/15 | Complete    | 2026-10-04 |
 | 2. Layout Engine & Cabinet Prototype | 9/9 | Complete    | 2026-10-06 |
-| 3. BGG Access Spike, Real Sync & Snapshot | 9/15 | In Progress|  |
+| 3. BGG Access Spike, Real Sync & Snapshot | 11/15 | In Progress|  |
 | 4. Enrichment, Box Images & Shape | 0/0 | Not started | - |
 | 5. Game Detail, Accessibility & Language | 0/0 | Not started | - |
 | 6. Owner Tools & Persistence | 0/0 | Not started | - |
