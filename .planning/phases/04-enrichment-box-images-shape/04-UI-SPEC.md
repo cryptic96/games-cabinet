@@ -1,7 +1,7 @@
 ---
 phase: 4
 slug: enrichment-box-images-shape
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-10-07
@@ -386,37 +386,63 @@ No new visitor-facing string is added. Owner review-sheet words (`flat`, `3D sho
 
 ## UI Considerations
 
-Surfaces and confirmed element kinds: art cover (media, interactive-control), generated cover fallback (media, static-content), art-coloured boxes (list-collection, static-content), thin boxes and expansion labels (static-content), "+N more" marker (interactive-control), plinth (static-content), phone cabinet (list-collection), review sheet (media, list-collection). Copy for empty and error states is in the Copywriting Contract and referenced, not repeated.
+Probe run after checker approval. Surfaces and owner-confirmed element kinds: E1 art cover (media, interactive-control, static-content); E2 generated cover fallback (media, static-content); E3 art-coloured boxes (list-collection, static-content); E4 thin boxes and expansion labels (static-content); E5 "+N more" marker (interactive-control); E6 plinth arch (static-content, reclassified from unclassified); E7 phone cabinet (list-collection); E8 owner review sheet (media, list-collection); E9 cover-share screenshots (media). 45 probe considerations (the 44 first raised, with the plinth's unclassified marker replaced by its 2 static-content categories), all resolved or dismissed with a reason; extra rows the researcher added beyond the probe are kept. Copy for empty and error states is in the Copywriting Contract and the sync contract, referenced here, not repeated.
 
 | Category | Element | Status | Verification | Resolution / Reason |
 |----------|---------|--------|--------------|---------------------|
 | empty | art cover | resolved | explicit | A game with no usable image (none, failed download, undecodable) shows the generated cover; the page has no placeholder text or icon |
 | loading | art cover | resolved | explicit | Until the file decodes the box shows its edge-colour fill at its final size; nothing shifts, nothing animates; the picture appears when ready |
 | error | art cover | resolved | explicit | An `error` event swaps in the generated cover for that button silently, keeping its colours; no message |
-| populated | art cover | resolved | explicit | The picture is fitted whole with `object-fit: contain` on the four edge colours, never cropped, stretched or overlaid; the only layer above it is the furniture shade; the title is in `aria-label` and `title`, the image has `alt=""` |
+| populated | art cover | resolved | explicit | The picture is fitted whole with `object-fit: contain` on the four edge colours, never cropped, stretched or overlaid; the only layer above it is the furniture shade (owner confirmed); the title is in `aria-label` and `title`, the image has `alt=""` |
 | partial | art cover | resolved | explicit | A game with art but no real sizes takes its box shape from the cover (no bars); a three-dimensional shot shown face-out takes the true box shape and shows bars in its own backdrop colour |
 | overflow | art cover | resolved | explicit | Mismatched shapes never crop: bars appear instead; at the starting disagreement margin bars total at most about 11 percent of the box width for a flat cover |
 | zero-one-many | art cover | resolved | explicit | Fewer than 12 games: every box faces out with art where it exists, so the few-games cabinet is all covers; 400 games: only face-out covers request images, lazily |
+| long-text | art cover | dismissed | n/a | An art cover draws no visible text; the title lives only in `aria-label` and `title`, which take no layout space |
+| empty | generated cover | resolved | explicit | A blank title shows `Untitled game` on the plate and in the accessible name (unchanged copy) |
 | loading | generated cover | dismissed | n/a | Drawn with CSS only, no request |
 | error | generated cover | dismissed | n/a | It is the fallback itself and has no failure path |
+| populated | generated cover | resolved | explicit | Unchanged look from the layout contract: art colour (or palette tone when there is no art) background, one of six patterns from the game's hash, a solid title plate about 40 percent of the cover height |
 | overflow | generated cover | resolved | explicit | The plate shows as many whole lines as fit, the last line carries the ellipsis, and the label always lies inside the plate and the plate inside the cover (browser-tested at 390px and 1440px) |
 | long-text | generated cover | resolved | explicit | A very long single word breaks inside the plate; the full title stays in the accessible name |
+| empty | art-coloured boxes | resolved | explicit | A picture that is entirely backdrop (an all-white cover) uses its overall mean colour, not an error and not the palette; a collection with no games shows the sync contract's empty state (bare cabinet, "being filled" message), unchanged |
+| loading | art-coloured boxes | resolved | explicit | Colours arrive inside the layout data, so no box has a loading state of its own; the whole-cabinet loading state is the sync contract's, unchanged |
+| error | art-coloured boxes | resolved | explicit | A failed cabinet load shows the sync contract's load-error state with "Try again", unchanged; a stored colour pair that fails the contrast check or is not `#rrggbb` is ignored and the palette tone is used |
 | populated | art-coloured boxes | resolved | explicit | Each spine, upright expansion, flat box, layer and orphan box takes one solid colour from its art with a white or black title at 4.5:1 or better at both ends of the shade; a red box is red |
 | partial | art-coloured boxes | resolved | explicit | A game without usable art keeps its palette tone; a stored colour that fails the contrast check or is not `#rrggbb` is ignored and the palette tone is used |
-| empty | art-coloured boxes | resolved | explicit | A picture that is entirely backdrop (an all-white cover) uses its overall mean colour, not an error and not the palette |
-| overflow | thin boxes | resolved | explicit | Boxes draw at real thickness down to 34 mm desktop and 59 mm phone; below the two-line threshold the second line is dropped and the title alone is ellipsised; nothing is cropped through a line |
+| overflow | art-coloured boxes | resolved | explicit | Titles stay on one line inside the box at the 12px floor and ellipsise; nothing is cut through a line (see thin boxes) |
+| zero-one-many | art-coloured boxes | resolved | explicit | Fewer than 12 games: every box faces out, so art colours show only on fallback covers; any count: colours are stored with the game, so no box makes a request however many there are |
+| long-text | art-coloured boxes | resolved | explicit | Long and non-Latin titles keep the existing shortening, `dir="auto"` and 12px floor; the full text stays in `aria-label` and `title` |
+| overflow | thin boxes | resolved | explicit | Boxes draw at real thickness down to 34 mm desktop and 59 mm phone (the 24px tap floor, owner confirmed for every phone); below the two-line threshold the second line is dropped and the title alone is ellipsised; nothing is cropped through a line |
 | long-text | thin boxes and expansion labels | resolved | explicit | Long and non-Latin titles keep the existing shortening, `dir="auto"` and 12px floor; the full text stays in `aria-label` and `title`; an orphan naming several bases shows the base with the lowest BGG game id |
 | partial | expansion labels | resolved | explicit | An expansion whose details have not arrived shows the interim `Expansion` when it has room; when they arrive the label upgrades with no renderer change |
+| loading | "+N more" marker | dismissed | n/a | Drawn from the layout data together with its stack; it makes no request of its own |
+| error | "+N more" marker | dismissed | n/a | It triggers no request and no action that can fail in this phase |
+| long-text | "+N more" marker | resolved | explicit | The visible text is only `+{N} more`, which always fits the chip; a long base title lengthens only the accessible name, never the chip |
 | zero-one-many | "+N more" marker | resolved | explicit | The accessible name starts with the visible text: `+{N} more expansions for {base}`, `+1 more expansion for {base}` for one |
 | populated | plinth | resolved | explicit | The arch reads as a defined opening with a lit upper-left lip and deep shade, stays inside the section box and is never a flat or hard black cut |
+| overflow | plinth | resolved | explicit | The arch rises 40 mm inside the 80 mm plinth, and no painted pixel leaves the section box at any width down to 320px |
+| long-text | plinth | dismissed | n/a | The plinth carries no text |
+| empty | phone cabinet | resolved | explicit | A collection with no games shows the sync contract's empty state (bare cabinet, "being filled" message), unchanged |
+| loading | phone cabinet | resolved | explicit | The whole-cabinet loading state is the sync contract's, unchanged; inside a drawn cabinet, art loads lazily per section behind its edge-colour fill |
+| error | phone cabinet | resolved | explicit | A failed cabinet load shows the sync contract's load-error state with "Try again", unchanged; a failed picture falls back silently to the generated cover |
+| partial | phone cabinet | resolved | explicit | On a fresh start, games show from collection data while details and art arrive over several runs: generated covers, palette tones, interim `Expansion` labels and interim sizes, each upgraded on a later redraw; boxes may move once when real sizes land (accepted) |
 | overflow | phone cabinet | resolved | explicit | No horizontal scroll at 320px; the plinth, arch and floor shadow stay inside each section box |
+| zero-one-many | phone cabinet | resolved | explicit | Fewer than 12 games: all covers in one section; 400 items: the section count is the density acceptance measure (below) |
 | populated | phone cabinet | resolved | backstop | statement: after real sizes land, the phone cabinet shows no non-last section with more than one empty row and the 400-item sample takes fewer than 12 sections; verification: backstop (measured report plus owner review on a phone) |
 | populated | cover-share default | resolved | backstop | statement: the owner has seen screenshots of the real cabinet at 20, 25 and 33 percent on desktop and phone and has picked one; verification: backstop |
+| empty | cover-share screenshots | dismissed | n/a | Built only from a real synced collection; never produced for an empty cabinet |
+| loading | cover-share screenshots | dismissed | n/a | Static images sent to the owner, with no interactive state |
+| error | cover-share screenshots | dismissed | n/a | One-off operator artefact; a failed capture is simply retaken |
 | populated | 3D shot as a face-out cover | resolved | backstop | statement: in the owner's review a 3D shot fitted into a true-proportion box with backdrop-coloured bars reads as an acceptable photo card, not as a defect; verification: backstop |
 | populated | dark spines | resolved | backstop | statement: near-black and very dark spines stay distinguishable from the cubby back through the light inset edge and contact shadow in review; verification: backstop |
 | populated | thin desktop spines | resolved | backstop | statement: 34 mm desktop spines with a 12px bold title read as legible, not cramped, in review; verification: backstop |
+| empty | review sheet | resolved | explicit | A missing candidate shows the word `none` in its column; a game with no usable art shows `generated cover` as its choice |
+| loading | review sheet | dismissed | n/a | A one-off static operator artefact with no interactive states |
+| error | review sheet | resolved | explicit | A candidate that failed to download or decode shows `none`, and the chosen column names the fallback that applied |
 | populated | review sheet | resolved | backstop | statement: the sheet shows both candidates, verdict and score, the chosen image, the fitted result, the spine and the size source for every game, and is sent only as images; verification: backstop |
-| loading, error | review sheet | dismissed | n/a | A one-off operator artefact with no interactive states |
+| partial | review sheet | resolved | explicit | A game with no sizes shows `estimate` or `default` as its size source; when candidate A is missing the verdict column reads `no verdict` |
+| overflow | review sheet | resolved | explicit | Titles are one line, ellipsised; 8 rows per page at about 1600 px wide |
+| zero-one-many | review sheet | resolved | explicit | As many pages as needed at 8 rows each, in collection order, with position numbers continuing across pages |
 
 ---
 
@@ -454,9 +480,9 @@ All **STARTING VALUE**. Items marked (engine) change the layout version and re-r
 
 These are the places where the decisions and the code pull against each other. The contract states what it assumes; the owner or the planner may overrule.
 
-1. **Phone spines cannot get thinner under the 24px tap rule.** The decision says boxes keep real thickness down to the width a line needs "and never below the 24 px tap target". At the narrowest phone, 24px is 59 mm, which is exactly today's phone spine minimum. So the change only helps phone upright expansions and orphans, and desktop. **Assumed:** the tap floor stays FIXED. **Lever, owner's call:** derive the phone floors from a 360px screen instead of 320px (about 52 mm), which would put a 320px phone's thinnest spines at about 21px. That breaks the 24px rule on the smallest phones only.
+1. **Phone spines cannot get thinner under the 24px tap rule.** The decision says boxes keep real thickness down to the width a line needs "and never below the 24 px tap target". At the narrowest phone, 24px is 59 mm, which is exactly today's phone spine minimum. So the change only helps phone upright expansions and orphans, and desktop. **Confirmed by the owner (2026-10-07):** the 24px tap floor stays FIXED on every phone. **Lever (declined for now):** derive the phone floors from a 360px screen instead of 320px (about 52 mm), which would put a 320px phone's thinnest spines at about 21px. That breaks the 24px rule on the smallest phones only.
 2. **Orphan expansions can lose their visible "Expansion for ..." line.** Applying the one-line floor to orphans means thin orphans show a title only, so a thin orphan looks like a base game until the detail card exists. **Assumed:** accepted, because the decision names that exact line as the one to drop and the accessible name keeps it. The two-line threshold keeps it for orphans at least 80 mm (desktop) or 89 mm (phone) thick.
-3. **The furniture shade falls across art.** The decision says nothing is drawn over the art, and the cabinet's shade (alpha at most 0.20, fading in the top 20 percent of a cubby) is the cabinet's lighting, not part of the picture, and falls on every box. **Assumed:** accepted and kept. If the owner wants art left entirely untouched, the lever is `--shade-alpha` 0 on art covers only, which loses the depth cue on exactly the boxes the owner looks at most.
+3. **The furniture shade falls across art.** The decision says nothing is drawn over the art, and the cabinet's shade (alpha at most 0.20, fading in the top 20 percent of a cubby) is the cabinet's lighting, not part of the picture, and falls on every box. **Confirmed by the owner (2026-10-07):** the shade stays on art covers. **Lever (declined for now):** `--shade-alpha` 0 on art covers only, which loses the depth cue on exactly the boxes the owner looks at most.
 4. **An expansion shown as an art cover cannot carry the visible "Expansion" tag** the sync contract required for small collections, because no text may sit on the art. Name and tooltip still say it. **Assumed:** accepted; it only occurs in collections under 12 games.
 5. **Three-dimensional shots face-out show large bars** (about 12 percent of the box height above and below for a square shot in a 3-by-4 box). They are the shot's own backdrop colour, so they read as a photo card. That is the look the owner chose when preferring "3D shot anyway"; it is a backstop review item.
 6. **Stability of box size estimates** is the plan's problem but visible here: a small drift in weight or play time must not move a box. Visual consequence if it does: a cubby rearranges silently after a weekly refresh. Required: coarse classes or rounded inputs, with a test that a small change in each input leaves the layout unchanged.
@@ -500,11 +526,11 @@ No component registry, package, font or icon set is introduced by this contract.
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-10-07 (gsd-ui-checker, all six dimensions PASS, no recommendations). Owner confirmed: element kinds (plinth as static content), all state resolutions, the furniture shade stays on art covers, the 24px phone tap floor stays on every phone.
