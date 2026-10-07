@@ -134,6 +134,27 @@ Things worth knowing:
 
 Tests that need to script BGG's answers without a network use `ScriptedBggHandler` from the same project. It is an `HttpMessageHandler` that answers from a queue (status, content type, body, optional delay, extra headers) and records every request's address, authorization scheme and parameter, and User-Agent, so a test can prove where a token was and was not sent.
 
+## Using a BGG token locally
+
+The BGG username and API token are configuration only. They never go in the repository, in `appsettings.json`, or in a test. For local development keep them in user secrets, which live in your home directory outside the repository and are loaded only when the app runs in the Development environment:
+
+```
+dotnet user-secrets --project Cabinet.Service set "Bgg:Username" "your-bgg-username"
+dotnet user-secrets --project Cabinet.Service set "Bgg:Token" "your-bgg-api-token"
+```
+
+On a server the same two values come from the environment file instead, as `Bgg__Username` and `Bgg__Token`.
+
+Without both values the app still starts: it logs one warning, serves the being-filled page, reports healthy, and every sync ends as not configured without contacting BGG.
+
+To run against the fake instead of the real service, start the fake as described above and set the base address for the app:
+
+```
+Bgg__BaseUri=http://127.0.0.1:6190/xmlapi2/ dotnet run --project Cabinet.Service
+```
+
+Use any dummy username and token. The base address override is honoured only in Development; in any other environment it is ignored and the app logs a warning. The token is sent only over HTTPS to the BGG API host, so a dummy token never reaches the fake, and nothing a visitor sends can change the username or the address the app calls.
+
 ## Running the checks
 
 - Lint and script tests: `build/lint.sh`
