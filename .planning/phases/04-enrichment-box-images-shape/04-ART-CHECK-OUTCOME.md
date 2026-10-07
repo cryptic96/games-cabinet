@@ -6,7 +6,7 @@
 - Request count: 3 of the 10 allowed API requests (calls J, K, L) and 7 of the 7 allowed image requests (M1 to M6, N)
 - Exit code: 0 (the check completed; the built-in guard passed, nothing withheld)
 - Run once, as the app user, from the owner's SSH alias, after the owner's approval. No other run happened.
-- Status: draft, awaiting the owner's sign-off.
+- Signed off by the owner on 2026-10-07, as drafted, keeping the 1000 ms default image gap.
 
 ## Decision table
 
