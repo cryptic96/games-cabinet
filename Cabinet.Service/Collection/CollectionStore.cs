@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Cabinet.Domain.Collection;
 using Cabinet.Domain.Layout;
 using Cabinet.Service.Layout;
 
@@ -30,6 +31,17 @@ public sealed class CollectionState
         Items = items;
         Version = version;
         CapturedAtUtc = capturedAtUtc;
+    }
+
+    /// <summary>Creates the view of a stored collection: its items are mapped in a fixed order and its version is derived from them.</summary>
+    /// <param name="snapshot">The stored collection.</param>
+    public static CollectionState FromSnapshot(CollectionSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        var items = SnapshotMapper.ToCabinetItems(snapshot);
+
+        return new CollectionState(items, SnapshotMapper.Version(items), snapshot.CapturedAtUtc);
     }
 
     /// <summary>The view before any collection has been synced: no items and no version.</summary>

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -16,8 +17,12 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
 {
     private const int MaxBindAttempts = 5;
 
+    private const string StorageDirectoryKey = "Storage:Directory";
+
     private readonly IReadOnlyDictionary<string, string?> _settings;
+    private readonly Action<IServiceCollection>? _configureServices;
     private readonly Func<(int Public, int Ops)> _pickPorts;
+    private readonly string? _ownedStorageDirectory;
     private IHost? _realHost;
 
     /// <summary>Creates the factory and picks two free loopback ports so clients can be built before the host starts.</summary>
@@ -39,15 +44,42 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
     {
     }
 
+    /// <summary>
+    /// Creates the factory with extra configuration values and a chance to replace services, such as the BGG transport or the
+    /// request pacer, before the host starts.
+    /// </summary>
+    /// <param name="settings">Configuration keys and values added on top of the committed settings.</param>
+    /// <param name="configureServices">Changes the services after the program registered them; null leaves them as they are.</param>
+    public CabinetWebApplicationFactory(IReadOnlyDictionary<string, string?> settings, Action<IServiceCollection>? configureServices)
+        : this(settings, configureServices, PickFreeLoopbackPorts)
+    {
+    }
+
     /// <summary>Creates the factory with its own port picker, so a test can hand it a port that is already taken.</summary>
     /// <param name="settings">Configuration keys and values added on top of the committed settings.</param>
     /// <param name="pickPorts">Returns the public and ops ports to try; called again whenever a chosen port turns out to be taken.</param>
     internal CabinetWebApplicationFactory(IReadOnlyDictionary<string, string?> settings, Func<(int Public, int Ops)> pickPorts)
+        : this(settings, null, pickPorts)
+    {
+    }
+
+    private CabinetWebApplicationFactory(
+        IReadOnlyDictionary<string, string?> settings,
+        Action<IServiceCollection>? configureServices,
+        Func<(int Public, int Ops)> pickPorts)
     {
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(pickPorts);
 
-        _settings = settings;
+        var effective = new Dictionary<string, string?>(settings);
+        if (!effective.ContainsKey(StorageDirectoryKey))
+        {
+            _ownedStorageDirectory = Path.Combine(Path.GetTempPath(), $"cabinet-tests-{Guid.NewGuid():N}");
+            effective[StorageDirectoryKey] = _ownedStorageDirectory;
+        }
+
+        _settings = effective;
+        _configureServices = configureServices;
         _pickPorts = pickPorts;
         (PublicPort, OpsPort) = pickPorts();
 
@@ -83,6 +115,11 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
         foreach (var (key, value) in _settings)
         {
             builder.UseSetting(key, value);
+        }
+
+        if (_configureServices is not null)
+        {
+            builder.ConfigureTestServices(_configureServices);
         }
     }
 
@@ -133,6 +170,11 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
         }
 
         base.Dispose(disposing);
+
+        if (disposing)
+        {
+            DeleteOwnedStorageDirectory();
+        }
     }
 
     /// <inheritdoc />
@@ -145,6 +187,24 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
         }
 
         await base.DisposeAsync();
+        DeleteOwnedStorageDirectory();
+    }
+
+    private void DeleteOwnedStorageDirectory()
+    {
+        if (_ownedStorageDirectory is null)
+        {
+            return;
+        }
+
+        try
+        {
+            Directory.Delete(_ownedStorageDirectory, recursive: true);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return;
+        }
     }
 
     /// <summary>
