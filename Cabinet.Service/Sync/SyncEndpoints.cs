@@ -84,6 +84,7 @@ public static class SyncEndpoints
         services.AddSingleton<SyncStatusService>();
         services.AddHostedService<SyncStartup>();
         services.AddHostedService<SyncWorker>();
+        services.AddHostedService<SyncScheduler>();
 
         return services;
     }
