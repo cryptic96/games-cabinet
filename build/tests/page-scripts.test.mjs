@@ -19,7 +19,7 @@ async function loadPageScript(name) {
 }
 
 const { COPY } = await loadPageScript('copy.js');
-const { serverOffsetMs, elapsedSeconds, isStale, buttonState, countdownText, wholeMinutesLeft, pressOutcome, shouldRedraw, reconnectDelayMs } = await loadPageScript('status.js');
+const { serverOffsetMs, elapsedSeconds, isStale, buttonState, countdownText, wholeMinutesLeft, pressOutcome, shouldRedraw, reconnectDelayMs, isOutdatedStatus } = await loadPageScript('status.js');
 const cases = JSON.parse(readFileSync(new URL('./fixtures/relative-time-cases.json', import.meta.url), 'utf8'));
 
 const SYNCED = '2030-01-15T12:00:00.000Z';
@@ -162,6 +162,18 @@ test('a redraw is wanted only for a version other than the one on screen', () =>
   assert.equal(shouldRedraw('v1', { snapshotVersion: '' }), false);
   assert.equal(shouldRedraw('v1', {}), false);
   assert.equal(shouldRedraw('v1', null), false);
+});
+
+test('a status older than one already taken is outdated, an equal or newer or undated one is not', () => {
+  const newest = Date.parse('2030-01-15T12:00:00.100Z');
+
+  assert.equal(isOutdatedStatus(newest, { serverTimeUtc: '2030-01-15T12:00:00.000Z' }), true);
+  assert.equal(isOutdatedStatus(newest, { serverTimeUtc: '2030-01-15T12:00:00.100Z' }), false);
+  assert.equal(isOutdatedStatus(newest, { serverTimeUtc: '2030-01-15T12:00:00.200Z' }), false);
+  assert.equal(isOutdatedStatus(newest, {}), false);
+  assert.equal(isOutdatedStatus(newest, { serverTimeUtc: 'not a time' }), false);
+  assert.equal(isOutdatedStatus(newest, null), false);
+  assert.equal(isOutdatedStatus(Number.NEGATIVE_INFINITY, { serverTimeUtc: '2030-01-15T12:00:00.000Z' }), false);
 });
 
 test('the reconnect delays are at once, 2 s, 10 s, 30 s and then every minute', () => {

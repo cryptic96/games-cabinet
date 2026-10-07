@@ -5,7 +5,7 @@
  * whatever fetches one. Only the visitor's own press ever writes to the note; a failed status fetch simply leaves the last values.
  */
 import { COPY } from './copy.js';
-import { serverOffsetMs, elapsedSeconds, isStale, buttonState, countdownText, pressOutcome, shouldRedraw } from './status.js';
+import { serverOffsetMs, elapsedSeconds, isStale, buttonState, countdownText, pressOutcome, shouldRedraw, isOutdatedStatus } from './status.js';
 
 const REFRESH_INTERVAL_MS = 30000;
 const POLL_INTERVAL_MS = 5000;
@@ -48,6 +48,11 @@ export function initSyncStatus(root, options = {}) {
   let pressing = false;
   let ownSyncPending = false;
   let pollTimer = null;
+  let newestServerTimeMs = Date.parse(root.dataset.serverTime ?? '');
+
+  if (!Number.isFinite(newestServerTimeMs)) {
+    newestServerTimeMs = Number.NEGATIVE_INFINITY;
+  }
 
   /**
    * Builds the relative-time button when the first sync lands on a page that loaded before any had.
@@ -225,7 +230,12 @@ export function initSyncStatus(root, options = {}) {
    *   started a sync also treats the first status that finds nothing running as the end of it, wherever that status came from.
    */
   function applyStatus(status, context = {}) {
+    if (isOutdatedStatus(newestServerTimeMs, status)) {
+      return;
+    }
+
     if (typeof status.serverTimeUtc === 'string') {
+      newestServerTimeMs = Math.max(newestServerTimeMs, Date.parse(status.serverTimeUtc) || newestServerTimeMs);
       offsetMs = serverOffsetMs(status.serverTimeUtc, Date.now());
       root.dataset.serverTime = status.serverTimeUtc;
     }
@@ -377,6 +387,7 @@ export function initSyncStatus(root, options = {}) {
     }
 
     pressing = true;
+    ownSyncPending = true;
 
     try {
       const response = await fetch('/cabinet/sync', { method: 'POST' });
@@ -387,20 +398,27 @@ export function initSyncStatus(root, options = {}) {
       }
 
       if (response.status === 202) {
-        say('');
-        pollOwnSync();
+        if (ownSyncPending) {
+          say('');
+          pollOwnSync();
+        }
       } else if (response.status === 409) {
+        ownSyncPending = false;
         say(COPY.noteRunning);
       } else if (response.status === 429) {
+        ownSyncPending = false;
+
         if (answer === null || answer.status === undefined) {
           adoptRetryAfter(response);
         }
 
         say(COPY.youCanSyncAgain(currentState().remainingMs));
       } else {
+        ownSyncPending = false;
         say(COPY.noteOffline);
       }
     } catch {
+      ownSyncPending = false;
       say(COPY.noteOffline);
     } finally {
       pressing = false;

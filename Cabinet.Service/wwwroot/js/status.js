@@ -123,6 +123,22 @@ export function shouldRedraw(onScreenVersion, status) {
   return typeof version === 'string' && version !== '' && version !== (onScreenVersion ?? '');
 }
 
+/**
+ * Whether a status was produced before one the page has already taken. Pushed and fetched statuses can arrive out of order (a
+ * sync that ends within milliseconds is announced before the answer to the press reaches the page), and an older one must never
+ * overwrite a newer one. A status without a readable server time is never treated as outdated.
+ * @param {number} newestServerTimeMs The server time, in milliseconds, of the newest status taken so far.
+ * @param {{ serverTimeUtc?: string }} status The status that arrived.
+ * @returns {boolean}
+ */
+export function isOutdatedStatus(newestServerTimeMs, status) {
+  const at = status === null || typeof status !== 'object' || typeof status.serverTimeUtc !== 'string'
+    ? Number.NaN
+    : Date.parse(status.serverTimeUtc);
+
+  return Number.isFinite(at) && at < newestServerTimeMs;
+}
+
 const RECONNECT_DELAYS_MS = Object.freeze([0, 2000, 10000, 30000]);
 const STEADY_RECONNECT_DELAY_MS = 60000;
 
