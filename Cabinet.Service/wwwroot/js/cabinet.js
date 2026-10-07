@@ -26,8 +26,7 @@ function currentProfile() {
  */
 function showLoading() {
   const message = document.createElement('p');
-  message.className = 'cabinet-message';
-  message.setAttribute('role', 'status');
+  message.className = 'cabinet-message cabinet-loading';
   message.textContent = COPY.loading;
   mount.replaceChildren(message);
 }
@@ -175,7 +174,7 @@ async function redraw() {
  * @returns {boolean} False: nothing changed on screen.
  */
 function abandonRedraw() {
-  if (mount.querySelector('.cabinet-message[role="status"]') !== null) {
+  if (mount.querySelector('.cabinet-loading') !== null) {
     load();
   }
 
