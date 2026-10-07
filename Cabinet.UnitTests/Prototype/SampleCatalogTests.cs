@@ -1,7 +1,7 @@
 using Cabinet.Service.Prototype;
+using Cabinet.UnitTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting.Internal;
 
 namespace Cabinet.UnitTests.Prototype;
 
@@ -64,7 +64,7 @@ public class SampleCatalogTests
     [Trait("Category", "Configuration")]
     public void The_committed_development_settings_switch_the_prototype_on_and_the_committed_default_leaves_it_off()
     {
-        var directory = FindServiceDirectory();
+        var directory = RepositoryPaths.ServiceDirectory();
         var committed = new ConfigurationBuilder().AddJsonFile(Path.Combine(directory, "appsettings.json")).Build();
         var development = new ConfigurationBuilder()
             .AddJsonFile(Path.Combine(directory, "appsettings.json"))
@@ -80,23 +80,5 @@ public class SampleCatalogTests
             .AddInMemoryCollection(value is null ? [] : new Dictionary<string, string?> { [SampleCatalog.EnabledKey] = value })
             .Build();
 
-    private static HostingEnvironment Environment(string name) => new() { EnvironmentName = name };
-
-    private static string FindServiceDirectory()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-
-        while (directory is not null)
-        {
-            var candidate = Path.Combine(directory.FullName, "Cabinet.Service");
-            if (File.Exists(Path.Combine(candidate, "Cabinet.Service.csproj")))
-            {
-                return candidate;
-            }
-
-            directory = directory.Parent;
-        }
-
-        throw new InvalidOperationException("Could not locate Cabinet.Service above the test output directory.");
-    }
+    private static TestEnvironment Environment(string name) => new(name);
 }

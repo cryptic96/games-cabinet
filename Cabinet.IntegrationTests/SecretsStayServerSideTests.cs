@@ -244,26 +244,11 @@ public class SecretsStayServerSideTests
 
     private static async Task WaitForLayoutChange(HttpClient client, string? initialETag)
     {
-        await WaitUntil(async () => (await Get(client, LayoutPath)).ETag != initialETag);
+        await SyncHarness.WaitUntil(async () => (await Get(client, LayoutPath)).ETag != initialETag);
     }
 
     private static async Task WaitForLine(CapturingLoggerProvider logs, string fragment)
     {
-        await WaitUntil(() => Task.FromResult(logs.Lines.Any(line => line.Contains(fragment, StringComparison.Ordinal))));
-    }
-
-    private static async Task WaitUntil(Func<Task<bool>> condition)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(15);
-
-        while (!await condition())
-        {
-            if (DateTime.UtcNow > deadline)
-            {
-                throw new TimeoutException("The condition did not hold within fifteen seconds.");
-            }
-
-            await Task.Delay(TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken);
-        }
+        await SyncHarness.WaitUntil(() => Task.FromResult(logs.Lines.Any(line => line.Contains(fragment, StringComparison.Ordinal))));
     }
 }

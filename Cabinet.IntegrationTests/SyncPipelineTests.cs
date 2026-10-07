@@ -35,7 +35,7 @@ public class SyncPipelineTests
 
         (await client.GetStringAsync("/", TestContext.Current.CancellationToken)).Should().Contain(BeingFilled);
         using var press = await client.PostAsync(SyncEndpointRoute, content: null, TestContext.Current.CancellationToken);
-        await WaitUntil(async () => (await ReadLayout(client)).ETag != initial.ETag);
+        await SyncHarness.WaitUntil(async () => (await ReadLayout(client)).ETag != initial.ETag);
         var synced = await ReadLayout(client);
 
         press.StatusCode.Should().Be(HttpStatusCode.Accepted);
@@ -62,7 +62,7 @@ public class SyncPipelineTests
         var initial = await ReadLayout(client);
 
         using var press = await client.PostAsync(SyncEndpointRoute, content: null, TestContext.Current.CancellationToken);
-        await WaitUntil(async () => (await ReadLayout(client)).ETag != initial.ETag);
+        await SyncHarness.WaitUntil(async () => (await ReadLayout(client)).ETag != initial.ETag);
         var synced = await ReadLayout(client);
 
         press.StatusCode.Should().Be(HttpStatusCode.Accepted);
@@ -81,7 +81,7 @@ public class SyncPipelineTests
 
         using var first = await client.PostAsync(SyncEndpointRoute, content: null, TestContext.Current.CancellationToken);
         using var second = await client.PostAsync(SyncEndpointRoute, content: null, TestContext.Current.CancellationToken);
-        await WaitUntil(async () => (await ReadLayout(client)).ETag != initial.ETag);
+        await SyncHarness.WaitUntil(async () => (await ReadLayout(client)).ETag != initial.ETag);
 
         first.StatusCode.Should().Be(HttpStatusCode.Accepted);
         second.StatusCode.Should().Be(HttpStatusCode.Conflict);
@@ -104,7 +104,7 @@ public class SyncPipelineTests
             using var client = first.CreatePublicClient();
             var initial = await ReadLayout(client);
             using var press = await client.PostAsync(SyncEndpointRoute, content: null, TestContext.Current.CancellationToken);
-            await WaitUntil(async () => (await ReadLayout(client)).ETag != initial.ETag);
+            await SyncHarness.WaitUntil(async () => (await ReadLayout(client)).ETag != initial.ETag);
             (syncedETag, syncedTitles) = await ReadLayout(client);
         }
 
@@ -194,30 +194,5 @@ public class SyncPipelineTests
             .ToList();
 
         return (response.Headers.ETag!.Tag, titles);
-    }
-
-    private sealed class TemporaryDirectory : IDisposable
-    {
-        public TemporaryDirectory() =>
-            Directory.CreateDirectory(FullPath = Path.Combine(Path.GetTempPath(), $"cabinet-sync-tests-{Guid.NewGuid():N}"));
-
-        public string FullPath { get; }
-
-        public void Dispose() => Directory.Delete(FullPath, recursive: true);
-    }
-
-    private static async Task WaitUntil(Func<Task<bool>> condition)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-
-        while (!await condition())
-        {
-            if (DateTime.UtcNow > deadline)
-            {
-                throw new TimeoutException("The condition did not hold within ten seconds.");
-            }
-
-            await Task.Delay(TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken);
-        }
     }
 }

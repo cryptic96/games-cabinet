@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
+# End-to-end proof of the packaged release layout: builds a real release, starts
+# it and checks the served page. Needs the .NET SDK and runs only with
+# CABINET_E2E=1.
 set -euo pipefail
+
+if [ "${CABINET_E2E:-0}" != "1" ]; then
+  echo "skipping package-release end-to-end test (set CABINET_E2E=1 to run)"
+  exit 0
+fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"

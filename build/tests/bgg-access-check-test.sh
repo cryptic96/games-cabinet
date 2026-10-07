@@ -111,6 +111,74 @@ else
   fail "an env file without a username did not exit 3 cleanly"
 fi
 
+echo "=== the output guard in a real run ==="
+GUARD_DRIVER='
+import http.client, importlib.util, socket, ssl, sys
+
+def refuse(*args, **kwargs):
+    raise AssertionError("network used")
+
+socket.socket = refuse
+socket.create_connection = refuse
+script, env_file, payload = sys.argv[1], sys.argv[2], sys.argv[3]
+spec = importlib.util.spec_from_file_location("bgg_access_check", script)
+module = importlib.util.module_from_spec(spec)
+sys.modules["bgg_access_check"] = module
+spec.loader.exec_module(module)
+if payload == "WRONG_TOKEN":
+    payload = module.WRONG_TOKEN
+
+def stub_calls(transport, username, collector, progress):
+    return ["call A: status 200", payload], False
+
+module.run_calls = stub_calls
+sys.exit(module.main(["--run", "--env-file", env_file]))
+'
+
+write_env() {
+  printf 'Bgg__Token=%s\nBgg__Username=%s\nBgg__ContactUrl=%s\n' "$2" "$3" "${4:-https://example.org/sentinel-contact}" >"$1"
+}
+
+expect_guard() {
+  local name="$1" env_file="$2" payload="$3" expected="$4"
+  local actual
+  actual="$(status_of python3 -c "$GUARD_DRIVER" "$SCRIPT" "$env_file" "$payload")"
+  if [ "$actual" = "$expected" ]; then
+    pass "$name"
+  else
+    fail "$name (exit $actual, expected $expected)"
+  fi
+}
+
+LONG_ENV="$WORK_DIR/long-name.env"
+write_env "$LONG_ENV" "sentinel-token-value" "sentinel-user-name"
+expect_guard "a clean report is printed" "$LONG_ENV" "shape only" 0
+if ! grep -q 'shape only' "$WORK_DIR/out.txt"; then
+  fail "the clean report was not printed"
+fi
+expect_guard "a report echoing the token is withheld" "$LONG_ENV" "see sentinel-token-value here" 4
+if ! grep -q 'output withheld' "$WORK_DIR/out.txt" || ! grep -q '^hint:' "$WORK_DIR/out.txt"; then
+  fail "the withheld run did not explain itself"
+fi
+if grep -q 'sentinel-token-value' "$WORK_DIR/out.txt"; then
+  fail "the withheld run printed the token"
+fi
+expect_guard "a report echoing the username is withheld" "$LONG_ENV" "see SENTINEL-user-name here" 4
+PLAIN_CONTACT_ENV="$WORK_DIR/plain-contact.env"
+write_env "$PLAIN_CONTACT_ENV" "sentinel-token-value" "sentinel-user-name" "sentinel-contact-address"
+expect_guard "a report echoing the contact address is withheld" "$PLAIN_CONTACT_ENV" "see sentinel-contact-address here" 4
+expect_guard "a report echoing the fixed wrong token is withheld" "$LONG_ENV" "WRONG_TOKEN" 4
+
+SHORT_ENV="$WORK_DIR/short-name.env"
+write_env "$SHORT_ENV" "sentinel-token-value" "us"
+expect_guard "a short username inside longer words does not withhold the report" "$SHORT_ENV" "status items stats" 0
+expect_guard "a short username as a whole word is withheld" "$SHORT_ENV" "seen by us today" 4
+expect_guard "a short username in another case as a whole word is withheld" "$SHORT_ENV" "seen by US today" 4
+
+SHORT_TOKEN_ENV="$WORK_DIR/short-token.env"
+write_env "$SHORT_TOKEN_ENV" "abc" "sentinel-user-name"
+expect_guard "a short token inside a longer word is still withheld" "$SHORT_TOKEN_ENV" "abcdef" 4
+
 echo "=== standard library only ==="
 IMPORT_CHECK='
 import ast, sys
