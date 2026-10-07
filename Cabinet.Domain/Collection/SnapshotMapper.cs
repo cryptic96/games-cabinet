@@ -12,7 +12,8 @@ public static class SnapshotMapper
 
     /// <summary>
     /// Maps every stored item to an item to draw, ordered by collection entry and then by game, so the same collection in
-    /// any source order gives the same cabinet.
+    /// any source order gives the same cabinet. An entry listed twice is one item, and it is the expansion; two entries for
+    /// the same game with different entry identifiers stay two items. Expansions carry no base game until one is paired.
     /// </summary>
     /// <param name="snapshot">The stored collection.</param>
     public static IReadOnlyList<CabinetItem> ToCabinetItems(CollectionSnapshot snapshot)
@@ -22,9 +23,17 @@ public static class SnapshotMapper
         return
         [
             .. snapshot.Items
+                .GroupBy(item => item.CollectionId)
+                .Select(entry => entry.FirstOrDefault(item => item.Kind == ItemKind.Expansion) ?? entry.First())
                 .OrderBy(item => item.CollectionId)
                 .ThenBy(item => item.GameId)
-                .Select(item => new CabinetItem(item.GameId, item.CollectionId, item.Title, item.Kind, DefaultBox(item.Kind), [])),
+                .Select(item => new CabinetItem(
+                    item.GameId,
+                    item.CollectionId,
+                    item.Title,
+                    item.Kind,
+                    BoxFromVersion.Map(item.Dimensions, item.Kind),
+                    [])),
         ];
     }
 
@@ -47,6 +56,5 @@ public static class SnapshotMapper
 
     /// <summary>The box size used for an item whose real size is not known.</summary>
     /// <param name="kind">Whether the item is a standalone game or an expansion.</param>
-    public static BoxDimensions DefaultBox(ItemKind kind) =>
-        kind == ItemKind.Expansion ? new BoxDimensions(200, 260, 40) : new BoxDimensions(225, 300, 60);
+    public static BoxDimensions DefaultBox(ItemKind kind) => BoxFromVersion.DefaultFor(kind);
 }
