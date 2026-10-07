@@ -9,7 +9,8 @@ where they differ.
 
 The cabinet shows the games you own on BGG, and it asks BGG for them itself, so
 nothing is typed in by hand. A sync makes exactly two collection calls to the
-BGG XML API:
+BGG XML API (followed by a few small calls for game details, described under
+"Game details"):
 
 1. the owned base games (expansions left out), then
 2. the owned expansions.
@@ -267,6 +268,64 @@ The request address contains the username, so the committed settings keep
 HTTP client logging at warning level and the sync never writes an address, an
 answer or a game title to the log. A failed sync logs only its category, such as
 unavailable or not configured.
+
+## Game details
+
+Besides the collection, the sync reads the details of each owned game from BGG's
+`thing` call. For every game it keeps the player count, the playing time, the
+minimum age, the complexity (weight), the average and ranked ratings, the
+designers, the mechanics, the address of the game's main picture and, for an
+expansion, the base game or games it expands. The detail card and the estimate
+of a box's size need this, and the expansion links decide which expansion
+stands beside which owned base game.
+
+The server asks politely and in small steps:
+
+- a game that is new to the collection gets its details in the same sync that
+  first sees it;
+- every other game is refreshed about weekly, the longest-known first, in a
+  limited number of calls per run, so a large collection fills in over several
+  runs;
+- a call names at most 20 games, asks only for the details and statistics (never
+  versions, comments, videos or marketplace data), goes through the same
+  five-second pacing as every other BGG call and carries the token only to the
+  BGG API host;
+- a run starts no further details call after six minutes have passed since the
+  run began.
+
+The details step runs after the collection is stored and shown, and the cabinet
+is redrawn as each answer arrives. A call that fails, whether BGG is throttling,
+unavailable or sends something unreadable, never fails the sync and never holds
+the collection back: the details already known are kept, the step stops for this
+run and the games are asked for again on the next run. A game missing from an
+answer keeps its previous details and is asked for again as well. The details of
+a game that is no longer owned are dropped. Until a game's details arrive the
+cabinet draws it from the collection data alone: an expansion shows the plain
+label "Expansion" and later upgrades to name its base game.
+
+An expansion stands beside the base game it expands when that base game is owned.
+When it expands several owned base games it stands beside the one with the
+lowest collection entry, and adding another base game later never moves it. An
+expansion whose base game is not owned is drawn on its own and labelled with the
+base game it belongs to. Only links that name a game an expansion belongs to are
+read; a big-box edition that merely contains an expansion is drawn as a game of
+its own next to that expansion.
+
+The details are kept in `snapshot.json` and are only used to draw the page. The
+site's own data endpoint does not list them: it carries no designers, mechanics,
+ratings, ages or player counts.
+
+Optional settings for the env file:
+
+| Key | Default | Range | Meaning |
+| --- | --- | --- | --- |
+| `Enrichment__MaxThingRequestsPerRun` | `25` | 1 to 100 | The most details calls one sync run makes. |
+| `Enrichment__RefreshBatchesPerRun` | `1` | 0 to 25 | How many of those calls may go to refreshing games whose details are already known. |
+| `Enrichment__RefreshAfterDays` | `7` | 1 to 90 | How old known details must be before they are refreshed; the setting `Enrichment:RefreshAfterDays` in a settings file. |
+
+In a settings file the same keys are written with a colon, for example
+`Enrichment:RefreshBatchesPerRun`. An out-of-range or non-numeric value stops the
+app at start-up with a message naming the key.
 
 ## Box art
 
