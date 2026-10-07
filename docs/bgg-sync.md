@@ -35,6 +35,53 @@ The server is polite to BGG:
 Only one sync runs at a time. Pressing the button while a sync runs answers
 "already running" and starts nothing more.
 
+## Sync now and the hourly sync
+
+Anyone who opens the site can press "sync now". The collection also refreshes
+on its own about once an hour, so pressing the button is never required.
+
+Every sync start, whether it is the hourly one, the one after a start-up or one
+a visitor pressed, opens a shared window of 10 minutes. While the window is open
+a press is refused with the time that remains (the answer is HTTP 429 with a
+`Retry-After` header in whole seconds). The window is shared by every visitor,
+so BGG sees at most one sync per window however many people press the button. A
+sync that fails still uses up its window. The hourly and start-up syncs are never
+refused by the window; they only open a new one, so a visitor cannot cause a
+second BGG call right after an hourly one.
+
+The window survives restarts and releases: it is written to disk before a sync
+is queued, so restarting the service does not give anyone a fresh press.
+
+The start-up sync runs once, a random 10 to 120 seconds after the service
+starts, and only when there is no collection yet or the last successful sync is
+older than the hourly interval. It also waits until the last sync started at
+least 15 minutes ago, so a service that keeps crashing cannot hammer BGG.
+
+Pages learn about the sync from `GET /cabinet/status`: when the collection was
+last synced, whether a sync is running, when the button may be used again and a
+one-word summary of the last run (`changed`, `unchanged`, `failed` or
+`heldBack`). It never says why a run failed, and it never carries the username,
+the token or counts.
+
+Settings, all optional, in the same env file:
+
+| Key | Default | Range | Meaning |
+| --- | --- | --- | --- |
+| `Sync__BackgroundEnabled` | `true` | `true` or `false` | Whether the hourly and start-up syncs run on their own. Pressing the button still works when it is off. |
+| `Sync__IntervalMinutes` | `60` | 15 to 1440 | Minutes between hourly syncs. |
+| `Sync__ManualCooldownMinutes` | `10` | 1 to 120 | Length of the shared window. |
+| `Sync__StartupJitterMaxSeconds` | `120` | 10 to 3600 | The latest the start-up sync may begin after the service starts. |
+| `Sync__StaleAfterHours` | `3` | 1 to 168 | How old the collection may get before a page treats it as out of date. |
+
+A value outside its range stops the service at start-up with a message that
+names the key.
+
+The bookkeeping (when the last sync started and finished, how it ended and when
+the window closes) lives in `sync-state.json`, next to `snapshot.json` in the
+state directory. It holds no secrets and can be deleted at any time: a missing,
+damaged or newer-format file is replaced by a fresh one (a damaged file is set
+aside as `sync-state.json.bad`), which only means the window starts closed.
+
 ## Configuration
 
 Put these in the server env file, `/etc/cabinet/cabinet.env`, then restart the
