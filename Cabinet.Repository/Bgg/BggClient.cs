@@ -10,9 +10,9 @@ namespace Cabinet.Repository.Bgg;
 /// <summary>
 /// Reads the owner's owned collection from the BGG XML API in two calls, because the unfiltered call labels expansions as
 /// base games with expansions excluded, then expansions. Every call goes through the shared pacer. A queued answer is
-/// polled on a slow, bounded schedule, a transient server error or throttle is retried once per call after a polite wait,
-/// and a whole sync never sends more than <see cref="MaxRequestsPerSync"/> requests, retries included. A refusal (401 or
-/// 403) is never retried. Whatever goes wrong ends the fetch with a failure category and never with a partial collection; the one
+/// polled on a slow, bounded schedule, a transient server error or throttle is retried once per call after a polite wait
+/// (at least <see cref="RetryFloor"/> for a throttle that names no wait of its own), and a whole sync never sends more than
+/// <see cref="MaxRequestsPerSync"/> requests, retries included. A refusal (401 or 403) is never retried. Whatever goes wrong ends the fetch with a failure category and never with a partial collection; the one
 /// exception is the caller cancelling, which propagates so the caller can tell a stop from a slow answer. A collection
 /// answer must declare its total, and the total must equal the entries read plus the entries left out for lacking an
 /// identifier. The client logs a count at most: a request address carries the username and an answer carries the owner's data.
@@ -35,6 +35,13 @@ public sealed class BggClient : ICollectionSource
 
     /// <summary>The longest wait a transient answer may ask for and still be retried; a longer ask means the next scheduled sync is the retry.</summary>
     public static readonly TimeSpan MaxRetryAfter = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// The shortest wait before the retry of a throttle (429 or 503) that carries no usable <c>Retry-After</c>. BGG's own
+    /// guidance is a gap of seconds between requests, but a throttle that names no wait is better answered with a longer
+    /// pause than with the pacer's gap alone. Other server errors keep the pacer's gap.
+    /// </summary>
+    public static readonly TimeSpan RetryFloor = TimeSpan.FromSeconds(30);
 
     private readonly HttpClient _http;
     private readonly BggOptions _options;
@@ -139,7 +146,7 @@ public sealed class BggClient : ICollectionSource
 
                 if (attempt.Kind == AttemptKind.Transient)
                 {
-                    if (retried || budget.IsSpent || RetryWaitFor(attempt.RetryAfter) is not { } retryWait)
+                    if (retried || budget.IsSpent || RetryWaitFor(attempt) is not { } retryWait)
                     {
                         return attempt.Result!;
                     }
@@ -234,14 +241,15 @@ public sealed class BggClient : ICollectionSource
 
     /// <summary>
     /// The wait before the one retry, on top of the pacer's own gap, or null when the answer asked for more than the cap and
-    /// the next scheduled sync is the retry. An answer that names no wait adds none, because the pacer already leaves at
-    /// least its gap after the failed request.
+    /// the next scheduled sync is the retry. A throttle that names no wait waits <see cref="RetryFloor"/>; a throttle that
+    /// names one waits that long, whatever it is up to the cap; any other transient answer adds nothing, because the pacer
+    /// already leaves at least its gap after the failed request.
     /// </summary>
-    private static TimeSpan? RetryWaitFor(TimeSpan? retryAfter)
+    private static TimeSpan? RetryWaitFor(Attempt attempt)
     {
-        if (retryAfter is not { } asked)
+        if (attempt.RetryAfter is not { } asked)
         {
-            return TimeSpan.Zero;
+            return attempt.Result is CollectionFetchResult.Failed { Failure: SyncFailure.Throttled } ? RetryFloor : TimeSpan.Zero;
         }
 
         if (asked > MaxRetryAfter)

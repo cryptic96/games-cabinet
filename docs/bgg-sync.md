@@ -170,6 +170,11 @@ polite on purpose:
 - when the answer carries a `Retry-After` header, the retry also waits for it
   (a number of seconds or a date). A header asking for more than 60 seconds means
   no retry at all: the next scheduled sync is the retry;
+- a throttle (429 or 503) that carries no usable `Retry-After` header, including
+  one that cannot be read, waits a floor of 30 seconds before the retry, because a
+  throttle that names no wait deserves a longer pause than the 5-second gap. Any
+  other 5xx answer keeps the 5-second gap. The floor is measured on the same clock
+  as every other wait, so tests move that clock instead of waiting;
 - it counts against the 16 requests a sync may send, and it is skipped when that
   budget is used up;
 - a refusal (401 or 403) is never retried, and there is no second retry.
@@ -178,7 +183,12 @@ A "queued" answer (HTTP 202) means BGG is still preparing the collection. The
 server asks again after 5, 10, 20 and then 30 seconds, at most six times for each
 call, and every ask goes through the same 5-second pacing as any other request.
 One sync sends at most 16 requests in total, and a whole sync is cancelled after
-10 minutes.
+10 minutes, counted on the same clock as the waits. Even the longest waits that
+can be asked for (every queued wait, a retry wait of up to 60 seconds for each
+call and the 5-second gaps) add up to well under that limit, so the limit only
+ever ends a sync whose requests themselves stall. A sync ended by the limit is
+recorded as a timeout; a sync interrupted because the service is stopping is not
+recorded at all, because it did not fail.
 
 Two kinds of answer are held back instead of applied, even though BGG answered
 properly:

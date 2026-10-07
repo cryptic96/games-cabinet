@@ -1,6 +1,8 @@
+using Cabinet.Domain.Collection;
 using Cabinet.FakeBgg;
 using Cabinet.FakeBgg.Testing;
 using Cabinet.Repository.Bgg;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Cabinet.UnitTests.Bgg;
 
@@ -53,6 +55,31 @@ public static class BggTestKit
         }
 
         return new BggClient(http, Options(), pacer ?? new ImmediatePacer(), time ?? TimeProvider.System, queuedWaits);
+    }
+
+    /// <summary>
+    /// Runs a whole fetch on a fake clock that is moved forward a second at a time, so a retry's wait costs a few
+    /// milliseconds of real time. Fails if the fetch has not finished within ten seconds of real time.
+    /// </summary>
+    /// <param name="handler">Answers the requests.</param>
+    public static async Task<CollectionFetchResult> FetchOnFakeClockAsync(HttpMessageHandler handler)
+    {
+        var clock = new FakeTimeProvider();
+        var fetch = Client(handler, clock).FetchOwnedAsync(TestContext.Current.CancellationToken);
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+
+        while (!fetch.IsCompleted)
+        {
+            if (DateTime.UtcNow > deadline)
+            {
+                throw new TimeoutException("The fetch did not finish within ten seconds of real time.");
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(2), TestContext.Current.CancellationToken);
+            clock.Advance(TimeSpan.FromSeconds(1));
+        }
+
+        return await fetch;
     }
 
     /// <summary>Whether a request is for the call that excludes expansions, which is the first call of a sync.</summary>

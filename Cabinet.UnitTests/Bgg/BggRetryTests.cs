@@ -230,6 +230,126 @@ public class BggRetryTests
         handler.Requests.Should().HaveCount(4);
     }
 
+    [Theory]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    public async Task A_throttle_without_a_retry_after_waits_the_floor_before_the_retry(HttpStatusCode throttle)
+    {
+        var clock = new FakeTimeProvider();
+        var baseCalls = 0;
+        var handler = new ScriptedBggHandler(
+            request => BggTestKit.IsBaseCall(request) && baseCalls++ == 0 ? ScriptedResponse.Empty(throttle) : BggTestKit.Good(Items, request),
+            clock);
+
+        var result = await Drive(Client(handler, clock).FetchOwnedAsync(TestContext.Current.CancellationToken), clock);
+
+        result.Should().BeOfType<CollectionFetchResult.Fetched>();
+        BggClient.RetryFloor.Should().Be(TimeSpan.FromSeconds(30));
+        (handler.Requests[1].At - handler.Requests[0].At).Should().BeGreaterThanOrEqualTo(BggClient.RetryFloor);
+    }
+
+    [Fact]
+    public async Task The_retry_of_a_throttle_does_not_start_before_the_floor_has_passed()
+    {
+        var clock = new FakeTimeProvider();
+        var baseCalls = 0;
+        var handler = new ScriptedBggHandler(
+            request => BggTestKit.IsBaseCall(request) && baseCalls++ == 0 ? ScriptedResponse.Empty(HttpStatusCode.TooManyRequests) : BggTestKit.Good(Items, request),
+            clock);
+        var fetch = Client(handler, clock).FetchOwnedAsync(TestContext.Current.CancellationToken);
+        await WaitForRequests(handler, 1);
+
+        clock.Advance(BggClient.RetryFloor - TimeSpan.FromSeconds(1));
+        await Task.Delay(TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken);
+
+        handler.Requests.Should().ContainSingle();
+        await Drive(fetch, clock);
+        handler.Requests.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public async Task A_retry_after_that_cannot_be_read_counts_as_none_and_the_floor_applies()
+    {
+        var clock = new FakeTimeProvider();
+        var baseCalls = 0;
+        var handler = new ScriptedBggHandler(
+            request => BggTestKit.IsBaseCall(request) && baseCalls++ == 0 ? Throttled("soon") : BggTestKit.Good(Items, request),
+            clock);
+
+        await Drive(Client(handler, clock).FetchOwnedAsync(TestContext.Current.CancellationToken), clock);
+
+        (handler.Requests[1].At - handler.Requests[0].At).Should().BeGreaterThanOrEqualTo(BggClient.RetryFloor);
+    }
+
+    [Fact]
+    public async Task A_retry_after_below_the_floor_is_honoured_as_asked_and_not_raised()
+    {
+        var clock = new FakeTimeProvider();
+        var baseCalls = 0;
+        var handler = new ScriptedBggHandler(
+            request => BggTestKit.IsBaseCall(request) && baseCalls++ == 0 ? Throttled("5") : BggTestKit.Good(Items, request),
+            clock);
+
+        await Drive(Client(handler, clock).FetchOwnedAsync(TestContext.Current.CancellationToken), clock);
+
+        (handler.Requests[1].At - handler.Requests[0].At).Should().BeLessThan(BggClient.RetryFloor);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    [InlineData(HttpStatusCode.BadGateway)]
+    [InlineData(HttpStatusCode.GatewayTimeout)]
+    public async Task Another_server_error_keeps_the_pacers_gap_and_does_not_wait_the_floor(HttpStatusCode serverError)
+    {
+        var clock = new FakeTimeProvider();
+        var baseCalls = 0;
+        var handler = new ScriptedBggHandler(
+            request => BggTestKit.IsBaseCall(request) && baseCalls++ == 0 ? ScriptedResponse.Empty(serverError) : BggTestKit.Good(Items, request),
+            clock);
+
+        await Drive(Client(handler, clock).FetchOwnedAsync(TestContext.Current.CancellationToken), clock);
+
+        (handler.Requests[1].At - handler.Requests[0].At).Should().BeLessThan(BggClient.RetryFloor);
+    }
+
+    [Fact]
+    public async Task A_throttle_that_repeats_after_the_floor_is_still_not_retried_a_second_time()
+    {
+        var clock = new FakeTimeProvider();
+        var handler = new ScriptedBggHandler(_ => ScriptedResponse.Empty(HttpStatusCode.TooManyRequests), clock);
+
+        var result = await Drive(Client(handler, clock).FetchOwnedAsync(TestContext.Current.CancellationToken), clock);
+
+        result.Should().BeOfType<CollectionFetchResult.Failed>().Which.Failure.Should().Be(SyncFailure.Throttled);
+        handler.Requests.Should().HaveCount(2);
+        (handler.Requests[1].At - handler.Requests[0].At).Should().BeGreaterThanOrEqualTo(BggClient.RetryFloor);
+    }
+
+    [Fact]
+    public void The_longest_waits_the_client_can_ask_for_fit_inside_the_whole_run_limit_with_room_to_spare()
+    {
+        var polling = BggClient.QueuedWaits.Aggregate(TimeSpan.Zero, (sum, wait) => sum + wait) * 2;
+        var retrying = (BggClient.RetryFloor > BggClient.MaxRetryAfter ? BggClient.RetryFloor : BggClient.MaxRetryAfter) * 2;
+        var pacing = BggOptions.MinimumRequestGap * BggClient.MaxRequestsPerSync;
+
+        (polling + retrying + pacing).Should().BeLessThan(Cabinet.Service.Sync.SyncWorker.RunLimit / 1.2);
+    }
+
+    private static async Task WaitForRequests(ScriptedBggHandler handler, int count)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+
+        while (handler.Requests.Count < count)
+        {
+            if (DateTime.UtcNow > deadline)
+            {
+                throw new TimeoutException("The request was not sent within ten seconds of real time.");
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(2), TestContext.Current.CancellationToken);
+        }
+    }
+
     private static BggClient Client(
         HttpMessageHandler handler,
         FakeTimeProvider clock,

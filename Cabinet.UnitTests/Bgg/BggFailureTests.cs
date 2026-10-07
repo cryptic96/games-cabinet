@@ -36,7 +36,7 @@ public class BggFailureTests
     {
         var handler = new ScriptedBggHandler(_ => Bad(answer));
 
-        var result = await BggTestKit.Client(handler).FetchOwnedAsync(TestContext.Current.CancellationToken);
+        var result = await BggTestKit.FetchOnFakeClockAsync(handler);
 
         result.Should().BeOfType<CollectionFetchResult.Failed>().Which.Failure.Should().Be(expected);
     }
@@ -51,7 +51,7 @@ public class BggFailureTests
     {
         var handler = new ScriptedBggHandler(request => BggTestKit.IsBaseCall(request) ? BggTestKit.Good(Items, request) : Bad(answer));
 
-        var result = await BggTestKit.Client(handler).FetchOwnedAsync(TestContext.Current.CancellationToken);
+        var result = await BggTestKit.FetchOnFakeClockAsync(handler);
 
         result.Should().BeOfType<CollectionFetchResult.Failed>().Which.Failure.Should().Be(expected);
         handler.Requests.Should().HaveCount(1 + expansionRequests);
@@ -65,7 +65,7 @@ public class BggFailureTests
     {
         var handler = new ScriptedBggHandler(_ => Bad(answer));
 
-        await BggTestKit.Client(handler).FetchOwnedAsync(TestContext.Current.CancellationToken);
+        await BggTestKit.FetchOnFakeClockAsync(handler);
 
         handler.Requests.Should().HaveCount(baseRequests);
         handler.Requests.Should().OnlyContain(request => request.Uri.Query.Contains("excludesubtype", StringComparison.Ordinal));
