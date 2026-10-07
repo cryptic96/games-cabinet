@@ -65,6 +65,10 @@ public static class BggXml
     private const string PublishedAt = "Thu, 01 Jan 2026 12:00:00 +0000";
     private const string LastModified = "2026-01-01 12:00:00";
     private const int BigBoxObjectId = 880001;
+
+    /// <summary>The path the fake serves its synthetic pictures under.</summary>
+    public const string ArtPath = "/fake-art/";
+
     private const int BigBoxContainedObjectId = SyntheticBggCollection.FirstObjectId + 3;
 
     /// <summary>Picks the entries a collection request asks for, the way BoardGameGeek does.</summary>
@@ -89,7 +93,11 @@ public static class BggXml
     /// <param name="items">Every entry in the invented collection.</param>
     /// <param name="query">The request's parameters.</param>
     /// <param name="totalItemsOverride">A declared total that differs from the number of entries written.</param>
-    public static string Collection(IEnumerable<FakeBggItem> items, CollectionQuery query, int? totalItemsOverride = null)
+    /// <param name="artOrigin">
+    /// The origin picture addresses point at, such as <c>http://127.0.0.1:6190</c>, so the fake's own synthetic pictures
+    /// are used; when null the addresses are invented ones on an example host that nothing serves.
+    /// </param>
+    public static string Collection(IEnumerable<FakeBggItem> items, CollectionQuery query, int? totalItemsOverride = null, string? artOrigin = null)
     {
         var selected = Select(items, query);
         var root = new XElement(
@@ -97,7 +105,7 @@ public static class BggXml
             new XAttribute("totalitems", (totalItemsOverride ?? selected.Count).ToString(CultureInfo.InvariantCulture)),
             new XAttribute("termsofuse", TermsOfUse),
             new XAttribute("pubdate", PublishedAt),
-            selected.Select(item => CollectionItem(item, query)));
+            selected.Select(item => CollectionItem(item, query, artOrigin)));
         return Serialize(root);
     }
 
@@ -134,7 +142,8 @@ public static class BggXml
     /// <param name="ids">The requested game ids.</param>
     /// <param name="known">The invented collection, used to give known ids their real titles and links.</param>
     /// <param name="stats">Whether the statistics block is wanted.</param>
-    public static string Things(IEnumerable<int> ids, IReadOnlyList<FakeBggItem> known, bool stats)
+    /// <param name="artOrigin">The origin picture addresses point at; when null they are invented addresses on an example host.</param>
+    public static string Things(IEnumerable<int> ids, IReadOnlyList<FakeBggItem> known, bool stats, string? artOrigin = null)
     {
         ArgumentNullException.ThrowIfNull(ids);
         ArgumentNullException.ThrowIfNull(known);
@@ -144,8 +153,8 @@ public static class BggXml
             "items",
             new XAttribute("termsofuse", TermsOfUse),
             ids.Select(id => byId.TryGetValue(id, out var item)
-                ? ThingItem(item, stats, byId)
-                : ThingItem(new FakeBggItem(id, 0, $"Example Thing {id}", false, true, 2000, null, null), stats, byId)));
+                ? ThingItem(item, stats, byId, artOrigin)
+                : ThingItem(new FakeBggItem(id, 0, $"Example Thing {id}", false, true, 2000, null, null), stats, byId, artOrigin)));
         return Serialize(root);
     }
 
@@ -154,7 +163,19 @@ public static class BggXml
     public static int VersionId(FakeBggItem item) =>
         SyntheticBggCollection.FirstVersionId + (int)Math.Max(0, item.CollId - SyntheticBggCollection.FirstCollId);
 
-    private static XElement CollectionItem(FakeBggItem item, CollectionQuery query)
+    private static string MainPicture(int objectId, string? artOrigin) =>
+        artOrigin is null ? $"https://example.org/images/{objectId}.jpg" : $"{artOrigin}{ArtPath}{Number(objectId)}-main.png";
+
+    private static string MainThumbnail(int objectId, string? artOrigin) =>
+        artOrigin is null ? $"https://example.org/thumbnails/{objectId}.jpg" : MainPicture(objectId, artOrigin);
+
+    private static string VersionPicture(int versionId, string? artOrigin) =>
+        artOrigin is null ? $"https://example.org/images/version-{versionId}.jpg" : $"{artOrigin}{ArtPath}{Number(versionId)}-version.png";
+
+    private static string VersionThumbnail(int versionId, string? artOrigin) =>
+        artOrigin is null ? $"https://example.org/thumbnails/version-{versionId}.jpg" : VersionPicture(versionId, artOrigin);
+
+    private static XElement CollectionItem(FakeBggItem item, CollectionQuery query, string? artOrigin)
     {
         var subtype = item.IsExpansion && query.Subtype == CollectionQuery.ExpansionSubtype
             ? CollectionQuery.ExpansionSubtype
@@ -178,8 +199,8 @@ public static class BggXml
         }
 
         element.Add(
-            new XElement("image", $"https://example.org/images/{item.ObjectId}.jpg"),
-            new XElement("thumbnail", $"https://example.org/thumbnails/{item.ObjectId}.jpg"));
+            new XElement("image", MainPicture(item.ObjectId, artOrigin)),
+            new XElement("thumbnail", MainThumbnail(item.ObjectId, artOrigin)));
 
         if (query.Stats)
         {
@@ -202,7 +223,7 @@ public static class BggXml
 
         if (query.Version && item.Version is { } version)
         {
-            element.Add(VersionElement(item, version));
+            element.Add(VersionElement(item, version, artOrigin));
         }
 
         if (query.ShowPrivate && !string.IsNullOrEmpty(item.Location))
@@ -238,15 +259,15 @@ public static class BggXml
         return stats;
     }
 
-    private static XElement VersionElement(FakeBggItem item, FakeVersion version) =>
+    private static XElement VersionElement(FakeBggItem item, FakeVersion version, string? artOrigin) =>
         new(
             "version",
             new XElement(
                 "item",
                 new XAttribute("type", "boardgameversion"),
                 new XAttribute("id", Number(VersionId(item))),
-                new XElement("thumbnail", $"https://example.org/thumbnails/version-{VersionId(item)}.jpg"),
-                new XElement("image", $"https://example.org/images/version-{VersionId(item)}.jpg"),
+                new XElement("thumbnail", VersionThumbnail(VersionId(item), artOrigin)),
+                new XElement("image", VersionPicture(VersionId(item), artOrigin)),
                 new XElement(
                     "link",
                     new XAttribute("type", "language"),
@@ -272,7 +293,7 @@ public static class BggXml
             new XAttribute("acquiredfrom", string.Empty),
             new XAttribute("inventorylocation", location));
 
-    private static XElement ThingItem(FakeBggItem item, bool stats, IReadOnlyDictionary<int, FakeBggItem> known)
+    private static XElement ThingItem(FakeBggItem item, bool stats, IReadOnlyDictionary<int, FakeBggItem> known, string? artOrigin)
     {
         var minPlayers = 1 + item.ObjectId % 3;
         var playingTime = 30 + 10 * (item.ObjectId % 6);
@@ -280,8 +301,8 @@ public static class BggXml
             "item",
             new XAttribute("type", item.IsExpansion ? CollectionQuery.ExpansionSubtype : "boardgame"),
             new XAttribute("id", Number(item.ObjectId)),
-            new XElement("thumbnail", $"https://example.org/thumbnails/{item.ObjectId}.jpg"),
-            new XElement("image", $"https://example.org/images/{item.ObjectId}.jpg"),
+            new XElement("thumbnail", MainThumbnail(item.ObjectId, artOrigin)),
+            new XElement("image", MainPicture(item.ObjectId, artOrigin)),
             new XElement("name", new XAttribute("type", "primary"), new XAttribute("sortindex", "1"), new XAttribute("value", item.Title)),
             new XElement("description", $"An invented description for example game {item.ObjectId}."),
             new XElement("yearpublished", new XAttribute("value", Number(item.Year ?? 0))),

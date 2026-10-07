@@ -12,6 +12,7 @@ namespace Cabinet.Service.Sync;
 /// <param name="RetryFailedAfter">How long a picture that failed, was refused or could not be read waits before it is tried again.</param>
 /// <param name="PruneGrace">How long a stored file that nothing refers to is kept before it is deleted.</param>
 /// <param name="DevelopmentOrigin">A local origin pictures may also come from in development; null otherwise.</param>
+/// <param name="DevelopmentOriginIgnored">Whether a development origin was configured outside development and therefore left out.</param>
 public sealed record ImageOptions(
     IReadOnlySet<string> AllowedHosts,
     long MaxBytes,
@@ -20,7 +21,8 @@ public sealed record ImageOptions(
     int MaxDownloadsPerRun,
     TimeSpan RetryFailedAfter,
     TimeSpan PruneGrace,
-    Uri? DevelopmentOrigin)
+    Uri? DevelopmentOrigin,
+    bool DevelopmentOriginIgnored = false)
 {
     /// <summary>The source policy these options describe.</summary>
     public ArtSourcePolicy Policy => new(AllowedHosts, DevelopmentOrigin);
@@ -45,12 +47,15 @@ public static class ImageSettings
     private const string PerRunKey = "Images:MaxDownloadsPerRun";
     private const string RetryKey = "Images:RetryFailedAfterHours";
     private const string GraceKey = "Images:PruneGraceDays";
+    private const string DevelopmentOriginKey = "Images:DevelopmentOrigin";
     private const long BytesPerMegabyte = 1_048_576;
     private const long PixelsPerMegapixel = 1_000_000;
 
     /// <summary>
-    /// Reads the seven Images keys. A key that is absent takes the default; a key that is present but out of range, not a
-    /// whole number, or naming no usable host throws.
+    /// Reads the Images keys. A key that is absent takes the default; a key that is present but out of range, not a
+    /// whole number, or naming no usable host throws. The development origin is read only in the Development environment;
+    /// anywhere else it is left out and reported through <see cref="ImageOptions.DevelopmentOriginIgnored"/>, so a server
+    /// settings file can never widen where pictures are fetched from.
     /// </summary>
     /// <param name="configuration">The configuration to read.</param>
     /// <param name="environment">The hosting environment the app runs in.</param>
@@ -60,6 +65,8 @@ public static class ImageSettings
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(environment);
 
+        var isDevelopment = environment.IsDevelopment();
+
         return new ImageOptions(
             ReadHosts(configuration),
             ReadWholeNumber(configuration, MegabytesKey, 1, 50, 12) * BytesPerMegabyte,
@@ -68,7 +75,32 @@ public static class ImageSettings
             ReadWholeNumber(configuration, PerRunKey, 1, 1000, 80),
             TimeSpan.FromHours(ReadWholeNumber(configuration, RetryKey, 1, 720, 24)),
             TimeSpan.FromDays(ReadWholeNumber(configuration, GraceKey, 1, 365, 7)),
-            null);
+            isDevelopment ? ReadDevelopmentOrigin(configuration) : null,
+            !isDevelopment && !string.IsNullOrWhiteSpace(configuration[DevelopmentOriginKey]));
+    }
+
+    private static Uri? ReadDevelopmentOrigin(IConfiguration configuration)
+    {
+        var text = configuration[DevelopmentOriginKey];
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        if (!Uri.TryCreate(text.Trim(), UriKind.Absolute, out var origin)
+            || origin.Scheme is not ("http" or "https")
+            || origin.UserInfo.Length != 0
+            || origin.Query.Length != 0
+            || origin.Fragment.Length != 0
+            || origin.AbsolutePath != "/"
+            || text.Trim().Contains('#', StringComparison.Ordinal)
+            || text.Trim().Contains('?', StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException($"{DevelopmentOriginKey} must be an absolute http or https origin without a path, query or user information.");
+        }
+
+        return origin;
     }
 
     private static HashSet<string> ReadHosts(IConfiguration configuration)

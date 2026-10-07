@@ -97,6 +97,68 @@ public static class SyntheticBggCollection
     public static int Clamp(int size) =>
         Sizes.OrderBy(offered => Math.Abs(offered - size)).ThenBy(offered => offered).First();
 
+    private static readonly IReadOnlyDictionary<int, (SyntheticArtKind? Version, SyntheticArtKind? Main)> ReviewCases =
+        new Dictionary<int, (SyntheticArtKind? Version, SyntheticArtKind? Main)>
+        {
+            [0] = (SyntheticArtKind.FlatCover, SyntheticArtKind.FlatCover),
+            [1] = (SyntheticArtKind.FlatWide, SyntheticArtKind.FlatWide),
+            [6] = (SyntheticArtKind.FlatNarrow, SyntheticArtKind.FlatNarrow),
+            [7] = (SyntheticArtKind.BoxOnWhite, SyntheticArtKind.FlatCover),
+            [8] = (SyntheticArtKind.BoxOnGreyGradient, SyntheticArtKind.BoxOnGreyGradient),
+            [23] = (SyntheticArtKind.BoxOnBlack, null),
+            [10] = (SyntheticArtKind.WhiteFramed, SyntheticArtKind.WhiteFramed),
+            [11] = (SyntheticArtKind.AllWhite, SyntheticArtKind.AllWhite),
+            [12] = (SyntheticArtKind.NearBlack, SyntheticArtKind.NearBlack),
+            [13] = (SyntheticArtKind.MidGreen, SyntheticArtKind.MidGreen),
+            [15] = (SyntheticArtKind.Banner, SyntheticArtKind.Banner),
+            [16] = (SyntheticArtKind.Undecodable, SyntheticArtKind.Undecodable),
+            [17] = (null, null),
+            [18] = (SyntheticArtKind.BlackFramed, SyntheticArtKind.BlackFramed),
+            [20] = (SyntheticArtKind.BoxTransparent, SyntheticArtKind.FlatCover),
+            [21] = (SyntheticArtKind.GradientFullBleed, SyntheticArtKind.GradientFullBleed),
+        };
+
+    private static readonly SyntheticArtKind[] CycledMainKinds =
+        [SyntheticArtKind.FlatCover, SyntheticArtKind.FlatWide, SyntheticArtKind.FlatNarrow];
+
+    private static readonly SyntheticArtKind[] CycledVersionKinds =
+    [
+        SyntheticArtKind.FlatCover,
+        SyntheticArtKind.FlatWide,
+        SyntheticArtKind.BoxOnWhite,
+        SyntheticArtKind.FlatNarrow,
+        SyntheticArtKind.BoxOnGreyGradient,
+        SyntheticArtKind.BoxOnBlack,
+    ];
+
+    /// <summary>
+    /// Chooses the invented picture the fake serves for an entry, or null when the picture must answer not found. The
+    /// choice depends only on the entry's position in the collection, so it never changes between runs. These positions
+    /// carry fixed cases, as version picture then main picture: 0 a flat cover that matches its box, 1 a relatively wider
+    /// flat picture, 6 a relatively narrower one, 7 a 3D box on white with a flat main picture, 8 a 3D box on a grey
+    /// gradient with a 3D main picture, 23 a 3D box on black with no main picture, 10 a thick white frame, 11 an all-white
+    /// cover, 12 a near-black cover, 13 a mid-green cover, 15 a very wide banner, 16 an undecodable file, 17 pictures that
+    /// answer not found, 18 a thin black frame, 20 a 3D box on a transparent backdrop, 21 a full-bleed gradient. Every other
+    /// entry cycles through the flat kinds for its main picture and through a mix of flat and 3D kinds for its version picture.
+    /// </summary>
+    /// <param name="item">The collection entry.</param>
+    /// <param name="version">True for the entry's selected version picture, false for the game's main picture.</param>
+    public static SyntheticArtKind? ArtFor(FakeBggItem item, bool version)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+
+        var position = (int)Math.Max(0, item.CollId - FirstCollId);
+
+        if (ReviewCases.TryGetValue(position, out var fixedCase))
+        {
+            return version ? fixedCase.Version : fixedCase.Main;
+        }
+
+        return version
+            ? CycledVersionKinds[position % CycledVersionKinds.Length]
+            : CycledMainKinds[position % CycledMainKinds.Length];
+    }
+
     private static IEnumerable<FakeBggItem> EdgeCases()
     {
         yield return Entry(0, "Example Game 1", false, true, 1998, Dimensions(6.3, 8.27, 2.09), "Shelf A");
