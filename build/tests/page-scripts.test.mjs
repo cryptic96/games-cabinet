@@ -1632,6 +1632,111 @@ test('only a cover ever draws a picture', () => {
   assert.equal(spine.querySelector('.cover-art'), null);
 });
 
+const ART_COLOUR = Object.freeze({ background: '#bd1e28', text: '#ffffff' });
+const PALETTE_BACKGROUND = '#6b4f3a';
+const PALETTE_TEXT = '#ffffff';
+
+test('every kind of box except the marker takes the colour taken from its art', () => {
+  const kinds = ['spine', 'flatBox', 'expansionLayer', 'expansionSpine', 'orphanExpansion', 'cover'];
+  const buttons = drawPlacements(kinds.map((kind, index) => (
+    { kind, gameId: index + 1, entryId: index + 1, title: `Invented ${kind}`, label: `Invented ${kind}`, colour: ART_COLOUR }
+  )));
+
+  assert.equal(buttons.length, kinds.length);
+
+  for (const button of buttons) {
+    assert.equal(button.properties.get('--bg'), ART_COLOUR.background, button.dataset.kind);
+    assert.equal(button.properties.get('--fg'), ART_COLOUR.text, button.dataset.kind);
+  }
+});
+
+test('a black title is accepted next to an art colour', () => {
+  const [spine] = drawPlacements([
+    { kind: 'spine', gameId: 1, entryId: 1, title: 'Invented Lantern', label: 'Invented Lantern', colour: { background: '#f2c14e', text: '#000000' } },
+  ]);
+
+  assert.equal(spine.properties.get('--bg'), '#f2c14e');
+  assert.equal(spine.properties.get('--fg'), '#000000');
+});
+
+test('a colour that is not a lowercase hex background with a white or black title is ignored and the palette tone is kept', () => {
+  const invalid = [
+    { background: '#bd1e28', text: '#2a1a10' },
+    { background: '#bd1e28', text: '#FFFFFF' },
+    { background: 'red', text: '#ffffff' },
+    { background: 'url(x)', text: '#ffffff' },
+    { background: '#BD1E28', text: '#ffffff' },
+    { background: '#bd1', text: '#ffffff' },
+    { background: '#bd1e28; background: url(x)', text: '#ffffff' },
+    { background: '#bd1e28' },
+    { text: '#ffffff' },
+    null,
+    'text',
+  ];
+  const buttons = drawPlacements(invalid.map((colour, index) => (
+    { kind: 'spine', gameId: index + 1, entryId: index + 1, title: `Invented ${index}`, label: `Invented ${index}`, colour }
+  )));
+
+  assert.equal(buttons.length, invalid.length);
+
+  for (const button of buttons) {
+    assert.equal(button.properties.get('--bg'), PALETTE_BACKGROUND);
+    assert.equal(button.properties.get('--fg'), PALETTE_TEXT);
+  }
+});
+
+test('the marker ignores a colour and takes none of its own', () => {
+  const [marker] = drawPlacements([
+    { kind: 'moreMarker', gameId: 1, entryId: 1, title: 'Invented Lantern', label: '', moreCount: 3, colour: ART_COLOUR },
+  ]);
+
+  assert.equal(marker.properties.has('--bg'), false);
+  assert.equal(marker.properties.has('--fg'), false);
+});
+
+test('a cover with art takes the art colour and a failed picture keeps it while its edge bars go', () => {
+  const edges = { top: '#112233', right: '#223344', bottom: '#334455', left: '#445566' };
+  const [cover] = drawPlacements([
+    { kind: 'cover', gameId: 8, entryId: 80, title: 'Invented Orchard', label: 'Invented Orchard', colour: ART_COLOUR, art: artWith({ edges }) },
+  ]);
+  const image = cover.children[0];
+  const failure = image.listeners.find((listener) => listener.type === 'error');
+
+  assert.equal(cover.properties.get('--bg'), ART_COLOUR.background);
+  assert.equal(cover.properties.get('--fg'), ART_COLOUR.text);
+  assert.equal(cover.properties.get('--edge-t'), '#112233');
+
+  const previous = globalThis.document;
+  globalThis.document = cover.page;
+
+  try {
+    failure.handler();
+  } finally {
+    globalThis.document = previous;
+  }
+
+  assert.equal(cover.dataset.art, undefined);
+  assert.equal(cover.properties.get('--bg'), ART_COLOUR.background);
+  assert.equal(cover.properties.get('--fg'), ART_COLOUR.text);
+
+  for (const property of ['--edge-t', '--edge-r', '--edge-b', '--edge-l']) {
+    assert.equal(cover.properties.has(property), false, property);
+  }
+
+  assert.notEqual(cover.querySelector('.cover-plate'), null);
+});
+
+test('a generated cover of a game with a colour takes it, and one without keeps its palette tone', () => {
+  const [coloured, plain] = drawPlacements([
+    { kind: 'cover', gameId: 1, entryId: 1, title: 'Invented Lantern', label: 'Invented Lantern', colour: ART_COLOUR },
+    { kind: 'cover', gameId: 2, entryId: 2, title: 'Invented Quarry', label: 'Invented Quarry' },
+  ]);
+
+  assert.equal(coloured.properties.get('--bg'), ART_COLOUR.background);
+  assert.notEqual(coloured.querySelector('.cover-plate'), null);
+  assert.equal(plain.properties.get('--bg'), PALETTE_BACKGROUND);
+});
+
 test('the page scripts never write a style attribute or an inline handler', () => {
   for (const name of ['render.js', 'cabinet.js', 'sync.js', 'status.js', 'live.js', 'copy.js']) {
     const source = readFileSync(new URL('../../Cabinet.Service/wwwroot/js/' + name, import.meta.url), 'utf8');
@@ -1641,7 +1746,7 @@ test('the page scripts never write a style attribute or an inline handler', () =
   }
 
   const [cover] = drawPlacements([
-    { kind: 'cover', gameId: 8, entryId: 80, title: 'Invented Orchard', label: 'Invented Orchard', art: artWith({ edges: { top: '#112233', right: '#223344', bottom: '#334455', left: '#445566' } }) },
+    { kind: 'cover', gameId: 8, entryId: 80, title: 'Invented Orchard', label: 'Invented Orchard', colour: ART_COLOUR, art: artWith({ edges: { top: '#112233', right: '#223344', bottom: '#334455', left: '#445566' } }) },
   ]);
 
   for (const node of [cover, ...cover.descendants()]) {
