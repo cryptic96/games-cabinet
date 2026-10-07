@@ -77,7 +77,7 @@ public class SyncFailureTests
         (await SyncHarness.ReadStatus(client)).LastResult.Should().Be("failed");
         (await SyncRounds.ReadLayout(client)).Should().BeEquivalentTo(before);
         (await File.ReadAllBytesAsync(snapshotPath, TestContext.Current.CancellationToken)).Should().Equal(storedBefore);
-        handler.Requests.Should().HaveCount(4);
+        handler.Requests.Should().HaveCount(5, "two for the first sync, then the base call, the failing expansion call and its one retry");
     }
 
     [Fact]
