@@ -110,18 +110,18 @@ public class LiveHubTests
         await using var first = await LivePage.ConnectAsync(factory, transport);
         await using var second = await LivePage.ConnectAsync(factory, transport);
 
-        var refused = await TryConnectAsync(factory, transport);
+        await ExpectRefusedAsync(factory, transport);
 
-        refused.Should().BeNull("the third connection is not held open");
+        limiter.Count.Should().Be(2, "the refused connection took no place");
         using var press = await client.PostAsync(SyncHarness.SyncRoute, content: null, TestContext.Current.CancellationToken);
         await SyncHarness.WaitUntil(() => Task.FromResult(first.Received.Count >= 2 && second.Received.Count >= 2));
 
         await first.Connection.StopAsync(TestContext.Current.CancellationToken);
         await SyncHarness.WaitUntil(() => Task.FromResult(limiter.Count == 1));
-        var admitted = await TryConnectAsync(factory, transport);
+        await using var admitted = await LivePage.ConnectAsync(factory, transport);
+        await SyncHarness.WaitUntil(() => Task.FromResult(limiter.Count == 2));
 
-        admitted.Should().NotBeNull("a place was freed");
-        await admitted!.DisposeAsync();
+        admitted.Closed.IsCompleted.Should().BeFalse("a place was freed, so the connection is held open");
     }
 
     [Fact]
@@ -150,9 +150,9 @@ public class LiveHubTests
             .Should().BeEquivalentTo(status.Json.EnumerateObject().Select(property => property.Name));
     }
 
-    private static async Task<LivePage?> TryConnectAsync(CabinetWebApplicationFactory factory, HttpTransportType transport)
+    private static async Task ExpectRefusedAsync(CabinetWebApplicationFactory factory, HttpTransportType transport)
     {
-        var page = LivePage.Create(factory, transport);
+        await using var page = LivePage.Create(factory, transport);
 
         try
         {
@@ -160,20 +160,10 @@ public class LiveHubTests
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            await page.DisposeAsync();
-
-            return null;
+            return;
         }
 
-        var closedFirst = await Task.WhenAny(page.Closed, Task.Delay(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken));
-        if (closedFirst == page.Closed)
-        {
-            await page.DisposeAsync();
-
-            return null;
-        }
-
-        return page;
+        await page.Closed.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
     }
 
     /// <summary>A hub connection that keeps every status it is sent.</summary>
