@@ -117,9 +117,9 @@ public static class SyncEndpoints
         switch (coordinator.TryRequest(SyncTrigger.Manual))
         {
             case SyncRequestResult.Started:
-                var started = statusService.Current() with { Running = true };
-
-                return Results.Json(new { outcome = "started", status = started }, statusCode: StatusCodes.Status202Accepted);
+                return Results.Json(
+                    new { outcome = "started", status = statusService.Current() },
+                    statusCode: StatusCodes.Status202Accepted);
 
             case SyncRequestResult.CoolingDown cooling:
                 context.Response.Headers.RetryAfter = WholeSecondsUntil(cooling.Until, time.GetUtcNow())

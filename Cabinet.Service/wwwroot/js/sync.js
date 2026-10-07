@@ -5,11 +5,12 @@
  * whatever fetches one. Only the visitor's own press ever writes to the note; a failed status fetch simply leaves the last values.
  */
 import { COPY } from './copy.js';
-import { serverOffsetMs, elapsedSeconds, isStale, buttonState, countdownText, pressOutcome, shouldRedraw, isOutdatedStatus } from './status.js';
+import { serverOffsetMs, elapsedSeconds, isStale, buttonState, countdownText, pressOutcome, shouldRedraw, isOutdatedStatus, ownSyncStillWaiting } from './status.js';
 
 const REFRESH_INTERVAL_MS = 30000;
 const POLL_INTERVAL_MS = 5000;
 const POLL_LIMIT_MS = 600000;
+const PRESS_TIMEOUT_MS = 15000;
 const TICK_INTERVAL_MS = 1000;
 const OUTCOME_NOTES = Object.freeze({
   changed: COPY.noteChanged,
@@ -21,10 +22,9 @@ const OUTCOME_NOTES = Object.freeze({
 /**
  * Starts the sync block behaviour.
  * @param {HTMLElement} root The element carrying the first-paint state as data attributes.
- * @param {{ onCollectionChanged?: () => Promise<boolean | void> | void, isLiveConnected?: () => boolean }} [options] onCollectionChanged is
- *   called when the status shows a collection version that is not the one on screen; a result of false means the redraw did not
- *   happen and the next status tries again. isLiveConnected tells whether pushed statuses are arriving, so this page only checks
- *   the status itself after its own press while they are not.
+ * @param {{ onCollectionChanged?: () => Promise<boolean | void> | void }} [options] onCollectionChanged is called when the status
+ *   shows a collection version that is not the one on screen; a result of false means the redraw did not happen and the next
+ *   status tries again.
  * @returns {{ applyStatus: (status: object, options?: { ownPress?: boolean }) => void, refresh: () => void }} The status takers other scripts call.
  */
 export function initSyncStatus(root, options = {}) {
@@ -48,6 +48,7 @@ export function initSyncStatus(root, options = {}) {
   let pressing = false;
   let ownSyncPending = false;
   let pollTimer = null;
+  let pollGeneration = 0;
   let newestServerTimeMs = Date.parse(root.dataset.serverTime ?? '');
 
   if (!Number.isFinite(newestServerTimeMs)) {
@@ -216,8 +217,12 @@ export function initSyncStatus(root, options = {}) {
       if (drawn !== false) {
         shownVersion = version;
       }
+    } catch {
+      return;
     } finally {
-      redrawingVersion = null;
+      if (redrawingVersion === version) {
+        redrawingVersion = null;
+      }
     }
   }
 
@@ -306,38 +311,37 @@ export function initSyncStatus(root, options = {}) {
   }
 
   /**
-   * Whether pushed statuses are arriving right now.
-   * @returns {boolean}
-   */
-  function liveConnected() {
-    return typeof options.isLiveConnected === 'function' && options.isLiveConnected();
-  }
-
-  /**
    * Follows this page's accepted press until the sync ends or the longest plausible sync has passed, so the button can never stay
-   * on "Syncing..." for good. While pushed statuses arrive they end it; while they do not, the status is checked every few seconds.
+   * on "Syncing..." for good. The status is fetched at once and then every few seconds whether or not pushed statuses arrive, and
+   * once more when the time runs out, because a push can be lost and an answer can be older than the push that followed it.
    */
   function pollOwnSync() {
     const deadline = Date.now() + POLL_LIMIT_MS;
+
+    pollGeneration += 1;
+
+    const generation = pollGeneration;
 
     ownSyncPending = true;
     window.clearTimeout(pollTimer);
 
     const step = async () => {
-      if (!liveConnected()) {
-        await fetchStatus(true);
+      pollTimer = null;
+      await fetchStatus(ownSyncPending);
+
+      if (generation !== pollGeneration) {
+        return;
       }
 
-      if (!ownSyncPending || Date.now() >= deadline) {
+      if (!ownSyncStillWaiting(ownSyncPending, Date.now(), deadline)) {
         ownSyncPending = false;
-        pollTimer = null;
         return;
       }
 
       pollTimer = window.setTimeout(step, POLL_INTERVAL_MS);
     };
 
-    pollTimer = window.setTimeout(step, POLL_INTERVAL_MS);
+    pollTimer = window.setTimeout(step, 0);
   }
 
   /**
@@ -387,40 +391,44 @@ export function initSyncStatus(root, options = {}) {
     }
 
     pressing = true;
-    ownSyncPending = true;
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), PRESS_TIMEOUT_MS);
 
     try {
-      const response = await fetch('/cabinet/sync', { method: 'POST' });
+      const response = await fetch('/cabinet/sync', { method: 'POST', signal: controller.signal });
       const answer = await readAnswer(response);
+      const accepted = response.status === 202;
+
+      if (accepted) {
+        ownSyncPending = true;
+      }
 
       if (answer !== null && typeof answer.status === 'object' && answer.status !== null) {
         applyStatus(answer.status);
       }
 
-      if (response.status === 202) {
+      if (accepted) {
         if (ownSyncPending) {
           say('');
           pollOwnSync();
         }
       } else if (response.status === 409) {
-        ownSyncPending = false;
         say(COPY.noteRunning);
       } else if (response.status === 429) {
-        ownSyncPending = false;
-
         if (answer === null || answer.status === undefined) {
           adoptRetryAfter(response);
         }
 
         say(COPY.youCanSyncAgain(currentState().remainingMs));
       } else {
-        ownSyncPending = false;
         say(COPY.noteOffline);
       }
     } catch {
       ownSyncPending = false;
       say(COPY.noteOffline);
     } finally {
+      window.clearTimeout(timeout);
       pressing = false;
     }
   }

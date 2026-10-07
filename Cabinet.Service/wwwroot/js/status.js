@@ -139,6 +139,18 @@ export function isOutdatedStatus(newestServerTimeMs, status) {
   return Number.isFinite(at) && at < newestServerTimeMs;
 }
 
+/**
+ * Whether the page should keep following the visitor's own press: while the press has not reached its outcome and the longest
+ * plausible sync has not passed.
+ * @param {boolean} pending Whether the press is still waiting for its outcome.
+ * @param {number} nowMs The visitor's clock now.
+ * @param {number} deadlineMs When to stop following the press, on the same clock.
+ * @returns {boolean}
+ */
+export function ownSyncStillWaiting(pending, nowMs, deadlineMs) {
+  return pending === true && nowMs < deadlineMs;
+}
+
 const RECONNECT_DELAYS_MS = Object.freeze([0, 2000, 10000, 30000]);
 const STEADY_RECONNECT_DELAY_MS = 60000;
 
