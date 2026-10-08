@@ -1,5 +1,6 @@
 using Cabinet.Domain.Layout;
 using Cabinet.Domain.Samples;
+using Cabinet.FakeBgg;
 using FluentAssertions;
 
 namespace Cabinet.UnitTests.Layout;
@@ -20,7 +21,7 @@ public class FamilyLayoutTests
     [Theory]
     [MemberData(nameof(LargeSamples))]
     [Trait("Category", "Layout")]
-    public void Every_expansion_with_an_owned_base_is_an_upright_a_layer_right_of_the_uprights_or_counted_in_its_marker(string name)
+    public void Every_expansion_with_an_owned_base_is_an_upright_a_layer_right_of_the_uprights_a_layer_next_door_or_counted_in_its_marker(string name)
     {
         SyntheticCollections.TryGetSample(name, out var items);
         var layout = CabinetLayoutEngine.Build(items, Design);
@@ -33,12 +34,13 @@ public class FamilyLayoutTests
             var baseEntry = placed.Single(entry => entry.Placement.GameId == family.Key && IsStanding(entry.Placement));
             var uprights = UprightsOf(placed, family.Key);
             var layers = LayersOf(placed, family.Key);
-            var marker = placed.SingleOrDefault(entry => entry.Placement.Kind == PlacementKind.MoreMarker && entry.Placement.FamilyId == family.Key);
+            var markers = placed.Where(entry => entry.Placement.Kind == PlacementKind.MoreMarker && entry.Placement.FamilyId == family.Key).ToList();
             var columnX = baseEntry.Placement.XMm + baseEntry.Placement.WidthMm + uprights.Sum(upright => upright.Placement.WidthMm);
 
-            layers.Should().OnlyContain(layer => layer.Placement.XMm == columnX, "family {0}", family.Key);
+            layers.Where(layer => layer.Cubby == baseEntry.Cubby).Should().OnlyContain(layer => layer.Placement.XMm == columnX, "family {0}", family.Key);
+            layers.Where(layer => layer.Cubby != baseEntry.Cubby).Should().OnlyContain(layer => layer.Placement.XMm == 0, "family {0}", family.Key);
             layers.Should().OnlyContain(layer => layer.Placement.WidthMm == Design.StackColumnWidthMm);
-            (uprights.Count + layers.Count + (marker.Placement?.MoreCount ?? 0)).Should().Be(family.Count(), "family {0}", family.Key);
+            (uprights.Count + layers.Count + markers.Sum(marker => marker.Placement.MoreCount ?? 0)).Should().Be(family.Count(), "family {0}", family.Key);
         }
 
         familyCount.Should().BeGreaterThan(0);
@@ -97,38 +99,49 @@ public class FamilyLayoutTests
         foreach (var family in FamiliesOf(items))
         {
             var baseEntry = placed.Single(entry => entry.Placement.GameId == family.Key && IsStanding(entry.Placement));
-            var cubbyHeight = layout.Sections[baseEntry.Section].Cubbies[baseEntry.Cubby].HeightMm;
-            var layers = LayersOf(placed, family.Key);
             var uprightIds = UprightsOf(placed, family.Key).Select(entry => entry.Placement.GameId).ToHashSet();
             var stacked = family
                 .Where(item => !uprightIds.Contains(item.BggId))
                 .OrderBy(item => item.CollectionId).ThenBy(item => item.BggId)
                 .Select(item => item.BggId)
                 .ToList();
-            var shown = stacked.Take(layers.Count).ToList();
-            var expected = shown
-                .OrderByDescending(id => layers.Single(layer => layer.Placement.GameId == id).Placement.HeightMm)
-                .ThenBy(id => stacked.IndexOf(id));
-            var top = 0;
+            var columns = LayersOf(placed, family.Key)
+                .GroupBy(layer => (layer.Section, layer.Cubby))
+                .OrderBy(group => group.Key.Cubby == baseEntry.Cubby ? 0 : 1)
+                .ToList();
+            var taken = 0;
 
-            layers.Select(layer => layer.Placement.GameId).Should().Equal(
-                expected, "family {0} shows its earliest stacked expansions, thickest at the bottom", family.Key);
-
-            foreach (var layer in layers)
+            foreach (var column in columns)
             {
-                layer.Placement.YMm.Should().Be(top, "layers of family {0} touch from the floor up", family.Key);
-                top += layer.Placement.HeightMm;
+                var cubbyHeight = layout.Sections[column.Key.Section].Cubbies.Single(cubby => cubby.Index == column.Key.Cubby).HeightMm;
+                var layers = column.OrderBy(layer => layer.Placement.YMm).ToList();
+                var shown = stacked.Skip(taken).Take(layers.Count).ToList();
+                var expected = shown
+                    .OrderByDescending(id => layers.Single(layer => layer.Placement.GameId == id).Placement.HeightMm)
+                    .ThenBy(id => stacked.IndexOf(id));
+                var top = 0;
+
+                taken += layers.Count;
+                layers.Select(layer => layer.Placement.GameId).Should().Equal(
+                    expected, "family {0} shows its earliest stacked expansions, thickest at the bottom of each column", family.Key);
+
+                foreach (var layer in layers)
+                {
+                    layer.Placement.YMm.Should().Be(top, "layers of family {0} touch from the floor up", family.Key);
+                    top += layer.Placement.HeightMm;
+                }
+
+                var marker = placed.SingleOrDefault(entry => entry.Placement.Kind == PlacementKind.MoreMarker
+                    && entry.Placement.FamilyId == family.Key && (entry.Section, entry.Cubby) == column.Key);
+
+                if (marker.Placement is not null)
+                {
+                    marker.Placement.YMm.Should().Be(top, "the marker sits on the top layer of family {0}", family.Key);
+                    top += marker.Placement.HeightMm;
+                }
+
+                top.Should().BeLessThanOrEqualTo(cubbyHeight, "family {0} stays under the shelf above", family.Key);
             }
-
-            var marker = placed.SingleOrDefault(entry => entry.Placement.Kind == PlacementKind.MoreMarker && entry.Placement.FamilyId == family.Key);
-
-            if (marker.Placement is not null)
-            {
-                marker.Placement.YMm.Should().Be(top, "the marker sits on the top layer of family {0}", family.Key);
-                top += marker.Placement.HeightMm;
-            }
-
-            top.Should().BeLessThanOrEqualTo(cubbyHeight, "family {0} stays under the shelf above", family.Key);
         }
     }
 
@@ -234,8 +247,8 @@ public class FamilyLayoutTests
         var layout = CabinetLayoutEngine.Build(items, Design, options);
 
         var placed = LayoutAssertions.PlacementsWithPosition(layout);
-        var biggest = FamiliesOf(items).Max(family => LayersOf(placed, family.Key).Count);
-        biggest.Should().BeLessThanOrEqualTo(stackMax);
+        var biggest = FamiliesOf(items).Max(family => LayersOf(placed, family.Key).GroupBy(layer => (layer.Section, layer.Cubby)).Select(column => column.Count()).DefaultIfEmpty(0).Max());
+        biggest.Should().BeLessThanOrEqualTo(stackMax, "each column of a family shows at most the setting");
         LayoutAssertions.AssertValid(layout, items);
     }
 
@@ -284,7 +297,8 @@ public class FamilyLayoutTests
         var baseEntry = placed.Single(entry => entry.Placement.GameId == earlier.ParentId && IsStanding(entry.Placement));
         var layer = placed.Single(entry => entry.Placement.GameId == earlier.Expansion.BggId);
         layer.Placement.Kind.Should().BeOneOf(PlacementKind.ExpansionLayer, PlacementKind.ExpansionSpine);
-        (layer.Section, layer.Cubby).Should().Be((baseEntry.Section, baseEntry.Cubby));
+        layer.Section.Should().Be(baseEntry.Section);
+        layer.Cubby.Should().BeInRange(baseEntry.Cubby, baseEntry.Cubby + 1, "the layer stands in the cubby of its base game or the next one");
     }
 
     [Fact]
@@ -680,6 +694,252 @@ public class FamilyLayoutTests
         upright.Placement.Kind.Should().Be(PlacementKind.ExpansionSpine);
         upright.Placement.HeightMm.Should().BeLessThanOrEqualTo(Design.Limits.MaxHeightMm);
         LayoutAssertions.AssertValid(layout, items);
+    }
+
+    public static TheoryData<string, string> InvariantCollections
+    {
+        get
+        {
+            var data = new TheoryData<string, string>();
+
+            foreach (var name in InvariantNames)
+            {
+                data.Add(name, SectionDesigns.DesktopName);
+                data.Add(name, SectionDesigns.PhoneName);
+            }
+
+            return data;
+        }
+    }
+
+    private static readonly string[] InvariantNames =
+    [
+        "sample-65",
+        "sample-400",
+        "random-1-150-20",
+        "random-2-150-40",
+        "random-3-200-35",
+        "random-4-120-60",
+        "random-5-300-25",
+        "random-6-80-50",
+        "fake-65",
+        "fake-400",
+    ];
+
+    private static IReadOnlyList<CabinetItem> ItemsFor(string name)
+    {
+        var parts = name.Split('-');
+
+        switch (parts[0])
+        {
+            case "sample":
+                SyntheticCollections.TryGetSample(parts[1], out var sample);
+
+                return sample;
+            case "fake":
+                return FakeCollectionItems.Map(SyntheticBggCollection.Create(int.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture)));
+            default:
+                return SyntheticCollections.Random(
+                    int.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture),
+                    int.Parse(parts[2], System.Globalization.CultureInfo.InvariantCulture),
+                    int.Parse(parts[3], System.Globalization.CultureInfo.InvariantCulture));
+        }
+    }
+
+    private static SectionDesign RowDesign(params int[] cubbyWidthsMm) =>
+        new("test", cubbyWidthsMm.Sum() + (20 * (cubbyWidthsMm.Length - 1)), 20, [new ShelfRow(300, cubbyWidthsMm)]) { StackColumnWidthMm = 140 };
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_stack_that_would_hide_expansions_continues_in_a_second_column_at_the_left_edge_of_the_next_cubby()
+    {
+        var design = RowDesign(300, 300);
+        var baseGame = BaseOf(1, depth: 40);
+        var expansions = Enumerable.Range(0, 8).Select(index => ExpansionOf(10 + index, baseGame, depth: 45)).ToList();
+        var items = new List<CabinetItem>([baseGame, .. expansions]);
+
+        var layout = CabinetLayoutEngine.Build(items, design, SpinesOnly);
+
+        var first = layout.Sections[0].Cubbies[0].Placements;
+        var second = layout.Sections[0].Cubbies[1].Placements;
+        first.Where(placement => placement.Kind == PlacementKind.ExpansionLayer).Select(placement => placement.GameId)
+            .Should().BeEquivalentTo([10, 11, 12, 13, 14, 15], "the family's own column shows every layer that fits under its shelf");
+        second.Where(placement => placement.Kind == PlacementKind.ExpansionLayer).Select(placement => placement.GameId)
+            .Should().BeEquivalentTo([16, 17], "the next expansions in collection order continue in the next cubby");
+        second.Should().OnlyContain(placement => placement.XMm == 0 && placement.FamilyId == 1);
+        layout.Sections[0].Cubbies.SelectMany(cubby => cubby.Placements).Should().NotContain(placement => placement.Kind == PlacementKind.MoreMarker);
+        LayoutAssertions.AssertValid(layout, items);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void The_marker_sits_on_the_second_column_and_counts_only_what_fits_nowhere()
+    {
+        var design = RowDesign(300, 300);
+        var baseGame = BaseOf(1, depth: 40);
+        var items = new List<CabinetItem>([baseGame, .. Enumerable.Range(0, 20).Select(index => ExpansionOf(10 + index, baseGame, depth: 45))]);
+
+        var layout = CabinetLayoutEngine.Build(items, design, SpinesOnly);
+
+        var first = layout.Sections[0].Cubbies[0].Placements;
+        var second = layout.Sections[0].Cubbies[1].Placements;
+        first.Count(placement => placement.Kind == PlacementKind.ExpansionLayer).Should().Be(6);
+        first.Should().NotContain(placement => placement.Kind == PlacementKind.MoreMarker);
+        second.Count(placement => placement.Kind == PlacementKind.ExpansionLayer).Should().Be(5);
+        second.Single(placement => placement.Kind == PlacementKind.MoreMarker).MoreCount.Should().Be(9);
+        LayoutAssertions.AssertValid(layout, items);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_family_in_a_cubby_with_no_neighbour_on_its_shelf_keeps_its_marker()
+    {
+        var design = RowDesign(600);
+        var baseGame = BaseOf(1, depth: 40);
+        var items = new List<CabinetItem>([baseGame, .. Enumerable.Range(0, 8).Select(index => ExpansionOf(10 + index, baseGame, depth: 45))]);
+
+        var layout = CabinetLayoutEngine.Build(items, design, SpinesOnly);
+
+        var placements = layout.Sections[0].Cubbies[0].Placements;
+        placements.Count(placement => placement.Kind == PlacementKind.ExpansionLayer).Should().Be(5);
+        placements.Single(placement => placement.Kind == PlacementKind.MoreMarker).MoreCount.Should().Be(3);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_family_in_the_last_cubby_of_a_shelf_row_keeps_its_marker_even_when_the_row_below_has_room()
+    {
+        var design = new SectionDesign("test", 620, 20, [new ShelfRow(300, [300, 300]), new ShelfRow(300, [300, 300])]) { StackColumnWidthMm = 140 };
+        var items = new List<CabinetItem>([BaseOf(1, depth: 150), BaseOf(2, depth: 150)]);
+        var baseGame = BaseOf(3, depth: 40);
+        items.Add(baseGame);
+        items.AddRange(Enumerable.Range(0, 8).Select(index => ExpansionOf(10 + index, baseGame, depth: 45)));
+
+        var layout = CabinetLayoutEngine.Build(items, design, SpinesOnly);
+
+        var home = layout.Sections[0].Cubbies.Single(cubby => cubby.Placements.Any(placement => placement.GameId == 3 && placement.Kind == PlacementKind.Spine));
+        home.Index.Should().Be(1, "the first cubby is full, so the family goes to the last cubby of the row");
+        home.Placements.Single(placement => placement.Kind == PlacementKind.MoreMarker).MoreCount.Should().Be(3);
+        layout.Sections[0].Cubbies.Single(cubby => cubby.Index == 2).Placements.Should().BeEmpty();
+        LayoutAssertions.AssertValid(layout, items);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_column_that_does_not_fit_beside_the_game_stands_at_the_left_edge_of_the_next_cubby()
+    {
+        var design = RowDesign(200, 300);
+        var filler = BaseOf(1, depth: 41);
+        var baseGame = BaseOf(2, depth: 40);
+        var items = new List<CabinetItem>(
+            [filler, baseGame, ExpansionOf(10, baseGame, depth: 60), ExpansionOf(11, baseGame, depth: 45), ExpansionOf(12, baseGame, depth: 45)]);
+
+        var layout = CabinetLayoutEngine.Build(items, design, SpinesOnly);
+
+        var first = layout.Sections[0].Cubbies[0].Placements;
+        var second = layout.Sections[0].Cubbies[1].Placements;
+        first.Select(placement => placement.GameId).Should().BeEquivalentTo([1, 2, 10], "the game and its upright stand in the first cubby");
+        first.Single(placement => placement.GameId == 2).XMm.Should().BeGreaterThan(first.Single(placement => placement.GameId == 1).XMm, "the family stands last");
+        second.Select(placement => placement.GameId).Should().BeEquivalentTo([11, 12]);
+        second.Should().OnlyContain(placement => placement.XMm == 0 && placement.Kind == PlacementKind.ExpansionLayer);
+        LayoutAssertions.AssertValid(layout, items);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_game_that_arrives_after_a_family_with_its_column_next_door_stands_before_the_family()
+    {
+        var design = RowDesign(200, 300);
+        var filler = BaseOf(1, depth: 41);
+        var baseGame = BaseOf(2, depth: 40);
+        var later = BaseOf(3, depth: 41);
+        var items = new List<CabinetItem>(
+            [filler, baseGame, later, ExpansionOf(10, baseGame, depth: 60), ExpansionOf(11, baseGame, depth: 45)]);
+
+        var layout = CabinetLayoutEngine.Build(items, design, SpinesOnly);
+
+        var first = layout.Sections[0].Cubbies[0].Placements;
+        first.Select(placement => placement.GameId).Should().BeEquivalentTo([1, 2, 3, 10]);
+        first.Single(placement => placement.GameId == 3).XMm.Should().BeLessThan(first.Single(placement => placement.GameId == 2).XMm);
+        first.Single(placement => placement.GameId == 10).XMm.Should().Be(first.Single(placement => placement.GameId == 2).XMm + 40);
+        LayoutAssertions.AssertValid(layout, items);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_column_standing_next_door_overflows_into_its_own_marker_and_never_into_a_third_cubby()
+    {
+        var design = new SectionDesign("test", 840, 20, [new ShelfRow(300, [200, 300, 300])]) { StackColumnWidthMm = 140 };
+        var filler = BaseOf(1, depth: 41);
+        var baseGame = BaseOf(2, depth: 40);
+        var items = new List<CabinetItem>([filler, baseGame, ExpansionOf(10, baseGame, depth: 60)]);
+        items.AddRange(Enumerable.Range(0, 12).Select(index => ExpansionOf(11 + index, baseGame, depth: 45)));
+
+        var layout = CabinetLayoutEngine.Build(items, design, SpinesOnly);
+
+        var second = layout.Sections[0].Cubbies[1].Placements;
+        second.Count(placement => placement.Kind == PlacementKind.ExpansionLayer).Should().Be(5);
+        second.Single(placement => placement.Kind == PlacementKind.MoreMarker).MoreCount.Should().Be(7);
+        layout.Sections[0].Cubbies[2].Placements.Should().BeEmpty("a family never reaches a third cubby");
+        LayoutAssertions.AssertValid(layout, items);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_family_whose_game_and_upright_fit_no_cubby_with_a_neighbour_goes_to_the_first_cubby_that_takes_it_whole()
+    {
+        var design = RowDesign(90, 300);
+        var baseGame = BaseOf(1, depth: 40);
+        var items = new List<CabinetItem>([baseGame, ExpansionOf(10, baseGame, depth: 60), ExpansionOf(11, baseGame, depth: 45)]);
+
+        var layout = CabinetLayoutEngine.Build(items, design, SpinesOnly);
+
+        layout.Sections[0].Cubbies[0].Placements.Should().BeEmpty("the game and its upright are wider than the first cubby");
+        layout.Sections[0].Cubbies[1].Placements.Select(placement => placement.GameId).Should().BeEquivalentTo([1, 10, 11]);
+        LayoutAssertions.AssertValid(layout, items);
+    }
+
+    [Theory]
+    [MemberData(nameof(InvariantCollections))]
+    [Trait("Category", "Layout")]
+    public void Every_family_stays_within_its_cubby_and_the_next_one_on_the_same_shelf(string name, string profile)
+    {
+        var items = ItemsFor(name);
+        SectionDesigns.TryGet(profile, out var design).Should().BeTrue();
+
+        foreach (var options in new[] { LayoutOptions.Default, SpinesOnly, SpinesOnly with { ExpansionStackMax = 3 } })
+        {
+            var layout = CabinetLayoutEngine.Build(items, design!, options);
+
+            LayoutAssertions.AssertValid(layout, items);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void The_invariant_covers_collections_in_which_families_use_the_next_cubby()
+    {
+        var spilled = 0;
+
+        foreach (var profile in new[] { SectionDesigns.Desktop, SectionDesigns.Phone })
+        {
+            foreach (var name in InvariantNames)
+            {
+                var layout = CabinetLayoutEngine.Build(ItemsFor(name), profile, SpinesOnly);
+                var placed = LayoutAssertions.PlacementsWithPosition(layout);
+
+                spilled += placed
+                    .Where(entry => entry.Placement.Kind is PlacementKind.ExpansionLayer or PlacementKind.MoreMarker)
+                    .Where(entry => placed.Any(other => other.Placement.GameId == entry.Placement.FamilyId
+                        && other.Placement.Kind is PlacementKind.Cover or PlacementKind.Spine
+                        && (other.Section, other.Cubby) != (entry.Section, entry.Cubby)))
+                    .Select(entry => entry.Placement.FamilyId)
+                    .Distinct()
+                    .Count();
+            }
+        }
+
+        spilled.Should().BeGreaterThan(5, "the sample collections hold families that continue in the next cubby");
     }
 
     private static PlacementKind ToKind(BoxPose pose) =>

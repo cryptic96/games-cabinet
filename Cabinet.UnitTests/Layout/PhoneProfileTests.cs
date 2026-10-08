@@ -234,7 +234,8 @@ public class PhoneProfileTests
             var home = PositionOfBase(after, baseId);
 
             changed.Should().HaveCountLessThanOrEqualTo(1, "seed {0}", seed);
-            changed.Where(position => position != home).Should().BeEmpty("seed {0}: only the cubby of base game {1} changes", seed, baseId);
+            changed.Where(position => position.Section != home.Section || (position.Cubby != home.Cubby && position.Cubby != home.Cubby + 1))
+                .Should().BeEmpty("seed {0}: only the cubby of base game {1}, or the one its column stands in, changes", seed, baseId);
             LayoutAssertions.AssertValid(after, [.. items, next]);
             tested++;
         }

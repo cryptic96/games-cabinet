@@ -155,20 +155,19 @@ internal static class LayoutAssertions
         List<(int Section, int Cubby, Placement Placement)> standing,
         IReadOnlyList<(int Section, int Cubby, Placement Placement)> placed)
     {
-        var baseEntry = standing.Single(entry => entry.Placement.GameId == baseId);
+        var baseEntry = standing.Where(entry => entry.Placement.GameId == baseId).OrderBy(entry => entry.Placement.EntryId).First();
         var members = placed.Where(entry => entry.Placement.FamilyId == baseId
             && entry.Placement.Kind is PlacementKind.ExpansionLayer or PlacementKind.MoreMarker or PlacementKind.ExpansionSpine).ToList();
-        var layers = members.Where(entry => entry.Placement.Kind == PlacementKind.ExpansionLayer).ToList();
-        var uprights = members.Where(entry => entry.Placement.Kind == PlacementKind.ExpansionSpine)
-            .OrderBy(entry => entry.Placement.XMm).ToList();
-        var markers = members.Where(entry => entry.Placement.Kind == PlacementKind.MoreMarker).ToList();
+        var home = members.Where(entry => entry.Section == baseEntry.Section && entry.Cubby == baseEntry.Cubby).ToList();
+        var away = members.Where(entry => !home.Contains(entry)).ToList();
+        var uprights = home.Where(entry => entry.Placement.Kind == PlacementKind.ExpansionSpine).OrderBy(entry => entry.Placement.XMm).ToList();
 
-        members.Should().OnlyContain(
-            entry => entry.Section == baseEntry.Section && entry.Cubby == baseEntry.Cubby,
-            "uprights, layers and the marker of family {0} stand in the cubby of their base game", baseId);
+        AssertAwayMembersStandNextDoor(layout, baseId, baseEntry, away, placed);
         members.Select(entry => entry.Placement.GameId).Where(id => id != baseId).Should().OnlyContain(id => expansionIds.Contains(id));
-        markers.Should().HaveCountLessThanOrEqualTo(1, "family {0} has at most one marker", baseId);
-        (layers.Count + uprights.Count + markers.Sum(entry => entry.Placement.MoreCount ?? 0))
+        members.Where(entry => entry.Placement.Kind == PlacementKind.MoreMarker).Should()
+            .HaveCountLessThanOrEqualTo(1, "family {0} has at most one marker", baseId);
+        (members.Count(entry => entry.Placement.Kind is PlacementKind.ExpansionLayer or PlacementKind.ExpansionSpine)
+            + members.Sum(entry => entry.Placement.MoreCount ?? 0))
             .Should().Be(expansionIds.Count, "family {0} counts each of its expansions once", baseId);
         uprights.Should().HaveCountLessThanOrEqualTo(Orientation.MaxUprightExpansions, "family {0} has at most two uprights", baseId);
 
@@ -182,14 +181,15 @@ internal static class LayoutAssertions
             edge += upright.Placement.WidthMm;
         }
 
-        members.Where(entry => entry.Placement.Kind is PlacementKind.ExpansionLayer or PlacementKind.MoreMarker)
-            .Should().OnlyContain(entry => entry.Placement.XMm == edge, "the stack column of family {0} starts after the last upright", baseId);
+        var homeColumn = home.Where(entry => entry.Placement.Kind is PlacementKind.ExpansionLayer or PlacementKind.MoreMarker).ToList();
 
-        AssertStackOrder(baseId, expansionIds, uprights.Select(entry => entry.Placement.GameId).ToList(), layers, markers);
+        homeColumn.Should().OnlyContain(entry => entry.Placement.XMm == edge, "the stack column of family {0} starts after the last upright", baseId);
+
+        AssertStackOrder(baseId, expansionIds, uprights.Select(entry => entry.Placement.GameId).ToList(), homeColumn, away);
 
         if (SectionDesigns.TryGet(layout.Profile, out var design))
         {
-            var columnWidth = members.Any(entry => entry.Placement.Kind != PlacementKind.ExpansionSpine) ? design.StackColumnWidthMm : 0;
+            var columnWidth = homeColumn.Count > 0 ? design.StackColumnWidthMm : 0;
 
             (edge + columnWidth - baseEntry.Placement.XMm).Should().BeLessThanOrEqualTo(
                 design.Limits.MaxWidthMm, "family {0} stays within the widest box the design holds", baseId);
@@ -197,15 +197,80 @@ internal static class LayoutAssertions
         }
     }
 
+    /// <summary>
+    /// Checks the members of a family that stand away from its base game: they lie in the next cubby to the right on the
+    /// same shelf row and in no other cubby, they are layers and at most one marker in a single column at the cubby's left
+    /// edge, and the family stands last in the cubby of its base game so the column is right beside it.
+    /// </summary>
+    private static void AssertAwayMembersStandNextDoor(
+        CabinetLayout layout,
+        int baseId,
+        (int Section, int Cubby, Placement Placement) baseEntry,
+        List<(int Section, int Cubby, Placement Placement)> away,
+        IReadOnlyList<(int Section, int Cubby, Placement Placement)> placed)
+    {
+        if (away.Count == 0)
+        {
+            return;
+        }
+
+        var section = layout.Sections.Single(candidate => candidate.Index == baseEntry.Section);
+        var homeCubby = section.Cubbies.Single(candidate => candidate.Index == baseEntry.Cubby);
+        var nextCubby = section.Cubbies.Single(candidate => candidate.Index == baseEntry.Cubby + 1);
+
+        away.Should().OnlyContain(
+            entry => entry.Section == baseEntry.Section && entry.Cubby == nextCubby.Index,
+            "family {0} reaches only the next cubby of its section", baseId);
+        nextCubby.YMm.Should().Be(homeCubby.YMm, "the next cubby of family {0} is on the same shelf row", baseId);
+        away.Should().OnlyContain(
+            entry => entry.Placement.Kind == PlacementKind.ExpansionLayer || entry.Placement.Kind == PlacementKind.MoreMarker,
+            "only layers and the marker of family {0} stand in the next cubby", baseId);
+        away.Should().OnlyContain(entry => entry.Placement.XMm == 0, "the column of family {0} starts at the left edge of the next cubby", baseId);
+        away.Count(entry => entry.Placement.Kind == PlacementKind.MoreMarker).Should().BeLessThanOrEqualTo(1);
+
+        placed.Where(entry => entry.Section == baseEntry.Section && entry.Cubby == baseEntry.Cubby && entry.Placement.FamilyId != baseId)
+            .Should().OnlyContain(
+                entry => entry.Placement.XMm + entry.Placement.WidthMm <= baseEntry.Placement.XMm,
+                "family {0} stands last in its cubby when its column stands next door", baseId);
+        placed.Where(entry => entry.Section == baseEntry.Section && entry.Cubby == nextCubby.Index && entry.Placement.XMm == 0
+                && entry.Placement.Kind is PlacementKind.ExpansionLayer or PlacementKind.MoreMarker)
+            .Select(entry => entry.Placement.FamilyId)
+            .Distinct()
+            .Should().ContainSingle("one family column stands at the left edge of a cubby");
+    }
+
     private static void AssertStackOrder(
         int baseId,
         IReadOnlyList<int> expansionIdsInCollectionOrder,
         IReadOnlyList<int> uprightIds,
+        IReadOnlyList<(int Section, int Cubby, Placement Placement)> homeColumn,
+        IReadOnlyList<(int Section, int Cubby, Placement Placement)> awayColumn)
+    {
+        var stacked = expansionIdsInCollectionOrder.Where(id => !uprightIds.Contains(id)).ToList();
+        var homeLayers = homeColumn.Where(entry => entry.Placement.Kind == PlacementKind.ExpansionLayer).ToList();
+        var awayLayers = awayColumn.Where(entry => entry.Placement.Kind == PlacementKind.ExpansionLayer).ToList();
+
+        AssertColumnOrder(baseId, stacked, stacked.Take(homeLayers.Count).ToList(), homeLayers, homeColumn.Where(entry => entry.Placement.Kind == PlacementKind.MoreMarker).ToList());
+        AssertColumnOrder(
+            baseId,
+            stacked,
+            stacked.Skip(homeLayers.Count).Take(awayLayers.Count).ToList(),
+            awayLayers,
+            awayColumn.Where(entry => entry.Placement.Kind == PlacementKind.MoreMarker).ToList());
+
+        if (awayColumn.Count > 0)
+        {
+            homeColumn.Should().NotContain(entry => entry.Placement.Kind == PlacementKind.MoreMarker, "the marker of family {0} sits on its last column", baseId);
+        }
+    }
+
+    private static void AssertColumnOrder(
+        int baseId,
+        List<int> stacked,
+        List<int> shown,
         IReadOnlyList<(int Section, int Cubby, Placement Placement)> layers,
         IReadOnlyList<(int Section, int Cubby, Placement Placement)> markers)
     {
-        var stacked = expansionIdsInCollectionOrder.Where(id => !uprightIds.Contains(id)).ToList();
-        var shown = stacked.Take(layers.Count).ToList();
         var fromFloor = layers.OrderBy(entry => entry.Placement.YMm).Select(entry => entry.Placement).ToList();
         var expectedOrder = shown
             .OrderByDescending(id => fromFloor.Single(placement => placement.GameId == id).HeightMm)

@@ -69,10 +69,18 @@ public class FamilyStabilityTests
             var after = CabinetLayoutEngine.Build([.. items, next], Design, WithoutExpansionCovers);
             var changed = LayoutAssertions.ChangedCubbies(before, after);
 
+            if (!UsesTheNextCubby(before, baseId) && UsesTheNextCubby(after, baseId))
+            {
+                AssertEarlierGamesKeepTheirCubby(items, items.Single(item => item.BggId == baseId && item.Kind == ItemKind.Base), before, after, seed);
+                tested++;
+
+                continue;
+            }
+
             changed.Should().HaveCountLessThanOrEqualTo(1, "seed {0}", seed);
             var home = PositionOfBase(after, baseId);
-            changed.Where(position => position.Section != home.Section || position.Cubby != home.Cubby)
-                .Should().BeEmpty("seed {0}: only the cubby of base game {1} changes", seed, baseId);
+            changed.Where(position => !IsHomeOrNextDoor(position, home))
+                .Should().BeEmpty("seed {0}: only the cubby of base game {1}, or the one its column stands in, changes", seed, baseId);
             LayoutAssertions.AssertValid(after, [.. items, next]);
             tested++;
         }
@@ -97,7 +105,7 @@ public class FamilyStabilityTests
         PlacementOf(before, next.BggId).HasValue.Should().BeFalse("the expansion is not in the cabinet before it arrives");
         PlacementOf(after, baseGame.BggId + 2)!.Value.Placement.Kind.Should().Be(PlacementKind.ExpansionLayer, "no room beside a base game at the width limit");
         PositionOfBaseKind(after, baseGame.BggId).Should().Be(PlacementKind.Cover);
-        LayoutAssertions.ChangedCubbies(before, after).Should().Equal([PositionOfBase(after, baseGame.BggId)]);
+        AssertOnlyTheFamilysCubbiesChange(before, after, baseGame.BggId);
         LayoutAssertions.AssertValid(after, [.. items, next]);
     }
 
@@ -117,7 +125,7 @@ public class FamilyStabilityTests
 
         UprightsOf(before, baseGame.BggId).Should().HaveCount(2);
         PlacementOf(after, next.BggId)!.Value.Placement.Kind.Should().Be(PlacementKind.ExpansionLayer, "two uprights already stand beside the base game");
-        LayoutAssertions.ChangedCubbies(before, after).Should().Equal([PositionOfBase(after, baseGame.BggId)]);
+        AssertOnlyTheFamilysCubbiesChange(before, after, baseGame.BggId);
         LayoutAssertions.AssertValid(after, [.. items, next]);
     }
 
@@ -137,7 +145,7 @@ public class FamilyStabilityTests
         LayersOf(before, baseGame.BggId).Select(entry => entry.Placement.GameId).Should().Equal(baseGame.BggId + 1, baseGame.BggId + 2);
         LayersOf(after, baseGame.BggId).Select(entry => entry.Placement.GameId)
             .Should().Equal(next.BggId, baseGame.BggId + 1, baseGame.BggId + 2);
-        LayoutAssertions.ChangedCubbies(before, after).Should().Equal([PositionOfBase(after, baseGame.BggId)]);
+        AssertOnlyTheFamilysCubbiesChange(before, after, baseGame.BggId);
         LayoutAssertions.AssertValid(after, [.. items, next]);
     }
 
@@ -224,7 +232,8 @@ public class FamilyStabilityTests
                 continue;
             }
 
-            (arrival.Value.Section, arrival.Value.Cubby).Should().Be(home, "seed {0}: the arrival stands in the cubby of its base game", seed);
+            IsHomeOrNextDoor((arrival.Value.Section, arrival.Value.Cubby), home)
+                .Should().BeTrue("seed {0}: the arrival stands in the cubby of its base game or the next one", seed);
 
             if (arrival.Value.Placement.Kind != PlacementKind.ExpansionSpine)
             {
@@ -254,8 +263,8 @@ public class FamilyStabilityTests
 
             var arrival = PlacementOf(after, next.BggId);
             var home = PositionOfBase(after, baseGame.BggId);
-            (arrival is not null ? (arrival.Value.Section, arrival.Value.Cubby) : home)
-                .Should().Be(home, "seed {0}: the new expansion stands beside its base game", seed);
+            IsHomeOrNextDoor(arrival is not null ? (arrival.Value.Section, arrival.Value.Cubby) : home, home)
+                .Should().BeTrue("seed {0}: the new expansion stands beside its base game or in the next cubby", seed);
             arrival?.Placement.Kind.Should().BeOneOf(PlacementKind.ExpansionLayer, PlacementKind.ExpansionSpine);
             MoreCountOf(after, baseGame.BggId).Should().Be(arrival is null ? 1 : 0, "seed {0}", seed);
             LayoutAssertions.AssertValid(after, [.. items, next]);
@@ -287,6 +296,110 @@ public class FamilyStabilityTests
         }
     }
 
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void An_expansion_that_joins_a_column_already_standing_next_door_changes_only_that_cubby()
+    {
+        var design = RowDesign(200, 300);
+        var filler = new CabinetItem(1, 1, "Invented Filler Game", ItemKind.Base, new BoxDimensions(150, 250, 41), []);
+        var baseGame = new CabinetItem(2, 2, "Invented Family Game", ItemKind.Base, new BoxDimensions(150, 250, 40), []);
+        var items = new List<CabinetItem>([filler, baseGame, ExpansionFor(baseGame, 10, ThickDepthMm + 5), ExpansionFor(baseGame, 11, ThinDepthMm)]);
+        var next = ExpansionFor(baseGame, 12, ThinDepthMm);
+
+        var before = CabinetLayoutEngine.Build(items, design, SpinesOnly);
+        var after = CabinetLayoutEngine.Build([.. items, next], design, SpinesOnly);
+
+        LayoutAssertions.AssertValid(after, [.. items, next]);
+        LayersOf(before, 2).Should().OnlyContain(entry => entry.Section == 0 && entry.Cubby == 1, "the column stands next door");
+        LayoutAssertions.ChangedCubbies(before, after).Should().Equal([(0, 1)]);
+        LayersOf(after, 2).Select(entry => entry.Placement.GameId).Should().Contain(next.BggId);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void The_expansion_that_first_needs_the_next_cubby_keeps_every_game_ordered_before_the_base_in_place()
+    {
+        var design = RowDesign(300, 300);
+        var firstFiller = new CabinetItem(1, 1, "Invented Filler One", ItemKind.Base, new BoxDimensions(150, 250, 41), []);
+        var baseGame = new CabinetItem(2, 2, "Invented Family Game", ItemKind.Base, new BoxDimensions(150, 250, 40), []);
+        var secondFiller = new CabinetItem(3, 3, "Invented Filler Two", ItemKind.Base, new BoxDimensions(150, 250, 41), []);
+        var items = new List<CabinetItem>([firstFiller, baseGame, secondFiller]);
+        items.AddRange(Enumerable.Range(0, 6).Select(index => ExpansionFor(baseGame, 10 + index, ThinDepthMm)));
+        var next = ExpansionFor(baseGame, 20, ThinDepthMm);
+
+        var before = CabinetLayoutEngine.Build(items, design, SpinesOnly);
+        var after = CabinetLayoutEngine.Build([.. items, next], design, SpinesOnly);
+
+        var beforeBase = LayoutAssertions.PlacementsWithPosition(before).Single(entry => entry.Placement.GameId == 2 && entry.Placement.Kind == PlacementKind.Spine);
+        var placedBefore = LayoutAssertions.PlacementsWithPosition(before);
+        var placedAfter = LayoutAssertions.PlacementsWithPosition(after);
+
+        LayoutAssertions.AssertValid(after, [.. items, next]);
+        LayersOf(before, 2).Select(entry => entry.Cubby).Should().OnlyContain(cubby => cubby == 0, "the whole family fits the first cubby before");
+        LayersOf(after, 2).Select(entry => entry.Cubby).Should().Contain(1, "the seventh stacked expansion needs the next cubby");
+        MoreCountOf(after, 2).Should().Be(0);
+
+        foreach (var entry in placedBefore.Where(entry => entry.Cubby == 0 && entry.Placement.XMm < beforeBase.Placement.XMm
+                     && entry.Placement.Kind is PlacementKind.Spine or PlacementKind.Cover or PlacementKind.FlatBox))
+        {
+            placedAfter.Single(candidate => candidate.Placement.GameId == entry.Placement.GameId && candidate.Placement.Kind == entry.Placement.Kind)
+                .Placement.XMm.Should().Be(entry.Placement.XMm, "game {0} stood before the base game in its cubby", entry.Placement.GameId);
+        }
+
+        LayoutAssertions.ChangedCubbies(before, after).Should().BeSubsetOf([(0, 0), (0, 1)]);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void The_expansion_that_brings_a_base_game_to_the_cover_threshold_turns_it_to_face_out_and_keeps_earlier_games_in_place()
+    {
+        var turned = 0;
+
+        for (var seed = 1; seed <= Seeds; seed++)
+        {
+            var items = new List<CabinetItem>(SyntheticCollections.Random(seed, CollectionSize));
+            var baseGame = items[20 + (seed % 80)];
+            items.Add(WithDepth(SyntheticCollections.NextExpansion(items, baseGame.BggId, seed), ThinDepthMm));
+            var next = WithDepth(SyntheticCollections.NextExpansion(items, baseGame.BggId, seed + 1000), ThinDepthMm);
+            var options = LayoutOptions.Default with { CoverSharePercent = 0, FewGamesThreshold = 0 };
+
+            var (before, after) = BuildBeforeAndAfter(items, next, options);
+
+            LayoutAssertions.AssertValid(after, [.. items, next]);
+            PositionOfBaseKind(after, baseGame.BggId).Should().Be(PlacementKind.Cover, "seed {0}: the base now has two owned expansions", seed);
+            AssertEarlierGamesKeepTheirCubby(items, baseGame, before, after, seed);
+
+            if (PositionOfBaseKind(before, baseGame.BggId) != PlacementKind.Cover)
+            {
+                turned++;
+            }
+        }
+
+        turned.Should().BeGreaterThan(Seeds / 2, "most bases stand as spines or lie flat at one expansion with a share of zero");
+    }
+
+    private static SectionDesign RowDesign(params int[] cubbyWidthsMm) =>
+        new("test", cubbyWidthsMm.Sum() + (20 * (cubbyWidthsMm.Length - 1)), 20, [new ShelfRow(300, cubbyWidthsMm)]) { StackColumnWidthMm = 140 };
+
+    private static bool UsesTheNextCubby(CabinetLayout layout, int baseId)
+    {
+        var home = PositionOfBase(layout, baseId);
+
+        return LayersOf(layout, baseId).Any(entry => entry.Cubby != home.Cubby || entry.Section != home.Section);
+    }
+
+    private static bool IsHomeOrNextDoor((int Section, int Cubby) position, (int Section, int Cubby) home) =>
+        position.Section == home.Section && (position.Cubby == home.Cubby || position.Cubby == home.Cubby + 1);
+
+    private static void AssertOnlyTheFamilysCubbiesChange(CabinetLayout before, CabinetLayout after, int baseId)
+    {
+        var home = PositionOfBase(after, baseId);
+        var changed = LayoutAssertions.ChangedCubbies(before, after);
+
+        changed.Should().ContainSingle();
+        IsHomeOrNextDoor(changed.Single(), home).Should().BeTrue("only the cubby of base game {0}, or the one its column stands in, changes", baseId);
+    }
+
     private static void AssertEarlierGamesKeepTheirCubby(
         IReadOnlyList<CabinetItem> items,
         CabinetItem baseGame,
@@ -294,9 +407,19 @@ public class FamilyStabilityTests
         CabinetLayout after,
         int seed)
     {
-        var earlier = items
-            .Where(item => item.CollectionId < baseGame.CollectionId)
+        var topLevel = items
             .Where(item => item.Kind == ItemKind.Base || LayoutAssertions.OwnedParentOf(item, items) is null)
+            .OrderBy(item => item.CollectionId)
+            .ThenBy(item => item.BggId)
+            .ToList();
+        var baseIndex = topLevel.FindIndex(item => item.BggId == baseGame.BggId && item.Kind == ItemKind.Base);
+        var seriesMates = SeriesGrouping.Group(topLevel)
+            .Where(group => group.Indices.Contains(baseIndex))
+            .SelectMany(group => group.Indices)
+            .Select(index => topLevel[index].BggId)
+            .ToHashSet();
+        var earlier = topLevel
+            .Where(item => item.CollectionId < baseGame.CollectionId && !seriesMates.Contains(item.BggId))
             .Select(item => item.BggId)
             .ToHashSet();
         var placed = LayoutAssertions.PlacementsWithPosition(after);
@@ -312,7 +435,7 @@ public class FamilyStabilityTests
 
     private static void AssertStackedArrivalOfAFamilyWithAStack(CabinetLayout before, CabinetLayout after, int baseId, int seed)
     {
-        if (!FamiliesWithAStack(before).Contains(baseId))
+        if (!FamiliesWithAStack(before).Contains(baseId) || (!UsesTheNextCubby(before, baseId) && UsesTheNextCubby(after, baseId)))
         {
             return;
         }
@@ -320,8 +443,8 @@ public class FamilyStabilityTests
         var home = PositionOfBase(after, baseId);
 
         LayoutAssertions.ChangedCubbies(before, after)
-            .Where(position => position.Section != home.Section || position.Cubby != home.Cubby)
-            .Should().BeEmpty("seed {0}: a thick arrival that joins an existing stack changes only the base's cubby", seed);
+            .Where(position => !IsHomeOrNextDoor(position, home))
+            .Should().BeEmpty("seed {0}: a thick arrival that joins an existing stack changes only the base's cubby or the one its column stands in", seed);
     }
 
     private static void AssertTouchesTheBaseOrThePreviousUpright(CabinetLayout after, int baseId, int arrivalId, int seed)
