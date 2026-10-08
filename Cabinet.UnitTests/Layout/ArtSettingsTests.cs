@@ -128,6 +128,11 @@ public class ArtSettingsTests
     [InlineData("Art:OrientFromCover", "yes")]
     [InlineData("Art:OrientFromCover", "")]
     [InlineData("Art:OrientFromCover", "1")]
+    [InlineData("Art:UnsureLandscapeMarginPercent", "0")]
+    [InlineData("Art:UnsureLandscapeMarginPercent", "101")]
+    [InlineData("Art:UnsureLandscapeMarginPercent", "twenty")]
+    [InlineData("Art:UnsureLandscapeMarginPercent", "20.5")]
+    [InlineData("Art:UnsureLandscapeMarginPercent", "")]
     public void A_bad_shape_setting_stops_startup_naming_the_key(string key, string text)
     {
         var act = () => ArtSettings.FromConfiguration(Configure((key, text)));
@@ -143,6 +148,27 @@ public class ArtSettingsTests
         var act = () => ArtSettings.FromConfiguration(Configure(("Art:ShapeMarginPercent", text)));
 
         act.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData("1")]
+    [InlineData("100")]
+    public void The_edges_of_the_unsure_landscape_margin_range_are_accepted(string text)
+    {
+        var act = () => ArtSettings.FromConfiguration(Configure(("Art:UnsureLandscapeMarginPercent", text)));
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void The_unsure_landscape_margin_binds_and_changes_the_fingerprint()
+    {
+        ArtSettings.FromConfiguration(Configure()).UnsureLandscapeMarginPercent.Should().Be(20);
+
+        var rules = ArtSettings.FromConfiguration(Configure(("Art:UnsureLandscapeMarginPercent", "35")));
+
+        rules.UnsureLandscapeMarginPercent.Should().Be(35);
+        rules.Fingerprint.Should().NotBe(ArtRules.Default.Fingerprint);
     }
 
     private static IConfiguration Configure(params (string Key, string Value)[] values) =>

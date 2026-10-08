@@ -484,8 +484,12 @@ their shape agrees with the cover; their area and depth are kept and the size
 still counts as real.
 
 A slanted product shot, a picture that is not clearly flat, and a picture that
-is not used never shape a box. Pictures that do not match their box never get
-cropped: bars fill the gap instead.
+is not used never shape a box. A picture that is not clearly flat or a product
+shot but is clearly landscape does turn the box the same way, without changing
+its shape or size: its width must be more than the set margin above its height,
+and a picture at the margin or in portrait turns nothing. A product shot never
+shapes or turns a box. Pictures that do not match their box never get cropped:
+bars fill the gap instead.
 
 Small changes in BGG data never change a box. The size class is kept until the
 game's score has moved clear of that class's band, so a weight moving from 2.74
@@ -503,12 +507,14 @@ Optional settings for the env file; they need a restart and no download:
 | Key | Default | Range | Meaning |
 | --- | --- | --- | --- |
 | `Art__ShapeMarginPercent` | `12` | 1 to 50 | How far, as a percentage of the cover's shape, the real sizes' shape may differ from a flat cover before the front is rebuilt from the cover. |
-| `Art__OrientFromCover` | `true` | `true` or `false` | Whether a flat landscape cover makes the front landscape, with its width as the longer side, whether the real sizes agree with it or not. When `false` the longer side always stands as the height. |
+| `Art__OrientFromCover` | `true` | `true` or `false` | Whether a flat landscape cover makes the front landscape, with its width as the longer side, whether the real sizes agree with it or not. When `false` no picture turns a box and the longer side always stands as the height. |
+| `Art__UnsureLandscapeMarginPercent` | `20` | 1 to 100 | How much wider than tall, as a percentage of its height, a picture that is not clearly flat or a product shot must be before it turns its box landscape. At 20 a picture 1.2 times as wide as tall turns nothing and a slightly wider one does. |
 
 In a settings file the same keys are written with a colon, for example
 `Art:ShapeMarginPercent`. An out-of-range value, a value that is not a whole
 number, or an `Art:OrientFromCover` that is not `true` or `false` stops the app
-at start-up with a message naming the key.
+at start-up with a message naming the key. This includes
+`Art:UnsureLandscapeMarginPercent`.
 
 ## Where the data lives
 

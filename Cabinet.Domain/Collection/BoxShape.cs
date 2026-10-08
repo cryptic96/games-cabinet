@@ -29,12 +29,15 @@ public sealed record ShapedBox(BoxDimensions Box, int PoseHeightMm, BoxSource So
 /// cover, in which case the cover gives the shape; without real dimensions a flat cover gives the shape and an estimate the
 /// size; without a cover the estimate or the default is drawn. A flat landscape cover also turns real dimensions that agree
 /// with it, so the front is drawn landscape at its real area and depth. A picture that is a photographed box or unsure never
-/// shapes anything, so the caller passes a cover only for a flat one. How a box stands never follows its picture.
+/// shapes anything, so the caller passes a cover only for a flat one. A photographed box never shapes or turns a box, and an
+/// unsure picture only turns one when it is clearly landscape, without changing its proportions. How a box stands never
+/// follows its picture.
 /// </summary>
 public static class BoxShape
 {
     private const double ShapeMarginTolerance = 1e-9;
     private const double PercentFactor = 100.0;
+    private const int PercentBase = 100;
 
     /// <summary>
     /// Works out the box to draw and the height that decides how it stands. The pose height is the real longer side, else the
@@ -45,7 +48,8 @@ public static class BoxShape
     /// <param name="details">What is known about the game, or null when nothing is.</param>
     /// <param name="flatCover">The stored picture file whose shape the box may take, or null when the picture is not a flat cover.</param>
     /// <param name="rules">The rules that set the disagreement margin and the orientation.</param>
-    public static ShapedBox Resolve(SnapshotItem item, GameDetails? details, ArtFile? flatCover, ArtRules rules)
+    /// <param name="unsurePicture">The stored picture file of an unsure chosen picture, which may only turn the box, or null.</param>
+    public static ShapedBox Resolve(SnapshotItem item, GameDetails? details, ArtFile? flatCover, ArtRules rules, ArtFile? unsurePicture = null)
     {
         ArgumentNullException.ThrowIfNull(item);
         ArgumentNullException.ThrowIfNull(rules);
@@ -54,13 +58,15 @@ public static class BoxShape
         var estimate = EstimateOf(item, details);
         var poseHeight = real?.HeightMm ?? estimate.HeightMm;
         var cover = flatCover is { Width: > 0, Height: > 0 } ? flatCover : null;
+        var turning = cover ?? (unsurePicture is { Width: > 0, Height: > 0 } ? unsurePicture : null);
+        var turnsUnsure = cover is null && turning is not null;
 
         if (real is not null)
         {
             return cover is not null && Disagrees(real, cover, rules.ShapeMarginPercent)
                 && Rebuilt(real, cover, rules) is { } rebuilt
                     ? new ShapedBox(rebuilt, poseHeight, BoxSource.CoverShape)
-                    : new ShapedBox(Turned(real, cover, rules), poseHeight, BoxSource.RealSize);
+                    : new ShapedBox(Turned(real, turning, turnsUnsure, rules), poseHeight, BoxSource.RealSize);
         }
 
         if (cover is not null)
@@ -68,13 +74,18 @@ public static class BoxShape
             return new ShapedBox(FromCover(estimate, cover, rules), poseHeight, BoxSource.CoverShape);
         }
 
-        return new ShapedBox(estimate, poseHeight, details is null ? BoxSource.Default : BoxSource.Estimate);
+        return new ShapedBox(Turned(estimate, turning, turnsUnsure, rules), poseHeight, details is null ? BoxSource.Default : BoxSource.Estimate);
     }
 
-    private static BoxDimensions Turned(BoxDimensions front, ArtFile? cover, ArtRules rules) =>
-        rules.OrientFromCover && cover is not null && cover.Width > cover.Height && front.WidthMm < front.HeightMm
+    private static BoxDimensions Turned(BoxDimensions front, ArtFile? picture, bool unsure, ArtRules rules) =>
+        rules.OrientFromCover && picture is not null && IsLandscapeEnough(picture, unsure, rules) && front.WidthMm < front.HeightMm
             ? new BoxDimensions(front.HeightMm, front.WidthMm, front.DepthMm)
             : front;
+
+    private static bool IsLandscapeEnough(ArtFile picture, bool unsure, ArtRules rules) =>
+        unsure
+            ? (long)picture.Width * PercentBase > (long)picture.Height * (PercentBase + rules.UnsureLandscapeMarginPercent)
+            : picture.Width > picture.Height;
 
     private static BoxDimensions EstimateOf(SnapshotItem item, GameDetails? details)
     {
