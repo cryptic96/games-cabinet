@@ -32,17 +32,25 @@ public sealed class SeriesTests
         var standing = Standing(document);
 
         AssertStandTogether(standing, items, SagaPositions);
-        AssertContinuesInTheNextCubby(standing, items, LinePositions);
+        AssertStaysInTheCubbyOrContinuesInTheNext(standing, items, LinePositions);
     }
 
-    private static void AssertContinuesInTheNextCubby(IReadOnlyList<Stand> standing, IReadOnlyList<FakeBggItem> items, int[] positions)
+    private static void AssertStaysInTheCubbyOrContinuesInTheNext(IReadOnlyList<Stand> standing, IReadOnlyList<FakeBggItem> items, int[] positions)
     {
         var first = standing.Single(stand => stand.Entry == items[positions[0]].CollId);
         var second = standing.Single(stand => stand.Entry == items[positions[1]].CollId);
 
         second.Section.Should().Be(first.Section);
-        second.Cubby.Should().Be(first.Cubby + 1, "the first game owns expansions and faces out, so the series continues in the next cubby");
-        second.X.Should().Be(SectionDesigns.Desktop.StackColumnWidthMm, "the column of the first game's family stands at the left edge, the continuing game right after it");
+        second.Cubby.Should().BeInRange(first.Cubby, first.Cubby + 1, "the series stays in the first game's cubby or continues in the next one");
+
+        if (second.Cubby == first.Cubby)
+        {
+            second.X.Should().BeGreaterThan(first.X, "the second game stands after the first game's front, in the same cubby");
+        }
+        else
+        {
+            second.X.Should().Be(SectionDesigns.Desktop.StackColumnWidthMm, "the column of the first game's family stands at the left edge, the continuing game right after it");
+        }
     }
 
     private static void AssertStandTogether(IReadOnlyList<Stand> standing, IReadOnlyList<FakeBggItem> items, int[] positions)
@@ -51,15 +59,23 @@ public sealed class SeriesTests
         var series = standing.Where(stand => entries.Contains(stand.Entry)).ToList();
 
         series.Should().HaveCount(positions.Length);
-        series.Select(stand => (stand.Section, stand.Cubby)).Distinct().Should().ContainSingle("the series fits one cubby");
 
-        var left = series.Min(stand => stand.X);
-        var right = series.Max(stand => stand.X);
-        var between = standing
-            .Where(stand => !entries.Contains(stand.Entry) && stand.Section == series[0].Section && stand.Cubby == series[0].Cubby)
-            .Where(stand => stand.X > left && stand.X < right);
+        var cubbies = series.Select(stand => (stand.Section, stand.Cubby)).Distinct().OrderBy(cubby => cubby.Section).ThenBy(cubby => cubby.Cubby).ToList();
 
-        between.Should().BeEmpty("no other game stands between the games of a series");
+        cubbies.Should().HaveCountLessThanOrEqualTo(2, "a series stands in one cubby or continues into the next one");
+        cubbies.Select(cubby => cubby.Cubby - cubbies[0].Cubby).Should().Equal(Enumerable.Range(0, cubbies.Count), "the cubbies of a series are neighbours");
+
+        foreach (var (section, cubby) in cubbies)
+        {
+            var inCubby = series.Where(stand => stand.Section == section && stand.Cubby == cubby).ToList();
+            var left = inCubby.Min(stand => stand.X);
+            var right = inCubby.Max(stand => stand.X);
+            var between = standing
+                .Where(stand => !entries.Contains(stand.Entry) && stand.Section == section && stand.Cubby == cubby)
+                .Where(stand => stand.X > left && stand.X < right);
+
+            between.Should().BeEmpty("no other game stands between the games of a series");
+        }
     }
 
     private static List<Stand> Standing(JsonDocument document) =>

@@ -22,12 +22,14 @@ public static class SectionDesigns
     private const int DesktopMinBoxThicknessMm = 34;
 
     /// <summary>
-    /// The wide design: five shelf rows of irregular cubbies across 1200 mm. Four rows are 330 mm or taller and no cubby is
-    /// narrower than 180 mm or wider than 560 mm, so a standard box stands with air above it in almost every cubby and the
-    /// largest face-out box has several cubbies to go to. The largest boxes therefore no longer pile up in a few cubbies and
-    /// open near-empty sections at the end, and no section but the last keeps a bare shelf row. The numbers came from a
-    /// seeded search over valid designs scored on the samples and on seeded collections with the measured size spread,
-    /// then confirmed on collections the search never saw.
+    /// The wide design: five shelf rows of irregular cubbies across 1200 mm, 1850 mm tall inside. Every row is 310 mm or
+    /// taller, so a standard box stands with air above it in every cubby; the cubbies are 170 to 550 mm wide with wide ones
+    /// in every row, so the largest face-out boxes, base games that face out beside several expansions and landscape fronts
+    /// have cubbies to go to wherever the shelves are. The largest box a section holds is therefore 430 by 430 mm. The big
+    /// boxes no longer pile up in a few cubbies and open a near-empty section at the end, and no section but the last
+    /// keeps a bare shelf row. The numbers came from a seeded search over valid designs, run outside the repository on
+    /// the samples, the fake collections and seeded collections with a realistic mix of box sizes, with every layout
+    /// rule on and at two cover shares, then confirmed on collections the search never saw.
     /// </summary>
     public static readonly SectionDesign Desktop = new(
         DesktopName,
@@ -35,11 +37,11 @@ public static class SectionDesigns
         FrameMm: FrameMm,
         Rows:
         [
-            new ShelfRow(330, [250, 190, 260, 440]),
-            new ShelfRow(360, [260, 270, 430, 180]),
-            new ShelfRow(370, [360, 320, 230, 230]),
-            new ShelfRow(370, [260, 540, 360]),
-            new ShelfRow(280, [180, 220, 560, 180]),
+            new ShelfRow(310, [190, 240, 290, 230, 170]),
+            new ShelfRow(430, [430, 390, 340]),
+            new ShelfRow(390, [280, 550, 330]),
+            new ShelfRow(330, [480, 380, 300]),
+            new ShelfRow(310, [310, 350, 500]),
         ])
     {
         MaxSpineHeightMm = 330,

@@ -44,6 +44,7 @@ public sealed class LocalArtTests
                 ["Images:MaxDownloadsPerRun"] = "1000",
                 ["Layout:CoverStrategy"] = "Random",
                 ["Layout:CoverSharePercent"] = "100",
+                ["Layout:LieFlatBeforeNewSection"] = "false",
             },
             services =>
             {

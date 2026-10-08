@@ -15,6 +15,15 @@ public class DensityTests
     private const int SpikeSeed = 4242;
     private const int SpikeCount = 400;
     private const string SpikeName = "spike-shaped";
+    private const int EarlierMixPhoneSectionTotal = 55;
+    private const int ShareDefault = 25;
+    private const int ShareServer = 33;
+
+    /// <summary>The phone sections of the realistic mix of sixty-five games, seeds one to twelve, at a cover share of 25 and of 33 percent.</summary>
+    private static readonly (int At25, int At33)[] MixPhoneSections =
+    [
+        (2, 2), (2, 3), (2, 2), (2, 3), (2, 2), (2, 3), (2, 3), (2, 3), (2, 2), (2, 2), (2, 2), (2, 2),
+    ];
 
     public static TheoryData<string> Collections => new("65", "400", SpikeName);
 
@@ -42,6 +51,23 @@ public class DensityTests
         var report = LayoutDensity.Measure(CabinetLayoutEngine.Build(items, SectionDesigns.Phone));
 
         report.Sections.Should().BeLessThan(LargeSampleSectionLimit, "{0}", report);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_realistic_mix_does_not_add_phone_sections()
+    {
+        var measured = MixPhoneSections
+            .Select((_, index) => (Seed: index + 1, Sections: new[] { ShareDefault, ShareServer }
+                .Select(share => CabinetLayoutEngine.Build(
+                    LayoutDensity.ItemsFor($"mix-65-{index + 1}"),
+                    SectionDesigns.Phone,
+                    LayoutOptions.Default with { CoverSharePercent = share }).Sections.Count)
+                .ToArray()))
+            .ToList();
+
+        measured.Select(entry => (entry.Sections[0], entry.Sections[1])).Should().Equal(MixPhoneSections);
+        measured.Sum(entry => entry.Sections.Sum()).Should().BeLessThanOrEqualTo(EarlierMixPhoneSectionTotal, "the phone takes no more sections in all than it did before families faced out and continued, series stood together and the desktop was retuned");
     }
 
     [Fact]

@@ -181,7 +181,7 @@ public class SyntheticCollectionsTests
         var layout = CabinetLayoutEngine.Build(items, SectionDesigns.Desktop);
 
         var kinds = layout.Sections.SelectMany(section => section.Cubbies).SelectMany(cubby => cubby.Placements).Select(placement => placement.Kind).ToHashSet();
-        kinds.Should().Contain(Enum.GetValues<PlacementKind>(), "the review sample shows every kind of placement");
+        kinds.Should().Contain(Enum.GetValues<PlacementKind>().Where(kind => kind != PlacementKind.MoreMarker), "the review sample shows every kind of placement but the marker, which only a family of more than a dozen expansions needs");
         layout.Sections[^1].Cubbies.Should().Contain(cubby => cubby.Placements.Count == 0);
         LayoutAssertions.AssertValid(layout, items);
     }
@@ -268,4 +268,57 @@ public class SyntheticCollectionsTests
         items.Select(item => item.Title).Should().NotContain(next.Title);
         next.Kind.Should().Be(ItemKind.Base);
     }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_size_mix_is_the_same_for_the_same_seed_and_differs_between_seeds()
+    {
+        var first = SyntheticCollections.SizeMix(7, 120);
+        var second = SyntheticCollections.SizeMix(7, 120);
+
+        first.Should().HaveCount(120);
+        first.Should().BeEquivalentTo(second, options => options.WithStrictOrdering());
+        SyntheticCollections.SizeMix(8, 120).Select(item => item.Box).Should().NotEqual(first.Select(item => item.Box));
+        SyntheticCollections.SizeMix(7, 0).Should().BeEmpty();
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_size_mix_of_four_hundred_has_the_shares_it_states_within_five_percentage_points_over_three_seeds()
+    {
+        var items = Enumerable.Range(1, 3).SelectMany(seed => SyntheticCollections.SizeMix(seed, 400)).ToList();
+        var bases = items.Where(item => item.Kind == ItemKind.Base).ToList();
+        var expansions = items.Where(item => item.Kind == ItemKind.Expansion).ToList();
+
+        Share(bases, item => item.Box == Cabinet.Domain.Collection.BoxFromVersion.DefaultFor(ItemKind.Base)).Should().BeInRange(25, 35);
+        Share(bases, item => item.Box.HeightMm < 200 && item.Box.WidthMm <= item.Box.HeightMm).Should().BeInRange(15, 25);
+        Share(bases, item => item.Box.WidthMm == item.Box.HeightMm).Should().BeInRange(15, 25);
+        Share(bases, item => item.Box.HeightMm >= 300 && item.Box.WidthMm < item.Box.HeightMm && item.Box.HeightMm != 300).Should().BeInRange(5, 15);
+        Share(bases, item => item.Box.WidthMm > item.Box.HeightMm).Should().BeInRange(2, 10);
+        Share(items, item => item.Kind == ItemKind.Expansion).Should().BeInRange(20, 30);
+        Share(expansions, item => item.Box == Cabinet.Domain.Collection.BoxFromVersion.DefaultFor(ItemKind.Expansion)).Should().BeInRange(35, 45);
+        items.Should().OnlyContain(item => item.Box.WidthMm % 10 == 0 || item.Box == Cabinet.Domain.Collection.BoxFromVersion.DefaultFor(item.Kind));
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_size_mix_has_families_of_up_to_eight_expansions_a_few_series_and_stands_landscape_fronts_at_their_long_side()
+    {
+        var items = SyntheticCollections.SizeMix(1, 400);
+        var familySizes = items
+            .Where(item => item.Kind == ItemKind.Expansion)
+            .SelectMany(item => item.ExpansionOf.Select(parent => parent.BggId))
+            .GroupBy(id => id)
+            .Select(group => group.Count())
+            .ToList();
+
+        familySizes.Max().Should().BeLessThanOrEqualTo(8);
+        familySizes.Count(size => size >= 2).Should().BeGreaterThan(3);
+        items.SelectMany(item => item.SeriesFamilies ?? []).Distinct().Should().HaveCountGreaterThanOrEqualTo(2);
+        items.Where(item => item.Box.WidthMm > item.Box.HeightMm).Should().OnlyContain(item => item.PoseHeightMm == item.Box.WidthMm);
+        items.Where(item => item.Box.WidthMm <= item.Box.HeightMm).Should().OnlyContain(item => item.PoseHeightMm == null);
+    }
+
+    private static double Share(IReadOnlyCollection<CabinetItem> items, Func<CabinetItem, bool> predicate) =>
+        100.0 * items.Count(predicate) / items.Count;
 }

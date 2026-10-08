@@ -37,7 +37,7 @@ public class SectionDesignTests
     [Trait("Category", "Layout")]
     public void The_shipped_designs_derive_their_interior_height_from_their_rows()
     {
-        SectionDesigns.Desktop.InteriorHeightMm.Should().Be(1790);
+        SectionDesigns.Desktop.InteriorHeightMm.Should().Be(1850);
         SectionDesigns.Phone.InteriorHeightMm.Should().Be(2560);
     }
 
@@ -267,8 +267,8 @@ public class SectionDesignTests
     }
 
     [Theory]
-    [InlineData("65", 5)]
-    [InlineData("400", 25)]
+    [InlineData("65", 1)]
+    [InlineData("400", 5)]
     [Trait("Category", "Layout")]
     public void The_samples_hold_a_few_oversize_boxes_and_build_valid_layouts_on_both_profiles(string name, int oversizeCount)
     {
