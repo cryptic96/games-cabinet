@@ -490,6 +490,8 @@ are read, so changing them needs a restart and no download:
 | `Art__ThreeDMaxFillPercent` | `93` | 0 to 100 | The most a product shot fills its frame. It must not be above `Art__FlatMinFillPercent`. |
 | `Art__ThreeDMinCornerPercent` | `40` | 0 to 100 | The least backdrop a product shot shows in its second emptiest corner. |
 
+The defaults shown are the values committed in the settings file. They were checked against the real collection and kept as they are.
+
 In a settings file the same keys are written with a colon, for example
 `Art:FlatMinFillPercent`. An out-of-range or non-numeric value stops the app at
 start-up with a message naming the key, and so does a product-shot fill limit
