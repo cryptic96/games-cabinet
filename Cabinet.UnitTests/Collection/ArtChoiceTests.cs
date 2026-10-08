@@ -141,6 +141,35 @@ public class ArtChoiceTests
 
     [Fact]
     [Trait("Category", "Enrichment")]
+    public void A_cut_out_that_fills_its_frame_is_a_3D_shot_and_scores_one()
+    {
+        var features = new ArtFeatures(0.13, 1.0, 0.0, 0.0, 0, CutOut: true);
+
+        ArtVerdicts.Classify(features, Defaults).Should().Be(ArtVerdict.ThreeD);
+        ArtVerdicts.Score(features).Should().Be(1.0);
+    }
+
+    [Fact]
+    [Trait("Category", "Enrichment")]
+    public void A_cut_out_that_is_almost_all_backdrop_is_still_flat()
+    {
+        ArtVerdicts.Classify(new ArtFeatures(0.97, 1.0, 0.0, 0.0, 0, CutOut: true), Defaults).Should().Be(ArtVerdict.Flat);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(false)]
+    [Trait("Category", "Enrichment")]
+    public void Features_that_are_not_a_cut_out_classify_and_score_as_before(bool? cutOut)
+    {
+        var features = new ArtFeatures(0.13, 1.0, 0.0, 0.0, 0, cutOut);
+
+        ArtVerdicts.Classify(features, Defaults).Should().Be(ArtVerdict.Flat);
+        ArtVerdicts.Score(features).Should().Be(0.0);
+    }
+
+    [Fact]
+    [Trait("Category", "Enrichment")]
     public void A_stricter_flat_fill_turns_a_near_flat_picture_into_unsure()
     {
         var features = new ArtFeatures(0.1, 0.98, 0.0, 0.0, 0);

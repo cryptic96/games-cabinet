@@ -79,7 +79,7 @@ public static class ReviewSheetModel
             string.IsNullOrWhiteSpace(trace.Item.Title) ? UntitledTitle : trace.Item.Title,
             candidateA,
             candidateB,
-            trace.VersionVerdict is { } verdict ? VerdictWord(verdict) : "no verdict",
+            trace.VersionVerdict is { } verdict ? VerdictWord(verdict, trace.VersionImage?.Features?.CutOut == true) : "no verdict",
             trace.VersionScore?.ToString(ScoreFormat, CultureInfo.InvariantCulture),
             trace.Pick,
             ChosenWords(trace.Pick),
@@ -116,9 +116,10 @@ public static class ReviewSheetModel
         return File.Exists(path) ? path : null;
     }
 
-    private static string VerdictWord(ArtVerdict verdict) => verdict switch
+    private static string VerdictWord(ArtVerdict verdict, bool cutOut) => verdict switch
     {
         ArtVerdict.Flat => "flat",
+        ArtVerdict.ThreeD when cutOut => "3D shot, cut-out",
         ArtVerdict.ThreeD => "3D shot",
         _ => "unsure",
     };

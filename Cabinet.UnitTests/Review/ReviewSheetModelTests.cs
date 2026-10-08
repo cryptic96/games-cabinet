@@ -63,6 +63,19 @@ public sealed partial class ReviewSheetModelTests : IDisposable
     }
 
     [Fact]
+    public void A_cut_out_picture_reads_as_a_3D_shot_marked_cut_out()
+    {
+        var cutOut = new ArtFeatures(0.13, 1.0, 0.0, 0.0, 0, CutOut: true);
+        var version = _fixture.MeasuredPicture("version", SyntheticArtKind.CutOutFrontOn, cutOut);
+        _fixture.Game(1, "Invented Lighthouse", version, null, UprightBox);
+
+        var row = Rows().Single();
+
+        row.Verdict.Should().Be("3D shot, cut-out");
+        row.ScoreText.Should().Be("1.00");
+    }
+
+    [Fact]
     public void A_game_without_a_version_picture_reads_no_verdict_and_shows_none_in_the_first_column()
     {
         var main = _fixture.Picture("main", SyntheticArtKind.FlatCover);

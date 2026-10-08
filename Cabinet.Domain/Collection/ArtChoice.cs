@@ -11,7 +11,8 @@ namespace Cabinet.Domain.Collection;
 /// <param name="Corner1">The largest backdrop share among the four corners of the subject's bounding box.</param>
 /// <param name="Corner2">The second largest backdrop share among those four corners.</param>
 /// <param name="SidesTouched">How many of the picture's four sides the subject touches.</param>
-public sealed record ArtFeatures(double BackdropShare, double Fill, double Corner1, double Corner2, int SidesTouched);
+/// <param name="CutOut">Whether the picture is a cut-out product picture whose background is transparent around most of its outer ring; null means it was measured before cut-outs were recognised.</param>
+public sealed record ArtFeatures(double BackdropShare, double Fill, double Corner1, double Corner2, int SidesTouched, bool? CutOut = null);
 
 /// <summary>
 /// The tuning values that turn <see cref="ArtFeatures"/> into a verdict. Every comparison is inclusive: a feature exactly
@@ -73,15 +74,21 @@ public static class ArtVerdicts
     private const double ScoreCornerRange = 0.7;
 
     /// <summary>
-    /// A picture that is almost all backdrop is flat, since there is nothing to confuse. Otherwise it is flat when it fills
-    /// its bounding box and every corner is full, a 3D shot when it leaves much of its bounding box empty and at least two
-    /// corners show backdrop, and unsure in between.
+    /// A picture that is almost all backdrop is flat, since there is nothing to confuse. A cut-out product picture is a 3D
+    /// shot however fully the box fills its frame. Otherwise it is flat when it fills its bounding box and every corner is
+    /// full, a 3D shot when it leaves much of its bounding box empty and at least two corners show backdrop, and unsure in
+    /// between.
     /// </summary>
     public static ArtVerdict Classify(ArtFeatures features, ArtThresholds thresholds)
     {
         if (features.BackdropShare >= thresholds.DegenerateBackdropShare)
         {
             return ArtVerdict.Flat;
+        }
+
+        if (features.CutOut == true)
+        {
+            return ArtVerdict.ThreeD;
         }
 
         if (features.Fill >= thresholds.FlatMinFill && features.Corner1 <= thresholds.FlatMaxCorner)
@@ -98,14 +105,16 @@ public static class ArtVerdicts
     }
 
     /// <summary>
-    /// A continuous measure from 0 for a flat cover to 1 for a clear 3D shot, for the review sheet. The verdict never
-    /// depends on it.
+    /// A continuous measure from 0 for a flat cover to 1 for a clear 3D shot, for the review sheet; a cut-out product
+    /// picture scores 1. The verdict never depends on it.
     /// </summary>
     public static double Score(ArtFeatures features) =>
-        Math.Clamp(
-            (ScoreFillWeight * (1 - features.Fill) / ScoreFillRange) + (ScoreCornerWeight * features.Corner2 / ScoreCornerRange),
-            0,
-            1);
+        features.CutOut == true
+            ? 1
+            : Math.Clamp(
+                (ScoreFillWeight * (1 - features.Fill) / ScoreFillRange) + (ScoreCornerWeight * features.Corner2 / ScoreCornerRange),
+                0,
+                1);
 }
 
 /// <summary>Which picture a game's box is drawn from.</summary>

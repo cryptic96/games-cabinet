@@ -29,6 +29,9 @@ public static class ArtAnalysis
     /// <summary>The share of the border the kept colours must hold together for the picture to have a backdrop at all.</summary>
     public const double BackdropMinRingShare = 0.55;
 
+    /// <summary>The share of the border that must be transparent for the picture to count as a cut-out product picture; a starting value.</summary>
+    public const double CutOutMinRingShare = BackdropMinRingShare;
+
     /// <summary>The largest colour distance, in the red, green, blue cube, at which a pixel still matches a backdrop colour.</summary>
     public const int BackdropTolerance = 18;
 
@@ -85,7 +88,7 @@ public static class ArtAnalysis
     {
         var (pixels, width, height) = WorkingCopy(source);
         var masks = BackdropMask.Analyse(pixels, width, height);
-        var features = Measure(pixels, masks.Backdrop, width, height);
+        var features = Measure(pixels, masks.Backdrop, masks.CutOut, width, height);
         var main = MainColour(pixels, masks, features, width, height);
 
         return new ArtFacts(
@@ -119,7 +122,7 @@ public static class ArtAnalysis
 
     private static bool IsOpaque(SKColor colour) => colour.Alpha >= TransparentAlpha;
 
-    private static ArtFeatures Measure(SKColor[] pixels, bool[] backdrop, int width, int height)
+    private static ArtFeatures Measure(SKColor[] pixels, bool[] backdrop, bool cutOut, int width, int height)
     {
         var backdropShare = (double)backdrop.Count(isBackdrop => isBackdrop) / pixels.Length;
         var subject = new bool[pixels.Length];
@@ -145,7 +148,7 @@ public static class ArtAnalysis
 
         if (subjectCount == 0)
         {
-            return new ArtFeatures(backdropShare, 1, 0, 0, 0);
+            return new ArtFeatures(backdropShare, 1, 0, 0, 0, cutOut);
         }
 
         var boxWidth = maxX - minX + 1;
@@ -162,7 +165,7 @@ public static class ArtAnalysis
         Array.Sort(corners);
         var sidesTouched = (minX == 0 ? 1 : 0) + (maxX == width - 1 ? 1 : 0) + (minY == 0 ? 1 : 0) + (maxY == height - 1 ? 1 : 0);
 
-        return new ArtFeatures(backdropShare, fill, corners[CornerCount - 1], corners[CornerCount - 2], sidesTouched);
+        return new ArtFeatures(backdropShare, fill, corners[CornerCount - 1], corners[CornerCount - 2], sidesTouched, cutOut);
     }
 
     private static double EmptyShare(bool[] subject, int width, int left, int top, int side)

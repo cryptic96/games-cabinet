@@ -25,7 +25,7 @@ public sealed class SyntheticArtTests
     public void Every_kind_is_listed_once()
     {
         SyntheticArt.All.Should().BeEquivalentTo(Enum.GetValues<SyntheticArtKind>());
-        SyntheticArt.All.Should().HaveCount(18);
+        SyntheticArt.All.Should().HaveCount(19);
     }
 
     [Theory]
@@ -71,6 +71,7 @@ public sealed class SyntheticArtTests
     [InlineData(SyntheticArtKind.BoxTransparentShadow, 760, 640)]
     [InlineData(SyntheticArtKind.BoxOnNoisyWhite, 760, 640)]
     [InlineData(SyntheticArtKind.DarkBorderCover, 600, 800)]
+    [InlineData(SyntheticArtKind.CutOutFrontOn, 640, 640)]
     public void Sizes_match_the_fixture_list(SyntheticArtKind kind, int width, int height)
     {
         SyntheticArt.SizeOf(kind).Should().Be((width, height));
@@ -99,6 +100,18 @@ public sealed class SyntheticArtTests
         Enumerable.Range(0, bitmap.Width).Last(x => Enumerable.Range(0, bitmap.Height).Any(y => test(bitmap.GetPixel(x, y))));
 
     private static bool IsColourful(SKColor colour) => Math.Max(colour.Red, Math.Max(colour.Green, colour.Blue)) - Math.Min(colour.Red, Math.Min(colour.Green, colour.Blue)) >= 30;
+
+    [Fact]
+    public void The_front_on_cut_out_has_only_fully_transparent_or_fully_opaque_pixels_and_fills_most_of_its_frame()
+    {
+        using var bitmap = SKBitmap.Decode(SyntheticArt.Encode(SyntheticArtKind.CutOutFrontOn));
+        var alphas = bitmap.Pixels.Select(colour => colour.Alpha).ToList();
+
+        alphas.Should().OnlyContain(alpha => alpha == 0 || alpha == 255);
+        bitmap.GetPixel(0, 0).Alpha.Should().Be(0);
+        bitmap.GetPixel(bitmap.Width - 1, bitmap.Height - 1).Alpha.Should().Be(0);
+        ((double)alphas.Count(alpha => alpha == 255) / alphas.Count).Should().BeInRange(0.75, 0.95);
+    }
 
     [Fact]
     public void The_transparent_box_is_see_through_outside_the_box()

@@ -5,7 +5,8 @@ namespace Cabinet.Repository.Images;
 /// <summary>Which pixels of a picture are plain backdrop, and which of those belong to a near-white backdrop.</summary>
 /// <param name="Backdrop">True for every pixel that is plain backdrop or nearly transparent.</param>
 /// <param name="LightBackdrop">True for the backdrop pixels whose nearest backdrop colour is near white, such as a white frame.</param>
-internal sealed record BackdropMaskResult(bool[] Backdrop, bool[] LightBackdrop);
+/// <param name="CutOut">True when a transparent ring colour is kept and holds enough of the ring for the picture to be a cut-out product picture.</param>
+internal sealed record BackdropMaskResult(bool[] Backdrop, bool[] LightBackdrop, bool CutOut);
 
 /// <summary>
 /// Finds the plain backdrop around a picture's subject from the colours along its outer border. A backdrop colour must
@@ -31,10 +32,11 @@ internal static class BackdropMask
         var light = new bool[pixels.Length];
         var ring = RingIndexes(width, height);
         var kept = KeptColours(pixels, ring);
+        var cutOut = kept.Any(colour => colour.Transparent && colour.Count >= ArtAnalysis.CutOutMinRingShare * ring.Count);
 
         if (kept.Count == 0 || KeptShare(kept, ring.Count) < ArtAnalysis.BackdropMinRingShare)
         {
-            return new BackdropMaskResult(backdrop, light);
+            return new BackdropMaskResult(backdrop, light, cutOut);
         }
 
         var queue = new Queue<int>();
@@ -64,7 +66,7 @@ internal static class BackdropMask
             light[index] = backdrop[index] && IsNearestNearWhite(pixels[index], kept);
         }
 
-        return new BackdropMaskResult(FramedSubject(backdrop, width, height), light);
+        return new BackdropMaskResult(FramedSubject(backdrop, width, height), light, cutOut);
     }
 
     private static bool[] FramedSubject(bool[] backdrop, int width, int height)

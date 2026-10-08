@@ -58,6 +58,9 @@ public enum SyntheticArtKind
 
     /// <summary>A flat cover inside a thick near-black border, with near-black art touching the border in two corners.</summary>
     DarkBorderCover,
+
+    /// <summary>A cut-out box seen almost straight on that fills most of a fully transparent frame, with hard edges and no shadow.</summary>
+    CutOutFrontOn,
 }
 
 /// <summary>
@@ -87,6 +90,7 @@ public static class SyntheticArt
     private const int NoiseRange = 6;
     private const int DarkBorderWidth = 42;
     private const float DarkTriangleShare = 0.40f;
+    private const int CutOutCanvasSize = 640;
 
     private static readonly SKColor FramedFieldColour = new(20, 130, 140);
 
@@ -105,6 +109,7 @@ public static class SyntheticArt
             => (BoxCanvasSize, BoxCanvasSize),
         SyntheticArtKind.Undecodable => (0, 0),
         SyntheticArtKind.BoxTransparentShadow or SyntheticArtKind.BoxOnNoisyWhite => (CroppedShotWidth, CroppedShotHeight),
+        SyntheticArtKind.CutOutFrontOn => (CutOutCanvasSize, CutOutCanvasSize),
         _ => (CoverWidth, CoverHeight),
     };
 
@@ -192,9 +197,35 @@ public static class SyntheticArt
             case SyntheticArtKind.DarkBorderCover:
                 DrawDarkBorderCover(canvas, width, height);
                 break;
+            case SyntheticArtKind.CutOutFrontOn:
+                DrawCutOutFrontOn(canvas);
+                break;
             default:
                 throw new NotSupportedException($"No drawing exists for {kind}.");
         }
+    }
+
+    private static void DrawCutOutFrontOn(SKCanvas canvas)
+    {
+        var front = new SKColor(40, 90, 150);
+        FillHardQuad(canvas, front, (14, 30), (560, 38), (560, 610), (14, 610));
+        FillHardQuad(canvas, new SKColor(70, 130, 190), (14, 120), (560, 124), (560, 200), (14, 196));
+        FillHardQuad(canvas, Shade(front, 0.62f), (560, 38), (620, 34), (620, 602), (560, 610));
+    }
+
+    private static void FillHardQuad(SKCanvas canvas, SKColor colour, params (float X, float Y)[] corners)
+    {
+        var builder = new SKPathBuilder();
+        builder.MoveTo(corners[0].X, corners[0].Y);
+        for (var index = 1; index < corners.Length; index++)
+        {
+            builder.LineTo(corners[index].X, corners[index].Y);
+        }
+
+        builder.Close();
+        using var path = builder.Detach();
+        using var paint = new SKPaint { Color = colour, IsAntialias = false };
+        canvas.DrawPath(path, paint);
     }
 
     private static void DrawTransparentShadowShot(SKCanvas canvas, int width, int height)

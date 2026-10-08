@@ -258,6 +258,38 @@ public sealed class ArtAnalysisTests
         new[] { facts.Top, facts.Right, facts.Bottom, facts.Left }.Should().OnlyContain(edge => Highest(edge) <= 40);
     }
 
+    [Fact]
+    public void A_cut_out_box_seen_almost_face_on_is_a_3D_shot()
+    {
+        var facts = Stored(SyntheticArtKind.CutOutFrontOn);
+
+        ArtVerdicts.Classify(facts.Features, ArtThresholds.Default).Should().Be(ArtVerdict.ThreeD, Describe(facts));
+        facts.Features.CutOut.Should().BeTrue(Describe(facts));
+    }
+
+    [Theory]
+    [InlineData(SyntheticArtKind.BoxTransparent)]
+    [InlineData(SyntheticArtKind.BoxTransparentShadow)]
+    public void Cut_out_boxes_report_a_cut_out(SyntheticArtKind kind)
+    {
+        var facts = Stored(kind);
+
+        ArtVerdicts.Classify(facts.Features, ArtThresholds.Default).Should().Be(ArtVerdict.ThreeD, Describe(facts));
+        facts.Features.CutOut.Should().BeTrue(Describe(facts));
+    }
+
+    [Fact]
+    public void Every_opaque_fixture_reports_no_cut_out()
+    {
+        var opaque = SyntheticArt.All.Where(kind => kind is not (SyntheticArtKind.Undecodable or SyntheticArtKind.BoxTransparent
+            or SyntheticArtKind.BoxTransparentShadow or SyntheticArtKind.CutOutFrontOn));
+
+        foreach (var kind in opaque)
+        {
+            Stored(kind).Features.CutOut.Should().BeFalse(kind.ToString());
+        }
+    }
+
     private static string Describe(ArtFacts facts) =>
         $"features {facts.Features}, score {ArtVerdicts.Score(facts.Features):0.00}, main {facts.Main.ToHex()}";
 
