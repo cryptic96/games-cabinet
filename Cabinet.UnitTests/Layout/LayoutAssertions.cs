@@ -108,6 +108,83 @@ internal static class LayoutAssertions
         return index >= 0 && SeriesGrouping.Group(topLevel).Any(group => group.Indices.Count > 1 && group.Indices.Contains(index));
     }
 
+    /// <summary>
+    /// Every place where a series does not run on in reading order: a game of the series that stands neither in the cubby
+    /// of the game before it nor in the very next cubby, counting cubbies across shelf rows and from the last cubby of a
+    /// section on to the first of the next. Each entry names the two games and their cubbies; an empty list means every
+    /// series stands as one block or runs on from cubby to cubby without leaving one out.
+    /// </summary>
+    public static IReadOnlyList<string> SeriesGaps(CabinetLayout layout, IReadOnlyList<CabinetItem> items, SectionDesign design) =>
+        [.. SeriesStanding(layout, items).SelectMany(series => GapsOf(series, design))];
+
+    /// <summary>The games of every series that does not run on in reading order (see <see cref="SeriesGaps"/>), each in entry order.</summary>
+    public static IReadOnlyList<IReadOnlyList<CabinetItem>> SeriesWithGaps(CabinetLayout layout, IReadOnlyList<CabinetItem> items, SectionDesign design)
+    {
+        var byEntry = items.ToDictionary(item => (item.CollectionId, item.BggId));
+
+        return
+        [
+            .. SeriesStanding(layout, items)
+                .Where(series => GapsOf(series, design).Count > 0)
+                .Select(series => (IReadOnlyList<CabinetItem>)[.. series.Select(entry => byEntry[(entry.Placement.EntryId, entry.Placement.GameId)])]),
+        ];
+    }
+
+    /// <summary>
+    /// The games of the series together with the owned expansions that stand beside them, so the series can be laid out on
+    /// its own exactly as it stands in the whole collection.
+    /// </summary>
+    public static IReadOnlyList<CabinetItem> WithOwnExpansions(IReadOnlyList<CabinetItem> series, IReadOnlyList<CabinetItem> items)
+    {
+        var bases = series.Select(item => item.BggId).ToHashSet();
+
+        return [.. series, .. items.Where(item => item.Kind == ItemKind.Expansion && OwnedParentOf(item, items) is { } parent && bases.Contains(parent))];
+    }
+
+    private static List<string> GapsOf(List<(int Section, int Cubby, Placement Placement)> series, SectionDesign design)
+    {
+        var gaps = new List<string>();
+
+        for (var index = 1; index < series.Count; index++)
+        {
+            var before = ReadingIndex(series[index - 1], design);
+            var now = ReadingIndex(series[index], design);
+
+            if (now != before && now != before + 1)
+            {
+                gaps.Add($"game {series[index].Placement.GameId} in {series[index].Section}:{series[index].Cubby} after game {series[index - 1].Placement.GameId} in {series[index - 1].Section}:{series[index - 1].Cubby}");
+            }
+        }
+
+        return gaps;
+    }
+
+    /// <summary>
+    /// The games of every series of two or more, each in the order they were added, with where they stand. The series are
+    /// read from the items with the same grouping rule the engine documents, over the games that stand on their own.
+    /// </summary>
+    private static List<List<(int Section, int Cubby, Placement Placement)>> SeriesStanding(CabinetLayout layout, IReadOnlyList<CabinetItem> items)
+    {
+        var topLevel = items
+            .Where(item => item.Kind == ItemKind.Base || OwnedParentOf(item, items) is null)
+            .OrderBy(item => item.CollectionId)
+            .ThenBy(item => item.BggId)
+            .ToList();
+        var standing = PlacementsWithPosition(layout)
+            .Where(entry => entry.Placement.Kind is PlacementKind.Spine or PlacementKind.Cover or PlacementKind.FlatBox or PlacementKind.OrphanExpansion)
+            .ToDictionary(entry => (entry.Placement.EntryId, entry.Placement.GameId));
+
+        return
+        [
+            .. SeriesGrouping.Group(topLevel)
+                .Where(group => group.Indices.Count > 1)
+                .Select(group => group.Indices.Select(index => standing[(topLevel[index].CollectionId, topLevel[index].BggId)]).ToList()),
+        ];
+    }
+
+    private static int ReadingIndex((int Section, int Cubby, Placement Placement) entry, SectionDesign design) =>
+        (entry.Section * design.Cubbies.Count) + entry.Cubby;
+
     /// <summary>Every placement of the layout with the section and cubby it stands in.</summary>
     public static IReadOnlyList<(int Section, int Cubby, Placement Placement)> PlacementsWithPosition(CabinetLayout layout) =>
         layout.Sections

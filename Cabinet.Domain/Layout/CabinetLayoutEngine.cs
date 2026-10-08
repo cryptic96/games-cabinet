@@ -7,24 +7,27 @@ namespace Cabinet.Domain.Layout;
 /// games, and expansions whose base game is not owned, are taken in collection then game identifier order, except that
 /// the games of one series (see <see cref="SeriesGrouping"/>) are taken together where the earliest of them would be
 /// taken: a series that fits one cubby stands in the first cubby, in reading order, that can take all of it, and a longer
-/// series goes game by game, each one starting at the cubby of the game before it. A game in no series goes into the
-/// first cubby, in reading order section by section, that can still take it the way it was chosen; failing that a plain
-/// game may lie flat in the first cubby that can take it lying down; a new section opens only when neither fits. An owned
-/// expansion never takes a place of its own: a thick one stands upright right beside its base game and a thinner one lies
-/// in a stack beside it, and the base game reserves the room for both in its cubby when it is placed, whether the
-/// expansion arrived before or after it. A family may use one more cubby: the next one to the right on the same shelf
-/// row. When the whole family does not fit a cubby but its game and uprights do, the stack column stands at the left edge
-/// of that next cubby, and the family stands last in its own cubby so the column is right beside it. When a whole family
-/// would hide expansions behind a marker, it shows the layers that fit under its shelf and continues in a second column at
-/// the left edge of the next cubby when that cubby has room, with the marker only for what fits nowhere. Which of these
-/// applies is fixed when the family is placed. A family never reaches a third cubby, another row or another section.
+/// series runs on from the first cubby from which each of its games can stand in the cubby of the game before it or in
+/// the very next cubby, so it never leaves a cubby out. Only a series whose games cannot stand side by side even in an
+/// empty section goes game by game to the first cubby that takes each. A game in no series goes into the first cubby, in
+/// reading order section by section, that can still take it the way it was chosen; failing that a plain game may lie flat
+/// in the first cubby that can take it lying down; a new section opens only when neither fits. An owned expansion never
+/// takes a place of its own: a thick one stands upright right beside its base game and a thinner one lies in a stack
+/// beside it, and the base game reserves the room for both in its cubby when it is placed, whether the expansion arrived
+/// before or after it. A family may use one more cubby: the next one to the right on the same shelf row. When the whole
+/// family does not fit a cubby but its game and uprights do, the stack column stands at the left edge of that next cubby,
+/// and the family stands last in its own cubby so the column is right beside it. When a whole family would hide
+/// expansions behind a marker, it shows the layers that fit under its shelf and continues in a second column at the left
+/// edge of the next cubby when that cubby has room, with the marker only for what fits nowhere, unless the next game of
+/// its series needs that room to run on. Which of these applies is fixed when the family is placed. A family never
+/// reaches a third cubby, another row or another section.
 /// Every section is drawn whole except the last, which is drawn only down to its last used shelf row (at least
 /// <see cref="MinTrimmedRows"/> rows); that is a matter of drawing alone, so no placement depends on it.
 /// </summary>
 public static class CabinetLayoutEngine
 {
     /// <summary>Bumped whenever the algorithm or a design changes on purpose, so a rearrangement is always a conscious change.</summary>
-    public const int LayoutVersion = 13;
+    public const int LayoutVersion = 14;
 
     /// <summary>
     /// The fewest shelf rows the last section is drawn with, so a nearly empty cabinet still reads as a piece of furniture.
@@ -214,10 +217,10 @@ public static class CabinetLayoutEngine
         Enumerable.Range(0, cubbyCount).Select(_ => new List<LayoutMember>()).ToList();
 
     /// <summary>
-    /// Places the games of one series, which are in entry order; a game in no series is a series of one. A series of several
-    /// games stands as one block in the first cubby, in reading order, that can take every game of it at once. When no
-    /// cubby can, its first game is placed as a plain game is and each later game continues from the cubby of the game
-    /// before it, see <see cref="PlaceOne"/>.
+    /// Places the games of one series, which are in entry order; a game in no series is a series of one and is placed on
+    /// its own, see <see cref="PlaceOne"/>. A series of several games is placed so it never leaves a cubby out, see
+    /// <see cref="TryPlaceRun"/>. Only when not even a new section can hold it that way does each game go, as a plain game
+    /// is placed, to the first cubby that takes it from the cubby of the game before it on.
     /// </summary>
     private static void PlaceSeries(
         List<List<List<LayoutMember>>> sections,
@@ -225,7 +228,7 @@ public static class CabinetLayoutEngine
         IReadOnlyList<LayoutMember> series,
         bool fewGames)
     {
-        if (series.Count > 1 && TryPlaceBlock(sections, context, series))
+        if (series.Count > 1 && TryPlaceRun(sections, context, series, fewGames))
         {
             return;
         }
@@ -238,18 +241,51 @@ public static class CabinetLayoutEngine
         }
     }
 
-    private static bool TryPlaceBlock(
+    /// <summary>
+    /// Places a series of several games so it never leaves a cubby out, and says whether it could. It tries, in turn: the
+    /// whole series as one block in one cubby; a run, in which every later game stands in the cubby of the game before it
+    /// or in the very next cubby in reading order, across shelf rows and from the last cubby of a section on into the first
+    /// of the next; such a run in which a plain game may lie flat; and such a run in which a family that is not the last
+    /// game of the series keeps its whole stack in its own column, with the marker, instead of continuing it in the next
+    /// cubby, so the next game has room there. Each way is tried from every cubby in reading order and the first that works
+    /// wins: first within the existing sections, then letting a run go on into a new section, and only then from every
+    /// cubby of a new section. Returns false, leaving the sections as they were, when nothing works even then.
+    /// </summary>
+    private static bool TryPlaceRun(
         List<List<List<LayoutMember>>> sections,
         BuildContext context,
-        IReadOnlyList<LayoutMember> series)
+        IReadOnlyList<LayoutMember> series,
+        bool fewGames)
     {
-        for (var sectionIndex = 0; sectionIndex < sections.Count; sectionIndex++)
+        var checkpoint = Checkpoint.Take(sections);
+        RunMode[] runs = context.Options.LieFlatBeforeNewSection && !fewGames
+            ? [RunMode.Standing, RunMode.LyingFlat, RunMode.KeepingStacks]
+            : [RunMode.Standing, RunMode.KeepingStacks];
+        RunMode[] all = [RunMode.Block, .. runs];
+        (RunMode[] Modes, bool Fresh, bool MayOpen)[] phases = [(all, false, false), (runs, false, true), (all, true, true)];
+
+        foreach (var (modes, fresh, mayOpen) in phases)
         {
-            for (var cubbyIndex = 0; cubbyIndex < sections[sectionIndex].Count; cubbyIndex++)
+            int[] sectionIndexes = fresh ? [checkpoint.SectionCount] : [.. Enumerable.Range(0, checkpoint.SectionCount)];
+
+            foreach (var mode in modes)
             {
-                if (TryAdd(sections, context, sectionIndex, cubbyIndex, series))
+                foreach (var sectionIndex in sectionIndexes)
                 {
-                    return true;
+                    for (var cubbyIndex = 0; cubbyIndex < context.Cubbies.Count; cubbyIndex++)
+                    {
+                        if (fresh)
+                        {
+                            sections.Add(NewSection(context.Cubbies.Count));
+                        }
+
+                        if (TryRunFrom(sections, context, series, new Position(sectionIndex, cubbyIndex), mode, mayOpen, fewGames))
+                        {
+                            return true;
+                        }
+
+                        checkpoint.Restore(sections);
+                    }
                 }
             }
         }
@@ -258,18 +294,132 @@ public static class CabinetLayoutEngine
     }
 
     /// <summary>
+    /// Places the series from the start cubby in the given way and says whether every game found a place; the caller undoes
+    /// what was added when one did not. A block puts every game in the start cubby at once. A run puts the first game in the
+    /// start cubby and every later game in the cubby of the game before it or else in the very next cubby in reading order,
+    /// standing the way it was chosen before lying flat when the mode allows that; a game that lands in a later cubby than
+    /// the game before it is marked so it stands first there. The cubby after the last one of the last section is the first
+    /// of a new section, which is opened only when <paramref name="mayOpen"/> allows it.
+    /// </summary>
+    private static bool TryRunFrom(
+        List<List<List<LayoutMember>>> sections,
+        BuildContext context,
+        IReadOnlyList<LayoutMember> series,
+        Position start,
+        RunMode mode,
+        bool mayOpen,
+        bool fewGames)
+    {
+        if (mode == RunMode.Block)
+        {
+            return TryAdd(sections, context, start.Section, start.Cubby, series);
+        }
+
+        Position? previous = null;
+
+        for (var index = 0; index < series.Count; index++)
+        {
+            var member = series[index];
+            Position[] cubbies = previous is { } before ? [before, Following(context, before)] : [start];
+            LayoutMember[] poses = mode is RunMode.LyingFlat or RunMode.KeepingStacks && MayLieFlatInstead(context, member, fewGames)
+                ? [member, member with { Pose = BoxPose.Flat }]
+                : [member];
+            var mayContinue = mode != RunMode.KeepingStacks || index == series.Count - 1;
+
+            if (TryPlaceAmong(sections, context, poses, cubbies, previous, new Permits(mayOpen, mayContinue)) is not { } placed)
+            {
+                return false;
+            }
+
+            previous = placed;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Tries each pose in turn in each of the cubbies in turn and returns the cubby that took the game, or null when none
+    /// did. A game that lands in a later cubby than the game of its series before it is marked so it stands first there.
+    /// </summary>
+    private static Position? TryPlaceAmong(
+        List<List<List<LayoutMember>>> sections,
+        BuildContext context,
+        IReadOnlyList<LayoutMember> poses,
+        IReadOnlyList<Position> cubbies,
+        Position? previous,
+        Permits permits)
+    {
+        foreach (var pose in poses)
+        {
+            foreach (var cubby in cubbies)
+            {
+                var candidate = previous is { } before && cubby.IsAfter(before) ? pose with { FromPreviousCubby = true } : pose;
+
+                if (TryAddOpening(sections, context, cubby, candidate, permits))
+                {
+                    return cubby;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Adds the game to the cubby as <see cref="TryAdd"/> does. When the cubby is the first of the section after the last
+    /// one, a new section is opened for it first if the permits allow that, and taken away again when the game does not fit.
+    /// </summary>
+    private static bool TryAddOpening(
+        List<List<List<LayoutMember>>> sections,
+        BuildContext context,
+        Position cubby,
+        LayoutMember member,
+        Permits permits)
+    {
+        var opens = cubby.Section == sections.Count;
+
+        if (opens && !permits.MayOpen)
+        {
+            return false;
+        }
+
+        if (opens)
+        {
+            sections.Add(NewSection(context.Cubbies.Count));
+        }
+
+        if (TryAdd(sections, context, cubby.Section, cubby.Cubby, [member], permits.MayContinue))
+        {
+            return true;
+        }
+
+        if (opens)
+        {
+            sections.RemoveAt(sections.Count - 1);
+        }
+
+        return false;
+    }
+
+    /// <summary>The next cubby in reading order: the next one of the section, or the first of the next section after its last.</summary>
+    private static Position Following(BuildContext context, Position cubby) =>
+        cubby.Cubby + 1 < context.Cubbies.Count ? cubby with { Cubby = cubby.Cubby + 1 } : new Position(cubby.Section + 1, 0);
+
+    /// <summary>
     /// Adds the members to one cubby when it can take them, and says whether it did. A family goes there whole, its column
     /// beside it, when it fits. When the whole family does not fit, a family with stacked expansions may stand in the
     /// cubby without its column when the next cubby of the same shelf row takes the column at its left edge. And when a
     /// whole family would hide expansions behind a marker, it continues in a second column at the left edge of that next
-    /// cubby instead, when the next cubby has room. Nothing ever goes beyond the next cubby of the row.
+    /// cubby instead, when the next cubby has room and <paramref name="mayContinue"/> allows it. Nothing ever goes beyond
+    /// the next cubby of the row.
     /// </summary>
     private static bool TryAdd(
         List<List<List<LayoutMember>>> sections,
         BuildContext context,
         int sectionIndex,
         int cubbyIndex,
-        IReadOnlyList<LayoutMember> batch)
+        IReadOnlyList<LayoutMember> batch,
+        bool mayContinue = true)
     {
         var section = sections[sectionIndex];
         var here = section[cubbyIndex];
@@ -277,7 +427,7 @@ public static class CabinetLayoutEngine
 
         if (CanArrange(context, sectionIndex, cubbyIndex, [.. here, .. batch]))
         {
-            if (nextIndex is { } overflowIndex && TryContinue(context, sectionIndex, cubbyIndex, overflowIndex, section, batch) is { } split)
+            if (mayContinue && nextIndex is { } overflowIndex && TryContinue(context, sectionIndex, cubbyIndex, overflowIndex, section, batch) is { } split)
             {
                 here.AddRange(split.Batch);
                 section[overflowIndex].Add(split.Column);
@@ -406,16 +556,21 @@ public static class CabinetLayoutEngine
         LayoutMember member,
         bool fewGames,
         Position start,
-        Position? previous)
-    {
-        var eligible = context.Options.LieFlatBeforeNewSection
-            && !fewGames
-            && member.Pose != BoxPose.Flat
-            && !member.IsOrphanExpansion
-            && !member.HasFamily;
+        Position? previous) =>
+        MayLieFlatInstead(context, member, fewGames)
+            ? TryPlaceFrom(sections, context, member with { Pose = BoxPose.Flat }, start, previous)
+            : null;
 
-        return eligible ? TryPlaceFrom(sections, context, member with { Pose = BoxPose.Flat }, start, previous) : null;
-    }
+    /// <summary>
+    /// Whether the game may lie flat when no cubby has room for it the way it was chosen: only a plain game chosen to face
+    /// out or stand, and only when the setting is on and the few-games look is off.
+    /// </summary>
+    private static bool MayLieFlatInstead(BuildContext context, LayoutMember member, bool fewGames) =>
+        context.Options.LieFlatBeforeNewSection
+        && !fewGames
+        && member.Pose != BoxPose.Flat
+        && !member.IsOrphanExpansion
+        && !member.HasFamily;
 
     private static Position? TryPlaceFrom(
         List<List<List<LayoutMember>>> sections,
@@ -514,6 +669,62 @@ public static class CabinetLayoutEngine
     private readonly record struct Position(int Section, int Cubby)
     {
         public bool IsAfter(Position other) => Section > other.Section || (Section == other.Section && Cubby > other.Cubby);
+    }
+
+    /// <summary>What a game of a run may do while it is placed.</summary>
+    /// <param name="MayOpen">Whether the run may open a new section after the last one.</param>
+    /// <param name="MayContinue">Whether a family may continue its stack in a second column in the next cubby.</param>
+    private readonly record struct Permits(bool MayOpen, bool MayContinue);
+
+    /// <summary>How a series of several games may spread over the cubbies, tried in this order.</summary>
+    private enum RunMode
+    {
+        /// <summary>Every game in one cubby at once, the way it was chosen.</summary>
+        Block,
+
+        /// <summary>Each game in the cubby of the game before it or the very next one, the way it was chosen.</summary>
+        Standing,
+
+        /// <summary>As <see cref="Standing"/>, and a plain game that fits neither cubby the way it was chosen may lie flat.</summary>
+        LyingFlat,
+
+        /// <summary>
+        /// As <see cref="LyingFlat"/>, and a family that is not the last game of the series keeps its whole stack in its own
+        /// column, with the marker, so the next game of the series has room in the next cubby.
+        /// </summary>
+        KeepingStacks,
+    }
+
+    /// <summary>
+    /// What the sections held before a series was tried: how many sections there were and how many members each cubby had.
+    /// Placing only ever adds members and sections, so restoring the counts undoes a try exactly.
+    /// </summary>
+    private sealed class Checkpoint
+    {
+        private readonly int[][] _counts;
+
+        private Checkpoint(int[][] counts) => _counts = counts;
+
+        public int SectionCount => _counts.Length;
+
+        public static Checkpoint Take(List<List<List<LayoutMember>>> sections) =>
+            new([.. sections.Select(section => section.Select(cubby => cubby.Count).ToArray())]);
+
+        public void Restore(List<List<List<LayoutMember>>> sections)
+        {
+            sections.RemoveRange(SectionCount, sections.Count - SectionCount);
+
+            for (var sectionIndex = 0; sectionIndex < SectionCount; sectionIndex++)
+            {
+                for (var cubbyIndex = 0; cubbyIndex < _counts[sectionIndex].Length; cubbyIndex++)
+                {
+                    var cubby = sections[sectionIndex][cubbyIndex];
+                    var count = _counts[sectionIndex][cubbyIndex];
+
+                    cubby.RemoveRange(count, cubby.Count - count);
+                }
+            }
+        }
     }
 
     private sealed record BuildContext(SectionDesign Design, IReadOnlyList<CubbyDesign> Cubbies, LayoutOptions Options)

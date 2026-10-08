@@ -44,8 +44,10 @@ on top of that last column and only for what fits nowhere. A family never reache
 a third cubby, another shelf row or another section, so every layer stays under
 its own cubby's shelf, and the layers drawn plus the number in the marker are
 always every expansion in its stack. A family in the last cubby of its shelf row
-keeps the single column and its marker. A cubby takes at most one family that
-continues next door, and at most one such column.
+keeps the single column and its marker. So does a family whose series could not
+run on otherwise, when the next game of its series needs the room that second
+column would take (see the series rules below). A cubby takes at most one family
+that continues next door, and at most one such column.
 
 Games of one series stand next to each other. Two things make games a series.
 The first is BoardGameGeek's family names: only families whose name starts with
@@ -64,13 +66,29 @@ base game never counts for a series of its own.
 A series is placed as one block where its earliest game would have been placed,
 with its games in the order they were added to the collection. It goes into the
 first cubby, in reading order, that can take the whole series, and inside the
-cubby its games stand side by side. A series too long for any one cubby goes
-game by game: each game starts looking at the cubby of the game before it and
-never goes back to an earlier cubby, so the series runs on from cubby to cubby
-and into later sections. A game that lands in a later cubby than the game before
-it stands first, at the left, in that cubby, so the series reads on from there.
-The setting `Layout:GroupSeries` switches all of this off, and the cabinet is
-then arranged as if no game belonged to a series.
+cubby its games stand side by side. A series too long for any one cubby runs on
+from cubby to cubby and never leaves a cubby out: each game stands in the cubby
+of the game before it or in the very next cubby in reading order, which after the
+last cubby of a shelf row is the first cubby of the row below, and after the last
+cubby of a section the first cubby of the next section. The series starts in the
+first cubby, in reading order, from which it can run on like that. When it can
+only do so with a plain game lying flat, that game lies flat. When it can only do
+so with a family that is not its last game keeping its whole stack in one column
+with the "+N more" marker, instead of continuing it in the next cubby, the family
+keeps the marker. A new section opens for the series only when no such run fits
+the existing sections: first a run that starts in the existing sections may go on
+into a new section, and only when none can does the series start in a new
+section. A game that lands in a later cubby than the game before it stands first,
+at the left, in that cubby, so the series reads on from there.
+
+Very rarely the games of a series cannot stand side by side even in an empty
+section: for example two tall boxes that each fit only the one cubby of the
+design that is tall and wide enough, and not together. Only then does each game
+go to the first cubby, from the cubby of the game before it on, that can take it,
+so the series still runs forward but with a gap. This is more likely on a phone,
+whose narrow design has fewer large cubbies, and with a high cover share. The
+setting `Layout:GroupSeries` switches all of this off, and the cabinet is then
+arranged as if no game belonged to a series.
 
 Boxes lying flat are piled up to four high, with the widest box at the bottom
 and the thicker box lower among boxes of the same width, so no box overhangs
@@ -112,7 +130,7 @@ two underscores.
 
 | Key | Default | Allowed values | What it does |
 |-----|---------|----------------|--------------|
-| `Layout:CoverSharePercent` | 25 | 0 to 100 | The share of boxes that face out as covers. With the size-weighted strategy the share is spread unevenly by box size. |
+| `Layout:CoverSharePercent` | 33 | 0 to 100 | The share of boxes that face out as covers. With the size-weighted strategy the share is spread unevenly by box size. The committed value was picked by looking at the real collection on the server: at 33 about a third of the games face out, families included, which is how the owner wants the shelves to read. A setting file without this key falls back to 25, the value the recorded layouts are made with. |
 | `Layout:CoverStrategy` | `SizeWeighted` | `SizeWeighted`, `Random`, `OversizeOnly` | How the boxes that face out are chosen. `SizeWeighted` makes large boxes much more likely to face out. `Random` gives every box the same chance, decided from its game identifier alone. `OversizeOnly` faces out exactly the boxes too tall to stand upright in the design and ignores the share. |
 | `Layout:ExpansionStackMax` | 6 | 1 to 20 | The most expansions drawn in one stack before the rest are summed up as "+N more". |
 | `Layout:FewGamesThreshold` | 12 | 0 to 100 | Below this many top-level games, every box faces out, so a small collection fills the cabinet with covers instead of a few lonely spines. |
@@ -180,13 +198,17 @@ A few changes rearrange more than that, and these are accepted:
 - An expansion that makes its family wider may move that family, and later
   cubbies may shift to make room, while every game ordered before the base game
   keeps its cubby. That is the first expansion for a game, the first one that
-  lies in a game's stack, and a big one that stands upright. An expansion that
-  joins a stack its game already has changes only that game's cubby, or the next
-  cubby when the stack's column already stands there.
+  lies in a game's stack, and a big one that stands upright. When the base game
+  belongs to a series, the whole series may move with it, because the series is
+  placed together where its first game stands, so then the games ordered before
+  the first game of the series are the ones that keep their cubby. An expansion
+  that joins a stack its game already has changes only that game's cubby, or the
+  next cubby when the stack's column already stands there.
 - The expansion that brings a base game to the threshold of
   `Layout:CoverFromExpansions` turns that game to face out, which widens its
   family, so it is accepted like any other widening: later cubbies may shift while
-  every game ordered before the base game keeps its cubby.
+  every game ordered before the base game, or before the first game of its series,
+  keeps its cubby.
 - The expansion that first needs the next cubby, either because the column does
   not fit beside the game any more or because the stack would otherwise hide
   expansions, changes that cubby too and may shift later cubbies. The family then
@@ -355,10 +377,12 @@ The tests keep the full layout of the samples of 0, 1, 5, 12 and 65 games on
 both designs, and a digest of the layout of the 400-game sample. They live in
 `Cabinet.UnitTests/Layout/Golden/`, next to a record of the layout version they
 were made at. Any change to the arrangement or to a section design shows up as
-a difference from those files, in the tests and in review. Thin boxes being
-drawn at their real thickness, down to the one-line floors, is why the recorded
-layouts changed from the version before: those boxes are narrower or lower than
-they were, and where that lets a later box fit earlier it moved too.
+a difference from those files, in the tests and in review. Series that run on
+from cubby to cubby without leaving a cubby out are why the recorded layouts
+changed from the version before: in the sample of 400 games several series used
+to leave cubbies out, and now stand side by side, which moves the games placed
+after them. The smaller samples keep their arrangement; only the version they
+record changed.
 
 An intended change needs two steps. Raise `CabinetLayoutEngine.LayoutVersion`,
 then record the layouts again from the repository root:

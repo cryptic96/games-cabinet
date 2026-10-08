@@ -1,5 +1,6 @@
 ---
 created: 2026-10-08T00:00:00.000Z
+updated: 2026-10-08T00:00:00.000Z
 title: Owner image overrides: candidate rows from the server review
 area: images
 severity: minor
@@ -8,12 +9,28 @@ files: []
 
 ## Problem
 
-The picture detector cannot always pick the picture the owner wants, and some games have no better candidate than the wrong one. Named by review-sheet row number only, these rows came out of the second server review round and are the first candidates for owner image overrides:
+The cabinet prefers a flat cover over a picture of the owned edition that reads as a 3D shot, a cut-out or a tight crop. The owner confirmed this rule ("flat covers first") at the end of the third server review round and chose to keep it. The consequence is that some games show their game's main picture, which can be another edition, another language or a generic picture, while a picture of the owned edition exists. Per-game owner image overrides are the fix.
 
-- Row 8, row 13 and row 15: wrong picks the detector could not solve on its own before the detector fix of plan 04-19; they may now pick their flat main picture, but the owned edition's picture is what the owner wants shown, so they stay candidates until review round 3 confirms.
-- Row 42: the owner wants the owned edition shown; the detector may now pick the main picture, which the owner accepts for now.
-- Row 44: its main picture shows another edition, and the detector falls back to it when the owned edition's picture is a 3D shot.
+Named by review-sheet row number only (the sheet is in collection order), these are the rows of the third round whose pick is the main picture while an owned-version picture exists. There are 23.
+
+Rows seen showing another edition, another language or a generic picture (judged by eye from the sheet pages):
+
+- Rows 11, 14, 29, 30, 33, 38, 41, 42, 44, 48 and 58: the main picture is another edition or another language than the owned one.
+- Row 37: the main picture appeared to be another edition.
+- Rows 59, 60, 61 and 62: all four show the same generic picture of several games together instead of their own box.
+
+Rows where the owner accepted the flat main picture under "flat covers first":
+
+- Rows 8, 13 and 15.
+
+Other rows whose pick is the main picture while an owned-version picture exists, with no difference seen between the two pictures beyond the owned one reading as a 3D shot or an unsure shape:
+
+- Rows 7, 9, 52 and 65.
+
+Row 42: the owner wants the owned edition shown; the main picture is accepted for now.
+
+Rows with no owned-version picture at all (10, 12, 16, 22, 23, 24, 31, 39, 47, 53 and 57) are not override candidates of this kind; they have nothing else to show.
 
 ## Solution
 
-When the owner image overrides arrive in the owner-tools phase (D-05, phase 6), check these rows first, after review round 3 confirms which of them still need one. No titles, addresses or picture data belong in this note.
+When the owner image overrides arrive in the owner-tools phase, work through the rows above, starting with the ones seen showing another edition, language or a generic picture. The detector settings and the "flat covers first" rule stay as they are; no stopgap list is built before then. No titles, addresses or picture data belong in this note.
