@@ -1,7 +1,9 @@
 using System.Net;
 using System.Text.Json;
+using Cabinet.Service.Layout;
 using Cabinet.UnitTests.Infrastructure;
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 
 namespace Cabinet.UnitTests.Configuration;
 
@@ -56,6 +58,50 @@ public class CommittedConfigurationTests
         using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(RepositoryPaths.ServiceDirectory(), "appsettings.json")));
 
         document.RootElement.GetProperty("Layout").GetProperty("CoverFromExpansions").GetInt32().Should().Be(2);
+    }
+
+    [Fact]
+    [Trait("Category", "Configuration")]
+    public void The_committed_layout_values_are_the_picked_numbers_and_pass_their_settings_validation()
+    {
+        var configuration = CommittedConfiguration();
+        var layout = configuration.GetSection("Layout");
+
+        layout["CoverSharePercent"].Should().Be("33");
+        layout["CoverFromExpansions"].Should().Be("2");
+        layout["GroupSeries"].Should().BeEquivalentTo("true");
+
+        var options = LayoutSettings.FromConfiguration(configuration);
+
+        options.CoverSharePercent.Should().Be(33);
+        options.CoverFromExpansions.Should().Be(2);
+        options.GroupSeries.Should().BeTrue();
+    }
+
+    [Fact]
+    [Trait("Category", "Configuration")]
+    public void The_committed_art_values_are_the_tuned_numbers_and_pass_their_settings_validation()
+    {
+        var configuration = CommittedConfiguration();
+        var art = configuration.GetSection("Art");
+
+        art["FlatMinFillPercent"].Should().Be("97");
+        art["FlatMaxCornerPercent"].Should().Be("15");
+        art["ThreeDMaxFillPercent"].Should().Be("93");
+        art["ThreeDMinCornerPercent"].Should().Be("40");
+        art["ShapeMarginPercent"].Should().Be("12");
+        art["OrientFromCover"].Should().BeEquivalentTo("true");
+        art["UnsureLandscapeMarginPercent"].Should().Be("20");
+
+        var rules = ArtSettings.FromConfiguration(configuration);
+
+        rules.Thresholds.FlatMinFill.Should().Be(0.97);
+        rules.Thresholds.FlatMaxCorner.Should().Be(0.15);
+        rules.Thresholds.ThreeDMaxFill.Should().Be(0.93);
+        rules.Thresholds.ThreeDMinCorner.Should().Be(0.40);
+        rules.ShapeMarginPercent.Should().Be(12);
+        rules.OrientFromCover.Should().BeTrue();
+        rules.UnsureLandscapeMarginPercent.Should().Be(20);
     }
 
     [Fact]
@@ -118,6 +164,11 @@ public class CommittedConfigurationTests
         assignments.Where(assignment => IPAddress.TryParse(assignment.Value, out _))
             .Should().OnlyContain(assignment => DocumentationRanges.Any(range => assignment.Value.StartsWith(range, StringComparison.Ordinal)));
     }
+
+    private static IConfiguration CommittedConfiguration() =>
+        new ConfigurationBuilder()
+            .AddJsonFile(Path.Combine(RepositoryPaths.ServiceDirectory(), "appsettings.json"), optional: false)
+            .Build();
 
     private static string Value(IEnumerable<(string Name, string Value)> assignments, string name) =>
         assignments.Single(assignment => assignment.Name == name).Value;

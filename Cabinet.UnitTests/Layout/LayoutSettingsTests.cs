@@ -11,7 +11,7 @@ public class LayoutSettingsTests
 {
     [Fact]
     [Trait("Category", "Layout")]
-    public void The_committed_appsettings_bind_to_the_documented_defaults()
+    public void The_committed_appsettings_bind_to_the_built_in_defaults_with_the_picked_cover_share()
     {
         var configuration = new ConfigurationBuilder()
             .AddJsonFile(Path.Combine(RepositoryPaths.ServiceDirectory(), "appsettings.json"), optional: false)
@@ -19,8 +19,8 @@ public class LayoutSettingsTests
 
         var options = LayoutSettings.FromConfiguration(configuration);
 
-        options.Should().Be(new LayoutOptions(25, CoverStrategy.SizeWeighted, 6, 12, true, true, 2));
-        options.Should().Be(LayoutOptions.Default);
+        options.Should().Be(new LayoutOptions(33, CoverStrategy.SizeWeighted, 6, 12, true, true, 2));
+        options.Should().Be(LayoutOptions.Default with { CoverSharePercent = 33 });
     }
 
     [Fact]
