@@ -56,15 +56,15 @@
     {
       "index": 0,
       "widthMm": 1200,
-      "heightMm": 1490,
+      "heightMm": 1170,
       "frameMm": 20,
       "cubbies": [
         {
           "index": 0,
           "xMm": 0,
           "yMm": 0,
-          "widthMm": 250,
-          "heightMm": 330,
+          "widthMm": 190,
+          "heightMm": 310,
           "placements": [
             {
               "gameId": 10025,
@@ -96,10 +96,10 @@
         },
         {
           "index": 1,
-          "xMm": 270,
+          "xMm": 210,
           "yMm": 0,
-          "widthMm": 190,
-          "heightMm": 330,
+          "widthMm": 240,
+          "heightMm": 310,
           "placements": [
             {
               "gameId": 10116,
@@ -118,32 +118,10 @@
         },
         {
           "index": 2,
-          "xMm": 480,
+          "xMm": 470,
           "yMm": 0,
-          "widthMm": 260,
-          "heightMm": 330,
-          "placements": [
-            {
-              "gameId": 10132,
-              "entryId": 500144,
-              "kind": "spine",
-              "xMm": 0,
-              "yMm": 0,
-              "widthMm": 74,
-              "heightMm": 255,
-              "title": "Quaylo Tavfordwyn Heskwynquin: Orvquinford Kelford Orvvex",
-              "label": "Quaylo Tavfordwyn\u2026",
-              "toneIndex": 5,
-              "patternIndex": 0
-            }
-          ]
-        },
-        {
-          "index": 3,
-          "xMm": 760,
-          "yMm": 0,
-          "widthMm": 440,
-          "heightMm": 330,
+          "widthMm": 290,
+          "heightMm": 310,
           "placements": [
             {
               "gameId": 10064,
@@ -161,11 +139,41 @@
           ]
         },
         {
+          "index": 3,
+          "xMm": 780,
+          "yMm": 0,
+          "widthMm": 230,
+          "heightMm": 310,
+          "placements": [
+            {
+              "gameId": 10132,
+              "entryId": 500144,
+              "kind": "spine",
+              "xMm": 0,
+              "yMm": 0,
+              "widthMm": 74,
+              "heightMm": 255,
+              "title": "Quaylo Tavfordwyn Heskwynquin: Orvquinford Kelford Orvvex",
+              "label": "Quaylo Tavfordwyn\u2026",
+              "toneIndex": 5,
+              "patternIndex": 0
+            }
+          ]
+        },
+        {
           "index": 4,
+          "xMm": 1030,
+          "yMm": 0,
+          "widthMm": 170,
+          "heightMm": 310,
+          "placements": []
+        },
+        {
+          "index": 5,
           "xMm": 0,
-          "yMm": 350,
-          "widthMm": 260,
-          "heightMm": 360,
+          "yMm": 330,
+          "widthMm": 430,
+          "heightMm": 430,
           "placements": [
             {
               "gameId": 10000,
@@ -179,15 +187,63 @@
               "label": "Heskbar Zimwyn",
               "toneIndex": 10,
               "patternIndex": 4
+            },
+            {
+              "gameId": 10066,
+              "entryId": 500051,
+              "kind": "cover",
+              "xMm": 77,
+              "yMm": 0,
+              "widthMm": 329,
+              "heightMm": 366,
+              "title": "Pellthan Drelra",
+              "label": "Pellthan Drelra",
+              "toneIndex": 6,
+              "patternIndex": 3
             }
           ]
         },
         {
-          "index": 5,
-          "xMm": 280,
-          "yMm": 350,
-          "widthMm": 270,
-          "heightMm": 360,
+          "index": 6,
+          "xMm": 450,
+          "yMm": 330,
+          "widthMm": 390,
+          "heightMm": 430,
+          "placements": [
+            {
+              "gameId": 10153,
+              "entryId": 500168,
+              "kind": "spine",
+              "xMm": 0,
+              "yMm": 0,
+              "widthMm": 90,
+              "heightMm": 373,
+              "title": "Tarntor Wendskra Yartor: and of Jormere Drelmeremont",
+              "label": "Tarntor Wendskra Yartor",
+              "toneIndex": 11,
+              "patternIndex": 2
+            },
+            {
+              "gameId": 10090,
+              "entryId": 500071,
+              "kind": "cover",
+              "xMm": 90,
+              "yMm": 0,
+              "widthMm": 275,
+              "heightMm": 275,
+              "title": "Morquinbar: the of",
+              "label": "Morquinbar: the of",
+              "toneIndex": 9,
+              "patternIndex": 1
+            }
+          ]
+        },
+        {
+          "index": 7,
+          "xMm": 860,
+          "yMm": 330,
+          "widthMm": 340,
+          "heightMm": 430,
           "placements": [
             {
               "gameId": 10147,
@@ -205,101 +261,11 @@
           ]
         },
         {
-          "index": 6,
-          "xMm": 570,
-          "yMm": 350,
-          "widthMm": 430,
-          "heightMm": 360,
-          "placements": [
-            {
-              "gameId": 10090,
-              "entryId": 500071,
-              "kind": "cover",
-              "xMm": 0,
-              "yMm": 0,
-              "widthMm": 275,
-              "heightMm": 275,
-              "title": "Morquinbar: the of",
-              "label": "Morquinbar: the of",
-              "toneIndex": 9,
-              "patternIndex": 1
-            }
-          ]
-        },
-        {
-          "index": 7,
-          "xMm": 1020,
-          "yMm": 350,
-          "widthMm": 180,
-          "heightMm": 360,
-          "placements": []
-        },
-        {
           "index": 8,
           "xMm": 0,
-          "yMm": 730,
-          "widthMm": 360,
-          "heightMm": 370,
-          "placements": [
-            {
-              "gameId": 10066,
-              "entryId": 500051,
-              "kind": "cover",
-              "xMm": 0,
-              "yMm": 0,
-              "widthMm": 329,
-              "heightMm": 366,
-              "title": "Pellthan Drelra",
-              "label": "Pellthan Drelra",
-              "toneIndex": 6,
-              "patternIndex": 3
-            }
-          ]
-        },
-        {
-          "index": 9,
-          "xMm": 380,
-          "yMm": 730,
-          "widthMm": 320,
-          "heightMm": 370,
-          "placements": [
-            {
-              "gameId": 10153,
-              "entryId": 500168,
-              "kind": "spine",
-              "xMm": 0,
-              "yMm": 0,
-              "widthMm": 90,
-              "heightMm": 370,
-              "title": "Tarntor Wendskra Yartor: and of Jormere Drelmeremont",
-              "label": "Tarntor Wendskra Yartor",
-              "toneIndex": 11,
-              "patternIndex": 2
-            }
-          ]
-        },
-        {
-          "index": 10,
-          "xMm": 720,
-          "yMm": 730,
-          "widthMm": 230,
-          "heightMm": 370,
-          "placements": []
-        },
-        {
-          "index": 11,
-          "xMm": 970,
-          "yMm": 730,
-          "widthMm": 230,
-          "heightMm": 370,
-          "placements": []
-        },
-        {
-          "index": 12,
-          "xMm": 0,
-          "yMm": 1120,
-          "widthMm": 260,
-          "heightMm": 370,
+          "yMm": 780,
+          "widthMm": 280,
+          "heightMm": 390,
           "placements": [
             {
               "gameId": 10173,
@@ -317,11 +283,11 @@
           ]
         },
         {
-          "index": 13,
-          "xMm": 280,
-          "yMm": 1120,
-          "widthMm": 540,
-          "heightMm": 370,
+          "index": 9,
+          "xMm": 300,
+          "yMm": 780,
+          "widthMm": 550,
+          "heightMm": 390,
           "placements": [
             {
               "gameId": 10213,
@@ -339,11 +305,11 @@
           ]
         },
         {
-          "index": 14,
-          "xMm": 840,
-          "yMm": 1120,
-          "widthMm": 360,
-          "heightMm": 370,
+          "index": 10,
+          "xMm": 870,
+          "yMm": 780,
+          "widthMm": 330,
+          "heightMm": 390,
           "placements": []
         }
       ]

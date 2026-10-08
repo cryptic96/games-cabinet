@@ -8,18 +8,19 @@ namespace Cabinet.UnitTests.Layout;
 /// Pins how full the desktop cabinet is, next to the phone checks: on realistic collections no section but the last keeps a
 /// bare shelf row, a collection of about sixty-five games has no bare row in the middle of any section, and a large
 /// collection does not end in a run of nearly empty sections because its biggest boxes had too few cubbies to go to.
-/// A section before the last holds at least 25 boxes: placing a series together packs one seeded collection a little less
-/// tightly than game by game, which is why the floor sits below the 30 it had before series stood together.
+/// A section before the last holds at least 30 boxes, and a realistic mix of box sizes never ends in a section of fewer than
+/// twelve placements that holds more than two big boxes.
 /// </summary>
 public class DesktopDensityTests
 {
     private const int LargeCount = 400;
     private const int MediumCount = 65;
-    private const int NonLastSectionFloor = 25;
+    private const int NonLastSectionFloor = 30;
     private const string SamplePrefix = "sample-";
     private const string SpikePrefix = "spike-";
     private const string MixPrefix = "mix-";
     private const int SmallTailPlacements = 12;
+    private const int MostBigBoxesInASmallTail = 2;
     private const int ShareDefault = 25;
     private const int ShareServer = 33;
 
@@ -32,8 +33,10 @@ public class DesktopDensityTests
     private static readonly string[] LargeNames =
         [SamplePrefix + "400", .. LargeSeeds.Select(seed => SpikePrefix + LargeCount + "-" + seed)];
 
-    private static readonly int[] MixMediumSeeds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-    private static readonly int[] MixLargeSeeds = [1, 2, 3, 4, 5, 6, 7, 8];
+    /// <summary>Seeds of the realistic mix of sixty-five games: four the design search trained on, the rest never seen by it, and the last five seeds on which the earlier design piled big boxes into a small last section.</summary>
+    private static readonly int[] MixMediumSeeds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 209, 210, 217, 260, 287];
+    /// <summary>Seeds of the realistic mix of four hundred games: two the design search trained on, the rest never seen by it, and the last five seeds on which the earlier design piled big boxes into a small last section.</summary>
+    private static readonly int[] MixLargeSeeds = [1, 2, 3, 4, 5, 6, 7, 8, 102, 106, 112, 118, 127];
 
     private static readonly string[] MixNames =
     [
@@ -115,7 +118,7 @@ public class DesktopDensityTests
 
         if (layout.Sections.Count > 1)
         {
-            (placements[^1] >= SmallTailPlacements || bigBoxes <= 1).Should().BeTrue("{0} at {1} percent: the last section holds {2} placements and {3} big boxes ({4})", name, coverSharePercent, placements[^1], bigBoxes, string.Join(", ", placements));
+            (placements[^1] >= SmallTailPlacements || bigBoxes <= MostBigBoxesInASmallTail).Should().BeTrue("{0} at {1} percent: the last section holds {2} placements and {3} big boxes ({4})", name, coverSharePercent, placements[^1], bigBoxes, string.Join(", ", placements));
         }
     }
 

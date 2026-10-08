@@ -56,71 +56,71 @@
     {
       "index": 0,
       "widthMm": 1200,
-      "heightMm": 710,
+      "heightMm": 760,
       "frameMm": 20,
       "cubbies": [
         {
           "index": 0,
           "xMm": 0,
           "yMm": 0,
-          "widthMm": 250,
-          "heightMm": 330,
+          "widthMm": 190,
+          "heightMm": 310,
           "placements": []
         },
         {
           "index": 1,
-          "xMm": 270,
+          "xMm": 210,
           "yMm": 0,
-          "widthMm": 190,
-          "heightMm": 330,
+          "widthMm": 240,
+          "heightMm": 310,
           "placements": []
         },
         {
           "index": 2,
-          "xMm": 480,
+          "xMm": 470,
           "yMm": 0,
-          "widthMm": 260,
-          "heightMm": 330,
+          "widthMm": 290,
+          "heightMm": 310,
           "placements": []
         },
         {
           "index": 3,
-          "xMm": 760,
+          "xMm": 780,
           "yMm": 0,
-          "widthMm": 440,
-          "heightMm": 330,
+          "widthMm": 230,
+          "heightMm": 310,
           "placements": []
         },
         {
           "index": 4,
-          "xMm": 0,
-          "yMm": 350,
-          "widthMm": 260,
-          "heightMm": 360,
+          "xMm": 1030,
+          "yMm": 0,
+          "widthMm": 170,
+          "heightMm": 310,
           "placements": []
         },
         {
           "index": 5,
-          "xMm": 280,
-          "yMm": 350,
-          "widthMm": 270,
-          "heightMm": 360,
+          "xMm": 0,
+          "yMm": 330,
+          "widthMm": 430,
+          "heightMm": 430,
           "placements": []
         },
         {
           "index": 6,
-          "xMm": 570,
-          "yMm": 350,
-          "widthMm": 430,
-          "heightMm": 360,
+          "xMm": 450,
+          "yMm": 330,
+          "widthMm": 390,
+          "heightMm": 430,
           "placements": []
         },
         {
           "index": 7,
-          "xMm": 1020,
-          "yMm": 350,
-          "widthMm": 180,
-          "heightMm": 360,
+          "xMm": 860,
+          "yMm": 330,
+          "widthMm": 340,
+          "heightMm": 430,
           "placements": []
         }
       ]

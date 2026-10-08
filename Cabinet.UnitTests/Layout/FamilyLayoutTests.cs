@@ -147,9 +147,11 @@ public class FamilyLayoutTests
 
     [Fact]
     [Trait("Category", "Layout")]
-    public void The_sample_of_sixty_five_has_a_family_that_needs_a_marker_and_names_how_many_are_hidden()
+    public void A_family_of_sixteen_expansions_needs_a_marker_and_names_how_many_are_hidden()
     {
-        SyntheticCollections.TryGetSample("65", out var items);
+        var baseGame = BaseOf(500, 60);
+        var items = new List<CabinetItem> { baseGame };
+        items.AddRange(Enumerable.Range(1, 16).Select(number => Thin(ExpansionOf(500 + number, baseGame, 30))));
         var layout = CabinetLayoutEngine.Build(items, Design);
 
         var markers = LayoutAssertions.PlacementsWithPosition(layout)
@@ -157,10 +159,11 @@ public class FamilyLayoutTests
             .Select(entry => entry.Placement)
             .ToList();
 
-        markers.Should().NotBeEmpty();
+        markers.Should().ContainSingle();
         markers.Should().OnlyContain(marker => marker.MoreCount >= 1 && marker.Label.Length == 0);
         markers.Should().OnlyContain(marker => marker.HeightMm == Design.MarkerHeightMm && marker.WidthMm == Design.StackColumnWidthMm);
-        markers.Max(marker => marker.MoreCount).Should().BeGreaterThanOrEqualTo(1, "the family of nine has at most two uprights and shows at most six layers at the default maximum");
+        LayersOf(LayoutAssertions.PlacementsWithPosition(layout), baseGame.BggId).Count.Should().BeLessThanOrEqualTo(12, "two columns of at most six layers show what fits");
+        LayoutAssertions.AssertValid(layout, items);
     }
 
     [Theory]

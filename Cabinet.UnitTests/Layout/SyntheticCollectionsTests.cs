@@ -181,7 +181,7 @@ public class SyntheticCollectionsTests
         var layout = CabinetLayoutEngine.Build(items, SectionDesigns.Desktop);
 
         var kinds = layout.Sections.SelectMany(section => section.Cubbies).SelectMany(cubby => cubby.Placements).Select(placement => placement.Kind).ToHashSet();
-        kinds.Should().Contain(Enum.GetValues<PlacementKind>(), "the review sample shows every kind of placement");
+        kinds.Should().Contain(Enum.GetValues<PlacementKind>().Where(kind => kind != PlacementKind.MoreMarker), "the review sample shows every kind of placement but the marker, which only a family of more than a dozen expansions needs");
         layout.Sections[^1].Cubbies.Should().Contain(cubby => cubby.Placements.Count == 0);
         LayoutAssertions.AssertValid(layout, items);
     }

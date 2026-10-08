@@ -222,6 +222,11 @@ There are two section designs: a wide one for desktop screens and a narrow one
 for phones, with fewer cubbies across so the sections stack one below the
 other. A game may stand on a different shelf on a phone than on a desktop.
 
+The desktop rows, top to bottom, are 310 millimetres tall with cubbies of 190,
+240, 290, 230 and 170; 430 with 430, 390 and 340; 390 with 280, 550 and 330; 330
+with 480, 380 and 300; and 310 with 310, 350 and 500. The phone rows are listed in
+`SectionDesigns`, next to the notes on how each design was found.
+
 Nothing the cabinet draws may be too small to read or tap. Each design states
 the narrowest width its section is ever drawn at, in screen pixels, and the
 engine turns a pixel target into millimetres of box with whole numbers,
@@ -295,31 +300,54 @@ other section is, so the stability rules above stay the only exceptions.
 
 ### Keeping the desktop cabinet dense
 
-The desktop design has five shelf rows across 1200 millimetres. Four rows are 330
-millimetres or taller, the shortest is 280, and no cubby is narrower than 180 or
-wider than 560. The largest box a design holds is taken from its tallest cubby,
-and larger boxes are scaled down to it, so the height of the tallest rows decides
-how many cubbies the biggest face-out boxes can go to. With only one tall row,
-those boxes crowded into a few cubbies, were left over after the shelves of
-earlier sections had filled with smaller games, and opened sections at the end
-that held only a handful of them. With several tall rows of similar height the
-biggest boxes spread over the cubbies and the end of the cabinet fills evenly.
-The cost is that the biggest boxes are drawn a little smaller: the largest box is
-370 millimetres tall instead of 400.
+The desktop design has five shelf rows across 1200 millimetres and is 1850
+millimetres tall inside. Every row is 310 millimetres or taller, and the cubbies
+run from 170 to 550 millimetres wide, with wide cubbies in every row. The largest
+box a design holds is taken from its tallest cubby, and larger boxes are scaled
+down to it: here that is 430 by 430 millimetres, and a base game that faces out
+beside its expansions is drawn at most 240 millimetres wide, to leave the stack
+column its room.
+
+The failure to avoid is a cabinet that ends in a nearly empty section holding the
+big boxes. Big boxes are the covers and flat boxes at least 300 millimetres wide,
+counting the stack of expansions beside them. They are placed last because they
+fit only a few cubbies, so when the narrow cubbies of the earlier sections fill
+first, the big boxes are left over and open a section for a handful of them. Rows
+that each have wide cubbies, and no row much shorter than a standard box, spread
+the big boxes over the whole cabinet so the end fills like the rest.
 
 The rules are that no section but the last keeps an empty row, that a collection
-of about sixty-five games has no empty row in the middle of any section, and that
-a large collection holds at least 25 games in every section but the last. The
-floor sits a little below what it was before series stood together, because
-placing a series as a block packs a seeded collection slightly less tightly than
-placing its games one by one. The
-layout tests check them on the samples of 65 and 400 games and on seeded
-collections of both sizes whose boxes follow the spread of sizes seen on real
-games, including collections that were not used when the rows were chosen. The
-rows were found by a seeded search over valid designs, scored on exactly these
-measures, so retune them the same way when a collection starts to leave bare rows
-or a near-empty section: change the rows and cubby widths of the desktop design
-first, then raise the layout version and record the layouts again.
+of about sixty-five games has no empty row in the middle of any section, that a
+large collection holds at least 30 games in every section but the last, and that
+a collection with a realistic mix of box sizes never ends in a section of fewer
+than twelve placements that holds more than two big boxes. The layout tests check
+them on the samples of 65 and 400 games, on seeded collections of both sizes whose
+boxes follow the spread of sizes seen on real games, and on the seeded realistic
+mix described under "Invented collections", at the cover shares of 25 and 33
+percent. The seeds of the realistic mix include ones the search never used and
+ones on which the earlier rows ended in a small section of big boxes.
+
+The rows were found by a seeded search over valid designs, run outside the
+repository: four to six rows of 260 to 430 millimetres, cubbies of 160 to 600
+millimetres, an interior no taller than 1900 millimetres, every candidate passing
+the design's own checks and every layout rule switched on. Each candidate was
+scored on the samples, the invented BGG collections, the earlier spike-shaped
+seeds and several dozen seeds of the realistic mix, at both cover shares, by the
+number of sections, empty rows, hollow rows, empty cubbies and a small last
+section of big boxes. Only the chosen rows are kept here, together with this
+description. A collection the search never saw still ends in a small section
+of big boxes about one time in forty, because a last section of a handful of
+placements simply holds the last few games of the collection and a few of those
+are big; the test therefore allows two big boxes in a small last section and
+fails on three or more. Retune the rows the same way when a collection
+starts to leave bare rows or a near-empty section: change the rows and cubby
+widths of the desktop design first, then raise the layout version, or, while the
+version has not shipped, record the layouts again under the same version.
+
+The phone design was not changed by this retune. The layout tests pin the phone
+sections of the same realistic mix and require that the phone takes no more
+sections in all than it did before families faced out and continued in the next
+cubby, series stood together and the desktop was retuned.
 
 ## Recorded layouts
 
@@ -380,8 +408,19 @@ The collections are made from invented syllables and mirror nothing real. The
 samples of 65 and 400 games also carry invented series: the sample of 65 has one
 series of three games and one of two, and the sample of 400 has six series, the
 longest of seven games, so the way a series stands together can be seen at both
-sizes. A
-missing or unknown choice shows the synced collection, and the value that was
+sizes.
+
+The layout tests also use a seeded collection shaped like a real hobby collection,
+made from coarse bands only: about thirty percent of the base games have no known
+size, so the default box applies; a fifth are small card boxes, a sixth standard
+portrait boxes, a fifth large squares, a tenth tall large boxes and one in twenty a
+wide landscape front. A quarter of the items are expansions in families of up to
+eight, several with two or more expansions, and a few series stand among the base
+games. Sizes are rounded to ten millimetres and shares to five percentage points,
+and a seed always gives the same collection. The tests name these collections
+`mix-` followed by the number of games and the seed.
+
+A missing or unknown choice shows the synced collection, and the value that was
 asked for is never repeated back into the page. When the switch is off or the
 site runs in production, there is no switcher and no "Invented collection of N
 items" line, and a `sample` value in the address is ignored. The sync status
