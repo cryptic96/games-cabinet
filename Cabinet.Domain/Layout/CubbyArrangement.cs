@@ -10,8 +10,9 @@ public static class CubbyArrangement
     public const int MaxFlatStackCount = 4;
 
     /// <summary>
-    /// Orders the members by a stable hash of their game identifier salted with the cubby, so the order looks varied but
-    /// changes only when the cubby's members change, and packs them from the left with no gap, bottom-aligned on the
+    /// Orders the members as <see cref="Order"/> does, so a series stands together in entry order and a cubby without a
+    /// series orders its boxes by a stable hash of their game identifier salted with the cubby, so the order looks varied
+    /// but changes only when the cubby's members change, and packs them from the left with no gap, bottom-aligned on the
     /// cubby floor. A box facing out is as wide as its front and a spine is as wide as its depth. A base game is followed
     /// immediately by its thick expansions, which stand upright on the floor in collection order, and then by a column of
     /// fixed width that holds its remaining expansions as thin layers stacked up from the floor, thickest at the bottom,
@@ -41,11 +42,7 @@ public static class CubbyArrangement
         ArgumentNullException.ThrowIfNull(members);
         ArgumentNullException.ThrowIfNull(options);
 
-        var ordered = members
-            .OrderBy(member => StableHash.Hash(member.Item.BggId, orderSalt))
-            .ThenBy(member => member.Item.CollectionId)
-            .ThenBy(member => member.Item.BggId)
-            .ToList();
+        var ordered = Order(members, orderSalt);
         var columns = BuildFlatColumns(design, ordered, cubby.HeightMm);
 
         if (columns is null)
@@ -89,6 +86,31 @@ public static class CubbyArrangement
         }
 
         return placements;
+    }
+
+    /// <summary>
+    /// Puts the members in slot order. The games of one series are one block, in entry order, and a plain game is a block of
+    /// its own. A block that holds a game continuing from an earlier cubby comes first, in entry order; the other blocks
+    /// follow, ordered by a stable hash of the series anchor salted with the cubby, so the order looks varied but depends
+    /// only on the cubby's members and on what was fixed when each was placed.
+    /// </summary>
+    private static List<LayoutMember> Order(IReadOnlyList<LayoutMember> members, int orderSalt)
+    {
+        var blocks = members
+            .GroupBy(member => member.SeriesAnchor)
+            .Select(block => block.OrderBy(member => member.Item.CollectionId).ThenBy(member => member.Item.BggId).ToList())
+            .ToList();
+        var continued = blocks
+            .Where(block => block.Any(member => member.FromPreviousCubby))
+            .OrderBy(block => block[0].Item.CollectionId)
+            .ThenBy(block => block[0].Item.BggId);
+        var others = blocks
+            .Where(block => !block.Any(member => member.FromPreviousCubby))
+            .OrderBy(block => StableHash.Hash(block[0].SeriesAnchor, orderSalt))
+            .ThenBy(block => block[0].Item.CollectionId)
+            .ThenBy(block => block[0].Item.BggId);
+
+        return [.. continued.Concat(others).SelectMany(block => block)];
     }
 
     /// <summary>

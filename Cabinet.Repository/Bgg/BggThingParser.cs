@@ -18,15 +18,19 @@ public static class BggThingParser
     /// <summary>The most designers, mechanics or expanded games kept for one game.</summary>
     public const int MaxListEntries = 20;
 
+    /// <summary>The most family links kept for one game.</summary>
+    public const int MaxFamilyEntries = 40;
+
     private const int MaxDocumentCharacters = 20_000_000;
     private const string DesignerLink = "boardgamedesigner";
     private const string MechanicLink = "boardgamemechanic";
     private const string ExpansionLink = "boardgameexpansion";
+    private const string FamilyLinkType = "boardgamefamily";
 
     /// <summary>
     /// Reads the answer with DTDs prohibited, no resolver and a size cap. An answer whose root is not the items element is
     /// rejected. An entry without a usable identifier is skipped and counted while the rest of the answer is kept. Only the
-    /// designer, mechanic and inbound expansion links are read; any other link is ignored.
+    /// designer, mechanic, family and inbound expansion links are read; any other link is ignored.
     /// </summary>
     /// <param name="body">The answer body.</param>
     /// <param name="enrichedAtUtc">The time stored on every game's details.</param>
@@ -90,7 +94,39 @@ public static class BggThingParser
             ReadNames(item, DesignerLink),
             ReadNames(item, MechanicLink),
             ReadExpandedGames(item),
-            ArtUrl.Canonical(item.Element("image")?.Value?.Trim()));
+            ArtUrl.Canonical(item.Element("image")?.Value?.Trim()),
+            Families: ReadFamilies(item));
+    }
+
+    private static IReadOnlyList<FamilyLink> ReadFamilies(XElement item)
+    {
+        var families = new List<FamilyLink>();
+
+        foreach (var link in item.Elements("link"))
+        {
+            if ((string?)link.Attribute("type") != FamilyLinkType
+                || !int.TryParse((string?)link.Attribute("id"), NumberStyles.None, CultureInfo.InvariantCulture, out var id)
+                || families.Any(family => family.Id == id))
+            {
+                continue;
+            }
+
+            var name = BggCollectionParser.CleanTitle((string?)link.Attribute("value") ?? string.Empty);
+
+            if (name.Length == 0)
+            {
+                continue;
+            }
+
+            families.Add(new FamilyLink(id, name));
+
+            if (families.Count == MaxFamilyEntries)
+            {
+                break;
+            }
+        }
+
+        return families;
     }
 
     private static int? ReadCount(XElement item, string name) =>

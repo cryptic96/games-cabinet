@@ -132,6 +132,40 @@ public class BggXmlTests
     }
 
     [Fact]
+    public void Things_carry_invented_family_links_with_three_series_one_lone_series_and_broad_families_for_every_game()
+    {
+        var items = SyntheticBggCollection.Create(400);
+        var ids = items.Where(item => item.Owned).Select(item => item.ObjectId).Distinct().ToList();
+
+        var document = XDocument.Parse(BggXml.Things(ids, items, stats: false));
+        var carriers = document.Root!.Elements("item")
+            .SelectMany(thing => LinksOf(thing, "boardgamefamily").Select(link => (Family: (string)link.Attribute("value")!, Game: (string)thing.Attribute("id")!)))
+            .GroupBy(pair => pair.Family)
+            .ToDictionary(group => group.Key, group => group.Select(pair => pair.Game).Distinct().Count());
+
+        carriers["Series: Example Saga"].Should().Be(3);
+        carriers["Game: Example Line"].Should().Be(2);
+        carriers["Series: Lone Example"].Should().Be(1);
+        carriers["Series: Example Long Cycle"].Should().Be(7);
+        carriers.Keys.Where(name => name.StartsWith("Theme: ", StringComparison.Ordinal)).Should().HaveCount(3);
+        carriers.Where(pair => pair.Key.StartsWith("Theme: ", StringComparison.Ordinal)).Should().OnlyContain(pair => pair.Value > 10);
+        carriers.Should().ContainKey("Components: Invented Pieces").And.ContainKey("Players: Invented Solo Rules");
+        document.Root!.Elements("item").Should().OnlyContain(thing => LinksOf(thing, "boardgamefamily").Any(link => ((string)link.Attribute("value")!).StartsWith("Theme: ", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void Families_depend_on_the_entry_alone_and_the_entries_at_the_series_positions_are_base_games()
+    {
+        var items = SyntheticBggCollection.Create(65);
+        var saga = new[] { 11, 26, 41 }.Select(position => items[position]).ToList();
+
+        saga.Should().OnlyContain(item => !item.IsExpansion);
+        saga.Select(item => SyntheticBggCollection.FamiliesFor(item).Single(family => family.Name.StartsWith("Series: ", StringComparison.Ordinal)).Id)
+            .Should().OnlyContain(id => id == 7001);
+        SyntheticBggCollection.FamiliesFor(items[11]).Should().Equal(SyntheticBggCollection.FamiliesFor(items[11]));
+    }
+
+    [Fact]
     public void The_ranked_rating_is_zero_for_every_seventh_game_id_and_above_zero_for_the_rest()
     {
         var items = SyntheticBggCollection.Create(65);

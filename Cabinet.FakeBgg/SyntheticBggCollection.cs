@@ -29,6 +29,11 @@ public sealed record FakeBggItem(
     int? BaseObjectId = null,
     IReadOnlyList<int>? AlsoExpands = null);
 
+/// <summary>One invented BGG family a game belongs to.</summary>
+/// <param name="Id">The family's id.</param>
+/// <param name="Name">The family's name, prefixed with its category the way BGG names families.</param>
+public sealed record FakeFamily(int Id, string Name);
+
 /// <summary>Builds deterministic, entirely invented owner collections of a few fixed sizes.</summary>
 public static class SyntheticBggCollection
 {
@@ -47,6 +52,16 @@ public static class SyntheticBggCollection
     private const int MissingBaseObjectId = 190001;
     private const int SecondMissingBaseObjectId = 190002;
     private const int ThickOrphanIndex = 34;
+    private const int SagaFamilyId = 7001;
+    private const int LineFamilyId = 7002;
+    private const int LoneFamilyId = 7003;
+    private const int LongCycleFamilyId = 7004;
+    private const int ThemeFamilyBaseId = 7100;
+    private const int ComponentsFamilyId = 7201;
+    private const int PlayersFamilyId = 7301;
+    private const int LongCycleFirstPosition = 65;
+    private const int LongCycleModulo = 50;
+    private const int LongCycleRemainder = 21;
 
     private static readonly IReadOnlyList<int> SecondOwnedBase = [FirstObjectId + 1];
 
@@ -159,6 +174,56 @@ public static class SyntheticBggCollection
         return version
             ? CycledVersionKinds[position % CycledVersionKinds.Length]
             : CycledMainKinds[position % CycledMainKinds.Length];
+    }
+
+    /// <summary>
+    /// The invented BGG families an entry belongs to, chosen from its position in the collection alone. Two series
+    /// families group several games (positions 11, 26 and 41; positions 13 and 52), one series family names a single game
+    /// (position 30), and in the large collection a long series family names seven games (every position from 65 whose
+    /// position modulo 50 is 21). Every entry also carries broad families that must never group anything: one of three
+    /// themes, a components family on even game ids and a players family on every fourth game id.
+    /// </summary>
+    /// <param name="item">The collection entry.</param>
+    public static IReadOnlyList<FakeFamily> FamiliesFor(FakeBggItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+
+        var position = (int)Math.Max(0, item.CollId - FirstCollId);
+        var families = new List<FakeFamily>();
+
+        if (position is 11 or 26 or 41)
+        {
+            families.Add(new FakeFamily(SagaFamilyId, "Series: Example Saga"));
+        }
+
+        if (position is 13 or 52)
+        {
+            families.Add(new FakeFamily(LineFamilyId, "Game: Example Line"));
+        }
+
+        if (position == 30)
+        {
+            families.Add(new FakeFamily(LoneFamilyId, "Series: Lone Example"));
+        }
+
+        if (position >= LongCycleFirstPosition && position % LongCycleModulo == LongCycleRemainder)
+        {
+            families.Add(new FakeFamily(LongCycleFamilyId, "Series: Example Long Cycle"));
+        }
+
+        families.Add(new FakeFamily(ThemeFamilyBaseId + (item.ObjectId % 3) + 1, $"Theme: Invented Theme {(item.ObjectId % 3) + 1}"));
+
+        if (item.ObjectId % 2 == 0)
+        {
+            families.Add(new FakeFamily(ComponentsFamilyId, "Components: Invented Pieces"));
+        }
+
+        if (item.ObjectId % 4 == 0)
+        {
+            families.Add(new FakeFamily(PlayersFamilyId, "Players: Invented Solo Rules"));
+        }
+
+        return families;
     }
 
     private static IEnumerable<FakeBggItem> EdgeCases()
