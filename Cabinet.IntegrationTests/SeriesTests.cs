@@ -19,17 +19,12 @@ public sealed class SeriesTests
     private static readonly int[] SagaPositions = [11, 26, 41];
     private static readonly int[] LinePositions = [13, 52];
 
-    private static readonly Dictionary<string, string?> BuiltInCoverShare = new()
-    {
-        ["Layout:CoverSharePercent"] = "25",
-    };
-
     [Fact]
     public async Task Games_that_share_a_series_family_stand_together_in_the_served_cabinet()
     {
         var items = SyntheticBggCollection.Create(65);
         var clock = SyncHarness.NewClock();
-        await using var factory = SyncHarness.CreateFactory(ScriptedBggHandler.ForCollection(items), clock, BuiltInCoverShare);
+        await using var factory = SyncHarness.CreateFactory(ScriptedBggHandler.ForCollection(items), clock);
         using var client = factory.CreatePublicClient();
 
         await SyncRounds.PressAndWait(client, clock, advance: false);

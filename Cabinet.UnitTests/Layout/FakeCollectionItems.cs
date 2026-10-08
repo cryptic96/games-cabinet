@@ -6,7 +6,8 @@ namespace Cabinet.UnitTests.Layout;
 /// <summary>
 /// Turns the invented BGG collections of the fake into the items the layout engine takes, so the layout tests can run on
 /// the collections a local run shows. Only owned entries are kept; sizes come from the invented versions, with the
-/// engine's own default for an entry without one.
+/// engine's own default for an entry without one, and each entry carries the invented families that name a series, the
+/// way the served collection does.
 /// </summary>
 internal static class FakeCollectionItems
 {
@@ -32,9 +33,18 @@ internal static class FakeCollectionItems
                     entry.Title,
                     entry.IsExpansion ? ItemKind.Expansion : ItemKind.Base,
                     BoxOf(entry),
-                    BasesOf(entry, titles))),
+                    BasesOf(entry, titles),
+                    SeriesFamilies: SeriesFamiliesOf(entry))),
         ];
     }
+
+    private static List<int> SeriesFamiliesOf(FakeBggItem entry) =>
+    [
+        .. SyntheticBggCollection.FamiliesFor(entry)
+            .Where(family => SeriesGrouping.IsSeriesFamily(family.Name))
+            .Select(family => family.Id)
+            .Distinct(),
+    ];
 
     private static BoxDimensions BoxOf(FakeBggItem entry)
     {

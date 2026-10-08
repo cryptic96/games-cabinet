@@ -10,8 +10,11 @@ namespace Cabinet.UnitTests.Layout;
 /// changes at most one cubby, and for an expansion of a family that cubby is the base game's. The one accepted exception
 /// is an expansion that makes its family wider: the first expansion for a base game, the first one that lies in a game's
 /// stack, or one that stands upright. That family may move and later cubbies may shift, so only the games ordered before
-/// the base game are held to their exact cubby. A game that joins a series is the other accepted exception, tested with
-/// the engine, so these checks leave out the appended games that join one.
+/// the base game are held to their exact cubby, or, when the base game belongs to a series, the games ordered before the
+/// first game of that series, because the whole series is placed where its first game stands. A wider family keeps its
+/// series running on without leaving a cubby out, at the default cover share and at the committed one. A game that joins
+/// a series is the other accepted exception, tested with the engine, so these checks leave out the appended games that
+/// join one.
 /// </summary>
 public class FamilyStabilityTests
 {
@@ -249,17 +252,21 @@ public class FamilyStabilityTests
         uprightSeeds.Should().BeGreaterThan(Seeds / 4, "most seeded families have room for an upright");
     }
 
-    [Fact]
+    [Theory]
+    [InlineData(25)]
+    [InlineData(33)]
     [Trait("Category", "Layout")]
-    public void First_expansion_for_a_base_game_reserves_its_place_and_keeps_earlier_games_in_place()
+    public void First_expansion_for_a_base_game_reserves_its_place_and_keeps_earlier_games_in_place(int coverSharePercent)
     {
+        var options = LayoutOptions.Default with { CoverSharePercent = coverSharePercent };
+
         for (var seed = 1; seed <= Seeds; seed++)
         {
             var items = SyntheticCollections.Random(seed, CollectionSize);
             var baseGame = items[20 + (seed % 80)];
             var next = SyntheticCollections.NextExpansion(items, baseGame.BggId, seed);
 
-            var (before, after) = BuildBeforeAndAfter(items, next);
+            var (before, after) = BuildBeforeAndAfter(items, next, options);
 
             var arrival = PlacementOf(after, next.BggId);
             var home = PositionOfBase(after, baseGame.BggId);
@@ -268,6 +275,7 @@ public class FamilyStabilityTests
             arrival?.Placement.Kind.Should().BeOneOf(PlacementKind.ExpansionLayer, PlacementKind.ExpansionSpine);
             MoreCountOf(after, baseGame.BggId).Should().Be(arrival is null ? 1 : 0, "seed {0}", seed);
             LayoutAssertions.AssertValid(after, [.. items, next]);
+            LayoutAssertions.SeriesGaps(after, [.. items, next], Design).Should().BeEmpty("seed {0}: a wider family keeps its series together", seed);
             AssertEarlierGamesKeepTheirCubby(items, baseGame, before, after, seed);
         }
     }
@@ -413,13 +421,9 @@ public class FamilyStabilityTests
             .ThenBy(item => item.BggId)
             .ToList();
         var baseIndex = topLevel.FindIndex(item => item.BggId == baseGame.BggId && item.Kind == ItemKind.Base);
-        var seriesMates = SeriesGrouping.Group(topLevel)
-            .Where(group => group.Indices.Contains(baseIndex))
-            .SelectMany(group => group.Indices)
-            .Select(index => topLevel[index].BggId)
-            .ToHashSet();
+        var firstOfSeries = SeriesGrouping.Group(topLevel).Single(group => group.Indices.Contains(baseIndex)).Indices[0];
         var earlier = topLevel
-            .Where(item => item.CollectionId < baseGame.CollectionId && !seriesMates.Contains(item.BggId))
+            .Take(firstOfSeries)
             .Select(item => item.BggId)
             .ToHashSet();
         var placed = LayoutAssertions.PlacementsWithPosition(after);
