@@ -76,6 +76,19 @@ public sealed partial class ReviewSheetModelTests : IDisposable
     }
 
     [Fact]
+    public void A_box_photographed_close_reads_as_a_3D_shot_marked_tight_crop()
+    {
+        var closeCrop = new ArtFeatures(0.06, 0.94, 0.31, 0.26, 4, CutOut: false, TightCrop: true);
+        var version = _fixture.MeasuredPicture("version", SyntheticArtKind.BoxOnWhiteTightCrop, closeCrop);
+        _fixture.Game(1, "Invented Lighthouse", version, null, UprightBox);
+
+        var row = Rows().Single();
+
+        row.Verdict.Should().Be("3D shot, tight crop");
+        row.ScoreText.Should().Be("1.00");
+    }
+
+    [Fact]
     public void A_game_without_a_version_picture_reads_no_verdict_and_shows_none_in_the_first_column()
     {
         var main = _fixture.Picture("main", SyntheticArtKind.FlatCover);

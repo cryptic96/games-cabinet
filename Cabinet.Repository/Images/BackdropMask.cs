@@ -6,7 +6,8 @@ namespace Cabinet.Repository.Images;
 /// <param name="Backdrop">True for every pixel that is plain backdrop or nearly transparent.</param>
 /// <param name="LightBackdrop">True for the backdrop pixels whose nearest backdrop colour is near white, such as a white frame.</param>
 /// <param name="CutOut">True when a transparent ring colour is kept and holds enough of the ring for the picture to be a cut-out product picture.</param>
-internal sealed record BackdropMaskResult(bool[] Backdrop, bool[] LightBackdrop, bool CutOut);
+/// <param name="LightCornerBackdrop">True when the backdrop stands only because a near-white colour fills most picture corners, as it does around a box photographed close.</param>
+internal sealed record BackdropMaskResult(bool[] Backdrop, bool[] LightBackdrop, bool CutOut, bool LightCornerBackdrop);
 
 /// <summary>
 /// Finds the plain backdrop around a picture's subject from the colours along its outer border. A backdrop colour must
@@ -14,7 +15,10 @@ internal sealed record BackdropMaskResult(bool[] Backdrop, bool[] LightBackdrop,
 /// has no backdrop at all. Every pixel is compared with fixed kept colours, so a smooth gradient never drifts into the
 /// mask one step at a time. Every near-white border pixel counts as one colour whatever its bucket, and any near-white
 /// pixel matches it, so a white margin around a studio photo with an off-white backdrop is one backdrop. When all four
-/// sides of the subject sit behind a straight border, the subject is the whole rectangle inside that border.
+/// sides of the subject sit behind a straight border, the subject is the whole rectangle inside that border. A studio backdrop is white, grey, black or transparent: a clearly coloured field is part of the
+/// art, and a plain backdrop that leaves an irregular or scattered subject behind it is part of the art too, so neither
+/// counts as a backdrop. A near-white backdrop that holds less of the border still counts when it fills most of the
+/// picture's corners, as it does when a photographed box is cropped close.
 /// </summary>
 internal static class BackdropMask
 {
@@ -31,14 +35,41 @@ internal static class BackdropMask
         var backdrop = new bool[pixels.Length];
         var light = new bool[pixels.Length];
         var ring = RingIndexes(width, height);
-        var kept = KeptColours(pixels, ring);
-        var cutOut = kept.Any(colour => colour.Transparent && colour.Count >= ArtAnalysis.CutOutMinRingShare * ring.Count);
+        var ringColours = KeptColours(pixels, ring);
+        var cutOut = ringColours.Any(colour => colour.Transparent && colour.Count >= ArtAnalysis.CutOutMinRingShare * ring.Count);
+        var kept = ringColours.Where(colour => !colour.IsColoured).ToList();
+        var standsOnFullShare = KeptShare(kept, ring.Count) >= ArtAnalysis.BackdropMinRingShare;
+        var standsOnLightShare = LightShare(kept, ring.Count) >= ArtAnalysis.LightBackdropMinRingShare;
 
-        if (kept.Count == 0 || KeptShare(kept, ring.Count) < ArtAnalysis.BackdropMinRingShare)
+        if (kept.Count == 0 || (!standsOnFullShare && !standsOnLightShare))
         {
-            return new BackdropMaskResult(backdrop, light, cutOut);
+            return new BackdropMaskResult(backdrop, light, cutOut, false);
         }
 
+        Flood(pixels, width, height, ring, kept, backdrop);
+
+        if (!standsOnFullShare && LightCorners(pixels, backdrop, kept, width, height) < ArtAnalysis.LightBackdropMinCorners)
+        {
+            return new BackdropMaskResult(new bool[pixels.Length], light, cutOut, false);
+        }
+
+        if (kept.Any(colour => !colour.Transparent) && !SubjectShape.IsOnePieceWithSolidOutline(pixels, backdrop, width, height))
+        {
+            return new BackdropMaskResult(new bool[pixels.Length], light, cutOut, false);
+        }
+
+        for (var index = 0; index < pixels.Length; index++)
+        {
+            light[index] = backdrop[index] && IsNearestNearWhite(pixels[index], kept);
+        }
+
+        return standsOnFullShare
+            ? new BackdropMaskResult(FramedSubject(backdrop, width, height), light, cutOut, false)
+            : new BackdropMaskResult(backdrop, light, cutOut, true);
+    }
+
+    private static void Flood(SKColor[] pixels, int width, int height, List<int> ring, List<KeptColour> kept, bool[] backdrop)
+    {
         var queue = new Queue<int>();
         foreach (var index in ring)
         {
@@ -60,14 +91,17 @@ internal static class BackdropMask
             Visit(x, y - 1, width, height, pixels, kept, backdrop, queue);
             Visit(x, y + 1, width, height, pixels, kept, backdrop, queue);
         }
-
-        for (var index = 0; index < pixels.Length; index++)
-        {
-            light[index] = backdrop[index] && IsNearestNearWhite(pixels[index], kept);
-        }
-
-        return new BackdropMaskResult(FramedSubject(backdrop, width, height), light, cutOut);
     }
+
+    private static int LightCorners(SKColor[] pixels, bool[] backdrop, List<KeptColour> kept, int width, int height)
+    {
+        var corners = new[] { 0, width - 1, (height - 1) * width, (height * width) - 1 };
+
+        return corners.Count(index => backdrop[index] && IsNearestNearWhite(pixels[index], kept));
+    }
+
+    private static double LightShare(List<KeptColour> kept, int ringCount) =>
+        (double)kept.Where(colour => colour.IsNearWhite).Sum(colour => colour.Count) / ringCount;
 
     private static bool[] FramedSubject(bool[] backdrop, int width, int height)
     {
@@ -290,6 +324,22 @@ internal static class BackdropMask
 
     private sealed record KeptColour(bool Transparent, int Count, double Red, double Green, double Blue)
     {
-        public bool IsNearWhite => Red >= ArtAnalysis.NearWhiteMin && Green >= ArtAnalysis.NearWhiteMin && Blue >= ArtAnalysis.NearWhiteMin;
+        public bool IsNearWhite => !Transparent && Red >= ArtAnalysis.NearWhiteMin && Green >= ArtAnalysis.NearWhiteMin && Blue >= ArtAnalysis.NearWhiteMin;
+
+        public bool IsColoured
+        {
+            get
+            {
+                if (Transparent)
+                {
+                    return false;
+                }
+
+                var highest = Math.Max(Red, Math.Max(Green, Blue));
+                var lowest = Math.Min(Red, Math.Min(Green, Blue));
+
+                return highest >= ArtAnalysis.ColouredBackdropMinValue && (highest - lowest) / highest >= ArtAnalysis.ColouredBackdropMinSaturation;
+            }
+        }
     }
 }

@@ -151,6 +151,23 @@ public class ArtChoiceTests
 
     [Fact]
     [Trait("Category", "Enrichment")]
+    public void A_box_photographed_close_is_a_3D_shot_and_scores_one()
+    {
+        var features = new ArtFeatures(0.06, 0.94, 0.31, 0.26, 4, CutOut: false, TightCrop: true);
+
+        ArtVerdicts.Classify(features, Defaults).Should().Be(ArtVerdict.ThreeD);
+        ArtVerdicts.Score(features).Should().Be(1.0);
+    }
+
+    [Fact]
+    [Trait("Category", "Enrichment")]
+    public void A_close_crop_that_is_almost_all_backdrop_is_still_flat()
+    {
+        ArtVerdicts.Classify(new ArtFeatures(0.97, 1.0, 0.0, 0.0, 4, TightCrop: true), Defaults).Should().Be(ArtVerdict.Flat);
+    }
+
+    [Fact]
+    [Trait("Category", "Enrichment")]
     public void A_cut_out_that_is_almost_all_backdrop_is_still_flat()
     {
         ArtVerdicts.Classify(new ArtFeatures(0.97, 1.0, 0.0, 0.0, 0, CutOut: true), Defaults).Should().Be(ArtVerdict.Flat);
@@ -162,7 +179,7 @@ public class ArtChoiceTests
     [Trait("Category", "Enrichment")]
     public void Features_that_are_not_a_cut_out_classify_and_score_as_before(bool? cutOut)
     {
-        var features = new ArtFeatures(0.13, 1.0, 0.0, 0.0, 0, cutOut);
+        var features = new ArtFeatures(0.13, 1.0, 0.0, 0.0, 0, cutOut, cutOut);
 
         ArtVerdicts.Classify(features, Defaults).Should().Be(ArtVerdict.Flat);
         ArtVerdicts.Score(features).Should().Be(0.0);

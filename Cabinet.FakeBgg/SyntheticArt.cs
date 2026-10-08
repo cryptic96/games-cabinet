@@ -61,6 +61,24 @@ public enum SyntheticArtKind
 
     /// <summary>A cut-out box seen almost straight on that fills most of a fully transparent frame, with hard edges and no shadow.</summary>
     CutOutFrontOn,
+
+    /// <summary>A box photo cropped tight on a white backdrop with faint noise: the box runs along all four picture edges and the white shows mainly in the four corners.</summary>
+    BoxOnWhiteTightCrop,
+
+    /// <summary>A flat cover on one uniform strongly coloured field that touches every edge, with a title banner across the top and an irregular figure below it.</summary>
+    CoverColouredField,
+
+    /// <summary>A wide flat cover on a near-black field with one large irregular illustration and a few small blocks, some touching the edge.</summary>
+    CoverOnBlackIrregular,
+
+    /// <summary>A flat cover on pure black with several separate pieces of art that touch neither each other nor the edge.</summary>
+    CoverOnBlackScattered,
+
+    /// <summary>A flat cover inside a strongly coloured border whose colour the art repeats in a large diagonal area that touches the border.</summary>
+    CoverColourFramed,
+
+    /// <summary>A flat cover whose top third is a near-white sky with faint noise that touches the top and part of the sides, above a full-bleed illustration.</summary>
+    CoverLightEdge,
 }
 
 /// <summary>
@@ -91,6 +109,20 @@ public static class SyntheticArt
     private const int DarkBorderWidth = 42;
     private const float DarkTriangleShare = 0.40f;
     private const int CutOutCanvasSize = 640;
+    private const int TightCropWidth = 760;
+    private const int TightCropHeight = 640;
+    private const int TightCropChamferX = 180;
+    private const int TightCropChamferY = 140;
+    private const int LightNoiseLevel = 252;
+    private const int LightNoiseRange = 3;
+    private const int LandscapeCoverWidth = 800;
+    private const int LandscapeCoverHeight = 460;
+    private const int ScatteredCoverWidth = 540;
+    private const int ScatteredCoverHeight = 860;
+    private const int FramedCoverWidth = 700;
+    private const int FramedCoverHeight = 480;
+    private const int ColourBorderWidth = 30;
+    private const int SkyHeight = 280;
 
     private static readonly SKColor FramedFieldColour = new(20, 130, 140);
 
@@ -110,6 +142,10 @@ public static class SyntheticArt
         SyntheticArtKind.Undecodable => (0, 0),
         SyntheticArtKind.BoxTransparentShadow or SyntheticArtKind.BoxOnNoisyWhite => (CroppedShotWidth, CroppedShotHeight),
         SyntheticArtKind.CutOutFrontOn => (CutOutCanvasSize, CutOutCanvasSize),
+        SyntheticArtKind.BoxOnWhiteTightCrop => (TightCropWidth, TightCropHeight),
+        SyntheticArtKind.CoverOnBlackIrregular => (LandscapeCoverWidth, LandscapeCoverHeight),
+        SyntheticArtKind.CoverOnBlackScattered => (ScatteredCoverWidth, ScatteredCoverHeight),
+        SyntheticArtKind.CoverColourFramed => (FramedCoverWidth, FramedCoverHeight),
         _ => (CoverWidth, CoverHeight),
     };
 
@@ -200,9 +236,176 @@ public static class SyntheticArt
             case SyntheticArtKind.CutOutFrontOn:
                 DrawCutOutFrontOn(canvas);
                 break;
+            case SyntheticArtKind.BoxOnWhiteTightCrop:
+                DrawBoxOnWhiteTightCrop(canvas, width, height);
+                break;
+            case SyntheticArtKind.CoverColouredField:
+                DrawCoverColouredField(canvas, width, height);
+                break;
+            case SyntheticArtKind.CoverOnBlackIrregular:
+                DrawCoverOnBlackIrregular(canvas, width, height);
+                break;
+            case SyntheticArtKind.CoverOnBlackScattered:
+                DrawCoverOnBlackScattered(canvas, width, height);
+                break;
+            case SyntheticArtKind.CoverColourFramed:
+                DrawCoverColourFramed(canvas, width, height);
+                break;
+            case SyntheticArtKind.CoverLightEdge:
+                DrawCoverLightEdge(canvas, width, height);
+                break;
             default:
                 throw new NotSupportedException($"No drawing exists for {kind}.");
         }
+    }
+
+    private static void DrawBoxOnWhiteTightCrop(SKCanvas canvas, int width, int height)
+    {
+        DrawBlockNoise(canvas, 0, 0, width, height, LightNoiseLevel, LightNoiseRange);
+        var builder = new SKPathBuilder();
+        builder.MoveTo(TightCropChamferX, 0);
+        builder.LineTo(width - TightCropChamferX, 0);
+        builder.LineTo(width, TightCropChamferY);
+        builder.LineTo(width, height - TightCropChamferY);
+        builder.LineTo(width - TightCropChamferX, height);
+        builder.LineTo(TightCropChamferX, height);
+        builder.LineTo(0, height - TightCropChamferY);
+        builder.LineTo(0, TightCropChamferY);
+        builder.Close();
+        using var outline = builder.Detach();
+
+        canvas.Save();
+        canvas.ClipPath(outline, SKClipOperation.Intersect, true);
+        FillQuadWithGradient(
+            canvas,
+            new SKPoint(0, 0),
+            new SKPoint(width, 0),
+            [new SKColor(160, 50, 40), new SKColor(210, 140, 50), new SKColor(70, 110, 150)],
+            (0, 0), (width, 0), (width, height), (0, height));
+        FillQuadWithGradient(
+            canvas,
+            new SKPoint(0, 0),
+            new SKPoint(0, height),
+            [new SKColor(60, 30, 30), new SKColor(30, 70, 60), new SKColor(30, 40, 90)],
+            (width * 0.74f, 0), (width, 0), (width, height), (width * 0.74f, height));
+        FillQuadWithGradient(
+            canvas,
+            new SKPoint(0, 0),
+            new SKPoint(width, 0),
+            [new SKColor(200, 90, 70), new SKColor(235, 205, 110), new SKColor(120, 170, 200)],
+            (0, 0), (width, 0), (width, 60), (width * 0.74f, 130), (0, 130));
+        FillQuad(canvas, new SKColor(235, 210, 150), (width * 0.12f, height * 0.40f), (width * 0.66f, height * 0.40f), (width * 0.66f, height * 0.58f), (width * 0.12f, height * 0.58f));
+        canvas.Restore();
+    }
+
+    private static void FillQuadWithGradient(SKCanvas canvas, SKPoint start, SKPoint end, SKColor[] stops, params (float X, float Y)[] corners)
+    {
+        var builder = new SKPathBuilder();
+        builder.MoveTo(corners[0].X, corners[0].Y);
+        for (var index = 1; index < corners.Length; index++)
+        {
+            builder.LineTo(corners[index].X, corners[index].Y);
+        }
+
+        builder.Close();
+        using var path = builder.Detach();
+        using var paint = new SKPaint { IsAntialias = true };
+        paint.Shader = SKShader.CreateLinearGradient(start, end, stops, SKShaderTileMode.Clamp);
+        canvas.DrawPath(path, paint);
+    }
+
+    private static void DrawBlockNoise(SKCanvas canvas, int left, int top, int width, int height, int level, int range)
+    {
+        var pixels = new SKColor[width * height];
+
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var red = level + NoiseShift((left + x) / NoiseBlock, (top + y) / NoiseBlock, 0, range);
+                var green = level + NoiseShift((left + x) / NoiseBlock, (top + y) / NoiseBlock, 1, range);
+                var blue = level + NoiseShift((left + x) / NoiseBlock, (top + y) / NoiseBlock, 2, range);
+                pixels[(y * width) + x] = new SKColor((byte)Math.Clamp(red, 0, 255), (byte)Math.Clamp(green, 0, 255), (byte)Math.Clamp(blue, 0, 255));
+            }
+        }
+
+        using var field = new SKBitmap(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul));
+        field.Pixels = pixels;
+        canvas.DrawBitmap(field, left, top, new SKSamplingOptions(), null);
+    }
+
+    private static void DrawRect(SKCanvas canvas, SKColor colour, float left, float top, float right, float bottom)
+    {
+        using var paint = new SKPaint { Color = colour, IsAntialias = true };
+        canvas.DrawRect(new SKRect(left, top, right, bottom), paint);
+    }
+
+    private static void DrawCoverColouredField(SKCanvas canvas, int width, int height)
+    {
+        canvas.Clear(new SKColor(30, 110, 70));
+        DrawRect(canvas, new SKColor(240, 200, 60), 0, 60, width, 190);
+        FillQuad(canvas, new SKColor(200, 70, 50), (230, 330), (380, 300), (430, 420), (400, 560), (450, 700), (250, 720), (200, 560), (170, 440));
+        DrawRect(canvas, new SKColor(235, 225, 190), 60, 720, 160, height);
+    }
+
+    private static void DrawCoverOnBlackIrregular(SKCanvas canvas, int width, int height)
+    {
+        canvas.Clear(new SKColor(12, 12, 14));
+        FillQuad(
+            canvas,
+            new SKColor(200, 150, 60),
+            (60, 40), (200, 20), (260, 90), (380, 60), (420, 170), (330, 230), (400, 320), (300, 430), (210, 380), (150, 430), (70, 330), (120, 240), (40, 180));
+        FillQuad(canvas, new SKColor(120, 40, 40), (120, 120), (230, 100), (250, 200), (160, 260), (110, 200));
+        DrawRect(canvas, new SKColor(225, 215, 190), 520, 30, 640, 50);
+        DrawRect(canvas, new SKColor(225, 215, 190), 600, 120, 720, 140);
+        DrawRect(canvas, new SKColor(225, 215, 190), 740, 200, width, 222);
+        DrawRect(canvas, new SKColor(225, 215, 190), 560, 380, width, 400);
+        DrawRect(canvas, new SKColor(225, 215, 190), 440, 440, 540, height);
+    }
+
+    private static void DrawCoverOnBlackScattered(SKCanvas canvas, int width, int height)
+    {
+        canvas.Clear(new SKColor(0, 0, 0));
+        DrawRect(canvas, new SKColor(230, 190, 60), 60, 50, width - 60, 120);
+        using (var emblem = new SKPaint { Color = new SKColor(190, 50, 50), IsAntialias = true })
+        {
+            canvas.DrawCircle(width / 2f, 430, 140, emblem);
+        }
+
+        using (var core = new SKPaint { Color = new SKColor(240, 230, 200), IsAntialias = true })
+        {
+            canvas.DrawCircle(width / 2f, 430, 60, core);
+        }
+
+        DrawRect(canvas, new SKColor(225, 215, 190), 80, 720, 260, 760);
+        DrawRect(canvas, new SKColor(225, 215, 190), 300, 770, 460, 800);
+    }
+
+    private static void DrawCoverColourFramed(SKCanvas canvas, int width, int height)
+    {
+        var border = new SKColor(150, 40, 120);
+        canvas.Clear(border);
+        var inner = new SKRect(ColourBorderWidth, ColourBorderWidth, width - ColourBorderWidth, height - ColourBorderWidth);
+
+        using (var scene = new SKPaint())
+        {
+            scene.Shader = SKShader.CreateLinearGradient(
+                new SKPoint(inner.Left, inner.Top),
+                new SKPoint(inner.Left, inner.Bottom),
+                [new SKColor(60, 150, 200), new SKColor(230, 190, 90)],
+                SKShaderTileMode.Clamp);
+            canvas.DrawRect(inner, scene);
+        }
+
+        FillQuad(canvas, border, (inner.Left, inner.Top), (inner.Left, inner.Bottom), (inner.Right, inner.Bottom));
+        DrawRect(canvas, new SKColor(250, 240, 210), inner.Left + (inner.Width * 0.45f), inner.Top + (inner.Height * 0.10f), inner.Right - (inner.Width * 0.08f), inner.Top + (inner.Height * 0.26f));
+    }
+
+    private static void DrawCoverLightEdge(SKCanvas canvas, int width, int height)
+    {
+        DrawVerticalGradient(canvas, width, height, [new SKColor(20, 80, 60), new SKColor(120, 140, 70), new SKColor(230, 170, 70)]);
+        DrawBlockNoise(canvas, 0, 0, width, SkyHeight, LightNoiseLevel - 2, LightNoiseRange);
+        DrawRect(canvas, new SKColor(255, 244, 214), width * 0.12f, height * 0.60f, width * 0.88f, height * 0.72f);
     }
 
     private static void DrawCutOutFrontOn(SKCanvas canvas)
@@ -293,7 +496,9 @@ public static class SyntheticArt
         canvas.DrawBitmap(backdrop, 0f, 0f, new SKSamplingOptions(), null);
     }
 
-    private static int NoiseShift(int blockX, int blockY, int channel)
+    private static int NoiseShift(int blockX, int blockY, int channel) => NoiseShift(blockX, blockY, channel, NoiseRange);
+
+    private static int NoiseShift(int blockX, int blockY, int channel, int range)
     {
         unchecked
         {
@@ -302,7 +507,7 @@ public static class SyntheticArt
             hash *= 1274126177u;
             hash ^= hash >> 16;
 
-            return (int)(hash % ((2 * NoiseRange) + 1)) - NoiseRange;
+            return (int)(hash % ((2 * range) + 1)) - range;
         }
     }
 

@@ -25,7 +25,7 @@ public sealed class SyntheticArtTests
     public void Every_kind_is_listed_once()
     {
         SyntheticArt.All.Should().BeEquivalentTo(Enum.GetValues<SyntheticArtKind>());
-        SyntheticArt.All.Should().HaveCount(19);
+        SyntheticArt.All.Should().HaveCount(25);
     }
 
     [Theory]
@@ -72,6 +72,12 @@ public sealed class SyntheticArtTests
     [InlineData(SyntheticArtKind.BoxOnNoisyWhite, 760, 640)]
     [InlineData(SyntheticArtKind.DarkBorderCover, 600, 800)]
     [InlineData(SyntheticArtKind.CutOutFrontOn, 640, 640)]
+    [InlineData(SyntheticArtKind.BoxOnWhiteTightCrop, 760, 640)]
+    [InlineData(SyntheticArtKind.CoverColouredField, 600, 800)]
+    [InlineData(SyntheticArtKind.CoverOnBlackIrregular, 800, 460)]
+    [InlineData(SyntheticArtKind.CoverOnBlackScattered, 540, 860)]
+    [InlineData(SyntheticArtKind.CoverColourFramed, 700, 480)]
+    [InlineData(SyntheticArtKind.CoverLightEdge, 600, 800)]
     public void Sizes_match_the_fixture_list(SyntheticArtKind kind, int width, int height)
     {
         SyntheticArt.SizeOf(kind).Should().Be((width, height));

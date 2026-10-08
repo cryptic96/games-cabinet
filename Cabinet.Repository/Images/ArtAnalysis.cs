@@ -32,6 +32,24 @@ public static class ArtAnalysis
     /// <summary>The share of the border that must be transparent for the picture to count as a cut-out product picture; a starting value.</summary>
     public const double CutOutMinRingShare = BackdropMinRingShare;
 
+    /// <summary>The share of the border a near-white backdrop must hold, when it also fills most picture corners, to count as a backdrop although the kept colours hold less than the usual share; a starting value.</summary>
+    public const double LightBackdropMinRingShare = 0.30;
+
+    /// <summary>How many of the picture's four corners a near-white backdrop that holds less than the usual share must fill; a starting value.</summary>
+    public const int LightBackdropMinCorners = 3;
+
+    /// <summary>The least value on its brightest channel for a border colour to count as clearly coloured; a starting value.</summary>
+    public const int ColouredBackdropMinValue = 32;
+
+    /// <summary>The least saturation, from 0 for grey to 1 for a pure hue, for a border colour to count as clearly coloured; a starting value.</summary>
+    public const double ColouredBackdropMinSaturation = 0.35;
+
+    /// <summary>The share of its convex outline the largest piece of the subject must cover for a plain backdrop around it to stand; a starting value.</summary>
+    public const double BoxOutlineMinSolidity = 0.85;
+
+    /// <summary>The share of all subject pixels the largest connected piece must hold for a plain backdrop around it to stand; a starting value.</summary>
+    public const double SubjectMinLargestShare = 0.90;
+
     /// <summary>The largest colour distance, in the red, green, blue cube, at which a pixel still matches a backdrop colour.</summary>
     public const int BackdropTolerance = 18;
 
@@ -79,6 +97,7 @@ public static class ArtAnalysis
     private const double CountWeight = 0.25;
     private const int OpaqueAlpha = 255;
     private const int CornerCount = 4;
+    private const int SideCount = 4;
 
     /// <summary>
     /// Measures the picture. A picture that is entirely backdrop uses its overall mean colour, and a picture with no
@@ -88,7 +107,7 @@ public static class ArtAnalysis
     {
         var (pixels, width, height) = WorkingCopy(source);
         var masks = BackdropMask.Analyse(pixels, width, height);
-        var features = Measure(pixels, masks.Backdrop, masks.CutOut, width, height);
+        var features = Measure(pixels, masks, width, height);
         var main = MainColour(pixels, masks, features, width, height);
 
         return new ArtFacts(
@@ -122,8 +141,10 @@ public static class ArtAnalysis
 
     private static bool IsOpaque(SKColor colour) => colour.Alpha >= TransparentAlpha;
 
-    private static ArtFeatures Measure(SKColor[] pixels, bool[] backdrop, bool cutOut, int width, int height)
+    private static ArtFeatures Measure(SKColor[] pixels, BackdropMaskResult masks, int width, int height)
     {
+        var backdrop = masks.Backdrop;
+        var cutOut = masks.CutOut;
         var backdropShare = (double)backdrop.Count(isBackdrop => isBackdrop) / pixels.Length;
         var subject = new bool[pixels.Length];
         var subjectCount = 0;
@@ -148,7 +169,7 @@ public static class ArtAnalysis
 
         if (subjectCount == 0)
         {
-            return new ArtFeatures(backdropShare, 1, 0, 0, 0, cutOut);
+            return new ArtFeatures(backdropShare, 1, 0, 0, 0, cutOut, false);
         }
 
         var boxWidth = maxX - minX + 1;
@@ -165,7 +186,9 @@ public static class ArtAnalysis
         Array.Sort(corners);
         var sidesTouched = (minX == 0 ? 1 : 0) + (maxX == width - 1 ? 1 : 0) + (minY == 0 ? 1 : 0) + (maxY == height - 1 ? 1 : 0);
 
-        return new ArtFeatures(backdropShare, fill, corners[CornerCount - 1], corners[CornerCount - 2], sidesTouched, cutOut);
+        var tightCrop = masks.LightCornerBackdrop && sidesTouched == SideCount;
+
+        return new ArtFeatures(backdropShare, fill, corners[CornerCount - 1], corners[CornerCount - 2], sidesTouched, cutOut, tightCrop);
     }
 
     private static double EmptyShare(bool[] subject, int width, int left, int top, int side)
