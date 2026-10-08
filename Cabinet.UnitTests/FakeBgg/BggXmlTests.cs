@@ -1,8 +1,10 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Xml.Linq;
+using Cabinet.Domain.Layout;
 using Cabinet.FakeBgg;
 using Cabinet.FakeBgg.Testing;
+using Cabinet.UnitTests.Layout;
 using FluentAssertions;
 using Microsoft.Extensions.Time.Testing;
 
@@ -12,6 +14,10 @@ namespace Cabinet.UnitTests.FakeBgg;
 [Trait("Category", "FakeBgg")]
 public class BggXmlTests
 {
+    private const int ThreeExpansionPosition = 13;
+    private const int SevenExpansionPosition = 28;
+    private const int ThickOrphanPosition = 34;
+
     private static readonly CollectionQuery OwnedBaseGames = new(true, null, "boardgameexpansion", true, false);
 
     [Fact]
@@ -329,6 +335,34 @@ public class BggXmlTests
         items.Any(item => item.Version is null).Should().BeTrue();
         items.Count(item => item.Location is not null).Should().Be(2);
     }
+
+    [Fact]
+    public void The_collection_of_sixty_five_has_one_base_game_with_three_expansions_and_one_with_seven_and_they_face_out()
+    {
+        var mapped = FakeCollectionItems.Map(SyntheticBggCollection.Create(65));
+        var threeBase = mapped.Single(item => item.CollectionId == SyntheticBggCollection.FirstCollId + ThreeExpansionPosition);
+        var sevenBase = mapped.Single(item => item.CollectionId == SyntheticBggCollection.FirstCollId + SevenExpansionPosition);
+
+        PairedExpansions(mapped, threeBase).Should().HaveCount(3);
+        PairedExpansions(mapped, sevenBase).Should().HaveCount(7);
+        mapped.Where(item => item.Kind == ItemKind.Base && item.BggId != threeBase.BggId && item.BggId != sevenBase.BggId)
+            .Should().OnlyContain(item => PairedExpansions(mapped, item).Count <= 1);
+        var thickOrphan = mapped.Single(item => item.CollectionId == SyntheticBggCollection.FirstCollId + ThickOrphanPosition);
+        LayoutAssertions.OwnedParentOf(thickOrphan, mapped).Should().BeNull("the thick expansion of a game that is not owned stays on its own");
+
+        var placed = LayoutAssertions.PlacementsWithPosition(CabinetLayoutEngine.Build(mapped, SectionDesigns.Desktop));
+
+        var bases = placed
+            .Where(entry => entry.Placement.EntryId == threeBase.CollectionId || entry.Placement.EntryId == sevenBase.CollectionId)
+            .Where(entry => entry.Placement.Kind is PlacementKind.Cover or PlacementKind.Spine or PlacementKind.FlatBox)
+            .ToList();
+
+        bases.Should().HaveCount(2);
+        bases.Should().OnlyContain(entry => entry.Placement.Kind == PlacementKind.Cover);
+    }
+
+    private static List<CabinetItem> PairedExpansions(IReadOnlyList<CabinetItem> mapped, CabinetItem baseGame) =>
+        [.. mapped.Where(item => item.Kind == ItemKind.Expansion && LayoutAssertions.OwnedParentOf(item, mapped) == baseGame.BggId)];
 
     [Fact]
     public async Task Handler_returns_queued_answers_in_order()

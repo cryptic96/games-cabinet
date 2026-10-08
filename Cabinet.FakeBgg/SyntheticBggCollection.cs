@@ -52,6 +52,8 @@ public static class SyntheticBggCollection
     private const int MissingBaseObjectId = 190001;
     private const int SecondMissingBaseObjectId = 190002;
     private const int ThickOrphanIndex = 34;
+    private const int ThreeExpansionBaseIndex = 13;
+    private const int SevenExpansionBaseIndex = 28;
     private const int SagaFamilyId = 7001;
     private const int LineFamilyId = 7002;
     private const int LoneFamilyId = 7003;
@@ -63,6 +65,19 @@ public static class SyntheticBggCollection
     private const int LongCycleModulo = 50;
     private const int LongCycleRemainder = 21;
 
+    private static readonly IReadOnlyDictionary<int, int> RedirectedExpansions = new Dictionary<int, int>
+    {
+        [19] = ThreeExpansionBaseIndex,
+        [24] = ThreeExpansionBaseIndex,
+        [29] = SevenExpansionBaseIndex,
+        [39] = SevenExpansionBaseIndex,
+        [44] = SevenExpansionBaseIndex,
+        [49] = SevenExpansionBaseIndex,
+        [54] = SevenExpansionBaseIndex,
+        [59] = SevenExpansionBaseIndex,
+        [64] = SevenExpansionBaseIndex,
+    };
+
     private static readonly IReadOnlyList<int> SecondOwnedBase = [FirstObjectId + 1];
 
     private static readonly IReadOnlyList<int> SecondMissingBase = [SecondMissingBaseObjectId];
@@ -73,7 +88,11 @@ public static class SyntheticBggCollection
     /// hand-picked edge cases (a game owned twice, an unowned entry, expansions with and without their base game in
     /// the collection, expansions that name a second owned or unowned base game, an escaped character, a non-Latin title,
     /// a blank title, versions with and without dimensions, two locations); the rest follow a regular pattern, except one
-    /// thick expansion of a game that is not owned, so an expansion box thick enough for a second line can be seen.
+    /// thick expansion of a game that is not owned, so an expansion box thick enough for a second line can be seen. Each
+    /// generated expansion expands the base game before it, except that the expansions at positions 19 and 24 expand the
+    /// base game at position 13, which also keeps the one at position 14, so it has three, and those at positions 29, 39,
+    /// 44, 49, 54, 59 and 64 expand the base game at position 28, so it has seven; the expansion at position 34 stays the
+    /// thick one of a game that is not owned.
     /// </summary>
     /// <param name="size">The wanted number of entries.</param>
     public static IReadOnlyList<FakeBggItem> Create(int size)
@@ -96,7 +115,7 @@ public static class SyntheticBggCollection
         {
             var index = items.Count;
             var item = IsGeneratedExpansion(index)
-                ? Generated(index, isExpansion: true, index == ThickOrphanIndex ? MissingBaseObjectId : lastBaseObjectId)
+                ? Generated(index, isExpansion: true, index == ThickOrphanIndex ? MissingBaseObjectId : BaseOfGeneratedExpansion(index, lastBaseObjectId))
                 : Generated(index, isExpansion: false, baseObjectId: null);
             if (!item.IsExpansion)
             {
@@ -300,6 +319,9 @@ public static class SyntheticBggCollection
     }
 
     private static bool IsGeneratedExpansion(int index) => index % 5 == 4;
+
+    private static int BaseOfGeneratedExpansion(int index, int lastBaseObjectId) =>
+        RedirectedExpansions.TryGetValue(index, out var basePosition) ? ObjectId(basePosition) : lastBaseObjectId;
 
     private static int ObjectId(int index) => FirstObjectId + index;
 

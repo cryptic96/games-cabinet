@@ -27,6 +27,26 @@ only raises the number in the marker. The base game reserves room for its uprigh
 stack as soon as it is placed, so an expansion is never left without a place
 beside its game.
 
+A base game that owns at least two expansions (the setting
+`Layout:CoverFromExpansions`) always faces out, whatever the cover share and the
+cover strategy, with its expansions beside it as before. The choice reads only
+the game's own owned expansions and the settings, never a picture. The few-games
+look still applies, and the setting at 0 turns the rule off.
+
+A family may use one more cubby: the next one to the right on the same shelf row,
+and nothing beyond it. When a family's game and upright expansions fit a cubby but
+its stack column does not, the family stands last in that cubby and the column
+stands at the left edge of the next cubby, right beside it. When a family would
+hide expansions behind "+N more", its own column shows the layers that fit under
+its shelf with no marker and a second column at the left edge of the next cubby
+shows the next expansions in collection order, as many as fit, with "+N more" only
+on top of that last column and only for what fits nowhere. A family never reaches
+a third cubby, another shelf row or another section, so every layer stays under
+its own cubby's shelf, and the layers drawn plus the number in the marker are
+always every expansion in its stack. A family in the last cubby of its shelf row
+keeps the single column and its marker. A cubby takes at most one family that
+continues next door, and at most one such column.
+
 Games of one series stand next to each other. Two things make games a series.
 The first is BoardGameGeek's family names: only families whose name starts with
 `Game: ` (a game, its spin-offs and standalone games) or `Series: ` (a named
@@ -97,6 +117,7 @@ two underscores.
 | `Layout:ExpansionStackMax` | 6 | 1 to 20 | The most expansions drawn in one stack before the rest are summed up as "+N more". |
 | `Layout:FewGamesThreshold` | 12 | 0 to 100 | Below this many top-level games, every box faces out, so a small collection fills the cabinet with covers instead of a few lonely spines. |
 | `Layout:LieFlatBeforeNewSection` | `true` | `true` or `false` | Lets a game that fits no existing cubby standing lie flat in the first cubby that can take it lying down, instead of opening a new section for it. Turning it off keeps every game standing the way it was chosen, but may add sections that are mostly empty. |
+| `Layout:CoverFromExpansions` | 2 | 0 to 20 | The fewest owned expansions that make a base game face out, whatever the cover share and strategy. 0 turns the rule off. |
 | `Layout:GroupSeries` | `true` | `true` or `false` | Places the games of one series next to each other (see "What the cabinet layout is"). Turning it off places every game on its own, the way the cabinet was arranged before series were grouped. |
 | `Prototype:Enabled` | `false` in the committed settings; `true` in the development settings | `true` or `false` | Shows the invented sample collections and their switcher while running locally in development. The deployed site ignores it. See "Invented collections" below. |
 
@@ -109,6 +130,7 @@ Layout__CoverSharePercent=30
 Layout__CoverStrategy=Random
 Layout__LieFlatBeforeNewSection=true
 Layout__GroupSeries=true
+Layout__CoverFromExpansions=2
 ```
 
 Then restart the service so it reads the file:
@@ -159,7 +181,18 @@ A few changes rearrange more than that, and these are accepted:
   cubbies may shift to make room, while every game ordered before the base game
   keeps its cubby. That is the first expansion for a game, the first one that
   lies in a game's stack, and a big one that stands upright. An expansion that
-  joins a stack its game already has changes only that game's cubby.
+  joins a stack its game already has changes only that game's cubby, or the next
+  cubby when the stack's column already stands there.
+- The expansion that brings a base game to the threshold of
+  `Layout:CoverFromExpansions` turns that game to face out, which widens its
+  family, so it is accepted like any other widening: later cubbies may shift while
+  every game ordered before the base game keeps its cubby.
+- The expansion that first needs the next cubby, either because the column does
+  not fit beside the game any more or because the stack would otherwise hide
+  expansions, changes that cubby too and may shift later cubbies. The family then
+  stands last in its own cubby, so the games that stood after it move in front of
+  it, while every game that stood before it keeps its place. An expansion that
+  joins a column already standing in the next cubby changes only that cubby.
 - A game that joins an existing series, because it shares a family or the start
   of its title with an earlier game, may move that whole series and later
   cubbies, since the series is placed together where its first game stands. Every
