@@ -218,7 +218,7 @@ Plans:
   4. Box proportions come from the owned version's real BGG dimensions when available, else from a flat cover's aspect ratio, else from a realistic default, and a 3D shot's outline is never used, so real boxes in the cabinet visibly differ in size and shape.
   5. Each spine takes its colour from its box art (ignoring plain backgrounds around product shots) and shows the title legibly with readable text contrast.
 
-**Plans:** 14/16 plans executed
+**Plans:** 14/18 plans executed
 
 Plans:
 **Wave 1**
@@ -255,9 +255,14 @@ Plans:
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 04-15-PLAN.md — The owner's review of the real collection: sheet, cover shares, tuning (owner-gated)
+- [ ] 04-15-PLAN.md — The owner's review of the real collection: sheet, cover shares, tuning (owner-gated; round 2 resumes after 04-18 on v0.4.1)
+- [ ] 04-17-PLAN.md — Round-1 fixes: landscape flat covers turn real sizes, unsure landscape pictures turn boxes (new setting), detector root-caused for white, transparent and dark-bordered pictures, analysis version 2 (gap closure)
 
 **Wave 8** *(blocked on Wave 7 completion)*
+
+- [ ] 04-18-PLAN.md — Release v0.4.1, deploy and bounded re-measure syncs on the container, games still waiting counted (owner-gated, gap closure)
+
+**Wave 9** *(blocked on Wave 8 completion)*
 
 - [ ] 04-16-PLAN.md — Tuned defaults committed, final release and the owner's deployed check (owner-gated)
 
