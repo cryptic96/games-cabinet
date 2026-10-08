@@ -24,3 +24,7 @@ Taste calls the owner carried forward when approving the layout prototype (v0.2.
 ## Solution
 
 Pull these into the Phase 4 UI design step (UI-SPEC tuning register) when that phase is planned. True box proportions from BGG dimensions may resolve the thickness and spine-width items; real cover art changes the cover-label items.
+
+## Completed (2026-10-08, phase 4 final release)
+
+Resolved by: thin boxes drawn at their real thickness (the readability minimums that made expansions look thick are gone), cover label lines stepped so the smallest covers no longer crop their last line, the plinth apron reworked, and the cover share picked by looking at the real collection on the server (committed as `Layout:CoverSharePercent` 33, about a third of the games facing out, families included). Picture choice stays "flat covers first"; wrong picks go to the owner image overrides candidates todo.
