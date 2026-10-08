@@ -403,7 +403,20 @@ A photographed product shot, a slanted box standing on a plain backdrop, makes a
 poor cover. The measurements tell it apart from a flat cover: a flat cover fills
 its frame and has full corners, while a product shot leaves much of its frame
 empty and shows backdrop in at least two corners. A picture that is neither
-clearly one nor the other counts as unsure. The rules are:
+clearly one nor the other counts as unsure.
+
+What counts as backdrop is found from the colours along the picture's outer
+edge. A white or near-white studio backdrop is one backdrop whatever its exact
+shade: uneven light and compression noise do not split it, and a pure white
+margin around a photo whose own backdrop is slightly off-white counts together
+with it, so a product shot padded with white is still told from a flat cover.
+When the subject sits behind a straight border on all four sides, such as a
+cover inside a thick black or white frame, the whole area inside that border
+is the subject, so dark art that touches a dark border is never mistaken for
+backdrop and does not make a flat cover look like a product shot. A slanted
+product shot has no such straight border, because its outline runs at an angle
+on every side. A cut-out picture on a transparent surround, with or without a
+see-through shadow, keeps its own colours when it is measured. The rules are:
 
 - when the picture of your edition is a flat cover, it is used;
 - when it is a product shot or unsure and the main picture is a flat cover, the
