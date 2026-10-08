@@ -17,7 +17,7 @@ public class SectionDesignTests
     private const int FirstBaseId = 1;
 
     private static readonly LayoutOptions AllCovers = new(0, CoverStrategy.SizeWeighted, 6, 100);
-    private static readonly LayoutOptions AllSpines = new(0, CoverStrategy.SizeWeighted, 6, 0);
+    private static readonly LayoutOptions AllSpines = new(0, CoverStrategy.SizeWeighted, 6, 0, CoverFromExpansions: 0);
 
     public static TheoryData<string> DesignNames => new(SectionDesigns.All.Select(design => design.Name));
 
@@ -37,7 +37,7 @@ public class SectionDesignTests
     [Trait("Category", "Layout")]
     public void The_shipped_designs_derive_their_interior_height_from_their_rows()
     {
-        SectionDesigns.Desktop.InteriorHeightMm.Should().Be(1790);
+        SectionDesigns.Desktop.InteriorHeightMm.Should().Be(1850);
         SectionDesigns.Phone.InteriorHeightMm.Should().Be(2560);
     }
 
@@ -147,7 +147,7 @@ public class SectionDesignTests
     [Theory]
     [MemberData(nameof(DesignNames))]
     [Trait("Category", "Layout")]
-    public void A_base_game_at_the_family_limits_with_thin_expansions_stands_in_one_cubby_with_a_marker(string name)
+    public void A_base_game_at_the_family_limits_with_thin_expansions_stands_in_its_cubby_and_the_next_with_a_marker(string name)
     {
         var design = DesignNamed(name);
         var limits = design.Limits;
@@ -158,7 +158,7 @@ public class SectionDesignTests
 
         LayoutAssertions.AssertValid(layout, items);
         var family = LayoutAssertions.PlacementsWithPosition(layout).ToList();
-        family.Select(entry => (entry.Section, entry.Cubby)).Distinct().Should().ContainSingle("the whole family stands in one cubby");
+        family.Select(entry => (entry.Section, entry.Cubby)).Distinct().Should().HaveCountLessThanOrEqualTo(2, "the family stands in one cubby or in two neighbouring ones");
         family.Should().Contain(entry => entry.Placement.Kind == PlacementKind.Cover && entry.Placement.WidthMm == limits.MaxFamilyBaseWidthMm);
         family.Should().Contain(entry => entry.Placement.Kind == PlacementKind.MoreMarker, "thirty expansions never all fit");
         family.Should().NotContain(entry => entry.Placement.Kind == PlacementKind.ExpansionSpine);
@@ -178,7 +178,7 @@ public class SectionDesignTests
 
         LayoutAssertions.AssertValid(layout, items);
         var placed = LayoutAssertions.PlacementsWithPosition(layout).ToList();
-        placed.Select(entry => (entry.Section, entry.Cubby)).Distinct().Should().ContainSingle("the whole family stands in one cubby");
+        placed.Select(entry => (entry.Section, entry.Cubby)).Distinct().Should().HaveCountLessThanOrEqualTo(2, "the family stands in one cubby or in two neighbouring ones");
         placed.Should().NotContain(entry => entry.Placement.Kind == PlacementKind.ExpansionSpine, "no room is left beside a base game at the width limit");
         placed.Should().Contain(entry => entry.Placement.Kind == PlacementKind.ExpansionLayer);
         placed.Should().Contain(entry => entry.Placement.Kind == PlacementKind.MoreMarker);
@@ -197,7 +197,7 @@ public class SectionDesignTests
 
         LayoutAssertions.AssertValid(layout, items);
         var placed = LayoutAssertions.PlacementsWithPosition(layout).ToList();
-        placed.Select(entry => (entry.Section, entry.Cubby)).Distinct().Should().ContainSingle("the whole family stands in one cubby");
+        placed.Select(entry => (entry.Section, entry.Cubby)).Distinct().Should().HaveCountLessThanOrEqualTo(2, "the family stands in one cubby or in two neighbouring ones");
         placed.Count(entry => entry.Placement.Kind == PlacementKind.ExpansionSpine).Should().Be(Orientation.MaxUprightExpansions);
         placed.Should().Contain(entry => entry.Placement.Kind == PlacementKind.ExpansionLayer);
         placed.Should().Contain(entry => entry.Placement.Kind == PlacementKind.MoreMarker);
@@ -267,8 +267,8 @@ public class SectionDesignTests
     }
 
     [Theory]
-    [InlineData("65", 5)]
-    [InlineData("400", 25)]
+    [InlineData("65", 1)]
+    [InlineData("400", 5)]
     [Trait("Category", "Layout")]
     public void The_samples_hold_a_few_oversize_boxes_and_build_valid_layouts_on_both_profiles(string name, int oversizeCount)
     {

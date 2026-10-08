@@ -234,6 +234,66 @@ public sealed class BggThingParserTests
         first.SameAs(second).Should().BeTrue();
     }
 
+    [Fact]
+    public void Family_links_are_read_with_their_ids_in_answer_order_cleaned_and_deduplicated_by_id()
+    {
+        var parsed = Parse(Answer(
+            Item(
+                1,
+                Link("boardgamefamily", 7001, "Series: Example Saga")
+                + Link("boardgamefamily", 7101, "Theme: Invented Theme\u0085")
+                + Link("boardgamefamily", 7001, "Series: Example Saga")
+                + Link("boardgamefamily", 7201, "   ")
+                + Link("boardgamefamily", 7301, "Players: Invented Solo Rules", inbound: true))));
+
+        parsed.Games[1].Families.Should().Equal(
+            new FamilyLink(7001, "Series: Example Saga"),
+            new FamilyLink(7101, "Theme: Invented Theme"),
+            new FamilyLink(7301, "Players: Invented Solo Rules"));
+    }
+
+    [Fact]
+    public void A_family_link_without_a_usable_id_is_left_out()
+    {
+        var parsed = Parse(Answer(
+            Item(
+                1,
+                "<link type=\"boardgamefamily\" value=\"Series: No Identifier\" />"
+                + "<link type=\"boardgamefamily\" id=\"-5\" value=\"Series: Negative\" />"
+                + "<link type=\"boardgamefamily\" id=\"abc\" value=\"Series: Not A Number\" />"
+                + Link("boardgamefamily", 7001, "Series: Example Saga"))));
+
+        parsed.Games[1].Families.Should().Equal(new FamilyLink(7001, "Series: Example Saga"));
+    }
+
+    [Fact]
+    public void Family_links_are_capped_at_forty_keeping_the_first_ones()
+    {
+        var links = string.Concat(Enumerable.Range(1, 60).Select(index => Link("boardgamefamily", 7000 + index, $"Theme: Invented Theme {index}")));
+
+        var families = Parse(Answer(Item(1, links))).Games[1].Families!;
+
+        BggThingParser.MaxFamilyEntries.Should().Be(40);
+        families.Should().HaveCount(40);
+        families[0].Should().Be(new FamilyLink(7001, "Theme: Invented Theme 1"));
+        families[39].Should().Be(new FamilyLink(7040, "Theme: Invented Theme 40"));
+    }
+
+    [Fact]
+    public void Every_parsed_game_carries_the_current_details_version()
+    {
+        var parsed = Parse(Answer(Item(1, string.Empty), Item(2, Link("boardgamefamily", 7001, "Series: Example Saga"))));
+
+        GameDetails.CurrentDetailsVersion.Should().Be(1);
+        parsed.Games.Values.Should().OnlyContain(details => details.DetailsVersion == GameDetails.CurrentDetailsVersion);
+    }
+
+    [Fact]
+    public void A_game_without_family_links_gets_an_empty_list()
+    {
+        Parse(Answer(Item(1, Link("boardgamedesigner", 1, "Invented Designer 1")))).Games[1].Families.Should().NotBeNull().And.BeEmpty();
+    }
+
     private static (int? MinPlayers, int? MaxPlayers, int? PlayingTime, int? MinPlayTime, int? MaxPlayTime, int? MinAge) Counts(GameDetails details) =>
         (details.MinPlayers, details.MaxPlayers, details.PlayingTime, details.MinPlayTime, details.MaxPlayTime, details.MinAge);
 

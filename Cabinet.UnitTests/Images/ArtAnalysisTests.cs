@@ -258,6 +258,129 @@ public sealed class ArtAnalysisTests
         new[] { facts.Top, facts.Right, facts.Bottom, facts.Left }.Should().OnlyContain(edge => Highest(edge) <= 40);
     }
 
+    [Fact]
+    public void A_cut_out_box_seen_almost_face_on_is_a_3D_shot()
+    {
+        var facts = Stored(SyntheticArtKind.CutOutFrontOn);
+
+        ArtVerdicts.Classify(facts.Features, ArtThresholds.Default).Should().Be(ArtVerdict.ThreeD, Describe(facts));
+        facts.Features.CutOut.Should().BeTrue(Describe(facts));
+    }
+
+    [Theory]
+    [InlineData(SyntheticArtKind.BoxTransparent)]
+    [InlineData(SyntheticArtKind.BoxTransparentShadow)]
+    public void Cut_out_boxes_report_a_cut_out(SyntheticArtKind kind)
+    {
+        var facts = Stored(kind);
+
+        ArtVerdicts.Classify(facts.Features, ArtThresholds.Default).Should().Be(ArtVerdict.ThreeD, Describe(facts));
+        facts.Features.CutOut.Should().BeTrue(Describe(facts));
+    }
+
+    [Fact]
+    public void Every_opaque_fixture_reports_no_cut_out()
+    {
+        var opaque = SyntheticArt.All.Where(kind => kind is not (SyntheticArtKind.Undecodable or SyntheticArtKind.BoxTransparent
+            or SyntheticArtKind.BoxTransparentShadow or SyntheticArtKind.CutOutFrontOn));
+
+        foreach (var kind in opaque)
+        {
+            Stored(kind).Features.CutOut.Should().BeFalse(kind.ToString());
+        }
+    }
+
+    [Fact]
+    public void Only_the_close_crop_fixture_reports_a_close_crop()
+    {
+        foreach (var kind in SyntheticArt.All.Where(kind => kind != SyntheticArtKind.Undecodable))
+        {
+            Stored(kind).Features.TightCrop.Should().Be(kind == SyntheticArtKind.BoxOnWhiteTightCrop, kind.ToString());
+        }
+    }
+
+    [Fact]
+    public void A_box_photo_cropped_tight_on_a_white_backdrop_is_a_3D_shot()
+    {
+        var facts = Stored(SyntheticArtKind.BoxOnWhiteTightCrop);
+
+        ArtVerdicts.Classify(facts.Features, ArtThresholds.Default).Should().Be(ArtVerdict.ThreeD, Describe(facts));
+        facts.Features.CutOut.Should().BeFalse(Describe(facts));
+        facts.Features.TightCrop.Should().BeTrue(Describe(facts));
+    }
+
+    [Fact]
+    public void A_flat_cover_on_a_large_coloured_field_is_flat()
+    {
+        var facts = Stored(SyntheticArtKind.CoverColouredField);
+
+        ArtVerdicts.Classify(facts.Features, ArtThresholds.Default).Should().Be(ArtVerdict.Flat, Describe(facts));
+    }
+
+    [Fact]
+    public void A_flat_cover_on_black_with_one_irregular_illustration_is_flat()
+    {
+        var facts = Stored(SyntheticArtKind.CoverOnBlackIrregular);
+
+        ArtVerdicts.Classify(facts.Features, ArtThresholds.Default).Should().Be(ArtVerdict.Flat, Describe(facts));
+    }
+
+    [Fact]
+    public void A_flat_cover_on_black_with_several_separate_pieces_of_art_is_flat()
+    {
+        var facts = Stored(SyntheticArtKind.CoverOnBlackScattered);
+
+        ArtVerdicts.Classify(facts.Features, ArtThresholds.Default).Should().Be(ArtVerdict.Flat, Describe(facts));
+    }
+
+    [Fact]
+    public void A_flat_cover_inside_a_coloured_border_that_its_art_repeats_is_flat()
+    {
+        var facts = Stored(SyntheticArtKind.CoverColourFramed);
+
+        ArtVerdicts.Classify(facts.Features, ArtThresholds.Default).Should().Be(ArtVerdict.Flat, Describe(facts));
+    }
+
+    [Fact]
+    public void A_flat_cover_with_a_light_sky_along_its_top_stays_flat()
+    {
+        var facts = Stored(SyntheticArtKind.CoverLightEdge);
+
+        ArtVerdicts.Classify(facts.Features, ArtThresholds.Default).Should().Be(ArtVerdict.Flat, Describe(facts));
+    }
+
+    [Theory]
+    [InlineData(SyntheticArtKind.BoxOnWhiteTightCrop, ArtVerdict.ThreeD)]
+    [InlineData(SyntheticArtKind.CutOutFrontOn, ArtVerdict.ThreeD)]
+    [InlineData(SyntheticArtKind.CoverColouredField, ArtVerdict.Flat)]
+    [InlineData(SyntheticArtKind.CoverOnBlackIrregular, ArtVerdict.Flat)]
+    [InlineData(SyntheticArtKind.CoverOnBlackScattered, ArtVerdict.Flat)]
+    [InlineData(SyntheticArtKind.CoverColourFramed, ArtVerdict.Flat)]
+    [InlineData(SyntheticArtKind.CoverLightEdge, ArtVerdict.Flat)]
+    public void The_failure_shape_fixtures_keep_their_verdict_at_half_and_one_and_a_half_times_their_size(SyntheticArtKind kind, ArtVerdict expected)
+    {
+        foreach (var factor in new[] { 0.5, 1.5 })
+        {
+            var facts = Stored(Scaled(kind, factor));
+
+            ArtVerdicts.Classify(facts.Features, ArtThresholds.Default).Should().Be(expected, $"{kind} at {factor}x: {Describe(facts)}");
+        }
+    }
+
+    private static byte[] Scaled(SyntheticArtKind kind, double factor)
+    {
+        using var source = SKBitmap.Decode(SyntheticArt.Encode(kind));
+        var width = (int)Math.Round(source.Width * factor);
+        var height = (int)Math.Round(source.Height * factor);
+        using var resized = source.Resize(
+            new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Unpremul),
+            new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear))!;
+        using var image = SKImage.FromBitmap(resized);
+        using var png = image.Encode(SKEncodedImageFormat.Png, 100);
+
+        return png.ToArray();
+    }
+
     private static string Describe(ArtFacts facts) =>
         $"features {facts.Features}, score {ArtVerdicts.Score(facts.Features):0.00}, main {facts.Main.ToHex()}";
 

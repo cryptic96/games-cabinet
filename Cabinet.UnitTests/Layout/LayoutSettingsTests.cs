@@ -19,7 +19,7 @@ public class LayoutSettingsTests
 
         var options = LayoutSettings.FromConfiguration(configuration);
 
-        options.Should().Be(new LayoutOptions(25, CoverStrategy.SizeWeighted, 6, 12, true));
+        options.Should().Be(new LayoutOptions(25, CoverStrategy.SizeWeighted, 6, 12, true, true, 2));
         options.Should().Be(LayoutOptions.Default);
     }
 
@@ -73,6 +73,11 @@ public class LayoutSettingsTests
     [InlineData("Layout:FewGamesThreshold", "-1")]
     [InlineData("Layout:FewGamesThreshold", "101")]
     [InlineData("Layout:FewGamesThreshold", "a dozen")]
+    [InlineData("Layout:CoverFromExpansions", "-1")]
+    [InlineData("Layout:CoverFromExpansions", "21")]
+    [InlineData("Layout:CoverFromExpansions", "two")]
+    [InlineData("Layout:CoverFromExpansions", "2.5")]
+    [InlineData("Layout:CoverFromExpansions", "")]
     [Trait("Category", "Layout")]
     public void A_number_out_of_range_or_not_a_whole_number_is_rejected_naming_the_key(string key, string text)
     {
@@ -88,6 +93,8 @@ public class LayoutSettingsTests
     [InlineData("Layout:ExpansionStackMax", "20")]
     [InlineData("Layout:FewGamesThreshold", "0")]
     [InlineData("Layout:FewGamesThreshold", "100")]
+    [InlineData("Layout:CoverFromExpansions", "0")]
+    [InlineData("Layout:CoverFromExpansions", "20")]
     [Trait("Category", "Layout")]
     public void The_edges_of_each_range_are_accepted(string key, string text)
     {
@@ -131,6 +138,48 @@ public class LayoutSettingsTests
         LayoutSettings.FromConfiguration(Configure()).LieFlatBeforeNewSection.Should().BeTrue();
     }
 
+    [Theory]
+    [InlineData("true", true)]
+    [InlineData("false", false)]
+    [InlineData("FALSE", false)]
+    [InlineData(" True ", true)]
+    [Trait("Category", "Layout")]
+    public void Grouping_series_accepts_true_and_false_in_any_letter_case(string text, bool expected)
+    {
+        LayoutSettings.FromConfiguration(Configure(("Layout:GroupSeries", text))).GroupSeries.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("maybe")]
+    [InlineData("")]
+    [InlineData("  ")]
+    [InlineData("1")]
+    [InlineData("yes")]
+    [Trait("Category", "Layout")]
+    public void Grouping_series_rejects_other_values_naming_the_key(string text)
+    {
+        var act = () => LayoutSettings.FromConfiguration(Configure(("Layout:GroupSeries", text)));
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Layout:GroupSeries*");
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void Grouping_series_defaults_to_true_when_the_key_is_absent_and_false_changes_the_fingerprint()
+    {
+        LayoutSettings.FromConfiguration(Configure()).GroupSeries.Should().BeTrue();
+        LayoutSettings.FromConfiguration(Configure(("Layout:GroupSeries", "false"))).Fingerprint
+            .Should().NotBe(LayoutSettings.FromConfiguration(Configure()).Fingerprint);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void The_expansion_cover_rule_defaults_to_two_when_the_key_is_absent()
+    {
+        LayoutSettings.FromConfiguration(Configure()).CoverFromExpansions.Should().Be(2);
+        LayoutSettings.FromConfiguration(Configure(("Layout:CoverFromExpansions", "5"))).CoverFromExpansions.Should().Be(5);
+    }
+
     [Fact]
     [Trait("Category", "Layout")]
     public void A_changed_setting_changes_the_fingerprint()
@@ -143,6 +192,9 @@ public class LayoutSettingsTests
             LayoutOptions.Default with { ExpansionStackMax = 7 },
             LayoutOptions.Default with { FewGamesThreshold = 13 },
             LayoutOptions.Default with { LieFlatBeforeNewSection = false },
+            LayoutOptions.Default with { GroupSeries = false },
+            LayoutOptions.Default with { CoverFromExpansions = 3 },
+            LayoutOptions.Default with { CoverFromExpansions = 0 },
         }.Select(options => options.Fingerprint).ToList();
 
         fingerprints.Distinct().Should().HaveCount(fingerprints.Count);

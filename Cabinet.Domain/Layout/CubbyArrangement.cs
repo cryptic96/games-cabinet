@@ -10,19 +10,23 @@ public static class CubbyArrangement
     public const int MaxFlatStackCount = 4;
 
     /// <summary>
-    /// Orders the members by a stable hash of their game identifier salted with the cubby, so the order looks varied but
-    /// changes only when the cubby's members change, and packs them from the left with no gap, bottom-aligned on the
+    /// Orders the members as <see cref="Order"/> does, so a series stands together in entry order and a cubby without a
+    /// series orders its boxes by a stable hash of their game identifier salted with the cubby, so the order looks varied
+    /// but changes only when the cubby's members change, and packs them from the left with no gap, bottom-aligned on the
     /// cubby floor. A box facing out is as wide as its front and a spine is as wide as its depth. A base game is followed
     /// immediately by its thick expansions, which stand upright on the floor in collection order, and then by a column of
     /// fixed width that holds its remaining expansions as thin layers stacked up from the floor, thickest at the bottom,
     /// with a marker on top counting the ones that did not fit; the column is as wide with one expansion as with many and
-    /// exists only when some expansion lies in it. Flat boxes lie with the spine out, as wide as the box is tall and as
-    /// tall as it is deep, and gather into short piles of up to four that start on the cubby floor; a pile sits where its
-    /// first box falls in the order and is as wide as its widest box. Inside a pile the widest box lies at the bottom and
-    /// the thicker box lower among boxes of the same width, so no box overhangs the one beneath it. An expansion without
-    /// an owned base game lies flat like a flat box but is never drawn lower than the design's orphan minimum. Returns
-    /// null when the members are wider than the cubby or any member or stack is taller than it; a total width or height
-    /// exactly equal to the cubby's still fits.
+    /// exists only when some expansion lies in it. A family whose column does not fit beside it stands last in its cubby
+    /// with the column, or the rest of its stack, as the first member of the next cubby on the same shelf row: that member
+    /// is placed at the cubby's left edge before everything else and carries the marker for what fits nowhere. A cubby
+    /// takes at most one family that continues next door and at most one such column. Flat boxes lie with the spine out, as
+    /// wide as the box is tall and as tall as it is deep, and gather into short piles of up to four that start on the cubby
+    /// floor; a pile sits where its first box falls in the order and is as wide as its widest box. Inside a pile the widest
+    /// box lies at the bottom and the thicker box lower among boxes of the same width, so no box overhangs the one beneath
+    /// it. An expansion without an owned base game lies flat like a flat box but is never drawn lower than the design's
+    /// orphan minimum. Returns null when the members are wider than the cubby or any member or stack is taller than it; a
+    /// total width or height exactly equal to the cubby's still fits.
     /// </summary>
     /// <param name="design">The section design the cubby belongs to.</param>
     /// <param name="cubby">The cubby to arrange.</param>
@@ -41,11 +45,12 @@ public static class CubbyArrangement
         ArgumentNullException.ThrowIfNull(members);
         ArgumentNullException.ThrowIfNull(options);
 
-        var ordered = members
-            .OrderBy(member => StableHash.Hash(member.Item.BggId, orderSalt))
-            .ThenBy(member => member.Item.CollectionId)
-            .ThenBy(member => member.Item.BggId)
-            .ToList();
+        if (members.Count(member => member.StandsLast) > 1 || members.Count(member => member.IsColumnOnly) > 1)
+        {
+            return null;
+        }
+
+        var ordered = Order(members, orderSalt);
         var columns = BuildFlatColumns(design, ordered, cubby.HeightMm);
 
         if (columns is null)
@@ -78,7 +83,9 @@ public static class CubbyArrangement
                 continue;
             }
 
-            var width = PlaceStanding(design, ordered[index], x, cubby, options, placements);
+            var width = ordered[index].IsColumnOnly
+                ? PlaceContinuedColumn(design, ordered[index], x, cubby, options, placements)
+                : PlaceStanding(design, ordered[index], x, cubby, options, placements);
 
             if (width is null)
             {
@@ -89,6 +96,40 @@ public static class CubbyArrangement
         }
 
         return placements;
+    }
+
+    /// <summary>
+    /// Puts the members in slot order. The column that continues a family from the cubby before comes first, at the left
+    /// edge. The games of one series are one block, in entry order, and a plain game is a block of its own. A block that
+    /// holds a game continuing from an earlier cubby comes next, in entry order; the other blocks follow, ordered by a
+    /// stable hash of the series anchor salted with the cubby. The block that holds a family with its column next door
+    /// goes last, with that family last in the block, so the column is right beside it. The order depends only on the
+    /// cubby's members and on what was fixed when each was placed.
+    /// </summary>
+    private static List<LayoutMember> Order(IReadOnlyList<LayoutMember> members, int orderSalt)
+    {
+        var columnOnly = members.Where(member => member.IsColumnOnly);
+        var blocks = members
+            .Where(member => !member.IsColumnOnly)
+            .GroupBy(member => member.SeriesAnchor)
+            .Select(block => block
+                .OrderBy(member => member.StandsLast)
+                .ThenBy(member => member.Item.CollectionId)
+                .ThenBy(member => member.Item.BggId)
+                .ToList())
+            .ToList();
+        var last = blocks.Where(block => block.Any(member => member.StandsLast));
+        var continued = blocks
+            .Where(block => block.Any(member => member.FromPreviousCubby) && !block.Any(member => member.StandsLast))
+            .OrderBy(block => block[0].Item.CollectionId)
+            .ThenBy(block => block[0].Item.BggId);
+        var others = blocks
+            .Where(block => !block.Any(member => member.FromPreviousCubby) && !block.Any(member => member.StandsLast))
+            .OrderBy(block => StableHash.Hash(block[0].SeriesAnchor, orderSalt))
+            .ThenBy(block => block[0].Item.CollectionId)
+            .ThenBy(block => block[0].Item.BggId);
+
+        return [.. columnOnly.Concat(continued.Concat(others).Concat(last).SelectMany(block => block))];
     }
 
     /// <summary>
@@ -201,6 +242,8 @@ public static class CubbyArrangement
     /// <summary>
     /// Places a box that faces out or stands as a spine, followed by its upright expansions and then the column of its
     /// stacked expansions when it has any, and returns the width used, or null when the box with all of them does not fit.
+    /// A family whose column stands next door takes no room for it here, and a family whose stack continues next door shows
+    /// in its own column the layers that fit under its shelf, with no marker, because the marker belongs to the last column.
     /// </summary>
     private static int? PlaceStanding(
         SectionDesign design,
@@ -214,7 +257,8 @@ public static class CubbyArrangement
         var kind = member.Pose == BoxPose.Cover ? PlacementKind.Cover : PlacementKind.Spine;
         var width = StandingWidthMm(design, member);
         var uprightsWidth = member.Uprights.Sum(upright => UprightWidthMm(design, upright));
-        var columnWidth = member.Expansions.Count > 0 ? design.StackColumnWidthMm : 0;
+        var ownColumn = member.Expansions.Count > 0 && !member.ColumnNextDoor;
+        var columnWidth = ownColumn ? design.StackColumnWidthMm : 0;
         var tallest = member.Uprights.Select(upright => upright.Box.HeightMm).Append(box.HeightMm).Max();
 
         if (x + width + uprightsWidth + columnWidth > cubby.WidthMm || tallest > cubby.HeightMm)
@@ -249,36 +293,107 @@ public static class CubbyArrangement
             next += uprightWidth;
         }
 
-        if (member.Expansions.Count > 0)
+        if (ownColumn)
         {
-            PlaceStack(design, member, next, cubby, options, placements);
+            PlaceStack(design, member.Item, member.Expansions, next, cubby, options, member.ContinuesNextDoor, placements);
         }
 
         return width + uprightsWidth + columnWidth;
     }
 
     /// <summary>
-    /// Places the layers of a family from the floor up in the column that starts at <paramref name="columnX"/>, then the
-    /// marker when some expansions do not fit. The stack layout works on the expansions in collection order and decides how
-    /// many are shown, so the shown ones are always the earliest arrivals; they are drawn thickest at the bottom, equal
-    /// thicknesses in collection order. The layers touch each other and the box on the column's left, and the marker
-    /// sits on the top layer.
+    /// Places the column that continues a family from the cubby before, at the position given, and returns its width, or
+    /// null when it is wider than the room left or not even one layer fits under the shelf. Its marker counts the
+    /// expansions that fit nowhere.
     /// </summary>
-    private static void PlaceStack(
+    private static int? PlaceContinuedColumn(
         SectionDesign design,
         LayoutMember member,
-        int columnX,
+        int x,
         CubbyDesign cubby,
         LayoutOptions options,
         List<Placement> placements)
     {
-        var baseItem = member.Item;
+        if (x + design.StackColumnWidthMm > cubby.WidthMm)
+        {
+            return null;
+        }
+
+        var stack = StackLayout.Layout(LayerHeights(design, member.Expansions), cubby.HeightMm, MarkerHeight(design), options.ExpansionStackMax);
+
+        if (stack.Visible == 0)
+        {
+            return null;
+        }
+
+        PlaceStack(design, member.Item, member.Expansions, x, cubby, options, continues: false, placements);
+
+        return design.StackColumnWidthMm;
+    }
+
+    /// <summary>
+    /// How a family whose stack would hide expansions behind a marker in the cubby can continue in the next cubby: the
+    /// number of layers its own column shows when none of them needs a marker, and the expansions that go to the second
+    /// column. Returns null when the stack shows everything, or when not even one layer fits, so there is nothing to split.
+    /// </summary>
+    /// <param name="design">The section design.</param>
+    /// <param name="family">The family, with the expansions of its stack.</param>
+    /// <param name="cubby">The cubby the family stands in.</param>
+    /// <param name="options">The layout settings.</param>
+    internal static (int OwnLayers, IReadOnlyList<CabinetItem> Remaining)? SplitStack(
+        SectionDesign design,
+        LayoutMember family,
+        CubbyDesign cubby,
+        LayoutOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(design);
+        ArgumentNullException.ThrowIfNull(family);
+        ArgumentNullException.ThrowIfNull(cubby);
+        ArgumentNullException.ThrowIfNull(options);
+
+        var heights = LayerHeights(design, family.Expansions);
+
+        if (StackLayout.Layout(heights, cubby.HeightMm, MarkerHeight(design), options.ExpansionStackMax).Hidden == 0)
+        {
+            return null;
+        }
+
+        var own = StackLayout.Layout(heights, cubby.HeightMm, 0, options.ExpansionStackMax).Visible;
+
+        return own == 0 ? null : (own, [.. family.Expansions.Skip(own)]);
+    }
+
+    private static List<int> LayerHeights(SectionDesign design, IReadOnlyList<CabinetItem> expansions)
+    {
         var minLayerHeight = Math.Max(design.MinLayerHeightMm, design.MinBoxThicknessMm);
-        var heights = member.Expansions
-            .Select(expansion => Math.Clamp(expansion.Box.DepthMm, minLayerHeight, design.MaxLayerHeightMm))
-            .ToList();
-        var markerHeight = Math.Max(design.MarkerHeightMm, design.MinBoxThicknessMm);
-        var stack = StackLayout.Layout(heights, cubby.HeightMm, markerHeight, options.ExpansionStackMax);
+
+        return [.. expansions.Select(expansion => Math.Clamp(expansion.Box.DepthMm, minLayerHeight, design.MaxLayerHeightMm))];
+    }
+
+    private static int MarkerHeight(SectionDesign design) => Math.Max(design.MarkerHeightMm, design.MinBoxThicknessMm);
+
+    /// <summary>
+    /// Places the layers of a family from the floor up in the column that starts at <paramref name="columnX"/>, then the
+    /// marker when some expansions do not fit. The stack layout works on the expansions in collection order and decides how
+    /// many are shown, so the shown ones are always the earliest arrivals; they are drawn thickest at the bottom, equal
+    /// thicknesses in collection order. The layers touch each other and the box on the column's left, and the marker
+    /// sits on the top layer. When the stack <paramref name="continues"/> in the next cubby the column shows the layers that
+    /// fit under the shelf with no marker, and the rest belong to the second column.
+    /// </summary>
+    private static void PlaceStack(
+        SectionDesign design,
+        CabinetItem baseItem,
+        IReadOnlyList<CabinetItem> expansions,
+        int columnX,
+        CubbyDesign cubby,
+        LayoutOptions options,
+        bool continues,
+        List<Placement> placements)
+    {
+        var heights = LayerHeights(design, expansions);
+        var markerHeight = MarkerHeight(design);
+        var stack = StackLayout.Layout(heights, cubby.HeightMm, continues ? 0 : markerHeight, options.ExpansionStackMax);
+        var hiddenByMarker = continues ? 0 : stack.Hidden;
         var pitch = Math.Max(1, design.LabelCharPitchMm);
         var drawOrder = Enumerable.Range(0, stack.Visible)
             .OrderByDescending(index => heights[index])
@@ -288,7 +403,7 @@ public static class CubbyArrangement
 
         foreach (var index in drawOrder)
         {
-            var expansion = member.Expansions[index];
+            var expansion = expansions[index];
 
             placements.Add(new Placement(
                 GameId: expansion.BggId,
@@ -310,7 +425,7 @@ public static class CubbyArrangement
             y += heights[index];
         }
 
-        if (stack.Hidden > 0)
+        if (hiddenByMarker > 0)
         {
             placements.Add(new Placement(
                 GameId: baseItem.BggId,
@@ -327,7 +442,7 @@ public static class CubbyArrangement
                 ToneIndex: SpinePalette.ToneFor(baseItem.BggId),
                 PatternIndex: SpinePalette.PatternFor(baseItem.BggId),
                 FamilyId: baseItem.BggId,
-                MoreCount: stack.Hidden));
+                MoreCount: hiddenByMarker));
         }
     }
 

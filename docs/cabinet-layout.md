@@ -27,6 +27,51 @@ only raises the number in the marker. The base game reserves room for its uprigh
 stack as soon as it is placed, so an expansion is never left without a place
 beside its game.
 
+A base game that owns at least two expansions (the setting
+`Layout:CoverFromExpansions`) always faces out, whatever the cover share and the
+cover strategy, with its expansions beside it as before. The choice reads only
+the game's own owned expansions and the settings, never a picture. The few-games
+look still applies, and the setting at 0 turns the rule off.
+
+A family may use one more cubby: the next one to the right on the same shelf row,
+and nothing beyond it. When a family's game and upright expansions fit a cubby but
+its stack column does not, the family stands last in that cubby and the column
+stands at the left edge of the next cubby, right beside it. When a family would
+hide expansions behind "+N more", its own column shows the layers that fit under
+its shelf with no marker and a second column at the left edge of the next cubby
+shows the next expansions in collection order, as many as fit, with "+N more" only
+on top of that last column and only for what fits nowhere. A family never reaches
+a third cubby, another shelf row or another section, so every layer stays under
+its own cubby's shelf, and the layers drawn plus the number in the marker are
+always every expansion in its stack. A family in the last cubby of its shelf row
+keeps the single column and its marker. A cubby takes at most one family that
+continues next door, and at most one such column.
+
+Games of one series stand next to each other. Two things make games a series.
+The first is BoardGameGeek's family names: only families whose name starts with
+`Game: ` (a game, its spin-offs and standalone games) or `Series: ` (a named
+series of separate games) count, and a family only counts when at least two
+owned games carry it. A family that only one owned game carries counts for
+nothing, and neither do the broad families that most games carry, such as
+themes, components or player counts. The second is the title: games whose
+titles are the same up to the first colon or spaced dash (or are the same whole
+title) are one series, ignoring capitals and extra spaces, and this always
+applies. Series join through the games they share, so if the first game is
+linked to the second and the second to the third, all three are one series. Only
+games that stand on their own take part, so an expansion that stands beside its
+base game never counts for a series of its own.
+
+A series is placed as one block where its earliest game would have been placed,
+with its games in the order they were added to the collection. It goes into the
+first cubby, in reading order, that can take the whole series, and inside the
+cubby its games stand side by side. A series too long for any one cubby goes
+game by game: each game starts looking at the cubby of the game before it and
+never goes back to an earlier cubby, so the series runs on from cubby to cubby
+and into later sections. A game that lands in a later cubby than the game before
+it stands first, at the left, in that cubby, so the series reads on from there.
+The setting `Layout:GroupSeries` switches all of this off, and the cabinet is
+then arranged as if no game belonged to a series.
+
 Boxes lying flat are piled up to four high, with the widest box at the bottom
 and the thicker box lower among boxes of the same width, so no box overhangs
 the one beneath it. A big box is chosen to face out or stand, and it does so
@@ -72,6 +117,8 @@ two underscores.
 | `Layout:ExpansionStackMax` | 6 | 1 to 20 | The most expansions drawn in one stack before the rest are summed up as "+N more". |
 | `Layout:FewGamesThreshold` | 12 | 0 to 100 | Below this many top-level games, every box faces out, so a small collection fills the cabinet with covers instead of a few lonely spines. |
 | `Layout:LieFlatBeforeNewSection` | `true` | `true` or `false` | Lets a game that fits no existing cubby standing lie flat in the first cubby that can take it lying down, instead of opening a new section for it. Turning it off keeps every game standing the way it was chosen, but may add sections that are mostly empty. |
+| `Layout:CoverFromExpansions` | 2 | 0 to 20 | The fewest owned expansions that make a base game face out, whatever the cover share and strategy. 0 turns the rule off. |
+| `Layout:GroupSeries` | `true` | `true` or `false` | Places the games of one series next to each other (see "What the cabinet layout is"). Turning it off places every game on its own, the way the cabinet was arranged before series were grouped. |
 | `Prototype:Enabled` | `false` in the committed settings; `true` in the development settings | `true` or `false` | Shows the invented sample collections and their switcher while running locally in development. The deployed site ignores it. See "Invented collections" below. |
 
 ### Changing a setting on the server
@@ -82,6 +129,8 @@ Put the setting in `/etc/cabinet/cabinet.env`, one per line, for example:
 Layout__CoverSharePercent=30
 Layout__CoverStrategy=Random
 Layout__LieFlatBeforeNewSection=true
+Layout__GroupSeries=true
+Layout__CoverFromExpansions=2
 ```
 
 Then restart the service so it reads the file:
@@ -111,8 +160,8 @@ The same collection always gives the same cabinet, on every visit and after
 every restart. Nothing is random in a way that changes between requests: every
 choice comes from the game's own identifier and the settings.
 
-Adding a game changes only the cubby it lands in. Neighbouring games keep
-their place, their orientation and their colour. A game lands lying flat when no
+Adding a game that joins no series changes only the cubby it lands in.
+Neighbouring games keep their place, their orientation and their colour. A game lands lying flat when no
 cubby had room for it standing the way it was chosen.
 
 The one thing that also changes is how much of the last section is drawn. A game
@@ -132,7 +181,22 @@ A few changes rearrange more than that, and these are accepted:
   cubbies may shift to make room, while every game ordered before the base game
   keeps its cubby. That is the first expansion for a game, the first one that
   lies in a game's stack, and a big one that stands upright. An expansion that
-  joins a stack its game already has changes only that game's cubby.
+  joins a stack its game already has changes only that game's cubby, or the next
+  cubby when the stack's column already stands there.
+- The expansion that brings a base game to the threshold of
+  `Layout:CoverFromExpansions` turns that game to face out, which widens its
+  family, so it is accepted like any other widening: later cubbies may shift while
+  every game ordered before the base game keeps its cubby.
+- The expansion that first needs the next cubby, either because the column does
+  not fit beside the game any more or because the stack would otherwise hide
+  expansions, changes that cubby too and may shift later cubbies. The family then
+  stands last in its own cubby, so the games that stood after it move in front of
+  it, while every game that stood before it keeps its place. An expansion that
+  joins a column already standing in the next cubby changes only that cubby.
+- A game that joins an existing series, because it shares a family or the start
+  of its title with an earlier game, may move that whole series and later
+  cubbies, since the series is placed together where its first game stands. Every
+  game ordered before the first game of the series keeps its cubby and its pose.
 - An expansion whose base game is added later moves from standing alone to
   standing beside that base game, upright or in its stack.
 - When one of the changes above shifts later cubbies, games in them may also
@@ -157,6 +221,11 @@ those change.
 There are two section designs: a wide one for desktop screens and a narrow one
 for phones, with fewer cubbies across so the sections stack one below the
 other. A game may stand on a different shelf on a phone than on a desktop.
+
+The desktop rows, top to bottom, are 310 millimetres tall with cubbies of 190,
+240, 290, 230 and 170; 430 with 430, 390 and 340; 390 with 280, 550 and 330; 330
+with 480, 380 and 300; and 310 with 310, 350 and 500. The phone rows are listed in
+`SectionDesigns`, next to the notes on how each design was found.
 
 Nothing the cabinet draws may be too small to read or tap. Each design states
 the narrowest width its section is ever drawn at, in screen pixels, and the
@@ -231,28 +300,54 @@ other section is, so the stability rules above stay the only exceptions.
 
 ### Keeping the desktop cabinet dense
 
-The desktop design has five shelf rows across 1200 millimetres. Four rows are 330
-millimetres or taller, the shortest is 280, and no cubby is narrower than 180 or
-wider than 560. The largest box a design holds is taken from its tallest cubby,
-and larger boxes are scaled down to it, so the height of the tallest rows decides
-how many cubbies the biggest face-out boxes can go to. With only one tall row,
-those boxes crowded into a few cubbies, were left over after the shelves of
-earlier sections had filled with smaller games, and opened sections at the end
-that held only a handful of them. With several tall rows of similar height the
-biggest boxes spread over the cubbies and the end of the cabinet fills evenly.
-The cost is that the biggest boxes are drawn a little smaller: the largest box is
-370 millimetres tall instead of 400.
+The desktop design has five shelf rows across 1200 millimetres and is 1850
+millimetres tall inside. Every row is 310 millimetres or taller, and the cubbies
+run from 170 to 550 millimetres wide, with wide cubbies in every row. The largest
+box a design holds is taken from its tallest cubby, and larger boxes are scaled
+down to it: here that is 430 by 430 millimetres, and a base game that faces out
+beside its expansions is drawn at most 240 millimetres wide, to leave the stack
+column its room.
+
+The failure to avoid is a cabinet that ends in a nearly empty section holding the
+big boxes. Big boxes are the covers and flat boxes at least 300 millimetres wide,
+counting the stack of expansions beside them. They are placed last because they
+fit only a few cubbies, so when the narrow cubbies of the earlier sections fill
+first, the big boxes are left over and open a section for a handful of them. Rows
+that each have wide cubbies, and no row much shorter than a standard box, spread
+the big boxes over the whole cabinet so the end fills like the rest.
 
 The rules are that no section but the last keeps an empty row, that a collection
-of about sixty-five games has no empty row in the middle of any section, and that
-a large collection holds at least 30 games in every section but the last. The
-layout tests check them on the samples of 65 and 400 games and on seeded
-collections of both sizes whose boxes follow the spread of sizes seen on real
-games, including collections that were not used when the rows were chosen. The
-rows were found by a seeded search over valid designs, scored on exactly these
-measures, so retune them the same way when a collection starts to leave bare rows
-or a near-empty section: change the rows and cubby widths of the desktop design
-first, then raise the layout version and record the layouts again.
+of about sixty-five games has no empty row in the middle of any section, that a
+large collection holds at least 30 games in every section but the last, and that
+a collection with a realistic mix of box sizes never ends in a section of fewer
+than twelve placements that holds more than two big boxes. The layout tests check
+them on the samples of 65 and 400 games, on seeded collections of both sizes whose
+boxes follow the spread of sizes seen on real games, and on the seeded realistic
+mix described under "Invented collections", at the cover shares of 25 and 33
+percent. The seeds of the realistic mix include ones the search never used and
+ones on which the earlier rows ended in a small section of big boxes.
+
+The rows were found by a seeded search over valid designs, run outside the
+repository: four to six rows of 260 to 430 millimetres, cubbies of 160 to 600
+millimetres, an interior no taller than 1900 millimetres, every candidate passing
+the design's own checks and every layout rule switched on. Each candidate was
+scored on the samples, the invented BGG collections, the earlier spike-shaped
+seeds and several dozen seeds of the realistic mix, at both cover shares, by the
+number of sections, empty rows, hollow rows, empty cubbies and a small last
+section of big boxes. Only the chosen rows are kept here, together with this
+description. A collection the search never saw still ends in a small section
+of big boxes about one time in forty, because a last section of a handful of
+placements simply holds the last few games of the collection and a few of those
+are big; the test therefore allows two big boxes in a small last section and
+fails on three or more. Retune the rows the same way when a collection
+starts to leave bare rows or a near-empty section: change the rows and cubby
+widths of the desktop design first, then raise the layout version, or, while the
+version has not shipped, record the layouts again under the same version.
+
+The phone design was not changed by this retune. The layout tests pin the phone
+sections of the same realistic mix and require that the phone takes no more
+sections in all than it did before families faced out and continued in the next
+cubby, series stood together and the desktop was retuned.
 
 ## Recorded layouts
 
@@ -273,8 +368,10 @@ CABINET_UPDATE_GOLDENS=1 dotnet test --project Cabinet.UnitTests/Cabinet.UnitTes
 ```
 
 The recording refuses to run while the layouts have changed and the version has
-not, so a rearrangement is always a conscious one. Look at the changed files
-before committing them. The switch is for local use only and is never set in
+not, so a rearrangement is always a conscious one. When several arrangement
+changes go into one release, the version is raised only once for the release:
+record the layouts once under a temporary higher version, then put the intended
+version back and record again. Look at the changed files before committing them. The switch is for local use only and is never set in
 the automated workflows.
 
 ## What the page shows
@@ -307,8 +404,23 @@ invented collection is shown, a line above the links states its size, and the
 being-filled message is not shown. The links are plain links, so they work
 without JavaScript.
 
-The collections are made from invented syllables and mirror nothing real. A
-missing or unknown choice shows the synced collection, and the value that was
+The collections are made from invented syllables and mirror nothing real. The
+samples of 65 and 400 games also carry invented series: the sample of 65 has one
+series of three games and one of two, and the sample of 400 has six series, the
+longest of seven games, so the way a series stands together can be seen at both
+sizes.
+
+The layout tests also use a seeded collection shaped like a real hobby collection,
+made from coarse bands only: about thirty percent of the base games have no known
+size, so the default box applies; a fifth are small card boxes, a sixth standard
+portrait boxes, a fifth large squares, a tenth tall large boxes and one in twenty a
+wide landscape front. A quarter of the items are expansions in families of up to
+eight, several with two or more expansions, and a few series stand among the base
+games. Sizes are rounded to ten millimetres and shares to five percentage points,
+and a seed always gives the same collection. The tests name these collections
+`mix-` followed by the number of games and the seed.
+
+A missing or unknown choice shows the synced collection, and the value that was
 asked for is never repeated back into the page. When the switch is off or the
 site runs in production, there is no switcher and no "Invented collection of N
 items" line, and a `sample` value in the address is ignored. The sync status

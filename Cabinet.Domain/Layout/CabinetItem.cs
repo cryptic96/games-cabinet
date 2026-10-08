@@ -55,6 +55,10 @@ public sealed record ArtImage(IReadOnlyList<ArtVariant> Variants, ArtEdges? Edge
 /// The standing height used to decide how the box stands: the real height, else the estimated one, never anything taken from
 /// a picture. Null means the height of <paramref name="Box"/>.
 /// </param>
+/// <param name="SeriesFamilies">
+/// The identifiers of the BGG families of the game that name a series, in the order the source gave them, without
+/// duplicates. Null or empty means the game belongs to no series family.
+/// </param>
 public sealed record CabinetItem(
     int BggId,
     long CollectionId,
@@ -64,4 +68,5 @@ public sealed record CabinetItem(
     IReadOnlyList<BaseGameRef> ExpansionOf,
     ArtImage? Art = null,
     PaletteTone? Colour = null,
-    int? PoseHeightMm = null);
+    int? PoseHeightMm = null,
+    IReadOnlyList<int>? SeriesFamilies = null);

@@ -17,7 +17,9 @@ again. No picture is fetched again for that.
 
 Each page holds up to eight games, one row per game, in collection order. The
 numbers continue across pages, so a game can be named by its number. The page
-header states the detector thresholds and the shape margin in use.
+header states the detector thresholds and the shape margin in use. The rules
+text is wrapped onto as many lines as the page width needs, and the rows start
+below the last line.
 
 | Column | What it shows |
 | --- | --- |
@@ -25,7 +27,7 @@ header states the detector thresholds and the shape margin in use.
 | Title | The title on one line, shortened with an ellipsis when it is long |
 | A: owned version | The picture of the edition that is owned, 160 pixels high, or the word `none` |
 | B: main image | The game's main picture, 160 pixels high, or the word `none` |
-| Verdict of A | `flat`, `3D shot` or `unsure` with the detector's score to two decimals, or `no verdict` when there is no usable picture of the owned edition |
+| Verdict of A | `flat`, `3D shot` or `unsure` with the detector's score to two decimals, or `no verdict` when there is no usable picture of the owned edition; a picture with a transparent background reads `3D shot, cut-out`, and a box photographed so close that it runs along all four sides reads `3D shot, tight crop` |
 | Chosen | `chosen: version image`, `chosen: main image` or `generated cover`; a 3 pixel tan outline marks the chosen picture in column A or B |
 | Result | The box front as the cabinet draws it: the chosen picture shown whole in a box of the drawn proportions, on the colours along its four edges, 160 pixels high |
 | Spine | A 40 by 160 pixel strip in the spine colour with the title in its text colour |

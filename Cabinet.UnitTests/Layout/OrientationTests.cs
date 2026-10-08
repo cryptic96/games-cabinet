@@ -130,6 +130,50 @@ public class OrientationTests
         shortPose.Should().Contain(BoxPose.Flat, "a box whose pose height is small may lie flat");
     }
 
+    [Theory]
+    [InlineData(CoverStrategy.SizeWeighted)]
+    [InlineData(CoverStrategy.Random)]
+    [InlineData(CoverStrategy.OversizeOnly)]
+    [Trait("Category", "Layout")]
+    public void A_base_game_with_enough_owned_expansions_faces_out_under_every_strategy_with_a_share_of_zero(CoverStrategy strategy)
+    {
+        var options = new LayoutOptions(0, strategy, 6, 0, CoverFromExpansions: 2);
+
+        for (var id = 1; id <= 200; id++)
+        {
+            var item = ItemOf(id, heightMm: 150 + (id % 150));
+
+            Orientation.Decide(item, options, Design, fewGames: false, ownedExpansions: 2).Should().Be(BoxPose.Cover, "game {0}", id);
+            Orientation.Decide(item, options, Design, fewGames: false, ownedExpansions: 9).Should().Be(BoxPose.Cover, "game {0}", id);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_base_game_with_fewer_owned_expansions_than_the_setting_follows_the_strategy()
+    {
+        var options = new LayoutOptions(0, CoverStrategy.Random, 6, 0, CoverFromExpansions: 3);
+
+        for (var id = 1; id <= 200; id++)
+        {
+            Orientation.Decide(ItemOf(id, 250), options, Design, fewGames: false, ownedExpansions: 2)
+                .Should().NotBe(BoxPose.Cover, "game {0} has two of the three expansions that make a base face out", id);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_setting_of_zero_turns_the_expansion_rule_off()
+    {
+        var options = new LayoutOptions(0, CoverStrategy.Random, 6, 0, CoverFromExpansions: 0);
+
+        for (var id = 1; id <= 200; id++)
+        {
+            Orientation.Decide(ItemOf(id, 250), options, Design, fewGames: false, ownedExpansions: 12)
+                .Should().NotBe(BoxPose.Cover, "game {0}", id);
+        }
+    }
+
     private static CabinetItem ItemOf(int bggId, int heightMm, int depthMm = 60) =>
         new(bggId, bggId, $"Invented Title {bggId}", ItemKind.Base, new BoxDimensions(heightMm * 3 / 4, heightMm, depthMm), []);
 }

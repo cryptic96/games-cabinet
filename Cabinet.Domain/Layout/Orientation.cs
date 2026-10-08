@@ -27,9 +27,10 @@ public enum SizeClass
 }
 
 /// <summary>
-/// Decides how each game is chosen to stand. A decision depends only on that game, the settings and the design, never on
-/// the other games, so adding a game never changes the pose it is chosen for. The one exception is the few-games switch,
-/// which looks at how many games there are and is accepted as a single global rearrangement. The engine may still lay a
+/// Decides how each game is chosen to stand. A decision depends only on that game, its own owned expansions, the settings
+/// and the design, never on the other games, so adding a game never changes the pose it is chosen for. The exceptions are
+/// the few-games switch, which looks at how many games there are and is accepted as a single global rearrangement, and an
+/// expansion that brings its base game to the owned-expansion threshold, which turns that base game to face out. The engine may still lay a
 /// game flat when no cubby has room for it in the pose it was chosen for. The choice reads the item's pose height and never
 /// the shape its picture gives the drawn box, so changing how a picture is judged never changes how a box stands.
 /// </summary>
@@ -103,15 +104,22 @@ public static class Orientation
 
     /// <summary>
     /// Decides whether the game faces out, stands as a spine or lies flat. When <paramref name="fewGames"/> is true every
-    /// box faces out. Otherwise the strategy picks the covers, and a small or thin box that does not face out may lie flat.
+    /// box faces out, and so does a base game with at least <see cref="LayoutOptions.CoverFromExpansions"/> owned expansions
+    /// when that setting is not zero. Otherwise the strategy picks the covers, and a small or thin box that does not face out
+    /// may lie flat.
     /// </summary>
-    public static BoxPose Decide(CabinetItem item, LayoutOptions options, SectionDesign design, bool fewGames)
+    /// <param name="item">The game.</param>
+    /// <param name="options">The layout settings.</param>
+    /// <param name="design">The section design.</param>
+    /// <param name="fewGames">Whether the collection is small enough that every box faces out.</param>
+    /// <param name="ownedExpansions">The number of owned expansions that stand beside this game; zero for a game without any.</param>
+    public static BoxPose Decide(CabinetItem item, LayoutOptions options, SectionDesign design, bool fewGames, int ownedExpansions = 0)
     {
         ArgumentNullException.ThrowIfNull(item);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(design);
 
-        if (fewGames || FacesOut(item, options, design))
+        if (fewGames || HasEnoughExpansions(options, ownedExpansions) || FacesOut(item, options, design))
         {
             return BoxPose.Cover;
         }
@@ -120,6 +128,9 @@ public static class Orientation
             ? BoxPose.Flat
             : BoxPose.Spine;
     }
+
+    private static bool HasEnoughExpansions(LayoutOptions options, int ownedExpansions) =>
+        options.CoverFromExpansions > 0 && ownedExpansions >= options.CoverFromExpansions;
 
     private static BoxDimensions PoseBox(CabinetItem item) =>
         item.PoseHeightMm is { } height ? item.Box with { HeightMm = height } : item.Box;

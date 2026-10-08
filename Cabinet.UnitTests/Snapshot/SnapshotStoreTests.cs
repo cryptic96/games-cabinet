@@ -71,6 +71,46 @@ public sealed class SnapshotStoreTests : IDisposable
     }
 
     [Fact]
+    public void Stored_picture_features_without_the_cut_out_value_still_load_and_the_value_round_trips()
+    {
+        File.WriteAllText(
+            SnapshotPath,
+            """
+            {
+              "schemaVersion": 2,
+              "capturedAtUtc": "2026-01-01T00:00:00Z",
+              "items": [],
+              "images": {
+                "https://cf.example.org/v.jpg": {
+                  "sourceUrl": "https://cf.example.org/v.jpg",
+                  "status": "ok",
+                  "attemptedAtUtc": "2026-01-01T00:00:00Z",
+                  "features": { "backdropShare": 0.1, "fill": 0.9, "corner1": 0.2, "corner2": 0.1, "sidesTouched": 2 }
+                }
+              }
+            }
+            """);
+        var store = CreateStore();
+
+        var loaded = store.Load();
+
+        loaded!.Images!["https://cf.example.org/v.jpg"].Features.Should().Be(new ArtFeatures(0.1, 0.9, 0.2, 0.1, 2));
+        loaded.Images["https://cf.example.org/v.jpg"].Features!.CutOut.Should().BeNull();
+        File.Exists(BadPath).Should().BeFalse();
+
+        var withCutOut = loaded with
+        {
+            Images = new Dictionary<string, ImageRecord>
+            {
+                ["https://cf.example.org/v.jpg"] = loaded.Images["https://cf.example.org/v.jpg"] with { Features = new ArtFeatures(0.1, 1.0, 0.0, 0.0, 0, CutOut: true) },
+            },
+        };
+        store.Save(withCutOut);
+
+        store.Load()!.Images!["https://cf.example.org/v.jpg"].Features!.CutOut.Should().BeTrue();
+    }
+
+    [Fact]
     public void A_schema_2_file_round_trips_every_field_of_the_game_details()
     {
         var moment = new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero);
@@ -103,6 +143,55 @@ public sealed class SnapshotStoreTests : IDisposable
 
         store.Load().Should().BeEquivalentTo(snapshot, options => options.WithStrictOrdering());
         File.ReadAllText(SnapshotPath).Should().Contain("\"games\"").And.Contain("\"expandsGames\"").And.Contain("\"bayesAverage\":6.5");
+    }
+
+    [Fact]
+    public void Family_links_round_trip_and_details_written_before_them_load_with_none()
+    {
+        var moment = new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero);
+        var snapshot = new CollectionSnapshot(
+            CollectionSnapshot.CurrentSchemaVersion,
+            moment,
+            [new SnapshotItem(7, 11, "First Example", ItemKind.Base, null, null, null)],
+            Games: new Dictionary<int, GameDetails>
+            {
+                [11] = new(moment, null, null, null, null, null, null, null, null, null, [], [], [], null, Families: [new FamilyLink(7001, "Series: Example Saga"), new FamilyLink(7101, "Theme: Invented Theme 1")], DetailsVersion: 1),
+                [12] = new(moment, null, null, null, null, null, null, null, null, null, [], [], [], null, Families: []),
+            });
+        var store = CreateStore();
+
+        store.Save(snapshot);
+
+        store.Load().Should().BeEquivalentTo(snapshot, options => options.WithStrictOrdering());
+        File.ReadAllText(SnapshotPath).Should().Contain("\"families\"").And.Contain("\"detailsVersion\":1");
+
+        File.WriteAllText(
+            SnapshotPath,
+            "{ \"schemaVersion\": 2, \"capturedAtUtc\": \"2026-01-01T00:00:00Z\", \"items\": [], "
+            + "\"games\": { \"9\": { \"enrichedAtUtc\": \"2026-01-01T00:00:00Z\", \"designers\": [], \"mechanics\": [], \"expandsGames\": [] } } }");
+
+        var older = CreateStore().Load();
+
+        older.Should().NotBeNull();
+        older!.Games![9].Families.Should().BeNull();
+        older.Games[9].DetailsVersion.Should().BeNull("details written before the version existed carry none");
+        File.Exists(BadPath).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("{ \"name\": \"Series: Example Saga\" }")]
+    [InlineData("{ \"id\": 7001 }")]
+    public void A_family_link_without_its_id_or_name_makes_the_file_malformed_and_it_is_set_aside(string family)
+    {
+        File.WriteAllText(
+            SnapshotPath,
+            "{ \"schemaVersion\": 2, \"capturedAtUtc\": \"2026-01-01T00:00:00Z\", \"items\": [], "
+            + "\"games\": { \"9\": { \"enrichedAtUtc\": \"2026-01-01T00:00:00Z\", \"designers\": [], \"mechanics\": [], \"expandsGames\": [], "
+            + $"\"families\": [ {family} ] }} }} }}");
+
+        CreateStore().Load().Should().BeNull();
+
+        File.Exists(BadPath).Should().BeTrue();
     }
 
     [Fact]

@@ -125,6 +125,51 @@ public class SnapshotMapperTests
     }
 
     [Fact]
+    public void An_item_carries_the_ids_of_its_game_and_series_families_only_distinct_and_in_source_order()
+    {
+        var details = Details([]) with
+        {
+            Families =
+            [
+                new FamilyLink(7101, "Theme: Invented Theme 1"),
+                new FamilyLink(7002, "Game: Example Line"),
+                new FamilyLink(7201, "Components: Invented Pieces"),
+                new FamilyLink(7001, "Series: Example Saga"),
+                new FamilyLink(7002, "Game: Example Line"),
+                new FamilyLink(7301, "Players: Invented Solo Rules"),
+                new FamilyLink(7401, "Gameplay: Not A Series"),
+                new FamilyLink(7501, "series: Wrong Case"),
+            ],
+        };
+        var snapshot = Snapshot(Items) with { Games = new Dictionary<int, GameDetails> { [9] = details } };
+
+        var mapped = SnapshotMapper.ToCabinetItems(snapshot);
+
+        mapped.Single(item => item.BggId == 9).SeriesFamilies.Should().Equal(7002, 7001);
+        mapped.Where(item => item.BggId != 9).Should().OnlyContain(item => item.SeriesFamilies == null || item.SeriesFamilies.Count == 0);
+    }
+
+    [Fact]
+    public void The_version_changes_when_a_series_family_changes_and_not_when_a_broad_family_does()
+    {
+        GameDetails With(params FamilyLink[] families) => Details([]) with { Families = families };
+
+        CollectionSnapshot SnapshotWith(GameDetails details) =>
+            Snapshot(Items) with { Games = new Dictionary<int, GameDetails> { [9] = details } };
+
+        string Version(CollectionSnapshot snapshot) => SnapshotMapper.Version(SnapshotMapper.ToCabinetItems(snapshot));
+
+        var series = Version(SnapshotWith(With(new FamilyLink(7001, "Series: Example Saga"))));
+        var otherSeries = Version(SnapshotWith(With(new FamilyLink(7002, "Series: Example Saga"))));
+        var withBroad = Version(SnapshotWith(With(new FamilyLink(7101, "Theme: Invented Theme 1"), new FamilyLink(7001, "Series: Example Saga"))));
+        var none = Version(SnapshotWith(With()));
+
+        otherSeries.Should().NotBe(series);
+        none.Should().NotBe(series);
+        withBroad.Should().Be(series);
+    }
+
+    [Fact]
     public void An_empty_collection_has_a_version_too()
     {
         SnapshotMapper.Version(SnapshotMapper.ToCabinetItems(Snapshot([]))).Should().MatchRegex("^[0-9a-f]{16}$");

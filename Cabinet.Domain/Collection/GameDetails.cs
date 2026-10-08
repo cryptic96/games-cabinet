@@ -2,6 +2,11 @@ using Cabinet.Domain.Layout;
 
 namespace Cabinet.Domain.Collection;
 
+/// <summary>One BGG family a game belongs to: a franchise, a series or a broad grouping such as a theme.</summary>
+/// <param name="Id">The family's identifier.</param>
+/// <param name="Name">The family's name, prefixed with its category, such as a game or a series.</param>
+public sealed record FamilyLink(int Id, string Name);
+
 /// <summary>
 /// What the details call of the source knows about one game. Every count and rating is null when the source gave none or
 /// gave a value that cannot be true (zero, negative, not a number). The lists keep the order the source gave them,
@@ -23,6 +28,8 @@ namespace Cabinet.Domain.Collection;
 /// <param name="MainImageUrl">The canonical address of the game's main picture, or null when the source gave none.</param>
 /// <param name="EstimatedSize">The box size class worked out from these details, or null when it has not been worked out.</param>
 /// <param name="EstimateModelVersion">The version of the estimate that produced <paramref name="EstimatedSize"/>, or null when there is none.</param>
+/// <param name="Families">The game's BGG family links; null when the details were read before families were.</param>
+/// <param name="DetailsVersion">What the build that read these details knew to read, or null for details read before versions existed.</param>
 public sealed record GameDetails(
     DateTimeOffset EnrichedAtUtc,
     int? MinPlayers,
@@ -39,8 +46,16 @@ public sealed record GameDetails(
     IReadOnlyList<BaseGameRef> ExpandsGames,
     string? MainImageUrl,
     BoxSizeClass? EstimatedSize = null,
-    int? EstimateModelVersion = null)
+    int? EstimateModelVersion = null,
+    IReadOnlyList<FamilyLink>? Families = null,
+    int? DetailsVersion = null)
 {
+    /// <summary>
+    /// What the details step reads from the source today. It is raised whenever the step starts reading something new, so
+    /// every stored game is read once more and gains the new field; details with another version are due again.
+    /// </summary>
+    public const int CurrentDetailsVersion = 1;
+
     /// <summary>Whether another set of details says exactly the same, comparing the lists by their contents.</summary>
     /// <param name="other">The details to compare with; null is never the same.</param>
     public bool SameAs(GameDetails? other) =>
@@ -58,9 +73,11 @@ public sealed record GameDetails(
         && MainImageUrl == other.MainImageUrl
         && EstimatedSize == other.EstimatedSize
         && EstimateModelVersion == other.EstimateModelVersion
+        && DetailsVersion == other.DetailsVersion
         && Designers.SequenceEqual(other.Designers)
         && Mechanics.SequenceEqual(other.Mechanics)
-        && ExpandsGames.SequenceEqual(other.ExpandsGames);
+        && ExpandsGames.SequenceEqual(other.ExpandsGames)
+        && (Families is null ? other.Families is null : other.Families is not null && Families.SequenceEqual(other.Families));
 }
 
 /// <summary>The answer of a details source: the details of the games it knows or the reason there are none.</summary>

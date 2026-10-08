@@ -1,8 +1,10 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Xml.Linq;
+using Cabinet.Domain.Layout;
 using Cabinet.FakeBgg;
 using Cabinet.FakeBgg.Testing;
+using Cabinet.UnitTests.Layout;
 using FluentAssertions;
 using Microsoft.Extensions.Time.Testing;
 
@@ -12,6 +14,10 @@ namespace Cabinet.UnitTests.FakeBgg;
 [Trait("Category", "FakeBgg")]
 public class BggXmlTests
 {
+    private const int ThreeExpansionPosition = 13;
+    private const int SevenExpansionPosition = 28;
+    private const int ThickOrphanPosition = 34;
+
     private static readonly CollectionQuery OwnedBaseGames = new(true, null, "boardgameexpansion", true, false);
 
     [Fact]
@@ -129,6 +135,40 @@ public class BggXmlTests
             thing.Element("maxplaytime").Should().NotBeNull();
             thing.Element("statistics")!.Element("ratings")!.Element("bayesaverage").Should().NotBeNull();
         }
+    }
+
+    [Fact]
+    public void Things_carry_invented_family_links_with_three_series_one_lone_series_and_broad_families_for_every_game()
+    {
+        var items = SyntheticBggCollection.Create(400);
+        var ids = items.Where(item => item.Owned).Select(item => item.ObjectId).Distinct().ToList();
+
+        var document = XDocument.Parse(BggXml.Things(ids, items, stats: false));
+        var carriers = document.Root!.Elements("item")
+            .SelectMany(thing => LinksOf(thing, "boardgamefamily").Select(link => (Family: (string)link.Attribute("value")!, Game: (string)thing.Attribute("id")!)))
+            .GroupBy(pair => pair.Family)
+            .ToDictionary(group => group.Key, group => group.Select(pair => pair.Game).Distinct().Count());
+
+        carriers["Series: Example Saga"].Should().Be(3);
+        carriers["Game: Example Line"].Should().Be(2);
+        carriers["Series: Lone Example"].Should().Be(1);
+        carriers["Series: Example Long Cycle"].Should().Be(7);
+        carriers.Keys.Where(name => name.StartsWith("Theme: ", StringComparison.Ordinal)).Should().HaveCount(3);
+        carriers.Where(pair => pair.Key.StartsWith("Theme: ", StringComparison.Ordinal)).Should().OnlyContain(pair => pair.Value > 10);
+        carriers.Should().ContainKey("Components: Invented Pieces").And.ContainKey("Players: Invented Solo Rules");
+        document.Root!.Elements("item").Should().OnlyContain(thing => LinksOf(thing, "boardgamefamily").Any(link => ((string)link.Attribute("value")!).StartsWith("Theme: ", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void Families_depend_on_the_entry_alone_and_the_entries_at_the_series_positions_are_base_games()
+    {
+        var items = SyntheticBggCollection.Create(65);
+        var saga = new[] { 11, 26, 41 }.Select(position => items[position]).ToList();
+
+        saga.Should().OnlyContain(item => !item.IsExpansion);
+        saga.Select(item => SyntheticBggCollection.FamiliesFor(item).Single(family => family.Name.StartsWith("Series: ", StringComparison.Ordinal)).Id)
+            .Should().OnlyContain(id => id == 7001);
+        SyntheticBggCollection.FamiliesFor(items[11]).Should().Equal(SyntheticBggCollection.FamiliesFor(items[11]));
     }
 
     [Fact]
@@ -295,6 +335,34 @@ public class BggXmlTests
         items.Any(item => item.Version is null).Should().BeTrue();
         items.Count(item => item.Location is not null).Should().Be(2);
     }
+
+    [Fact]
+    public void The_collection_of_sixty_five_has_one_base_game_with_three_expansions_and_one_with_seven_and_they_face_out()
+    {
+        var mapped = FakeCollectionItems.Map(SyntheticBggCollection.Create(65));
+        var threeBase = mapped.Single(item => item.CollectionId == SyntheticBggCollection.FirstCollId + ThreeExpansionPosition);
+        var sevenBase = mapped.Single(item => item.CollectionId == SyntheticBggCollection.FirstCollId + SevenExpansionPosition);
+
+        PairedExpansions(mapped, threeBase).Should().HaveCount(3);
+        PairedExpansions(mapped, sevenBase).Should().HaveCount(7);
+        mapped.Where(item => item.Kind == ItemKind.Base && item.BggId != threeBase.BggId && item.BggId != sevenBase.BggId)
+            .Should().OnlyContain(item => PairedExpansions(mapped, item).Count <= 1);
+        var thickOrphan = mapped.Single(item => item.CollectionId == SyntheticBggCollection.FirstCollId + ThickOrphanPosition);
+        LayoutAssertions.OwnedParentOf(thickOrphan, mapped).Should().BeNull("the thick expansion of a game that is not owned stays on its own");
+
+        var placed = LayoutAssertions.PlacementsWithPosition(CabinetLayoutEngine.Build(mapped, SectionDesigns.Desktop));
+
+        var bases = placed
+            .Where(entry => entry.Placement.EntryId == threeBase.CollectionId || entry.Placement.EntryId == sevenBase.CollectionId)
+            .Where(entry => entry.Placement.Kind is PlacementKind.Cover or PlacementKind.Spine or PlacementKind.FlatBox)
+            .ToList();
+
+        bases.Should().HaveCount(2);
+        bases.Should().OnlyContain(entry => entry.Placement.Kind == PlacementKind.Cover);
+    }
+
+    private static List<CabinetItem> PairedExpansions(IReadOnlyList<CabinetItem> mapped, CabinetItem baseGame) =>
+        [.. mapped.Where(item => item.Kind == ItemKind.Expansion && LayoutAssertions.OwnedParentOf(item, mapped) == baseGame.BggId)];
 
     [Fact]
     public async Task Handler_returns_queued_answers_in_order()

@@ -115,6 +115,8 @@ public class CabinetLayoutEngineTests
     [Trait("Category", "Layout")]
     public void Appending_a_game_changes_at_most_one_cubby_across_seeded_collections()
     {
+        var checkedSeeds = 0;
+
         for (var seed = 1; seed <= StabilitySeeds; seed++)
         {
             var items = SyntheticCollections.Random(seed, StabilityCollectionSize);
@@ -122,16 +124,74 @@ public class CabinetLayoutEngineTests
             var before = CabinetLayoutEngine.Build(items, SectionDesigns.Desktop);
             var after = CabinetLayoutEngine.Build([.. items, next], SectionDesigns.Desktop);
 
+            LayoutAssertions.AssertValid(after, [.. items, next]);
+
+            if (LayoutAssertions.JoinsSeries(items, next))
+            {
+                continue;
+            }
+
+            checkedSeeds++;
             var changed = LayoutAssertions.ChangedCubbies(before, after);
 
             changed.Should().HaveCountLessThanOrEqualTo(1, "seed {0}", seed);
-            LayoutAssertions.AssertValid(after, [.. items, next]);
 
             if (after.Sections.Count > before.Sections.Count)
             {
                 changed.Should().OnlyContain(position => position.Section >= before.Sections.Count, "seed {0} opened a new section", seed);
             }
         }
+
+        checkedSeeds.Should().BeGreaterThan(StabilitySeeds / 2, "most appended games join no series");
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void Appending_a_game_that_joins_a_series_keeps_every_game_before_the_series_in_place()
+    {
+        for (var seed = 1; seed <= StabilitySeeds; seed++)
+        {
+            var items = SyntheticCollections.Random(seed, StabilityCollectionSize);
+            var partner = items[(seed * 7) % items.Count];
+            var next = SyntheticCollections.NextBaseGame(items, seed) with { Title = $"{SeriesGrouping.TitleKey(partner.Title)}: Appended" };
+            var all = items.Append(next).OrderBy(item => item.CollectionId).ThenBy(item => item.BggId).ToList();
+            var series = SeriesGrouping.Group(all).Single(group => group.Indices.Contains(all.IndexOf(next)));
+            var firstEntry = all[series.Indices[0]].CollectionId;
+            var before = LayoutAssertions.PlacementsWithPosition(CabinetLayoutEngine.Build(items, SectionDesigns.Desktop));
+            var afterLayout = CabinetLayoutEngine.Build([.. items, next], SectionDesigns.Desktop);
+            var after = LayoutAssertions.PlacementsWithPosition(afterLayout);
+
+            series.Indices.Count.Should().BeGreaterThan(1, "seed {0}: the appended game joins a series", seed);
+            LayoutAssertions.AssertValid(afterLayout, [.. items, next]);
+
+            foreach (var game in items.Where(item => item.CollectionId < firstEntry))
+            {
+                var was = before.Single(entry => entry.Placement.EntryId == game.CollectionId);
+                var now = after.Single(entry => entry.Placement.EntryId == game.CollectionId);
+
+                (now.Section, now.Cubby, now.Placement.Kind).Should().Be((was.Section, was.Cubby, was.Placement.Kind), "seed {0}, game {1}", seed, game.BggId);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("65")]
+    [InlineData("400")]
+    [Trait("Category", "Layout")]
+    public void Series_grouping_off_gives_the_arrangement_without_series(string sample)
+    {
+        SyntheticCollections.TryGetSample(sample, out var items);
+        var withoutSeries = items.Select(item => item with { Title = $"Invented Title {item.BggId}", SeriesFamilies = null }).ToList();
+        var off = LayoutOptions.Default with { GroupSeries = false };
+
+        var grouped = CabinetLayoutEngine.Build(items, SectionDesigns.Desktop);
+        var ungrouped = CabinetLayoutEngine.Build(items, SectionDesigns.Desktop, off);
+
+        LayoutAssertions.Geometry(ungrouped).Should().Be(LayoutAssertions.Geometry(CabinetLayoutEngine.Build(withoutSeries, SectionDesigns.Desktop, off)));
+        LayoutAssertions.Geometry(ungrouped).Should().Be(LayoutAssertions.Geometry(CabinetLayoutEngine.Build(withoutSeries, SectionDesigns.Desktop)));
+        LayoutAssertions.Geometry(grouped).Should().NotBe(LayoutAssertions.Geometry(ungrouped), "the sample holds series");
+        LayoutAssertions.AssertValid(ungrouped, items);
+        ungrouped.OptionsFingerprint.Should().NotBe(grouped.OptionsFingerprint);
     }
 
     [Fact]

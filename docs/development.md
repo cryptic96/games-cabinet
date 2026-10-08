@@ -97,7 +97,7 @@ It prints its address, `http://127.0.0.1:6190/xmlapi2/`, and runs until you stop
 What it answers:
 
 - `GET /xmlapi2/collection` honours `own`, `subtype`, `excludesubtype`, `version`, `showprivate` and `stats`. Like the real service, a request with no subtype filter labels expansions as base games, which is why the sync asks for base games and expansions in two calls.
-- `GET /xmlapi2/thing` answers one invented game for each requested id, and refuses more than 20 ids.
+- `GET /xmlapi2/thing` answers one invented game for each requested id, and refuses more than 20 ids. Every game carries invented family links: two series (three games in one, two in another), a series family that only one game carries, in the 400-entry collection a long series of seven games, and broad families on every game (themes, components, player counts) that must never group anything.
 - `POST /fake/scenario?name=<scenario>&size=<n>` switches the behaviour while it runs. Either parameter may be left out to keep its current value.
 
 Scenarios:
@@ -117,7 +117,7 @@ Scenarios:
 | `unauthorized` | Answers `401` with an empty body. |
 | `unavailable` | Answers `503`. |
 
-Collection sizes are 0, 1, 5, 65 and 400 entries; any other number is rounded to the nearest of these. Collections of five entries or more include the awkward cases a sync has to handle: a game owned twice, an entry that is not owned, expansions whose base game is and is not in the collection, titles with an ampersand, a non-Latin script and no text at all, and boxes with and without dimensions.
+Collection sizes are 0, 1, 5, 65 and 400 entries; any other number is rounded to the nearest of these. In the collections of 65 and 400 entries one base game has three owned expansions and another has seven, so a base game that faces out because of its expansions, and a family that continues in the next cubby, can both be seen. Collections of five entries or more include the awkward cases a sync has to handle: a game owned twice, an entry that is not owned, expansions whose base game is and is not in the collection, titles with an ampersand, a non-Latin script and no text at all, and boxes with and without dimensions.
 
 Switch scenarios from another terminal:
 
