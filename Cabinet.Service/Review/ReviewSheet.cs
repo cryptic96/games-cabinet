@@ -29,6 +29,10 @@ public static class ReviewSheet
 
     private const int Margin = 22;
     private const int HeaderHeight = 92;
+    private const int FirstRulesBaseline = 62;
+    private const int RulesLineHeight = 20;
+    private const string RuleSeparator = "|";
+    private const string RuleJoint = "   ";
     private const int ColumnHeaderHeight = 36;
     private const int RowPadding = 10;
     private const int CellPadding = 8;
@@ -110,6 +114,91 @@ public static class ReviewSheet
             $"flat: fill at least {Percent(thresholds.FlatMinFill)}% and emptiest corner at most {Percent(thresholds.FlatMaxCorner)}%   |   3D shot: fill at most {Percent(thresholds.ThreeDMaxFill)}% and second corner at least {Percent(thresholds.ThreeDMinCorner)}%   |   shape margin {rules.ShapeMarginPercent}%   |   landscape covers make landscape boxes: {(rules.OrientFromCover ? "yes" : "no")}   |   unsure pictures wider by more than {rules.UnsureLandscapeMarginPercent}% turn boxes");
     }
 
+    /// <summary>
+    /// Breaks the rules sentence into lines that each measure at most the given width. A line break falls at a rule
+    /// separator when it can, and at a space inside a rule that is itself too wide. Joining the lines with a space gives the
+    /// sentence back, apart from the spacing around the separators.
+    /// </summary>
+    /// <param name="rules">The rules in use.</param>
+    /// <param name="font">The font the lines are drawn with.</param>
+    /// <param name="maxWidth">The widest a line may measure.</param>
+    public static IReadOnlyList<string> RulesLines(ArtRules rules, SKFont font, float maxWidth)
+    {
+        ArgumentNullException.ThrowIfNull(rules);
+        ArgumentNullException.ThrowIfNull(font);
+
+        var parts = RulesText(rules).Split(RuleSeparator, StringSplitOptions.TrimEntries);
+        var lines = new List<string>();
+        var current = string.Empty;
+
+        for (var index = 0; index < parts.Length; index++)
+        {
+            var part = index < parts.Length - 1 ? parts[index] + RuleJoint + RuleSeparator : parts[index];
+            var joined = current.Length == 0 ? part : current + RuleJoint + part;
+
+            if (font.MeasureText(joined) <= maxWidth)
+            {
+                current = joined;
+
+                continue;
+            }
+
+            if (current.Length > 0)
+            {
+                lines.Add(current);
+                current = string.Empty;
+            }
+
+            current = WrapWide(part, font, maxWidth, lines);
+        }
+
+        if (current.Length > 0)
+        {
+            lines.Add(current);
+        }
+
+        return lines;
+    }
+
+    /// <summary>The height of the page header in pixels when the rules sentence takes the given number of lines.</summary>
+    /// <param name="rulesLineCount">The number of lines the rules sentence takes, at least one.</param>
+    public static int HeaderHeightPx(int rulesLineCount) => HeaderHeight + (Math.Max(1, rulesLineCount) - 1) * RulesLineHeight;
+
+    /// <summary>The baseline in pixels of one line of the rules sentence.</summary>
+    /// <param name="lineIndex">The zero-based line number.</param>
+    public static int RulesBaselinePx(int lineIndex) => FirstRulesBaseline + (lineIndex * RulesLineHeight);
+
+    /// <summary>The height of a page in pixels for the given number of rows and rules lines.</summary>
+    /// <param name="rowCount">The number of game rows on the page.</param>
+    /// <param name="rulesLineCount">The number of lines the rules sentence takes.</param>
+    public static int PageHeightPx(int rowCount, int rulesLineCount) =>
+        HeaderHeightPx(rulesLineCount) + ColumnHeaderHeight + (rowCount * RowHeight) + PageBottomMargin;
+
+    /// <summary>The widest a line of the rules sentence may measure on a page, in pixels.</summary>
+    public const int RulesWidthPx = PageWidthPx - (2 * Margin);
+
+    private static string WrapWide(string part, SKFont font, float maxWidth, List<string> lines)
+    {
+        var current = string.Empty;
+
+        foreach (var word in part.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var joined = current.Length == 0 ? word : current + " " + word;
+
+            if (current.Length > 0 && font.MeasureText(joined) > maxWidth)
+            {
+                lines.Add(current);
+                current = word;
+
+                continue;
+            }
+
+            current = joined;
+        }
+
+        return current;
+    }
+
     private static string Percent(double share) => Math.Round(share * PercentFactor).ToString(CultureInfo.InvariantCulture);
 
     private static byte[] DrawPage(
@@ -120,15 +209,17 @@ public static class ReviewSheet
         ArtRules rules,
         Fonts fonts)
     {
-        var height = HeaderHeight + ColumnHeaderHeight + (pageRows.Count * RowHeight) + PageBottomMargin;
+        var rulesLines = RulesLines(rules, fonts.Small, RulesWidthPx);
+        var headerHeight = HeaderHeightPx(rulesLines.Count);
+        var height = PageHeightPx(pageRows.Count, rulesLines.Count);
 
         using var bitmap = new SKBitmap(new SKImageInfo(PageWidthPx, height, SKColorType.Rgba8888, SKAlphaType.Opaque));
         using (var canvas = new SKCanvas(bitmap))
         {
             canvas.Clear(PageColour);
-            DrawHeader(canvas, pageRows, totalRows, pageNumber, pageCount, rules, fonts);
+            DrawHeader(canvas, pageRows, totalRows, pageNumber, pageCount, rulesLines, headerHeight, fonts);
 
-            var top = HeaderHeight + ColumnHeaderHeight;
+            var top = headerHeight + ColumnHeaderHeight;
 
             foreach (var row in pageRows)
             {
@@ -149,7 +240,8 @@ public static class ReviewSheet
         int totalRows,
         int pageNumber,
         int pageCount,
-        ArtRules rules,
+        IReadOnlyList<string> rulesLines,
+        int headerHeight,
         Fonts fonts)
     {
         var range = pageRows.Count == 0
@@ -166,10 +258,14 @@ public static class ReviewSheet
             SKTextAlign.Left,
             fonts.Title,
             ink);
-        canvas.DrawText(RulesText(rules), Margin, 62, SKTextAlign.Left, fonts.Small, muted);
+
+        for (var line = 0; line < rulesLines.Count; line++)
+        {
+            canvas.DrawText(rulesLines[line], Margin, RulesBaselinePx(line), SKTextAlign.Left, fonts.Small, muted);
+        }
 
         var x = Margin;
-        var baseline = HeaderHeight + 24;
+        var baseline = headerHeight + 24;
         foreach (var (name, width) in Columns())
         {
             canvas.DrawText(name, x + CellPadding, baseline, SKTextAlign.Left, fonts.Heading, ink);
