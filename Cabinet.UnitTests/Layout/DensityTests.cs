@@ -22,7 +22,7 @@ public class DensityTests
     /// <summary>The phone sections of the realistic mix of sixty-five games, seeds one to twelve, at a cover share of 25 and of 33 percent.</summary>
     private static readonly (int At25, int At33)[] MixPhoneSections =
     [
-        (2, 2), (2, 3), (2, 2), (2, 3), (2, 2), (2, 3), (2, 3), (2, 3), (2, 2), (2, 2), (2, 2), (2, 2),
+        (2, 2), (2, 3), (3, 2), (2, 3), (2, 2), (2, 3), (2, 2), (3, 3), (2, 2), (2, 2), (2, 2), (2, 2),
     ];
 
     public static TheoryData<string> Collections => new("65", "400", SpikeName);

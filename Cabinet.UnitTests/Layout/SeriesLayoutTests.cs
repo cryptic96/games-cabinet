@@ -1,4 +1,5 @@
 using Cabinet.Domain.Layout;
+using Cabinet.FakeBgg;
 using FluentAssertions;
 
 namespace Cabinet.UnitTests.Layout;
@@ -306,6 +307,75 @@ public class SeriesLayoutTests
 
     [Fact]
     [Trait("Category", "Layout")]
+    public void A_series_that_no_cubby_takes_whole_starts_where_it_can_run_on_without_skipping_a_cubby()
+    {
+        var design = new SectionDesign("test", 670, 10, [new ShelfRow(280, [250, 100, 300])]) { StackColumnWidthMm = 100 };
+        var plain = new[] { WithDepth(1, 1, 150), WithDepth(2, 2, 120) };
+        var series = new[] { WithDepth(101, 10, 70, SeriesFamily), WithDepth(102, 11, 150, SeriesFamily) };
+        var items = plain.Concat(series).ToList();
+
+        var layout = CabinetLayoutEngine.Build(items, design, SpinesOnly);
+
+        LayoutAssertions.AssertValid(layout, items);
+        InStandingOrder(layout, 0).Should().Equal([1], "the series would leave the narrow middle cubby out if it started beside the first game");
+        InStandingOrder(layout, 1).Should().Equal([101], "the series starts in the first cubby from which it runs on without a gap");
+        InStandingOrder(layout, 2).Should().Equal([102, 2], "the game that continues the series stands first in the next cubby");
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_family_of_a_series_keeps_its_marker_when_the_next_game_needs_the_room_its_second_column_would_take()
+    {
+        var design = new SectionDesign("test", 540, 20, [new ShelfRow(300, [220, 300])]) { StackColumnWidthMm = 140, MaxSpineHeightMm = 250 };
+        var family = Titled(1, 1, "Kelmont: One") with { Box = new BoxDimensions(150, 240, 40) };
+        var later = Titled(2, 2, "Kelmont: Two") with { Box = new BoxDimensions(200, 280, 60) };
+        var expansions = Enumerable.Range(10, 8).Select(id => ExpansionOf(id, id, family)).ToList();
+        var items = new List<CabinetItem>([family, later, .. expansions]);
+        var options = new LayoutOptions(0, CoverStrategy.OversizeOnly, 6, 0, CoverFromExpansions: 0);
+
+        var layout = CabinetLayoutEngine.Build(items, design, options);
+
+        LayoutAssertions.AssertValid(layout, items);
+        LayoutAssertions.SeriesGaps(layout, items, design).Should().BeEmpty();
+        layout.Sections.Should().ContainSingle("the series fits the existing section once the family keeps its stack in one column");
+        Cubby(layout, 0).Should().OnlyContain(placement => placement.FamilyId == 1, "the family stands whole in the first cubby");
+        Cubby(layout, 0).Single(placement => placement.Kind == PlacementKind.MoreMarker).MoreCount.Should().Be(3, "the family keeps the expansions that do not fit under its shelf behind its marker");
+        Cubby(layout, 1).Should().ContainSingle().Which.GameId.Should().Be(2, "the next game of the series has the next cubby to itself instead of a second column");
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_series_whose_games_cannot_stand_side_by_side_even_in_an_empty_section_still_runs_forward()
+    {
+        var design = new SectionDesign("test", 300, 20, [new ShelfRow(300, [300]), new ShelfRow(150, [300])]) { StackColumnWidthMm = 100, MaxSpineHeightMm = 250 };
+        var first = Titled(1, 1, "Kelmont: One") with { Box = new BoxDimensions(200, 280, 60) };
+        var second = Titled(2, 2, "Kelmont: Two") with { Box = new BoxDimensions(200, 280, 60) };
+        var items = new List<CabinetItem>([first, second]);
+        var options = new LayoutOptions(0, CoverStrategy.OversizeOnly, 6, 0, LieFlatBeforeNewSection: false);
+
+        var layout = CabinetLayoutEngine.Build(items, design, options);
+
+        LayoutAssertions.AssertValid(layout, items);
+        InStandingOrder(layout, 0).Should().Equal([1], "only the tall cubby takes either box, and not both");
+        InStandingOrder(layout, 0, sectionIndex: 1).Should().Equal([2], "the second game goes on to the next tall cubby, past the short one");
+        LayoutAssertions.SeriesGaps(layout, items, design).Should().ContainSingle("the one gap no arrangement of this design can avoid");
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void The_series_of_the_invented_bgg_collection_never_skip_a_cubby_at_the_committed_cover_share()
+    {
+        var items = FakeCollectionItems.Map(SyntheticBggCollection.Create(65));
+        var options = LayoutOptions.Default with { CoverSharePercent = 33 };
+
+        var layout = CabinetLayoutEngine.Build(items, SectionDesigns.Desktop, options);
+
+        LayoutAssertions.AssertValid(layout, items);
+        LayoutAssertions.SeriesGaps(layout, items, SectionDesigns.Desktop).Should().BeEmpty("every game of a series stands in the cubby of the game before it or the very next one");
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
     public void A_long_series_never_stands_before_the_game_that_precedes_it_in_reading_order()
     {
         var series = Enumerable.Range(1, 30).Select(index => Game(index * 3, index, SeriesFamily)).ToList();
@@ -350,6 +420,9 @@ public class SeriesLayoutTests
 
     private static CabinetItem Titled(int id, long entry, string title, params int[] families) =>
         Game(id, entry, families) with { Title = title };
+
+    private static CabinetItem ExpansionOf(int id, long entry, CabinetItem baseGame) =>
+        new(id, entry, $"Invented Expansion {id}", ItemKind.Expansion, new BoxDimensions(120, 200, 45), [new BaseGameRef(baseGame.BggId, baseGame.Title)]);
 
     private static List<int> InStandingOrder(CabinetLayout layout, int cubbyIndex, int sectionIndex = 0) =>
         [.. Cubby(layout, cubbyIndex, sectionIndex).OrderBy(placement => placement.XMm).Select(placement => placement.GameId)];
