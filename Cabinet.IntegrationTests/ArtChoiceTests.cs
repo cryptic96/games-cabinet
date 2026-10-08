@@ -2,6 +2,7 @@ using System.Text.Json;
 using Cabinet.FakeBgg;
 using Cabinet.FakeBgg.Testing;
 using Cabinet.IntegrationTests.Infrastructure;
+using Cabinet.Repository.Images;
 using FluentAssertions;
 
 namespace Cabinet.IntegrationTests;
@@ -125,10 +126,12 @@ public sealed class ArtChoiceTests
 
         var snapshotPath = Path.Combine(storage.FullPath, "snapshot.json");
         var stored = await File.ReadAllTextAsync(snapshotPath, TestContext.Current.CancellationToken);
-        stored.Should().Contain("\"analysisVersion\":1");
+        var current = $"\"analysisVersion\":{ArtProcessor.AnalysisVersion}";
+        var older = $"\"analysisVersion\":{ArtProcessor.AnalysisVersion - 1}";
+        stored.Should().Contain(current);
         await File.WriteAllTextAsync(
             snapshotPath,
-            stored.Replace("\"analysisVersion\":1", "\"analysisVersion\":0", StringComparison.Ordinal),
+            stored.Replace(current, older, StringComparison.Ordinal),
             TestContext.Current.CancellationToken);
 
         var secondImages = ScriptPictures(items);
@@ -140,7 +143,7 @@ public sealed class ArtChoiceTests
         secondImages.Requests.Should().NotBeEmpty("every picture measured by an older analysis is fetched again");
         StoredRecords(storage).Values
             .Where(record => record.GetProperty("status").GetString() == "ok")
-            .Should().OnlyContain(record => record.GetProperty("analysisVersion").GetInt32() == 1);
+            .Should().OnlyContain(record => record.GetProperty("analysisVersion").GetInt32() == ArtProcessor.AnalysisVersion);
     }
 
     private static Dictionary<string, string?> WithStorage(TemporaryDirectory storage) =>

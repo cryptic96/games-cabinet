@@ -53,7 +53,7 @@ public static class ArtProcessor
     /// turns a colour into a background and text pair change, so every stored picture is processed again over the
     /// following syncs.
     /// </summary>
-    public const int AnalysisVersion = 1;
+    public const int AnalysisVersion = 2;
 
     private const int DecodeWidth = 960;
     private const int WebpQuality = 80;

@@ -218,7 +218,7 @@ Plans:
   4. Box proportions come from the owned version's real BGG dimensions when available, else from a flat cover's aspect ratio, else from a realistic default, and a 3D shot's outline is never used, so real boxes in the cabinet visibly differ in size and shape.
   5. Each spine takes its colour from its box art (ignoring plain backgrounds around product shots) and shows the title legibly with readable text contrast.
 
-**Plans:** 13/16 plans executed
+**Plans:** 15/18 plans executed
 
 Plans:
 **Wave 1**
@@ -251,13 +251,18 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 04-14-PLAN.md — Release for the server round; the real collection enriched and its art stored (owner-gated)
+- [x] 04-14-PLAN.md — Release for the server round; the real collection enriched and its art stored (owner-gated)
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 04-15-PLAN.md — The owner's review of the real collection: sheet, cover shares, tuning (owner-gated)
+- [ ] 04-15-PLAN.md — The owner's review of the real collection: sheet, cover shares, tuning (owner-gated; round 2 resumes after 04-18 on v0.4.1)
+- [x] 04-17-PLAN.md — Round-1 fixes: landscape flat covers turn real sizes, unsure landscape pictures turn boxes (new setting), detector root-caused for white, transparent and dark-bordered pictures, analysis version 2 (gap closure)
 
 **Wave 8** *(blocked on Wave 7 completion)*
+
+- [ ] 04-18-PLAN.md — Release v0.4.1, deploy and bounded re-measure syncs on the container, games still waiting counted (owner-gated, gap closure)
+
+**Wave 9** *(blocked on Wave 8 completion)*
 
 - [ ] 04-16-PLAN.md — Tuned defaults committed, final release and the owner's deployed check (owner-gated)
 
@@ -339,7 +344,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 1. Repo, Guardrails & Walking-Skeleton Deploy | 15/15 | Complete    | 2026-10-04 |
 | 2. Layout Engine & Cabinet Prototype | 9/9 | Complete    | 2026-10-06 |
 | 3. BGG Access Spike, Real Sync & Snapshot | 15/15 | Complete    | 2026-10-07 |
-| 4. Enrichment, Box Images & Shape | 13/16 | In Progress|  |
+| 4. Enrichment, Box Images & Shape | 15/18 | In Progress|  |
 | 5. Game Detail, Accessibility & Language | 0/0 | Not started | - |
 | 6. Owner Tools & Persistence | 0/0 | Not started | - |
 | 7. Game-Night Filters & Location Cabinets | 0/0 | Not started | - |

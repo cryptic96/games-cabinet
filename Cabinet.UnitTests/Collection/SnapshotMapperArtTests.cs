@@ -65,6 +65,26 @@ public sealed class SnapshotMapperArtTests
         failedRecordOnly.Should().Be(without);
     }
 
+    [Fact]
+    public void An_unsure_landscape_chosen_picture_turns_the_box_and_a_3D_one_never_does()
+    {
+        var unsure = new ArtFeatures(0.2, 0.95, 0.30, 0.20, 2);
+        var threeD = new ArtFeatures(0.3, 0.70, 0.60, 0.50, 1);
+        var flat = new ArtFeatures(0.0, 1.0, 0.0, 0.0, 4);
+        var item = Item(VersionUrl, null) with { Dimensions = new VersionDimensions(6.3, 8.27, 2.09) };
+
+        BoxOf(item, unsure).Should().Be(new BoxDimensions(210, 160, 53));
+        BoxOf(item, threeD).Should().Be(new BoxDimensions(160, 210, 53));
+        BoxOf(item, flat).WidthMm.Should().BeGreaterThan(BoxOf(item, flat).HeightMm, "a flat cover keeps the rebuild of a front that disagrees");
+    }
+
+    private static BoxDimensions BoxOf(SnapshotItem item, ArtFeatures features)
+    {
+        var record = new ImageRecord(VersionUrl, ImageStatus.Ok, Moment, [new ArtFile(480, 300, "wide-480.webp")], features);
+
+        return SnapshotMapper.ToCabinetItems(Snapshot(item, record)).Single().Box;
+    }
+
     private static string Version(CollectionSnapshot snapshot) => SnapshotMapper.Version(SnapshotMapper.ToCabinetItems(snapshot));
 
     private static SnapshotItem Item(string? versionImage, string? mainImage) =>

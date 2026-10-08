@@ -75,7 +75,8 @@ public sealed class ReviewSheetTests : IDisposable
     {
         var text = ReviewSheet.RulesText(ArtRules.Default);
 
-        text.Should().Contain("fill at least 97%").And.Contain("shape margin 12%").And.Contain("second corner at least 40%");
+        text.Should().Contain("fill at least 97%").And.Contain("shape margin 12%").And.Contain("second corner at least 40%")
+            .And.Contain("wider by more than 20%");
     }
 
     private void AddGames(int count)

@@ -215,6 +215,57 @@ public sealed class ArtAnalysisTests
         facts.Top.Should().Be(new RgbColour(255, 255, 255));
     }
 
+    [Fact]
+    public void A_half_transparent_picture_keeps_its_straight_colour()
+    {
+        using var bitmap = new SKBitmap(new SKImageInfo(200, 200, SKColorType.Rgba8888, SKAlphaType.Unpremul));
+        bitmap.Pixels = Enumerable.Repeat(new SKColor(200, 40, 40, 128), 200 * 200).ToArray();
+        using var image = SKImage.FromBitmap(bitmap);
+        using var png = image.Encode(SKEncodedImageFormat.Png, 100);
+
+        var main = Stored(png.ToArray()).Main;
+
+        Near(main, new RgbColour(200, 40, 40), 12).Should().BeTrue($"the main colour was {main.ToHex()}");
+    }
+
+    [Fact]
+    public void A_cut_out_box_with_a_see_through_shadow_is_a_3D_shot_with_the_box_colour_as_main_colour()
+    {
+        var facts = Stored(SyntheticArtKind.BoxTransparentShadow);
+
+        ArtVerdicts.Classify(facts.Features, ArtThresholds.Default).Should().Be(ArtVerdict.ThreeD, Describe(facts));
+        facts.Main.B.Should().BeGreaterThanOrEqualTo(facts.Main.R, Describe(facts));
+        Highest(facts.Main).Should().BeGreaterThan(120, Describe(facts));
+    }
+
+    [Fact]
+    public void A_box_cropped_close_on_a_noisy_white_backdrop_is_a_3D_shot()
+    {
+        var facts = Stored(SyntheticArtKind.BoxOnNoisyWhite);
+
+        ArtVerdicts.Classify(facts.Features, ArtThresholds.Default).Should().Be(ArtVerdict.ThreeD, Describe(facts));
+        facts.Features.Fill.Should().BeLessThanOrEqualTo(0.93, Describe(facts));
+        facts.Features.Corner2.Should().BeGreaterThanOrEqualTo(0.40, Describe(facts));
+    }
+
+    [Fact]
+    public void A_flat_cover_inside_a_thick_dark_border_is_flat_and_warm_with_dark_edges()
+    {
+        var facts = Stored(SyntheticArtKind.DarkBorderCover);
+
+        ArtVerdicts.Classify(facts.Features, ArtThresholds.Default).Should().Be(ArtVerdict.Flat, Describe(facts));
+        ((int)facts.Main.R).Should().BeGreaterThanOrEqualTo(facts.Main.B + 40, Describe(facts));
+        new[] { facts.Top, facts.Right, facts.Bottom, facts.Left }.Should().OnlyContain(edge => Highest(edge) <= 40);
+    }
+
+    private static string Describe(ArtFacts facts) =>
+        $"features {facts.Features}, score {ArtVerdicts.Score(facts.Features):0.00}, main {facts.Main.ToHex()}";
+
+    private static ArtFacts Stored(SyntheticArtKind kind) => Stored(SyntheticArt.Encode(kind));
+
+    private static ArtFacts Stored(byte[] bytes) =>
+        ArtProcessor.Process(bytes, new ArtLimits(12_000_000, 36_000_000)).Should().BeOfType<ArtProcessing.Done>().Subject.Facts;
+
     private static ArtFacts Analyse(SyntheticArtKind kind)
     {
         using var bitmap = SKBitmap.Decode(SyntheticArt.Encode(kind));
