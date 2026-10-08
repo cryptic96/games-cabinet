@@ -112,7 +112,7 @@ two underscores.
 
 | Key | Default | Allowed values | What it does |
 |-----|---------|----------------|--------------|
-| `Layout:CoverSharePercent` | 25 | 0 to 100 | The share of boxes that face out as covers. With the size-weighted strategy the share is spread unevenly by box size. |
+| `Layout:CoverSharePercent` | 33 | 0 to 100 | The share of boxes that face out as covers. With the size-weighted strategy the share is spread unevenly by box size. The committed value was picked by looking at the real collection on the server: at 33 about a third of the games face out, families included, which is how the owner wants the shelves to read. A setting file without this key falls back to 25, the value the recorded layouts are made with. |
 | `Layout:CoverStrategy` | `SizeWeighted` | `SizeWeighted`, `Random`, `OversizeOnly` | How the boxes that face out are chosen. `SizeWeighted` makes large boxes much more likely to face out. `Random` gives every box the same chance, decided from its game identifier alone. `OversizeOnly` faces out exactly the boxes too tall to stand upright in the design and ignores the share. |
 | `Layout:ExpansionStackMax` | 6 | 1 to 20 | The most expansions drawn in one stack before the rest are summed up as "+N more". |
 | `Layout:FewGamesThreshold` | 12 | 0 to 100 | Below this many top-level games, every box faces out, so a small collection fills the cabinet with covers instead of a few lonely spines. |
