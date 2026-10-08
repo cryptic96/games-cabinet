@@ -3,16 +3,22 @@ namespace Cabinet.Domain.Layout;
 /// <summary>
 /// Builds the cabinet for a collection. The result is a pure function of the items, the section design and the layout
 /// options: nothing is remembered between calls, so the same collection always gives the same cabinet. How each game
-/// stands is decided from that game alone. Base games, and expansions whose base game is not owned, are taken in
-/// collection then game identifier order, except that the games of one series (see <see cref="SeriesGrouping"/>) are
-/// taken together where the earliest of them would be taken: a series that fits one cubby stands in the first cubby, in
-/// reading order, that can take all of it, and a longer series goes game by game, each one starting at the cubby of the
-/// game before it. A game in no series goes into the first cubby, in reading order section by section, that
-/// can still take it the way it was chosen; failing that a plain game may lie flat in the first cubby that can take it
-/// lying down; a new section opens only when neither fits. An owned expansion never takes a place of its own: a thick
-/// one stands upright right beside its base game and a thinner one lies in a stack beside it, and the base game reserves
-/// the room for both in its cubby when it is placed, whether the expansion arrived before or after it. Every section
-/// is drawn whole except the last, which is drawn only down to its last used shelf row (at least
+/// stands is decided from that game and its own owned expansions alone: a base game with enough of them faces out. Base
+/// games, and expansions whose base game is not owned, are taken in collection then game identifier order, except that
+/// the games of one series (see <see cref="SeriesGrouping"/>) are taken together where the earliest of them would be
+/// taken: a series that fits one cubby stands in the first cubby, in reading order, that can take all of it, and a longer
+/// series goes game by game, each one starting at the cubby of the game before it. A game in no series goes into the
+/// first cubby, in reading order section by section, that can still take it the way it was chosen; failing that a plain
+/// game may lie flat in the first cubby that can take it lying down; a new section opens only when neither fits. An owned
+/// expansion never takes a place of its own: a thick one stands upright right beside its base game and a thinner one lies
+/// in a stack beside it, and the base game reserves the room for both in its cubby when it is placed, whether the
+/// expansion arrived before or after it. A family may use one more cubby: the next one to the right on the same shelf
+/// row. When the whole family does not fit a cubby but its game and uprights do, the stack column stands at the left edge
+/// of that next cubby, and the family stands last in its own cubby so the column is right beside it. When a whole family
+/// would hide expansions behind a marker, it shows the layers that fit under its shelf and continues in a second column at
+/// the left edge of the next cubby when that cubby has room, with the marker only for what fits nowhere. Which of these
+/// applies is fixed when the family is placed. A family never reaches a third cubby, another row or another section.
+/// Every section is drawn whole except the last, which is drawn only down to its last used shelf row (at least
 /// <see cref="MinTrimmedRows"/> rows); that is a matter of drawing alone, so no placement depends on it.
 /// </summary>
 public static class CabinetLayoutEngine
@@ -98,7 +104,7 @@ public static class CabinetLayoutEngine
         }
 
         var expansions = families.ExpansionsOf(item);
-        var pose = Orientation.Decide(item, options, design, fewGames);
+        var pose = Orientation.Decide(item, options, design, fewGames, expansions.Count);
 
         if (expansions.Count > 0 && pose == BoxPose.Flat)
         {
@@ -241,13 +247,8 @@ public static class CabinetLayoutEngine
         {
             for (var cubbyIndex = 0; cubbyIndex < sections[sectionIndex].Count; cubbyIndex++)
             {
-                var candidate = new List<LayoutMember>(sections[sectionIndex][cubbyIndex]);
-                candidate.AddRange(series);
-
-                if (CanArrange(context, sectionIndex, cubbyIndex, candidate))
+                if (TryAdd(sections, context, sectionIndex, cubbyIndex, series))
                 {
-                    sections[sectionIndex][cubbyIndex].AddRange(series);
-
                     return true;
                 }
             }
@@ -255,6 +256,116 @@ public static class CabinetLayoutEngine
 
         return false;
     }
+
+    /// <summary>
+    /// Adds the members to one cubby when it can take them, and says whether it did. A family goes there whole, its column
+    /// beside it, when it fits. When the whole family does not fit, a family with stacked expansions may stand in the
+    /// cubby without its column when the next cubby of the same shelf row takes the column at its left edge. And when a
+    /// whole family would hide expansions behind a marker, it continues in a second column at the left edge of that next
+    /// cubby instead, when the next cubby has room. Nothing ever goes beyond the next cubby of the row.
+    /// </summary>
+    private static bool TryAdd(
+        List<List<List<LayoutMember>>> sections,
+        BuildContext context,
+        int sectionIndex,
+        int cubbyIndex,
+        IReadOnlyList<LayoutMember> batch)
+    {
+        var section = sections[sectionIndex];
+        var here = section[cubbyIndex];
+        var nextIndex = NextOnShelfRow(context, cubbyIndex);
+
+        if (CanArrange(context, sectionIndex, cubbyIndex, [.. here, .. batch]))
+        {
+            if (nextIndex is { } overflowIndex && TryContinue(context, sectionIndex, cubbyIndex, overflowIndex, section, batch) is { } split)
+            {
+                here.AddRange(split.Batch);
+                section[overflowIndex].Add(split.Column);
+
+                return true;
+            }
+
+            here.AddRange(batch);
+
+            return true;
+        }
+
+        if (nextIndex is not { } neighbourIndex)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < batch.Count; index++)
+        {
+            if (!HasStackedExpansions(batch[index]))
+            {
+                continue;
+            }
+
+            var column = LayoutMember.ColumnFor(batch[index], batch[index].Expansions);
+            var standing = Replace(batch, index, batch[index] with { ColumnNextDoor = true });
+
+            if (CanArrange(context, sectionIndex, cubbyIndex, [.. here, .. standing])
+                && CanArrange(context, sectionIndex, neighbourIndex, [.. section[neighbourIndex], column]))
+            {
+                here.AddRange(standing);
+                section[neighbourIndex].Add(column);
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Finds a family among the members whose stack would hide expansions behind a marker and that can continue in a second
+    /// column in the next cubby, and returns the members with that family marked and the column to add there; null when no
+    /// family can.
+    /// </summary>
+    private static (List<LayoutMember> Batch, LayoutMember Column)? TryContinue(
+        BuildContext context,
+        int sectionIndex,
+        int cubbyIndex,
+        int nextIndex,
+        List<List<LayoutMember>> section,
+        IReadOnlyList<LayoutMember> batch)
+    {
+        for (var index = 0; index < batch.Count; index++)
+        {
+            if (!HasStackedExpansions(batch[index])
+                || CubbyArrangement.SplitStack(context.Design, batch[index], context.Cubbies[cubbyIndex], context.Options) is not { } split)
+            {
+                continue;
+            }
+
+            var column = LayoutMember.ColumnFor(batch[index], split.Remaining);
+            var standing = Replace(batch, index, batch[index] with { ContinuesNextDoor = true });
+
+            if (CanArrange(context, sectionIndex, cubbyIndex, [.. section[cubbyIndex], .. standing])
+                && CanArrange(context, sectionIndex, nextIndex, [.. section[nextIndex], column]))
+            {
+                return (standing, column);
+            }
+        }
+
+        return null;
+    }
+
+    private static bool HasStackedExpansions(LayoutMember member) => member.Expansions.Count > 0 && !member.IsColumnOnly;
+
+    private static List<LayoutMember> Replace(IReadOnlyList<LayoutMember> members, int index, LayoutMember replacement)
+    {
+        var copy = new List<LayoutMember>(members) { [index] = replacement };
+
+        return copy;
+    }
+
+    /// <summary>The index of the next cubby to the right on the same shelf row, or null when this cubby is the last of its row.</summary>
+    private static int? NextOnShelfRow(BuildContext context, int cubbyIndex) =>
+        cubbyIndex + 1 < context.Cubbies.Count && context.Cubbies[cubbyIndex + 1].YMm == context.Cubbies[cubbyIndex].YMm
+            ? cubbyIndex + 1
+            : null;
 
     /// <summary>
     /// Places one game in the first cubby, in reading order, that can take it the way it was chosen; failing that lying
@@ -321,12 +432,9 @@ public static class CabinetLayoutEngine
             {
                 var here = new Position(sectionIndex, cubbyIndex);
                 var placed = previous is { } before && here.IsAfter(before) ? member with { FromPreviousCubby = true } : member;
-                var candidate = new List<LayoutMember>(section[cubbyIndex]) { placed };
 
-                if (CanArrange(context, sectionIndex, cubbyIndex, candidate))
+                if (TryAdd(sections, context, sectionIndex, cubbyIndex, [placed]))
                 {
-                    section[cubbyIndex].Add(placed);
-
                     return here;
                 }
             }

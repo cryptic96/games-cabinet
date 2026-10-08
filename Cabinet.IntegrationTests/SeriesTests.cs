@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Cabinet.Domain.Layout;
 using Cabinet.FakeBgg;
 using Cabinet.FakeBgg.Testing;
 using Cabinet.IntegrationTests.Infrastructure;
@@ -8,7 +9,8 @@ namespace Cabinet.IntegrationTests;
 
 /// <summary>
 /// Proves, through a booted host with scripted answers, that games sharing a BGG series family stand together in the
-/// served cabinet after one sync, and that a family only one game carries and broad families change nothing.
+/// served cabinet after one sync, that a series too wide for one cubby continues in the next, and that a family only one
+/// game carries and broad families change nothing.
 /// </summary>
 [Trait("Category", "Sync")]
 public sealed class SeriesTests
@@ -30,7 +32,17 @@ public sealed class SeriesTests
         var standing = Standing(document);
 
         AssertStandTogether(standing, items, SagaPositions);
-        AssertStandTogether(standing, items, LinePositions);
+        AssertContinuesInTheNextCubby(standing, items, LinePositions);
+    }
+
+    private static void AssertContinuesInTheNextCubby(IReadOnlyList<Stand> standing, IReadOnlyList<FakeBggItem> items, int[] positions)
+    {
+        var first = standing.Single(stand => stand.Entry == items[positions[0]].CollId);
+        var second = standing.Single(stand => stand.Entry == items[positions[1]].CollId);
+
+        second.Section.Should().Be(first.Section);
+        second.Cubby.Should().Be(first.Cubby + 1, "the first game owns expansions and faces out, so the series continues in the next cubby");
+        second.X.Should().Be(SectionDesigns.Desktop.StackColumnWidthMm, "the column of the first game's family stands at the left edge, the continuing game right after it");
     }
 
     private static void AssertStandTogether(IReadOnlyList<Stand> standing, IReadOnlyList<FakeBggItem> items, int[] positions)

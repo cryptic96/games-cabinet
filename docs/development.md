@@ -117,7 +117,7 @@ Scenarios:
 | `unauthorized` | Answers `401` with an empty body. |
 | `unavailable` | Answers `503`. |
 
-Collection sizes are 0, 1, 5, 65 and 400 entries; any other number is rounded to the nearest of these. Collections of five entries or more include the awkward cases a sync has to handle: a game owned twice, an entry that is not owned, expansions whose base game is and is not in the collection, titles with an ampersand, a non-Latin script and no text at all, and boxes with and without dimensions.
+Collection sizes are 0, 1, 5, 65 and 400 entries; any other number is rounded to the nearest of these. In the collections of 65 and 400 entries one base game has three owned expansions and another has seven, so a base game that faces out because of its expansions, and a family that continues in the next cubby, can both be seen. Collections of five entries or more include the awkward cases a sync has to handle: a game owned twice, an entry that is not owned, expansions whose base game is and is not in the collection, titles with an ampersand, a non-Latin script and no text at all, and boxes with and without dimensions.
 
 Switch scenarios from another terminal:
 
