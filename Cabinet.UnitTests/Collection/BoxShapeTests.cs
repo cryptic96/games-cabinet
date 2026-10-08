@@ -115,6 +115,43 @@ public sealed class BoxShapeTests
     }
 
     [Fact]
+    public void A_landscape_flat_cover_turns_real_sizes_of_the_same_proportions_keeping_area_depth_and_source()
+    {
+        var item = Item(new VersionDimensions(6.3, 8.27, 2.09));
+        var cover = new ArtFile(1000, 760, "e-480.webp");
+
+        var shaped = BoxShape.Resolve(item, null, cover, ArtRules.Default);
+
+        shaped.Box.Should().Be(new BoxDimensions(210, 160, 53));
+        shaped.Source.Should().Be(BoxSource.RealSize);
+        shaped.PoseHeightMm.Should().Be(210);
+    }
+
+    [Fact]
+    public void With_the_orientation_rule_off_real_sizes_stay_portrait_under_a_landscape_cover()
+    {
+        var item = Item(new VersionDimensions(6.3, 8.27, 2.09));
+        var off = ArtRules.Default with { OrientFromCover = false };
+
+        var shaped = BoxShape.Resolve(item, null, new ArtFile(1000, 760, "e-480.webp"), off);
+
+        shaped.Box.Should().Be(new BoxDimensions(160, 210, 53));
+        shaped.Source.Should().Be(BoxSource.RealSize);
+    }
+
+    [Fact]
+    public void A_landscape_cover_turns_real_sizes_whose_rebuilt_front_would_not_be_believable()
+    {
+        var item = Item(new VersionDimensions(7, 8, 2));
+
+        var shaped = BoxShape.Resolve(item, null, new ArtFile(1000, 50, "w.webp"), ArtRules.Default);
+
+        shaped.Source.Should().Be(BoxSource.RealSize);
+        shaped.Box.Should().Be(new BoxDimensions(203, 178, 51));
+        shaped.PoseHeightMm.Should().Be(203);
+    }
+
+    [Fact]
     public void A_wider_margin_keeps_what_the_default_margin_rebuilds()
     {
         var item = Item(new VersionDimensions(6.3, 8.27, 2.09));

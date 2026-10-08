@@ -27,8 +27,9 @@ public sealed record ShapedBox(BoxDimensions Box, int PoseHeightMm, BoxSource So
 /// <summary>
 /// Chooses the size to draw for a box: the real dimensions when they are believable, unless they clearly contradict a flat
 /// cover, in which case the cover gives the shape; without real dimensions a flat cover gives the shape and an estimate the
-/// size; without a cover the estimate or the default is drawn. A picture that is a photographed box or unsure never shapes
-/// anything, so the caller passes a cover only for a flat one.
+/// size; without a cover the estimate or the default is drawn. A flat landscape cover also turns real dimensions that agree
+/// with it, so the front is drawn landscape at its real area and depth. A picture that is a photographed box or unsure never
+/// shapes anything, so the caller passes a cover only for a flat one. How a box stands never follows its picture.
 /// </summary>
 public static class BoxShape
 {
@@ -36,8 +37,9 @@ public static class BoxShape
     private const double PercentFactor = 100.0;
 
     /// <summary>
-    /// Works out the box to draw and the height that decides how it stands. The pose height is the real height, else the
-    /// estimated one, and never depends on the cover.
+    /// Works out the box to draw and the height that decides how it stands. The pose height is the real longer side, else the
+    /// estimated one, before any turning, and never depends on a picture. A flat landscape cover turns real dimensions to a
+    /// landscape front also when their shape agrees with it, keeping their area, depth and source.
     /// </summary>
     /// <param name="item">The stored item with its reported dimensions.</param>
     /// <param name="details">What is known about the game, or null when nothing is.</param>
@@ -58,7 +60,7 @@ public static class BoxShape
             return cover is not null && Disagrees(real, cover, rules.ShapeMarginPercent)
                 && Rebuilt(real, cover, rules) is { } rebuilt
                     ? new ShapedBox(rebuilt, poseHeight, BoxSource.CoverShape)
-                    : new ShapedBox(real, poseHeight, BoxSource.RealSize);
+                    : new ShapedBox(Turned(real, cover, rules), poseHeight, BoxSource.RealSize);
         }
 
         if (cover is not null)
@@ -68,6 +70,11 @@ public static class BoxShape
 
         return new ShapedBox(estimate, poseHeight, details is null ? BoxSource.Default : BoxSource.Estimate);
     }
+
+    private static BoxDimensions Turned(BoxDimensions front, ArtFile? cover, ArtRules rules) =>
+        rules.OrientFromCover && cover is not null && cover.Width > cover.Height && front.WidthMm < front.HeightMm
+            ? new BoxDimensions(front.HeightMm, front.WidthMm, front.DepthMm)
+            : front;
 
     private static BoxDimensions EstimateOf(SnapshotItem item, GameDetails? details)
     {

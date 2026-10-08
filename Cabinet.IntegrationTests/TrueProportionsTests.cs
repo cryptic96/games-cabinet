@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Cabinet.Domain.Collection;
+using Cabinet.Domain.Layout;
 using Cabinet.FakeBgg;
 using Cabinet.FakeBgg.Testing;
 using Cabinet.IntegrationTests.Infrastructure;
@@ -23,6 +24,10 @@ public sealed class TrueProportionsTests
     private const double RatioStep = 0.05;
     private const double LandscapeRatio = 900.0 / 800.0;
     private const double RatioTolerance = 0.02;
+    private const long TurnedRealSizeEntry = SyntheticBggCollection.FirstCollId + 1;
+    private const int TurnedLongerSideMm = 298;
+    private const int TurnedShorterSideMm = 241;
+    private const int TurnedDepthMm = 79;
 
     private static readonly Dictionary<string, string?> AllowExampleHost = new()
     {
@@ -49,6 +54,33 @@ public sealed class TrueProportionsTests
         ((double)placement.GetProperty("widthMm").GetInt32() / placement.GetProperty("heightMm").GetInt32())
             .Should().BeApproximately(LandscapeRatio, LandscapeRatio * RatioTolerance);
         placement.GetProperty("art").GetProperty("fit").GetString().Should().Be("exact");
+    }
+
+    [Fact]
+    public async Task A_game_with_real_sizes_of_the_same_proportions_as_its_flat_landscape_cover_is_drawn_landscape_at_its_real_size()
+    {
+        var items = SyntheticBggCollection.Create(65);
+        var entry = items.Single(item => item.CollId == TurnedRealSizeEntry);
+        var wide = SyntheticArt.Encode(SyntheticArtKind.FlatWide);
+        var images = new ScriptedImageHandler()
+            .Serve($"{ImageHost}version-{BggXml.VersionId(entry)}.jpg", wide)
+            .Serve($"{ImageHost}{entry.ObjectId}.jpg", wide);
+        var clock = SyncHarness.NewClock();
+        await using var factory = SyncHarness.CreateFactory(ScriptedBggHandler.ForCollection(items), clock, AllowExampleHost, images);
+        using var client = factory.CreatePublicClient();
+
+        await SyncRounds.PressAndWait(client, clock, advance: false);
+        var mapped = factory.ServingServices.GetRequiredService<CollectionStore>().Current.Items
+            .Single(item => item.CollectionId == TurnedRealSizeEntry);
+        using var document = JsonDocument.Parse(await client.GetStringAsync(LayoutPath, TestContext.Current.CancellationToken));
+        var placement = Placements(document).Single(candidate => candidate.GetProperty("entryId").GetInt64() == TurnedRealSizeEntry);
+
+        mapped.Box.Should().Be(new BoxDimensions(TurnedLongerSideMm, TurnedShorterSideMm, TurnedDepthMm));
+        mapped.PoseHeightMm.Should().Be(TurnedLongerSideMm);
+        placement.GetProperty("kind").GetString().Should().Be("cover");
+        ((double)placement.GetProperty("widthMm").GetInt32() / placement.GetProperty("heightMm").GetInt32())
+            .Should().BeApproximately((double)TurnedLongerSideMm / TurnedShorterSideMm, ((double)TurnedLongerSideMm / TurnedShorterSideMm) * RatioTolerance);
+        placement.GetProperty("art").GetProperty("fit").GetString().Should().Be("height");
     }
 
     [Fact]

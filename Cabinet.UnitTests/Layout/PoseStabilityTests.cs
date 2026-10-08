@@ -57,8 +57,50 @@ public sealed class PoseStabilityTests
         }
     }
 
+    [Theory]
+    [MemberData(nameof(Samples))]
+    public void Turning_boxes_by_their_pictures_never_changes_a_pose(string sample)
+    {
+        var snapshot = TurnedPicturesSnapshotOf(sample);
+        var turning = SnapshotMapper.ToCabinetItems(snapshot, ArtRules.Default);
+        var upright = SnapshotMapper.ToCabinetItems(snapshot, ArtRules.Default with { OrientFromCover = false });
+
+        turning.Select(item => item.Box).Should().NotEqual(upright.Select(item => item.Box), "turning changes the drawn boxes");
+        turning.Select(item => item.PoseHeightMm).Should().Equal(upright.Select(item => item.PoseHeightMm));
+
+        foreach (var strategy in Enum.GetValues<CoverStrategy>())
+        {
+            var options = new LayoutOptions(25, strategy, 6, 12, true);
+
+            foreach (var design in SectionDesigns.All)
+            {
+                PosesOf(turning, options, design).Should().Equal(PosesOf(upright, options, design), "{0} on {1}", strategy, design.Name);
+            }
+        }
+    }
+
     private static List<(int BggId, BoxPose Pose)> PosesOf(IReadOnlyList<CabinetItem> items, LayoutOptions options, SectionDesign design) =>
         [.. items.Select(item => (item.BggId, Orientation.Decide(item, options, design, fewGames: false)))];
+
+    private static CollectionSnapshot TurnedPicturesSnapshotOf(string sample)
+    {
+        SyntheticCollections.TryGetSample(sample, out var source).Should().BeTrue();
+
+        var items = new List<SnapshotItem>();
+        var images = new Dictionary<string, ImageRecord>();
+
+        foreach (var item in source)
+        {
+            var address = $"{AddressPrefix}turned-{item.CollectionId}.jpg";
+            var dimensions = new VersionDimensions(item.Box.WidthMm / MillimetresPerInch, item.Box.HeightMm / MillimetresPerInch, item.Box.DepthMm / MillimetresPerInch);
+            var turnedFront = new ArtFile(item.Box.HeightMm, item.Box.WidthMm, "turned.webp");
+
+            items.Add(new SnapshotItem(item.CollectionId, item.BggId, item.Title, item.Kind, null, dimensions, null, address));
+            images[address] = new ImageRecord(address, ImageStatus.Ok, Moment, [turnedFront], FlatFeatures);
+        }
+
+        return new CollectionSnapshot(CollectionSnapshot.CurrentSchemaVersion, Moment, items, images);
+    }
 
     private static CollectionSnapshot SnapshotOf(string sample)
     {

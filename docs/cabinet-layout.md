@@ -138,6 +138,10 @@ A few changes rearrange more than that, and these are accepted:
 - When one of the changes above shifts later cubbies, games in them may also
   change between standing the way they were chosen and lying flat, because that
   depends on the room left by the games before them.
+- A picture, or a change in how pictures are judged, that turns a box front
+  landscape (or back) changes that box's drawn size, so later cubbies may shift
+  as with the other accepted changes. The way the box was chosen to stand never
+  changes.
 - Changing a layout setting changes the arrangement, since the settings are
   part of what decides it.
 
