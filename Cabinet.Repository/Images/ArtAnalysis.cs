@@ -56,6 +56,15 @@ public static class ArtAnalysis
     /// <summary>The least value on every channel for a backdrop colour to count as a near-white frame.</summary>
     public const int NearWhiteMin = 224;
 
+    /// <summary>The widest spread between the highest and the lowest channel for a near-white pixel; a starting value.</summary>
+    public const int NearWhiteMaxSpread = 24;
+
+    /// <summary>The most two insets of one side may differ by, in pixels of the working copy, and still count as the same border; a starting value.</summary>
+    public const int FrameInsetTolerancePx = 1;
+
+    /// <summary>The share of the rows or columns of a side that must hold the same inset for that side to count as straight; a starting value.</summary>
+    public const double FrameStraightShare = 0.50;
+
     /// <summary>The colour used when a picture has no opaque pixel at all.</summary>
     public static readonly RgbColour FallbackColour = new(128, 128, 128);
 

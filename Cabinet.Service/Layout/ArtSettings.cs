@@ -17,6 +17,9 @@ public static class ArtSettings
     private const string ThreeDMinCornerKey = "Art:ThreeDMinCornerPercent";
     private const string ShapeMarginKey = "Art:ShapeMarginPercent";
     private const string OrientFromCoverKey = "Art:OrientFromCover";
+    private const string UnsureLandscapeMarginKey = "Art:UnsureLandscapeMarginPercent";
+    private const int MinUnsureLandscapeMarginPercent = 1;
+    private const int MaxUnsureLandscapeMarginPercent = 100;
     private const int MinShapeMarginPercent = 1;
     private const int MaxShapeMarginPercent = 50;
     private const double PercentDivisor = 100.0;
@@ -46,7 +49,13 @@ public static class ArtSettings
         return new ArtRules(
             new ArtThresholds(flatMinFill, flatMaxCorner, threeDMaxFill, threeDMinCorner, defaults.DegenerateBackdropShare),
             ReadWholeNumber(configuration, ShapeMarginKey, MinShapeMarginPercent, MaxShapeMarginPercent, ArtRules.DefaultShapeMarginPercent),
-            ReadSwitch(configuration, OrientFromCoverKey, fallback: true));
+            ReadSwitch(configuration, OrientFromCoverKey, fallback: true),
+            ReadWholeNumber(
+                configuration,
+                UnsureLandscapeMarginKey,
+                MinUnsureLandscapeMarginPercent,
+                MaxUnsureLandscapeMarginPercent,
+                ArtRules.DefaultUnsureLandscapeMarginPercent));
     }
 
     private static int ReadWholeNumber(IConfiguration configuration, string key, int min, int max, int fallback)

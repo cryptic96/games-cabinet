@@ -46,7 +46,8 @@ public static class SnapshotMapper
     /// cover, the game's main picture when the owned edition's picture is a photographed box and the main picture is flat,
     /// and the owned edition's picture otherwise. The chosen picture also supplies the colour pair and the edge colours the
     /// item carries; a game with no usable picture carries neither. A chosen picture that is a flat cover may also give the
-    /// box its shape; see <see cref="BoxShape"/>.
+    /// box its shape, and an unsure one that is clearly landscape may turn it; a photographed box does neither; see
+    /// <see cref="BoxShape"/>.
     /// </summary>
     /// <param name="snapshot">The stored collection.</param>
     /// <param name="rules">The rules that turn stored measurements into a choice.</param>
@@ -143,7 +144,14 @@ public static class SnapshotMapper
             _ => null,
         };
         var details = snapshot.Games is not null && snapshot.Games.TryGetValue(item.GameId, out var known) ? known : null;
-        var shaped = BoxShape.Resolve(item, details, FlatCoverOf(chosen, rules), rules);
+        var chosenVerdict = VerdictOf(chosen, rules);
+        var widest = chosen is null ? null : WidestFile(chosen);
+        var shaped = BoxShape.Resolve(
+            item,
+            details,
+            chosenVerdict == ArtVerdict.Flat ? widest : null,
+            rules,
+            chosenVerdict == ArtVerdict.Unsure ? widest : null);
 
         var mapped = new CabinetItem(
             item.GameId,
@@ -168,8 +176,7 @@ public static class SnapshotMapper
             mapped);
     }
 
-    private static ArtFile? FlatCoverOf(ImageRecord? chosen, ArtRules rules) =>
-        VerdictOf(chosen, rules) == ArtVerdict.Flat ? chosen!.Files!.OrderByDescending(file => file.Width).First() : null;
+    private static ArtFile WidestFile(ImageRecord chosen) => chosen.Files!.OrderByDescending(file => file.Width).First();
 
     private static ImageRecord? UsableRecord(string? url, IReadOnlyDictionary<string, ImageRecord> images) =>
         url is not null

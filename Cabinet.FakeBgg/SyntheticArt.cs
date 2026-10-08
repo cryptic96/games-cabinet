@@ -49,6 +49,15 @@ public enum SyntheticArtKind
 
     /// <summary>Bytes that are not a picture at all.</summary>
     Undecodable,
+
+    /// <summary>A cut-out 3D box cropped close to its sides on a fully transparent backdrop, with a see-through shadow below and to the right.</summary>
+    BoxTransparentShadow,
+
+    /// <summary>A 3D box cropped close to its sides on a white-to-near-white backdrop with compression-like noise and a soft contact shadow.</summary>
+    BoxOnNoisyWhite,
+
+    /// <summary>A flat cover inside a thick near-black border, with near-black art touching the border in two corners.</summary>
+    DarkBorderCover,
 }
 
 /// <summary>
@@ -64,6 +73,20 @@ public static class SyntheticArt
     private const float BoxTiltDegrees = -14f;
     private const float WhiteFrameShare = 0.15f;
     private const float BlackFrameShare = 0.025f;
+    private const int CroppedShotWidth = 760;
+    private const int CroppedShotHeight = 640;
+    private const float CroppedShotInset = 2f;
+    private const float CroppedFrontWidth = 360f;
+    private const float CroppedFrontHeight = 230f;
+    private const float CroppedDepthX = 110f;
+    private const float CroppedDepthY = -60f;
+    private const int NoiseBlock = 8;
+    private const int WhitePadding = 24;
+    private const int NoisyBackdropTop = 234;
+    private const int NoisyBackdropBottom = 230;
+    private const int NoiseRange = 6;
+    private const int DarkBorderWidth = 42;
+    private const float DarkTriangleShare = 0.40f;
 
     private static readonly SKColor FramedFieldColour = new(20, 130, 140);
 
@@ -81,6 +104,7 @@ public static class SyntheticArt
         SyntheticArtKind.BoxOnWhite or SyntheticArtKind.BoxOnGreyGradient or SyntheticArtKind.BoxOnBlack or SyntheticArtKind.BoxTransparent
             => (BoxCanvasSize, BoxCanvasSize),
         SyntheticArtKind.Undecodable => (0, 0),
+        SyntheticArtKind.BoxTransparentShadow or SyntheticArtKind.BoxOnNoisyWhite => (CroppedShotWidth, CroppedShotHeight),
         _ => (CoverWidth, CoverHeight),
     };
 
@@ -159,9 +183,174 @@ public static class SyntheticArt
             case SyntheticArtKind.BoxTransparent:
                 DrawBoxShot(canvas, SKColors.Transparent, new SKColor(59, 148, 69), false);
                 break;
+            case SyntheticArtKind.BoxTransparentShadow:
+                DrawTransparentShadowShot(canvas, width, height);
+                break;
+            case SyntheticArtKind.BoxOnNoisyWhite:
+                DrawNoisyWhiteShot(canvas, width, height);
+                break;
+            case SyntheticArtKind.DarkBorderCover:
+                DrawDarkBorderCover(canvas, width, height);
+                break;
             default:
                 throw new NotSupportedException($"No drawing exists for {kind}.");
         }
+    }
+
+    private static void DrawTransparentShadowShot(SKCanvas canvas, int width, int height)
+    {
+        var fitted = FitBox(width, 20f, CroppedFrontHeight);
+
+        using (var shadowPaint = new SKPaint
+        {
+            Color = new SKColor(0, 0, 0, 110),
+            IsAntialias = true,
+            MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 14f),
+        })
+        {
+            canvas.DrawOval(new SKRect(fitted.Bounds.Left + 60, fitted.Bounds.Bottom - 60, width - CroppedShotInset, height), shadowPaint);
+        }
+
+        DrawFittedBox(canvas, fitted, new SKColor(150, 60, 170));
+    }
+
+    private static void DrawNoisyWhiteShot(SKCanvas canvas, int width, int height)
+    {
+        canvas.Clear(new SKColor(255, 255, 255));
+        canvas.Save();
+        canvas.Translate(WhitePadding, WhitePadding);
+
+        var photoWidth = width - (2 * WhitePadding);
+        var photoHeight = height - (2 * WhitePadding);
+        DrawNoisyBackdrop(canvas, photoWidth, photoHeight);
+        var fitted = FitBox(photoWidth, 2f, CroppedFrontHeight);
+
+        using (var shadowPaint = new SKPaint
+        {
+            Color = new SKColor(60, 60, 64, 80),
+            IsAntialias = true,
+            MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 10f),
+        })
+        {
+            canvas.DrawOval(new SKRect(fitted.Bounds.Left + 60, fitted.Bounds.Bottom - 30, fitted.Bounds.Right, photoHeight), shadowPaint);
+        }
+
+        DrawFittedBox(canvas, fitted, new SKColor(30, 110, 60));
+        canvas.Restore();
+    }
+
+    private static void DrawNoisyBackdrop(SKCanvas canvas, int width, int height)
+    {
+        var pixels = new SKColor[width * height];
+
+        for (var y = 0; y < height; y++)
+        {
+            var mix = (float)y / (height - 1);
+            var level = (int)Math.Round(NoisyBackdropTop + ((NoisyBackdropBottom - NoisyBackdropTop) * mix));
+
+            for (var x = 0; x < width; x++)
+            {
+                var red = level + NoiseShift(x / NoiseBlock, y / NoiseBlock, 0);
+                var green = level + NoiseShift(x / NoiseBlock, y / NoiseBlock, 1);
+                var blue = level + 2 + NoiseShift(x / NoiseBlock, y / NoiseBlock, 2);
+                pixels[(y * width) + x] = new SKColor((byte)Math.Clamp(red, 0, 255), (byte)Math.Clamp(green, 0, 255), (byte)Math.Clamp(blue, 0, 255));
+            }
+        }
+
+        using var backdrop = new SKBitmap(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul));
+        backdrop.Pixels = pixels;
+        canvas.DrawBitmap(backdrop, 0f, 0f, new SKSamplingOptions(), null);
+    }
+
+    private static int NoiseShift(int blockX, int blockY, int channel)
+    {
+        unchecked
+        {
+            var hash = (uint)((blockX * 73856093) ^ (blockY * 19349663) ^ (channel * 83492791));
+            hash ^= hash >> 13;
+            hash *= 1274126177u;
+            hash ^= hash >> 16;
+
+            return (int)(hash % ((2 * NoiseRange) + 1)) - NoiseRange;
+        }
+    }
+
+    private static void DrawDarkBorderCover(SKCanvas canvas, int width, int height)
+    {
+        canvas.Clear(new SKColor(14, 14, 16));
+        var inner = new SKRect(DarkBorderWidth, DarkBorderWidth, width - DarkBorderWidth, height - DarkBorderWidth);
+
+        using (var paint = new SKPaint())
+        {
+            paint.Shader = SKShader.CreateLinearGradient(
+                new SKPoint(inner.Left, inner.Top),
+                new SKPoint(inner.Right, inner.Bottom),
+                [new SKColor(232, 168, 40), new SKColor(196, 60, 40)],
+                SKShaderTileMode.Clamp);
+            canvas.DrawRect(inner, paint);
+        }
+
+        using (var band = new SKPaint { Color = new SKColor(255, 244, 214, 220), IsAntialias = true })
+        {
+            canvas.DrawRect(
+                new SKRect(inner.Left + (inner.Width * 0.08f), inner.Top + (inner.Height * 0.40f), inner.Right - (inner.Width * 0.08f), inner.Top + (inner.Height * 0.52f)),
+                band);
+        }
+
+        var reachX = inner.Width * DarkTriangleShare;
+        var reachY = inner.Height * DarkTriangleShare;
+        FillQuad(canvas, new SKColor(20, 20, 24), (inner.Left, inner.Top), (inner.Left + reachX, inner.Top), (inner.Left, inner.Top + reachY));
+        FillQuad(canvas, new SKColor(10, 10, 12), (inner.Right, inner.Bottom), (inner.Right - reachX, inner.Bottom), (inner.Right, inner.Bottom - reachY));
+    }
+
+    private readonly record struct FittedBox(float Scale, float OffsetX, float OffsetY, float FrontHeight, SKRect Bounds);
+
+    private static FittedBox FitBox(int canvasWidth, float topOffset, float frontHeight)
+    {
+        var tilt = BoxTiltDegrees * Math.PI / 180.0;
+        var cos = (float)Math.Cos(tilt);
+        var sin = (float)Math.Sin(tilt);
+        var corners = new (float X, float Y)[]
+        {
+            (0, 0), (CroppedFrontWidth, 0), (CroppedFrontWidth, frontHeight), (0, frontHeight),
+            (CroppedDepthX, CroppedDepthY), (CroppedFrontWidth + CroppedDepthX, CroppedDepthY),
+            (CroppedFrontWidth + CroppedDepthX, frontHeight + CroppedDepthY),
+        };
+        var rotated = corners.Select(corner => ((corner.X * cos) - (corner.Y * sin), (corner.X * sin) + (corner.Y * cos))).ToList();
+        var minX = rotated.Min(corner => corner.Item1);
+        var maxX = rotated.Max(corner => corner.Item1);
+        var minY = rotated.Min(corner => corner.Item2);
+        var maxY = rotated.Max(corner => corner.Item2);
+        var scale = (canvasWidth - (2 * CroppedShotInset)) / (maxX - minX);
+        var offsetX = CroppedShotInset - (scale * minX);
+        var offsetY = topOffset - (scale * minY);
+
+        return new FittedBox(scale, offsetX, offsetY, frontHeight, new SKRect(CroppedShotInset, topOffset, canvasWidth - CroppedShotInset, topOffset + (scale * (maxY - minY))));
+    }
+
+    private static void DrawFittedBox(SKCanvas canvas, FittedBox fitted, SKColor front)
+    {
+        var frontHeight = fitted.FrontHeight;
+        canvas.Save();
+        canvas.Translate(fitted.OffsetX, fitted.OffsetY);
+        canvas.Scale(fitted.Scale);
+        canvas.RotateDegrees(BoxTiltDegrees);
+        FillQuad(canvas, front, (0, 0), (CroppedFrontWidth, 0), (CroppedFrontWidth, frontHeight), (0, frontHeight));
+        FillQuad(
+            canvas,
+            Shade(front, 0.62f),
+            (CroppedFrontWidth, 0),
+            (CroppedFrontWidth + CroppedDepthX, CroppedDepthY),
+            (CroppedFrontWidth + CroppedDepthX, frontHeight + CroppedDepthY),
+            (CroppedFrontWidth, frontHeight));
+        FillQuad(
+            canvas,
+            Shade(front, 1.2f),
+            (0, 0),
+            (CroppedDepthX, CroppedDepthY),
+            (CroppedFrontWidth + CroppedDepthX, CroppedDepthY),
+            (CroppedFrontWidth, 0));
+        canvas.Restore();
     }
 
     private static void DrawDiagonalIllustration(SKCanvas canvas, int width, int height, SKColor from, SKColor to)

@@ -107,7 +107,7 @@ public static class ReviewSheet
 
         return string.Create(
             CultureInfo.InvariantCulture,
-            $"flat: fill at least {Percent(thresholds.FlatMinFill)}% and emptiest corner at most {Percent(thresholds.FlatMaxCorner)}%   |   3D shot: fill at most {Percent(thresholds.ThreeDMaxFill)}% and second corner at least {Percent(thresholds.ThreeDMinCorner)}%   |   shape margin {rules.ShapeMarginPercent}%   |   landscape covers make landscape boxes: {(rules.OrientFromCover ? "yes" : "no")}");
+            $"flat: fill at least {Percent(thresholds.FlatMinFill)}% and emptiest corner at most {Percent(thresholds.FlatMaxCorner)}%   |   3D shot: fill at most {Percent(thresholds.ThreeDMaxFill)}% and second corner at least {Percent(thresholds.ThreeDMinCorner)}%   |   shape margin {rules.ShapeMarginPercent}%   |   landscape covers make landscape boxes: {(rules.OrientFromCover ? "yes" : "no")}   |   unsure pictures wider by more than {rules.UnsureLandscapeMarginPercent}% turn boxes");
     }
 
     private static string Percent(double share) => Math.Round(share * PercentFactor).ToString(CultureInfo.InvariantCulture);

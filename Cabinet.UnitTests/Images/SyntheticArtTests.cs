@@ -8,6 +8,8 @@ namespace Cabinet.UnitTests.Images;
 [Trait("Category", "Images")]
 public sealed class SyntheticArtTests
 {
+    private const int WhiteMarginPx = 24;
+
     public static TheoryData<SyntheticArtKind> DecodableKinds()
     {
         var kinds = new TheoryData<SyntheticArtKind>();
@@ -23,7 +25,7 @@ public sealed class SyntheticArtTests
     public void Every_kind_is_listed_once()
     {
         SyntheticArt.All.Should().BeEquivalentTo(Enum.GetValues<SyntheticArtKind>());
-        SyntheticArt.All.Should().HaveCount(15);
+        SyntheticArt.All.Should().HaveCount(18);
     }
 
     [Theory]
@@ -66,10 +68,37 @@ public sealed class SyntheticArtTests
     [InlineData(SyntheticArtKind.BoxOnGreyGradient, 800, 800)]
     [InlineData(SyntheticArtKind.BoxOnBlack, 800, 800)]
     [InlineData(SyntheticArtKind.BoxTransparent, 800, 800)]
+    [InlineData(SyntheticArtKind.BoxTransparentShadow, 760, 640)]
+    [InlineData(SyntheticArtKind.BoxOnNoisyWhite, 760, 640)]
+    [InlineData(SyntheticArtKind.DarkBorderCover, 600, 800)]
     public void Sizes_match_the_fixture_list(SyntheticArtKind kind, int width, int height)
     {
         SyntheticArt.SizeOf(kind).Should().Be((width, height));
     }
+
+    [Fact]
+    public void The_cropped_shots_reach_their_side_edges_inside_any_white_margin_and_the_shadow_is_see_through()
+    {
+        using var shadowed = SKBitmap.Decode(SyntheticArt.Encode(SyntheticArtKind.BoxTransparentShadow));
+        using var noisy = SKBitmap.Decode(SyntheticArt.Encode(SyntheticArtKind.BoxOnNoisyWhite));
+
+        shadowed.GetPixel(0, 0).Alpha.Should().Be(0);
+        Enumerable.Range(0, shadowed.Width).Select(x => shadowed.GetPixel(x, shadowed.Height - 1).Alpha)
+            .Should().Contain(alpha => alpha > 0 && alpha < 255);
+        FirstColumnWhere(shadowed, colour => colour.Alpha == 255).Should().BeLessThanOrEqualTo(4);
+        LastColumnWhere(shadowed, colour => colour.Alpha == 255).Should().BeGreaterThanOrEqualTo(shadowed.Width - 5);
+        noisy.GetPixel(0, 0).Alpha.Should().Be(255);
+        FirstColumnWhere(noisy, IsColourful).Should().BeLessThanOrEqualTo(WhiteMarginPx + 4);
+        LastColumnWhere(noisy, IsColourful).Should().BeGreaterThanOrEqualTo(noisy.Width - 1 - WhiteMarginPx - 4);
+    }
+
+    private static int FirstColumnWhere(SKBitmap bitmap, Func<SKColor, bool> test) =>
+        Enumerable.Range(0, bitmap.Width).First(x => Enumerable.Range(0, bitmap.Height).Any(y => test(bitmap.GetPixel(x, y))));
+
+    private static int LastColumnWhere(SKBitmap bitmap, Func<SKColor, bool> test) =>
+        Enumerable.Range(0, bitmap.Width).Last(x => Enumerable.Range(0, bitmap.Height).Any(y => test(bitmap.GetPixel(x, y))));
+
+    private static bool IsColourful(SKColor colour) => Math.Max(colour.Red, Math.Max(colour.Green, colour.Blue)) - Math.Min(colour.Red, Math.Min(colour.Green, colour.Blue)) >= 30;
 
     [Fact]
     public void The_transparent_box_is_see_through_outside_the_box()

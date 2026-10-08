@@ -115,6 +115,96 @@ public sealed class BoxShapeTests
     }
 
     [Fact]
+    public void A_landscape_flat_cover_turns_real_sizes_of_the_same_proportions_keeping_area_depth_and_source()
+    {
+        var item = Item(new VersionDimensions(6.3, 8.27, 2.09));
+        var cover = new ArtFile(1000, 760, "e-480.webp");
+
+        var shaped = BoxShape.Resolve(item, null, cover, ArtRules.Default);
+
+        shaped.Box.Should().Be(new BoxDimensions(210, 160, 53));
+        shaped.Source.Should().Be(BoxSource.RealSize);
+        shaped.PoseHeightMm.Should().Be(210);
+    }
+
+    [Fact]
+    public void With_the_orientation_rule_off_real_sizes_stay_portrait_under_a_landscape_cover()
+    {
+        var item = Item(new VersionDimensions(6.3, 8.27, 2.09));
+        var off = ArtRules.Default with { OrientFromCover = false };
+
+        var shaped = BoxShape.Resolve(item, null, new ArtFile(1000, 760, "e-480.webp"), off);
+
+        shaped.Box.Should().Be(new BoxDimensions(160, 210, 53));
+        shaped.Source.Should().Be(BoxSource.RealSize);
+    }
+
+    [Fact]
+    public void A_landscape_cover_turns_real_sizes_whose_rebuilt_front_would_not_be_believable()
+    {
+        var item = Item(new VersionDimensions(7, 8, 2));
+
+        var shaped = BoxShape.Resolve(item, null, new ArtFile(1000, 50, "w.webp"), ArtRules.Default);
+
+        shaped.Source.Should().Be(BoxSource.RealSize);
+        shaped.Box.Should().Be(new BoxDimensions(203, 178, 51));
+        shaped.PoseHeightMm.Should().Be(203);
+    }
+
+    [Fact]
+    public void An_unsure_picture_wider_than_the_margin_turns_real_sizes_without_reshaping_them()
+    {
+        var item = Item(new VersionDimensions(6.3, 8.27, 2.09));
+
+        var shaped = BoxShape.Resolve(item, null, null, ArtRules.Default, new ArtFile(1300, 1000, "u.webp"));
+
+        shaped.Box.Should().Be(new BoxDimensions(210, 160, 53));
+        shaped.Source.Should().Be(BoxSource.RealSize);
+        shaped.PoseHeightMm.Should().Be(210);
+    }
+
+    [Fact]
+    public void An_unsure_picture_at_the_margin_or_in_portrait_leaves_the_box_portrait()
+    {
+        var item = Item(new VersionDimensions(6.3, 8.27, 2.09));
+        var portrait = new BoxDimensions(160, 210, 53);
+
+        BoxShape.Resolve(item, null, null, ArtRules.Default, new ArtFile(1200, 1000, "m.webp")).Box.Should().Be(portrait);
+        BoxShape.Resolve(item, null, null, ArtRules.Default, new ArtFile(1201, 1000, "n.webp")).Box.Should().Be(new BoxDimensions(210, 160, 53));
+        BoxShape.Resolve(item, null, null, ArtRules.Default, new ArtFile(800, 1000, "p.webp")).Box.Should().Be(portrait);
+        BoxShape.Resolve(item, null, null, ArtRules.Default with { UnsureLandscapeMarginPercent = 40 }, new ArtFile(1300, 1000, "q.webp"))
+            .Box.Should().Be(portrait);
+    }
+
+    [Fact]
+    public void An_unsure_landscape_picture_turns_an_estimated_or_default_box_and_keeps_its_source()
+    {
+        var details = Details();
+        var estimate = SizeEstimate.Dimensions(SizeEstimate.Assign(details, null, null)!.Value, ItemKind.Base);
+        var picture = new ArtFile(1300, 1000, "u.webp");
+
+        var estimated = BoxShape.Resolve(Item(null), details, null, ArtRules.Default, picture);
+        var nothing = BoxShape.Resolve(Item(null), null, null, ArtRules.Default, picture);
+
+        estimated.Box.Should().Be(new BoxDimensions(estimate.HeightMm, estimate.WidthMm, estimate.DepthMm));
+        estimated.Source.Should().Be(BoxSource.Estimate);
+        estimated.PoseHeightMm.Should().Be(estimate.HeightMm);
+        nothing.Box.Should().Be(new BoxDimensions(300, 225, 60));
+        nothing.Source.Should().Be(BoxSource.Default);
+        nothing.PoseHeightMm.Should().Be(300);
+    }
+
+    [Fact]
+    public void An_unsure_picture_never_turns_a_box_when_pictures_may_not_orient_boxes()
+    {
+        var off = ArtRules.Default with { OrientFromCover = false };
+        var picture = new ArtFile(1300, 1000, "u.webp");
+
+        BoxShape.Resolve(Item(new VersionDimensions(6.3, 8.27, 2.09)), null, null, off, picture).Box.Should().Be(new BoxDimensions(160, 210, 53));
+        BoxShape.Resolve(Item(null), null, null, off, picture).Box.Should().Be(new BoxDimensions(225, 300, 60));
+    }
+
+    [Fact]
     public void A_wider_margin_keeps_what_the_default_margin_rebuilds()
     {
         var item = Item(new VersionDimensions(6.3, 8.27, 2.09));

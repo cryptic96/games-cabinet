@@ -403,7 +403,20 @@ A photographed product shot, a slanted box standing on a plain backdrop, makes a
 poor cover. The measurements tell it apart from a flat cover: a flat cover fills
 its frame and has full corners, while a product shot leaves much of its frame
 empty and shows backdrop in at least two corners. A picture that is neither
-clearly one nor the other counts as unsure. The rules are:
+clearly one nor the other counts as unsure.
+
+What counts as backdrop is found from the colours along the picture's outer
+edge. A white or near-white studio backdrop is one backdrop whatever its exact
+shade: uneven light and compression noise do not split it, and a pure white
+margin around a photo whose own backdrop is slightly off-white counts together
+with it, so a product shot padded with white is still told from a flat cover.
+When the subject sits behind a straight border on all four sides, such as a
+cover inside a thick black or white frame, the whole area inside that border
+is the subject, so dark art that touches a dark border is never mistaken for
+backdrop and does not make a flat cover look like a product shot. A slanted
+product shot has no such straight border, because its outline runs at an angle
+on every side. A cut-out picture on a transparent surround, with or without a
+see-through shadow, keeps its own colours when it is measured. The rules are:
 
 - when the picture of your edition is a flat cover, it is used;
 - when it is a product shot or unsure and the main picture is a flat cover, the
@@ -478,11 +491,18 @@ longer side) is compared with the cover's. If they differ by more than the
 margin, the front is rebuilt from the cover's shape, keeping the same front area
 and the same depth; at or below the margin the real sizes are used as they are.
 A rebuilt front that would fall outside the believable range is not used, and
-the real sizes stay.
+the real sizes stay. When the chosen picture is a flat landscape cover, the real
+sizes are also drawn landscape, with their longer side as the width, even when
+their shape agrees with the cover; their area and depth are kept and the size
+still counts as real.
 
 A slanted product shot, a picture that is not clearly flat, and a picture that
-is not used never shape a box. Pictures that do not match their box never get
-cropped: bars fill the gap instead.
+is not used never shape a box. A picture that is not clearly flat or a product
+shot but is clearly landscape does turn the box the same way, without changing
+its shape or size: its width must be more than the set margin above its height,
+and a picture at the margin or in portrait turns nothing. A product shot never
+shapes or turns a box. Pictures that do not match their box never get cropped:
+bars fill the gap instead.
 
 Small changes in BGG data never change a box. The size class is kept until the
 game's score has moved clear of that class's band, so a weight moving from 2.74
@@ -491,21 +511,23 @@ genuinely different game gets a different box. A release that changes how
 classes are estimated starts every game over once.
 
 How a box stands, facing out, upright or lying flat, never depends on its
-picture. It is decided from the real height, or else the estimated height, so
-changing how pictures are judged can reshape boxes but never rearranges how they
-stand.
+picture. It is decided from the real longer side, or else the estimated height,
+before any box is turned landscape, so changing how pictures are judged can
+reshape or turn boxes but never rearranges how they stand.
 
 Optional settings for the env file; they need a restart and no download:
 
 | Key | Default | Range | Meaning |
 | --- | --- | --- | --- |
 | `Art__ShapeMarginPercent` | `12` | 1 to 50 | How far, as a percentage of the cover's shape, the real sizes' shape may differ from a flat cover before the front is rebuilt from the cover. |
-| `Art__OrientFromCover` | `true` | `true` or `false` | Whether a flat landscape cover makes the front landscape, with its width as the longer side. When `false` the longer side always stands as the height. |
+| `Art__OrientFromCover` | `true` | `true` or `false` | Whether a flat landscape cover makes the front landscape, with its width as the longer side, whether the real sizes agree with it or not. When `false` no picture turns a box and the longer side always stands as the height. |
+| `Art__UnsureLandscapeMarginPercent` | `20` | 1 to 100 | How much wider than tall, as a percentage of its height, a picture that is not clearly flat or a product shot must be before it turns its box landscape. At 20 a picture 1.2 times as wide as tall turns nothing and a slightly wider one does. |
 
 In a settings file the same keys are written with a colon, for example
 `Art:ShapeMarginPercent`. An out-of-range value, a value that is not a whole
 number, or an `Art:OrientFromCover` that is not `true` or `false` stops the app
-at start-up with a message naming the key.
+at start-up with a message naming the key. This includes
+`Art:UnsureLandscapeMarginPercent`.
 
 ## Where the data lives
 
