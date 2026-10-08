@@ -27,6 +27,11 @@ public sealed class ReviewCaseVerdictTests
         SyntheticArtKind.MidGreen,
         SyntheticArtKind.GradientFullBleed,
         SyntheticArtKind.DarkBorderCover,
+        SyntheticArtKind.CoverColouredField,
+        SyntheticArtKind.CoverOnBlackIrregular,
+        SyntheticArtKind.CoverOnBlackScattered,
+        SyntheticArtKind.CoverColourFramed,
+        SyntheticArtKind.CoverLightEdge,
     };
 
     public static TheoryData<SyntheticArtKind> DecodableKinds()

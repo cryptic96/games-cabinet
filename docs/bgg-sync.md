@@ -415,8 +415,24 @@ cover inside a thick black or white frame, the whole area inside that border
 is the subject, so dark art that touches a dark border is never mistaken for
 backdrop and does not make a flat cover look like a product shot. A slanted
 product shot has no such straight border, because its outline runs at an angle
-on every side. A cut-out picture on a transparent surround, with or without a
-see-through shadow, keeps its own colours when it is measured. The rules are:
+on every side.
+
+Studio backdrops are white, grey, black or transparent, so the measurement only
+treats those as backdrop. A large field of a clear colour is part of a cover's
+art and never counts as backdrop; the same goes for a dark field that surrounds
+an irregular picture or several separate pieces of art. Such a cover is judged
+as a whole and counts as flat. The price is that a box photographed on a strongly
+coloured backdrop may count as flat too.
+
+A picture whose background is transparent is a cut-out product picture. It is
+always a product shot, however fully the box fills its frame, and the review
+sheet marks its verdict as a cut-out. A box photographed so close that it runs
+along all four sides of the picture, with the white backdrop showing mainly in
+the corners, is also a product shot even though the white holds only part of the
+outer edge; the review sheet marks it as a tight crop. A picture with light
+areas along a few of its edges, such as a sky above an illustration, is not
+mistaken for one, because its light areas do not fill most of the corners. A
+cut-out keeps its own colours when it is measured. The rules are:
 
 - when the picture of your edition is a flat cover, it is used;
 - when it is a product shot or unsure and the main picture is a flat cover, the

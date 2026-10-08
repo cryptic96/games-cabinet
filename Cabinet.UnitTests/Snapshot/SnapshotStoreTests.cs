@@ -71,6 +71,46 @@ public sealed class SnapshotStoreTests : IDisposable
     }
 
     [Fact]
+    public void Stored_picture_features_without_the_cut_out_value_still_load_and_the_value_round_trips()
+    {
+        File.WriteAllText(
+            SnapshotPath,
+            """
+            {
+              "schemaVersion": 2,
+              "capturedAtUtc": "2026-01-01T00:00:00Z",
+              "items": [],
+              "images": {
+                "https://cf.example.org/v.jpg": {
+                  "sourceUrl": "https://cf.example.org/v.jpg",
+                  "status": "ok",
+                  "attemptedAtUtc": "2026-01-01T00:00:00Z",
+                  "features": { "backdropShare": 0.1, "fill": 0.9, "corner1": 0.2, "corner2": 0.1, "sidesTouched": 2 }
+                }
+              }
+            }
+            """);
+        var store = CreateStore();
+
+        var loaded = store.Load();
+
+        loaded!.Images!["https://cf.example.org/v.jpg"].Features.Should().Be(new ArtFeatures(0.1, 0.9, 0.2, 0.1, 2));
+        loaded.Images["https://cf.example.org/v.jpg"].Features!.CutOut.Should().BeNull();
+        File.Exists(BadPath).Should().BeFalse();
+
+        var withCutOut = loaded with
+        {
+            Images = new Dictionary<string, ImageRecord>
+            {
+                ["https://cf.example.org/v.jpg"] = loaded.Images["https://cf.example.org/v.jpg"] with { Features = new ArtFeatures(0.1, 1.0, 0.0, 0.0, 0, CutOut: true) },
+            },
+        };
+        store.Save(withCutOut);
+
+        store.Load()!.Images!["https://cf.example.org/v.jpg"].Features!.CutOut.Should().BeTrue();
+    }
+
+    [Fact]
     public void A_schema_2_file_round_trips_every_field_of_the_game_details()
     {
         var moment = new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero);
