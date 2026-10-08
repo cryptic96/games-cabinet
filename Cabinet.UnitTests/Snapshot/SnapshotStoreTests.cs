@@ -155,7 +155,7 @@ public sealed class SnapshotStoreTests : IDisposable
             [new SnapshotItem(7, 11, "First Example", ItemKind.Base, null, null, null)],
             Games: new Dictionary<int, GameDetails>
             {
-                [11] = new(moment, null, null, null, null, null, null, null, null, null, [], [], [], null, Families: [new FamilyLink(7001, "Series: Example Saga"), new FamilyLink(7101, "Theme: Invented Theme 1")]),
+                [11] = new(moment, null, null, null, null, null, null, null, null, null, [], [], [], null, Families: [new FamilyLink(7001, "Series: Example Saga"), new FamilyLink(7101, "Theme: Invented Theme 1")], DetailsVersion: 1),
                 [12] = new(moment, null, null, null, null, null, null, null, null, null, [], [], [], null, Families: []),
             });
         var store = CreateStore();
@@ -163,7 +163,7 @@ public sealed class SnapshotStoreTests : IDisposable
         store.Save(snapshot);
 
         store.Load().Should().BeEquivalentTo(snapshot, options => options.WithStrictOrdering());
-        File.ReadAllText(SnapshotPath).Should().Contain("\"families\"");
+        File.ReadAllText(SnapshotPath).Should().Contain("\"families\"").And.Contain("\"detailsVersion\":1");
 
         File.WriteAllText(
             SnapshotPath,
@@ -174,6 +174,7 @@ public sealed class SnapshotStoreTests : IDisposable
 
         older.Should().NotBeNull();
         older!.Games![9].Families.Should().BeNull();
+        older.Games[9].DetailsVersion.Should().BeNull("details written before the version existed carry none");
         File.Exists(BadPath).Should().BeFalse();
     }
 

@@ -274,8 +274,9 @@ unavailable or not configured.
 Besides the collection, the sync reads the details of each owned game from BGG's
 `thing` call. For every game it keeps the player count, the playing time, the
 minimum age, the complexity (weight), the average and ranked ratings, the
-designers, the mechanics, the address of the game's main picture and, for an
-expansion, the base game or games it expands. The detail card and the estimate
+designers, the mechanics, the address of the game's main picture, its BGG
+families (id and name, up to 40 per game) and, for an expansion, the base game or
+games it expands. The detail card and the estimate
 of a box's size need this, and the expansion links decide which expansion
 stands beside which owned base game.
 
@@ -283,6 +284,10 @@ The server asks politely and in small steps:
 
 - a game that is new to the collection gets its details in the same sync that
   first sees it;
+- details stored by an earlier release that did not read something the current
+  release reads are asked for again once, right after the new games and in
+  collection order, within the same limit of calls per run, so a collection of
+  about sixty games is read again with four calls in one sync;
 - every other game is refreshed about weekly, the longest-known first, in a
   limited number of calls per run, so a large collection fills in over several
   runs;
@@ -302,6 +307,15 @@ answer keeps its previous details and is asked for again as well. The details of
 a game that is no longer owned are dropped. Until a game's details arrive the
 cabinet draws it from the collection data alone: an expansion shows the plain
 label "Expansion" and later upgrades to name its base game.
+
+The family links are stored and used only to place the games of one series next to
+each other: a family whose name starts with `Game: ` or `Series: ` that at least two
+owned games carry makes those games a series, and every other family is ignored.
+A release that starts reading something new from the details marks the stored
+details as read by an older release, so the next sync reads every game's details
+once more: new games first, then the rest in collection order, 20 games per call,
+within the limit of calls per run. A run that runs out of calls carries on in the
+next run.
 
 An expansion stands beside the base game it expands when that base game is owned.
 When it expands several owned base games it stands beside the one with the

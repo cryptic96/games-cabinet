@@ -22,13 +22,14 @@
 | thing: designer and mechanic links | INTEGRATE | |
 | thing: inbound expansion links (which base games an expansion expands) | INTEGRATE | |
 | thing: error, throttle and queued answers | INTEGRATE | |
-| thing: other link types (outbound expansion, compilation, family, ...) | OPT-OUT | not needed — pairing reads only inbound expansion links (big-box editions hide nothing) and no feature shows the others |
+| thing: family links (`boardgamefamily`: id and name) | INTEGRATE | series placement: families named `Game: ` or `Series: ` that at least two owned games carry place those games together; broad families are stored and never used |
+| thing: other link types (outbound expansion, compilation, ...) | OPT-OUT | not needed — pairing reads only inbound expansion links (big-box editions hide nothing) and no feature shows the others |
 | thing: description | OPT-OUT | not needed — the detail card needs no long description |
 | thing: polls (suggested players, age, language dependence) | OPT-OUT | not needed yet — "best at N players" is a later-version feature |
 | thing: rank list | OPT-OUT | not needed yet — the Bayesian average is stored; the detail phase decides what to show |
 | thing: `versions=1` | OPT-OUT | explicitly out of scope — returns every printing; the owned version comes from the collection call |
 | thing: comments, rating comments, videos, marketplace | OPT-OUT | not needed — no feature uses them |
-| family | OPT-OUT | not needed — no feature uses game families |
+| family (the `family` endpoint) | OPT-OUT | not needed — the family names arrive with the details call, so no separate lookup is made |
 | plays | OPT-OUT | not needed — play logging is not a feature |
 | user | OPT-OUT | not needed — the username is configuration |
 | guild | OPT-OUT | not needed — no guild feature |

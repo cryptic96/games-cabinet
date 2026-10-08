@@ -280,6 +280,15 @@ public sealed class BggThingParserTests
     }
 
     [Fact]
+    public void Every_parsed_game_carries_the_current_details_version()
+    {
+        var parsed = Parse(Answer(Item(1, string.Empty), Item(2, Link("boardgamefamily", 7001, "Series: Example Saga"))));
+
+        GameDetails.CurrentDetailsVersion.Should().Be(1);
+        parsed.Games.Values.Should().OnlyContain(details => details.DetailsVersion == GameDetails.CurrentDetailsVersion);
+    }
+
+    [Fact]
     public void A_game_without_family_links_gets_an_empty_list()
     {
         Parse(Answer(Item(1, Link("boardgamedesigner", 1, "Invented Designer 1")))).Games[1].Families.Should().NotBeNull().And.BeEmpty();

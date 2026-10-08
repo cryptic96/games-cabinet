@@ -102,11 +102,70 @@ public sealed class EnrichmentPlannerTests
         first.Select(batch => batch.ToArray()).Should().BeEquivalentTo(second.Select(batch => batch.ToArray()), options => options.WithStrictOrdering());
     }
 
+    [Fact]
+    public void Details_read_by_an_older_build_are_planned_again_in_calls_of_twenty_naming_every_game()
+    {
+        var known = Enumerable.Range(1, 62).ToDictionary(id => id, id => OlderDetails(Now - TimeSpan.FromHours(1)));
+
+        var plan = EnrichmentPlanner.Plan(Items(62), known, Now, EnrichmentOptions.Default);
+
+        plan.Should().HaveCount(4);
+        plan.SelectMany(batch => batch).Should().Equal(Enumerable.Range(1, 62));
+        plan.Should().OnlyContain(batch => batch.Count <= EnrichmentPlanner.MaxIdsPerRequest);
+    }
+
+    [Fact]
+    public void Games_without_details_come_first_then_older_details_in_collection_order_then_the_weekly_refresh()
+    {
+        var known = new Dictionary<int, GameDetails>
+        {
+            [1] = OlderDetails(Now - TimeSpan.FromDays(20)),
+            [2] = Details(Now - TimeSpan.FromDays(30)),
+            [3] = OlderDetails(Now - TimeSpan.FromHours(1)),
+            [4] = Details(Now - TimeSpan.FromHours(1)),
+        };
+        var options = EnrichmentOptions.Default with { RefreshBatchesPerRun = 1 };
+
+        var plan = EnrichmentPlanner.Plan(Items(5), known, Now, options);
+
+        plan.Select(batch => batch.ToArray()).Should().BeEquivalentTo(new[] { new[] { 5 }, [1, 3], [2] }, options => options.WithStrictOrdering());
+    }
+
+    [Fact]
+    public void Older_details_share_the_limit_of_the_run_and_never_count_against_the_refresh_calls()
+    {
+        var known = Enumerable.Range(1, 62).ToDictionary(id => id, id => OlderDetails(Now - TimeSpan.FromHours(1)));
+        var two = EnrichmentOptions.Default with { MaxThingRequestsPerRun = 2 };
+        var noRefresh = EnrichmentOptions.Default with { RefreshBatchesPerRun = 0 };
+
+        EnrichmentPlanner.Plan(Items(62), known, Now, two).Should().HaveCount(2);
+        EnrichmentPlanner.Plan(Items(62), known, Now, noRefresh).Should().HaveCount(4);
+    }
+
+    [Fact]
+    public void Details_with_the_current_version_are_planned_only_by_the_weekly_refresh()
+    {
+        var known = Enumerable.Range(1, 30).ToDictionary(id => id, id => Details(Now - TimeSpan.FromHours(1)));
+
+        EnrichmentPlanner.Plan(Items(30), known, Now, EnrichmentOptions.Default).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_game_that_is_both_older_and_due_for_the_weekly_refresh_is_asked_for_once()
+    {
+        var known = new Dictionary<int, GameDetails> { [1] = OlderDetails(Now - TimeSpan.FromDays(30)) };
+
+        EnrichmentPlanner.Plan(Items(1), known, Now, EnrichmentOptions.Default).Should().ContainSingle().Which.Should().Equal(1);
+    }
+
     private static SnapshotItem[] Items(int count) => [.. Enumerable.Range(1, count).Select(id => Item(id, id))];
 
     private static SnapshotItem Item(long collectionId, int gameId) =>
         new(collectionId, gameId, $"Example {gameId}", ItemKind.Base, null, null, null);
 
     private static GameDetails Details(DateTimeOffset at) =>
+        new(at, null, null, null, null, null, null, null, null, null, [], [], [], null, DetailsVersion: GameDetails.CurrentDetailsVersion);
+
+    private static GameDetails OlderDetails(DateTimeOffset at) =>
         new(at, null, null, null, null, null, null, null, null, null, [], [], [], null);
 }

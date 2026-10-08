@@ -27,6 +27,31 @@ only raises the number in the marker. The base game reserves room for its uprigh
 stack as soon as it is placed, so an expansion is never left without a place
 beside its game.
 
+Games of one series stand next to each other. Two things make games a series.
+The first is BoardGameGeek's family names: only families whose name starts with
+`Game: ` (a game, its spin-offs and standalone games) or `Series: ` (a named
+series of separate games) count, and a family only counts when at least two
+owned games carry it. A family that only one owned game carries counts for
+nothing, and neither do the broad families that most games carry, such as
+themes, components or player counts. The second is the title: games whose
+titles are the same up to the first colon or spaced dash (or are the same whole
+title) are one series, ignoring capitals and extra spaces, and this always
+applies. Series join through the games they share, so if the first game is
+linked to the second and the second to the third, all three are one series. Only
+games that stand on their own take part, so an expansion that stands beside its
+base game never counts for a series of its own.
+
+A series is placed as one block where its earliest game would have been placed,
+with its games in the order they were added to the collection. It goes into the
+first cubby, in reading order, that can take the whole series, and inside the
+cubby its games stand side by side. A series too long for any one cubby goes
+game by game: each game starts looking at the cubby of the game before it and
+never goes back to an earlier cubby, so the series runs on from cubby to cubby
+and into later sections. A game that lands in a later cubby than the game before
+it stands first, at the left, in that cubby, so the series reads on from there.
+The setting `Layout:GroupSeries` switches all of this off, and the cabinet is
+then arranged as if no game belonged to a series.
+
 Boxes lying flat are piled up to four high, with the widest box at the bottom
 and the thicker box lower among boxes of the same width, so no box overhangs
 the one beneath it. A big box is chosen to face out or stand, and it does so
@@ -72,6 +97,7 @@ two underscores.
 | `Layout:ExpansionStackMax` | 6 | 1 to 20 | The most expansions drawn in one stack before the rest are summed up as "+N more". |
 | `Layout:FewGamesThreshold` | 12 | 0 to 100 | Below this many top-level games, every box faces out, so a small collection fills the cabinet with covers instead of a few lonely spines. |
 | `Layout:LieFlatBeforeNewSection` | `true` | `true` or `false` | Lets a game that fits no existing cubby standing lie flat in the first cubby that can take it lying down, instead of opening a new section for it. Turning it off keeps every game standing the way it was chosen, but may add sections that are mostly empty. |
+| `Layout:GroupSeries` | `true` | `true` or `false` | Places the games of one series next to each other (see "What the cabinet layout is"). Turning it off places every game on its own, the way the cabinet was arranged before series were grouped. |
 | `Prototype:Enabled` | `false` in the committed settings; `true` in the development settings | `true` or `false` | Shows the invented sample collections and their switcher while running locally in development. The deployed site ignores it. See "Invented collections" below. |
 
 ### Changing a setting on the server
@@ -82,6 +108,7 @@ Put the setting in `/etc/cabinet/cabinet.env`, one per line, for example:
 Layout__CoverSharePercent=30
 Layout__CoverStrategy=Random
 Layout__LieFlatBeforeNewSection=true
+Layout__GroupSeries=true
 ```
 
 Then restart the service so it reads the file:
@@ -111,8 +138,8 @@ The same collection always gives the same cabinet, on every visit and after
 every restart. Nothing is random in a way that changes between requests: every
 choice comes from the game's own identifier and the settings.
 
-Adding a game changes only the cubby it lands in. Neighbouring games keep
-their place, their orientation and their colour. A game lands lying flat when no
+Adding a game that joins no series changes only the cubby it lands in.
+Neighbouring games keep their place, their orientation and their colour. A game lands lying flat when no
 cubby had room for it standing the way it was chosen.
 
 The one thing that also changes is how much of the last section is drawn. A game
@@ -133,6 +160,10 @@ A few changes rearrange more than that, and these are accepted:
   keeps its cubby. That is the first expansion for a game, the first one that
   lies in a game's stack, and a big one that stands upright. An expansion that
   joins a stack its game already has changes only that game's cubby.
+- A game that joins an existing series, because it shares a family or the start
+  of its title with an earlier game, may move that whole series and later
+  cubbies, since the series is placed together where its first game stands. Every
+  game ordered before the first game of the series keeps its cubby and its pose.
 - An expansion whose base game is added later moves from standing alone to
   standing beside that base game, upright or in its stack.
 - When one of the changes above shifts later cubbies, games in them may also
@@ -245,7 +276,10 @@ The cost is that the biggest boxes are drawn a little smaller: the largest box i
 
 The rules are that no section but the last keeps an empty row, that a collection
 of about sixty-five games has no empty row in the middle of any section, and that
-a large collection holds at least 30 games in every section but the last. The
+a large collection holds at least 25 games in every section but the last. The
+floor sits a little below what it was before series stood together, because
+placing a series as a block packs a seeded collection slightly less tightly than
+placing its games one by one. The
 layout tests check them on the samples of 65 and 400 games and on seeded
 collections of both sizes whose boxes follow the spread of sizes seen on real
 games, including collections that were not used when the rows were chosen. The
@@ -273,8 +307,10 @@ CABINET_UPDATE_GOLDENS=1 dotnet test --project Cabinet.UnitTests/Cabinet.UnitTes
 ```
 
 The recording refuses to run while the layouts have changed and the version has
-not, so a rearrangement is always a conscious one. Look at the changed files
-before committing them. The switch is for local use only and is never set in
+not, so a rearrangement is always a conscious one. When several arrangement
+changes go into one release, the version is raised only once for the release:
+record the layouts once under a temporary higher version, then put the intended
+version back and record again. Look at the changed files before committing them. The switch is for local use only and is never set in
 the automated workflows.
 
 ## What the page shows
@@ -307,7 +343,11 @@ invented collection is shown, a line above the links states its size, and the
 being-filled message is not shown. The links are plain links, so they work
 without JavaScript.
 
-The collections are made from invented syllables and mirror nothing real. A
+The collections are made from invented syllables and mirror nothing real. The
+samples of 65 and 400 games also carry invented series: the sample of 65 has one
+series of three games and one of two, and the sample of 400 has six series, the
+longest of seven games, so the way a series stands together can be seen at both
+sizes. A
 missing or unknown choice shows the synced collection, and the value that was
 asked for is never repeated back into the page. When the switch is off or the
 site runs in production, there is no switcher and no "Invented collection of N

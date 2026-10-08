@@ -29,6 +29,7 @@ public sealed record FamilyLink(int Id, string Name);
 /// <param name="EstimatedSize">The box size class worked out from these details, or null when it has not been worked out.</param>
 /// <param name="EstimateModelVersion">The version of the estimate that produced <paramref name="EstimatedSize"/>, or null when there is none.</param>
 /// <param name="Families">The game's BGG family links; null when the details were read before families were.</param>
+/// <param name="DetailsVersion">What the build that read these details knew to read, or null for details read before versions existed.</param>
 public sealed record GameDetails(
     DateTimeOffset EnrichedAtUtc,
     int? MinPlayers,
@@ -46,8 +47,15 @@ public sealed record GameDetails(
     string? MainImageUrl,
     BoxSizeClass? EstimatedSize = null,
     int? EstimateModelVersion = null,
-    IReadOnlyList<FamilyLink>? Families = null)
+    IReadOnlyList<FamilyLink>? Families = null,
+    int? DetailsVersion = null)
 {
+    /// <summary>
+    /// What the details step reads from the source today. It is raised whenever the step starts reading something new, so
+    /// every stored game is read once more and gains the new field; details with another version are due again.
+    /// </summary>
+    public const int CurrentDetailsVersion = 1;
+
     /// <summary>Whether another set of details says exactly the same, comparing the lists by their contents.</summary>
     /// <param name="other">The details to compare with; null is never the same.</param>
     public bool SameAs(GameDetails? other) =>
@@ -65,6 +73,7 @@ public sealed record GameDetails(
         && MainImageUrl == other.MainImageUrl
         && EstimatedSize == other.EstimatedSize
         && EstimateModelVersion == other.EstimateModelVersion
+        && DetailsVersion == other.DetailsVersion
         && Designers.SequenceEqual(other.Designers)
         && Mechanics.SequenceEqual(other.Mechanics)
         && ExpandsGames.SequenceEqual(other.ExpandsGames)

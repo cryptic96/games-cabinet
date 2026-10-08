@@ -95,7 +95,8 @@ public static class BggThingParser
             ReadNames(item, MechanicLink),
             ReadExpandedGames(item),
             ArtUrl.Canonical(item.Element("image")?.Value?.Trim()),
-            Families: ReadFamilies(item));
+            Families: ReadFamilies(item),
+            DetailsVersion: GameDetails.CurrentDetailsVersion);
     }
 
     private static IReadOnlyList<FamilyLink> ReadFamilies(XElement item)
