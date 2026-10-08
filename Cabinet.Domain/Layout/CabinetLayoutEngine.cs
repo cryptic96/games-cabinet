@@ -3,8 +3,8 @@ namespace Cabinet.Domain.Layout;
 /// <summary>
 /// Builds the cabinet for a collection. The result is a pure function of the items, the section design and the layout
 /// options: nothing is remembered between calls, so the same collection always gives the same cabinet. How each game
-/// stands is decided from that game alone. Base games, and expansions whose base game is not owned, are taken in
-/// collection then game identifier order, except that the games of one series (see <see cref="SeriesGrouping"/>) are
+/// stands is decided from that game and its own owned expansions alone: a base game with enough of them faces out. Base
+/// games, and expansions whose base game is not owned, are taken in collection then game identifier order, except that the games of one series (see <see cref="SeriesGrouping"/>) are
 /// taken together where the earliest of them would be taken: a series that fits one cubby stands in the first cubby, in
 /// reading order, that can take all of it, and a longer series goes game by game, each one starting at the cubby of the
 /// game before it. A game in no series goes into the first cubby, in reading order section by section, that
@@ -98,7 +98,7 @@ public static class CabinetLayoutEngine
         }
 
         var expansions = families.ExpansionsOf(item);
-        var pose = Orientation.Decide(item, options, design, fewGames);
+        var pose = Orientation.Decide(item, options, design, fewGames, expansions.Count);
 
         if (expansions.Count > 0 && pose == BoxPose.Flat)
         {

@@ -85,7 +85,7 @@ public class ShelfMixTests
 
         foreach (var share in new[] { 0, 100 })
         {
-            var options = new LayoutOptions(share, CoverStrategy.OversizeOnly, 6, 12, false);
+            var options = new LayoutOptions(share, CoverStrategy.OversizeOnly, 6, 12, false, CoverFromExpansions: 0);
             var layout = CabinetLayoutEngine.Build(items, Design, options);
 
             PlacementsOf(layout)
@@ -168,7 +168,7 @@ public class ShelfMixTests
     public void A_share_of_zero_with_size_weighting_gives_no_covers_above_the_threshold()
     {
         SyntheticCollections.TryGetSample("400", out var items);
-        var options = new LayoutOptions(0, CoverStrategy.SizeWeighted, 6, 12);
+        var options = new LayoutOptions(0, CoverStrategy.SizeWeighted, 6, 12, CoverFromExpansions: 0);
 
         var layout = CabinetLayoutEngine.Build(items, Design, options);
 
@@ -216,8 +216,8 @@ public class ShelfMixTests
     {
         SyntheticCollections.TryGetSample(name, out var items);
 
-        var on = CabinetLayoutEngine.Build(items, Design, LayoutOptions.Default);
-        var off = CabinetLayoutEngine.Build(items, Design, LayoutOptions.Default with { LieFlatBeforeNewSection = false });
+        var on = CabinetLayoutEngine.Build(items, Design, LayoutOptions.Default with { CoverFromExpansions = 0 });
+        var off = CabinetLayoutEngine.Build(items, Design, LayoutOptions.Default with { CoverFromExpansions = 0, LieFlatBeforeNewSection = false });
 
         on.Sections.Count.Should().BeLessThan(off.Sections.Count);
         LayoutAssertions.AssertValid(on, items);

@@ -25,7 +25,8 @@ public class FamilyStabilityTests
     private const int ThickDepthMm = 55;
 
     private static readonly SectionDesign Design = SectionDesigns.Desktop;
-    private static readonly LayoutOptions SpinesOnly = new(0, CoverStrategy.SizeWeighted, 6, 0);
+    private static readonly LayoutOptions SpinesOnly = new(0, CoverStrategy.SizeWeighted, 6, 0, CoverFromExpansions: 0);
+    private static readonly LayoutOptions WithoutExpansionCovers = LayoutOptions.Default with { CoverFromExpansions = 0 };
 
     [Fact]
     [Trait("Category", "Layout")]
@@ -56,7 +57,7 @@ public class FamilyStabilityTests
         for (var seed = 1; seed <= Seeds; seed++)
         {
             var items = SyntheticCollections.Random(seed, CollectionSize, ExpansionPercent);
-            var before = CabinetLayoutEngine.Build(items, Design);
+            var before = CabinetLayoutEngine.Build(items, Design, WithoutExpansionCovers);
             var baseId = FamiliesWithAStack(before).OrderBy(id => id).Skip(seed % 3).FirstOrDefault();
 
             if (baseId == 0)
@@ -65,7 +66,7 @@ public class FamilyStabilityTests
             }
 
             var next = WithDepth(SyntheticCollections.NextExpansion(items, baseId, seed), ThinDepthMm);
-            var after = CabinetLayoutEngine.Build([.. items, next], Design);
+            var after = CabinetLayoutEngine.Build([.. items, next], Design, WithoutExpansionCovers);
             var changed = LayoutAssertions.ChangedCubbies(before, after);
 
             changed.Should().HaveCountLessThanOrEqualTo(1, "seed {0}", seed);
@@ -209,7 +210,7 @@ public class FamilyStabilityTests
 
             var baseGame = items.Single(item => item.BggId == baseId && item.Kind == ItemKind.Base);
             var next = WithDepth(SyntheticCollections.NextExpansion(items, baseId, seed), ThickDepthMm);
-            var (before, after) = BuildBeforeAndAfter(items, next);
+            var (before, after) = BuildBeforeAndAfter(items, next, WithoutExpansionCovers);
             var arrival = PlacementOf(after, next.BggId);
             var home = PositionOfBase(after, baseId);
 
@@ -337,8 +338,11 @@ public class FamilyStabilityTests
         (uprights[index].Section, uprights[index].Cubby).Should().Be((baseEntry.Section, baseEntry.Cubby));
     }
 
-    private static (CabinetLayout Before, CabinetLayout After) BuildBeforeAndAfter(IReadOnlyList<CabinetItem> items, CabinetItem next) =>
-        (CabinetLayoutEngine.Build(items, Design), CabinetLayoutEngine.Build([.. items, next], Design));
+    private static (CabinetLayout Before, CabinetLayout After) BuildBeforeAndAfter(
+        IReadOnlyList<CabinetItem> items,
+        CabinetItem next,
+        LayoutOptions? options = null) =>
+        (CabinetLayoutEngine.Build(items, Design, options ?? LayoutOptions.Default), CabinetLayoutEngine.Build([.. items, next], Design, options ?? LayoutOptions.Default));
 
     private static CabinetItem WithDepth(CabinetItem expansion, int depthMm) =>
         expansion with { Box = expansion.Box with { DepthMm = depthMm } };

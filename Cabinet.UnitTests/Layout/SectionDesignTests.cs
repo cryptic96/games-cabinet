@@ -17,7 +17,7 @@ public class SectionDesignTests
     private const int FirstBaseId = 1;
 
     private static readonly LayoutOptions AllCovers = new(0, CoverStrategy.SizeWeighted, 6, 100);
-    private static readonly LayoutOptions AllSpines = new(0, CoverStrategy.SizeWeighted, 6, 0);
+    private static readonly LayoutOptions AllSpines = new(0, CoverStrategy.SizeWeighted, 6, 0, CoverFromExpansions: 0);
 
     public static TheoryData<string> DesignNames => new(SectionDesigns.All.Select(design => design.Name));
 

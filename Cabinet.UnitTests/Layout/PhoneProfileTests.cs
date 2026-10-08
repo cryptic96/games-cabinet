@@ -31,6 +31,7 @@ public class PhoneProfileTests
 
     private static readonly SectionDesign Phone = SectionDesigns.Phone;
     private static readonly SectionDesign Desktop = SectionDesigns.Desktop;
+    private static readonly LayoutOptions WithoutExpansionCovers = LayoutOptions.Default with { CoverFromExpansions = 0 };
 
     public static TheoryData<int, int, int, int> FloorCases => new()
     {
@@ -218,7 +219,7 @@ public class PhoneProfileTests
         for (var seed = 1; seed <= StabilitySeeds; seed++)
         {
             var items = SyntheticCollections.Random(seed, StabilityCollectionSize, ExpansionPercent);
-            var before = CabinetLayoutEngine.Build(items, Phone);
+            var before = CabinetLayoutEngine.Build(items, Phone, WithoutExpansionCovers);
             var baseId = FamiliesWithAStack(before).OrderBy(id => id).Skip(seed % 3).FirstOrDefault();
 
             if (baseId == 0)
@@ -228,7 +229,7 @@ public class PhoneProfileTests
 
             var thin = SyntheticCollections.NextExpansion(items, baseId, seed);
             var next = thin with { Box = thin.Box with { DepthMm = ThinDepthMm } };
-            var after = CabinetLayoutEngine.Build([.. items, next], Phone);
+            var after = CabinetLayoutEngine.Build([.. items, next], Phone, WithoutExpansionCovers);
             var changed = LayoutAssertions.ChangedCubbies(before, after);
             var home = PositionOfBase(after, baseId);
 

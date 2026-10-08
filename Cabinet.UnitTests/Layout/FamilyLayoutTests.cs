@@ -12,7 +12,7 @@ public class FamilyLayoutTests
 {
     private static readonly SectionDesign Design = SectionDesigns.Desktop;
     private const int MaxThinDepthMm = 45;
-    private static readonly LayoutOptions SpinesOnly = new(0, CoverStrategy.SizeWeighted, 6, 0);
+    private static readonly LayoutOptions SpinesOnly = new(0, CoverStrategy.SizeWeighted, 6, 0, CoverFromExpansions: 0);
     private static readonly LayoutOptions EveryBoxFacesOut = new(100, CoverStrategy.Random, 6, 0);
 
     public static TheoryData<string> LargeSamples => new("65", "400");
@@ -180,6 +180,45 @@ public class FamilyLayoutTests
             .ToList();
 
         kinds.Should().Contain([PlacementKind.Cover, PlacementKind.Spine]);
+    }
+
+    [Theory]
+    [InlineData(2, 2, PlacementKind.Cover)]
+    [InlineData(2, 3, PlacementKind.Cover)]
+    [InlineData(2, 1, PlacementKind.Spine)]
+    [InlineData(3, 2, PlacementKind.Spine)]
+    [InlineData(0, 5, PlacementKind.Spine)]
+    [Trait("Category", "Layout")]
+    public void A_base_game_faces_out_exactly_when_it_has_as_many_owned_expansions_as_the_setting_asks(int setting, int expansions, PlacementKind expected)
+    {
+        var baseGame = BaseOf(1, depth: 40);
+        var items = new List<CabinetItem> { baseGame };
+        items.AddRange(Enumerable.Range(0, expansions).Select(index => ExpansionOf(10 + index, baseGame, depth: 20)));
+        var options = SpinesOnly with { CoverFromExpansions = setting };
+
+        var layout = CabinetLayoutEngine.Build(items, Design, options);
+
+        LayoutAssertions.PlacementsWithPosition(layout).Single(entry => entry.Placement.GameId == 1 && IsStanding(entry.Placement))
+            .Placement.Kind.Should().Be(expected);
+        LayoutAssertions.AssertValid(layout, items);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_base_game_with_two_expansions_faces_out_beside_them_under_the_default_settings_in_the_few_games_free_sample()
+    {
+        SyntheticCollections.TryGetSample("400", out var items);
+        var layout = CabinetLayoutEngine.Build(items, Design);
+        var placed = LayoutAssertions.PlacementsWithPosition(layout);
+        var crowded = FamiliesOf(items).Where(family => family.Count() >= LayoutOptions.Default.CoverFromExpansions).ToList();
+
+        crowded.Should().NotBeEmpty();
+
+        foreach (var family in crowded)
+        {
+            placed.Single(entry => entry.Placement.GameId == family.Key && IsStanding(entry.Placement))
+                .Placement.Kind.Should().Be(PlacementKind.Cover, "family {0} has {1} owned expansions", family.Key, family.Count());
+        }
     }
 
     [Theory]
