@@ -10,8 +10,6 @@ namespace Cabinet.UnitTests.Layout;
 /// collection does not end in a run of nearly empty sections because its biggest boxes had too few cubbies to go to.
 /// A section before the last holds at least 25 boxes: placing a series together packs one seeded collection a little less
 /// tightly than game by game, which is why the floor sits below the 30 it had before series stood together.
-/// The checks on empty rows and the section count of the medium collection run without the rule that makes a base game with
-/// two owned expansions face out, which takes room that those numbers were tuned without.
 /// </summary>
 public class DesktopDensityTests
 {
@@ -21,7 +19,6 @@ public class DesktopDensityTests
     private const string SamplePrefix = "sample-";
     private const string SpikePrefix = "spike-";
 
-    private static readonly LayoutOptions WithoutExpansionCovers = LayoutOptions.Default with { CoverFromExpansions = 0 };
     private static readonly int[] MediumSeeds = [1, 2, 3, 4, 5, 6, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112];
     private static readonly int[] LargeSeeds = [4242, 11, 12, 201, 202, 203, 204, 205, 206];
 
@@ -44,7 +41,7 @@ public class DesktopDensityTests
     {
         var items = ItemsFor(name);
 
-        var layout = CabinetLayoutEngine.Build(items, SectionDesigns.Desktop, WithoutExpansionCovers);
+        var layout = CabinetLayoutEngine.Build(items, SectionDesigns.Desktop);
         var report = LayoutDensity.Measure(layout);
 
         LayoutAssertions.AssertValid(layout, items);
@@ -56,7 +53,7 @@ public class DesktopDensityTests
     [Trait("Category", "Layout")]
     public void A_medium_collection_has_no_empty_row_in_the_middle_of_any_desktop_section(string name)
     {
-        var layout = CabinetLayoutEngine.Build(ItemsFor(name), SectionDesigns.Desktop, WithoutExpansionCovers);
+        var layout = CabinetLayoutEngine.Build(ItemsFor(name), SectionDesigns.Desktop);
 
         LayoutDensity.HollowRows(layout).Should().OnlyContain(rows => rows == 0, "{0}: {1}", name, string.Join(", ", LayoutDensity.PlacementsPerSection(layout)));
     }
@@ -91,7 +88,7 @@ public class DesktopDensityTests
         SyntheticCollections.TryGetSample("65", out var medium);
         SyntheticCollections.TryGetSample("400", out var large);
 
-        CabinetLayoutEngine.Build(medium, SectionDesigns.Desktop, WithoutExpansionCovers).Sections.Should().HaveCount(2);
+        CabinetLayoutEngine.Build(medium, SectionDesigns.Desktop).Sections.Should().HaveCount(2);
         CabinetLayoutEngine.Build(large, SectionDesigns.Desktop).Sections.Count.Should().BeLessThan(9);
     }
 
