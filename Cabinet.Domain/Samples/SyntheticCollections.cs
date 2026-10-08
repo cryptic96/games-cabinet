@@ -1,3 +1,4 @@
+using Cabinet.Domain.Collection;
 using Cabinet.Domain.Layout;
 
 namespace Cabinet.Domain.Samples;
@@ -32,6 +33,13 @@ public static class SyntheticCollections
     private const int TwoParentFirst = 5;
     private const int TwoParentSecond = 30;
     private const int LongTitleOrphan = 29;
+    private const int MixExpansionPercent = 25;
+    private const int MixMaxFamilySize = 8;
+    private const int MixMinSeriesCount = 2;
+    private const int MixSeriesPerBaseGames = 60;
+    private const int MixSeriesMinLength = 2;
+    private const int MixSeriesMaxLength = 4;
+    private const ulong MixSeedMask = 0x51E3D1C5UL;
 
     private static readonly string[] FirstSyllables =
     [
@@ -79,6 +87,23 @@ public static class SyntheticCollections
         [30, 100, 180, 240],
         [15, 65, 135],
         [25, 85],
+    ];
+
+    private static readonly (int Share, Func<SplitMix64, BoxDimensions>? Make)[] MixBaseBoxes =
+    [
+        (30, null),
+        (20, SmallCardBox),
+        (15, StandardBox),
+        (20, SquareBox),
+        (10, TallLargeBox),
+        (5, LandscapeBox),
+    ];
+
+    private static readonly (int Share, Func<SplitMix64, BoxDimensions>? Make)[] MixExpansionBoxes =
+    [
+        (40, null),
+        (40, SquareExpansionBox),
+        (20, SmallExpansionBox),
     ];
 
     private static readonly int[] ReviewOversizeBases = [3, 31];
@@ -159,6 +184,32 @@ public static class SyntheticCollections
         var titles = new HashSet<string>(StringComparer.Ordinal);
 
         return Assemble(generator, titles, count, RandomRoles(generator, titles, expansionPercent));
+    }
+
+    /// <summary>
+    /// A seeded collection shaped like a real hobby collection, built from coarse bands only: about thirty percent of the base
+    /// games have no known size so the default box applies, a fifth are small card boxes, a sixth standard portrait boxes,
+    /// a fifth large squares, a tenth tall large boxes and one in twenty a wide landscape front; expansions are mostly large
+    /// squares or the default box. A quarter of the items are expansions in families of up to eight, a few of them with two
+    /// or more, and a few invented series stand among the base games. Sizes are rounded to ten millimetres and shares to
+    /// five percentage points, and the same seed always gives the same collection.
+    /// </summary>
+    /// <param name="seed">The seed.</param>
+    /// <param name="count">The number of items.</param>
+    public static IReadOnlyList<CabinetItem> SizeMix(int seed, int count)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(count);
+
+        var generator = new SplitMix64(unchecked((ulong)seed));
+        var titles = new HashSet<string>(StringComparer.Ordinal);
+        var assembled = Assemble(generator, titles, count, RandomRoles(generator, titles, MixExpansionPercent, MixMaxFamilySize));
+        var sizing = new SplitMix64(unchecked((ulong)seed) ^ MixSeedMask);
+        var sized = assembled
+            .Select(item => item with { Box = MixBoxFor(sizing, item.Kind), PoseHeightMm = null })
+            .Select(item => item with { PoseHeightMm = item.Box.WidthMm > item.Box.HeightMm ? item.Box.WidthMm : null })
+            .ToList();
+
+        return WithSeries(sized, MixSeries(sizing, sized.Count(item => item.Kind == ItemKind.Base)));
     }
 
     /// <summary>A new base game whose collection and game identifiers are above every existing one and whose title is unused.</summary>
@@ -350,7 +401,89 @@ public static class SyntheticCollections
         return new CabinetItem(draft.BggId, draft.CollectionId, draft.Title, ItemKind.Expansion, draft.Box, parents);
     }
 
-    private static RoleChooser RandomRoles(SplitMix64 generator, HashSet<string> titles, int expansionPercent)
+    private static BoxDimensions MixBoxFor(SplitMix64 generator, ItemKind kind)
+    {
+        var bands = kind == ItemKind.Expansion ? MixExpansionBoxes : MixBaseBoxes;
+        var roll = generator.NextInt(0, 100);
+
+        foreach (var (share, make) in bands)
+        {
+            roll -= share;
+
+            if (roll < 0)
+            {
+                return make is null ? BoxFromVersion.DefaultFor(kind) : make(generator);
+            }
+        }
+
+        return BoxFromVersion.DefaultFor(kind);
+    }
+
+    private static int[][] MixSeries(SplitMix64 generator, int baseGames)
+    {
+        var seriesCount = Math.Max(MixMinSeriesCount, baseGames / MixSeriesPerBaseGames);
+        var taken = new HashSet<int>();
+        var series = new List<int[]>();
+
+        for (var index = 0; index < seriesCount; index++)
+        {
+            var length = generator.NextInt(MixSeriesMinLength, MixSeriesMaxLength + 1);
+            var members = new List<int>();
+
+            while (members.Count < length && taken.Count < baseGames)
+            {
+                var ordinal = generator.NextInt(0, baseGames);
+
+                if (taken.Add(ordinal))
+                {
+                    members.Add(ordinal);
+                }
+            }
+
+            if (members.Count >= MixSeriesMinLength)
+            {
+                series.Add([.. members]);
+            }
+        }
+
+        return [.. series];
+    }
+
+    private static BoxDimensions SmallCardBox(SplitMix64 generator) =>
+        RoundedBox(generator.NextInt(80, 151), generator.NextInt(110, 191), generator.NextInt(20, 61));
+
+    private static BoxDimensions StandardBox(SplitMix64 generator) =>
+        RoundedBox(generator.NextInt(150, 201), generator.NextInt(200, 251), generator.NextInt(40, 71));
+
+    private static BoxDimensions SquareBox(SplitMix64 generator)
+    {
+        var side = generator.NextInt(0, 2) == 0 ? 290 : 300;
+
+        return new BoxDimensions(side, side, RoundTen(generator.NextInt(40, 141)));
+    }
+
+    private static BoxDimensions TallLargeBox(SplitMix64 generator) =>
+        RoundedBox(generator.NextInt(250, 301), generator.NextInt(300, 441), generator.NextInt(50, 111));
+
+    private static BoxDimensions LandscapeBox(SplitMix64 generator) =>
+        RoundedBox(generator.NextInt(350, 411), generator.NextInt(250, 281), generator.NextInt(50, 101));
+
+    private static BoxDimensions SquareExpansionBox(SplitMix64 generator)
+    {
+        var side = generator.NextInt(0, 2) == 0 ? 290 : 300;
+
+        return new BoxDimensions(side, side, RoundTen(generator.NextInt(20, 81)));
+    }
+
+    private static BoxDimensions SmallExpansionBox(SplitMix64 generator) =>
+        RoundedBox(generator.NextInt(100, 191), generator.NextInt(150, 251), generator.NextInt(20, 61));
+
+    private static BoxDimensions RoundedBox(int width, int height, int depth) =>
+        new(RoundTen(width), RoundTen(height), RoundTen(depth));
+
+    private static int RoundTen(int value) => (value + 5) / 10 * 10;
+
+    private static RoleChooser RandomRoles(SplitMix64 generator, HashSet<string> titles, int expansionPercent, int maxFamilySize = MaxFamilySize)
     {
         var basePositions = new List<int>();
         var familySizes = new Dictionary<int, int>();
@@ -358,7 +491,7 @@ public static class SyntheticCollections
         return position =>
         {
             var role = expansionPercent > 0 && basePositions.Count > 0 && generator.NextInt(0, 100) < expansionPercent
-                ? ChooseExpansionRole(generator, titles, basePositions, familySizes)
+                ? ChooseExpansionRole(generator, titles, basePositions, familySizes, maxFamilySize)
                 : null;
 
             if (role is null)
@@ -382,7 +515,8 @@ public static class SyntheticCollections
         SplitMix64 generator,
         HashSet<string> titles,
         List<int> basePositions,
-        Dictionary<int, int> familySizes)
+        Dictionary<int, int> familySizes,
+        int maxFamilySize)
     {
         var kindRoll = generator.NextInt(0, 100);
 
@@ -393,7 +527,7 @@ public static class SyntheticCollections
             return new Role([], absent);
         }
 
-        var first = PickFamily(generator, basePositions, familySizes, excluded: -1);
+        var first = PickFamily(generator, basePositions, familySizes, maxFamilySize, excluded: -1);
 
         if (first < 0)
         {
@@ -402,7 +536,7 @@ public static class SyntheticCollections
 
         if (kindRoll < OrphanPercent + TwoParentPercent)
         {
-            var second = PickFamily(generator, basePositions, familySizes, excluded: first);
+            var second = PickFamily(generator, basePositions, familySizes, maxFamilySize, excluded: first);
 
             if (second >= 0)
             {
@@ -418,10 +552,10 @@ public static class SyntheticCollections
     /// has, so a few popular games gather big families while most have none, like a real collection. Games with a full
     /// family are never picked; returns -1 when no game can take another expansion.
     /// </summary>
-    private static int PickFamily(SplitMix64 generator, List<int> basePositions, Dictionary<int, int> familySizes, int excluded)
+    private static int PickFamily(SplitMix64 generator, List<int> basePositions, Dictionary<int, int> familySizes, int maxFamilySize, int excluded)
     {
         var candidates = basePositions
-            .Where(position => position != excluded && familySizes[position] < MaxFamilySize)
+            .Where(position => position != excluded && familySizes[position] < maxFamilySize)
             .ToList();
 
         if (candidates.Count == 0)

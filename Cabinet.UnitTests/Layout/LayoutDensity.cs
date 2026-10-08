@@ -40,6 +40,10 @@ public static class LayoutDensity
     private const int ExpansionLengthMaxMm = 295;
     private const int ExpansionDepthMinMm = 39;
     private const int ExpansionDepthMaxMm = 80;
+    private const int BigBoxWidthMm = 300;
+    private const string SamplePrefix = "sample-";
+    private const string SpikePrefix = "spike-";
+    private const string MixPrefix = "mix-";
 
     /// <summary>Counts the sections and, for every section but the last, the shelf rows without a placement.</summary>
     /// <param name="layout">The layout to measure.</param>
@@ -79,6 +83,49 @@ public static class LayoutDensity
     /// <param name="layout">The layout to measure.</param>
     public static IReadOnlyList<int> PlacementsPerSection(CabinetLayout layout) =>
         layout.Sections.Select(section => section.Cubbies.Sum(cubby => cubby.Placements.Count)).ToList();
+
+    /// <summary>
+    /// The collection a density test name stands for: <c>sample-65</c> and <c>sample-400</c> are the invented samples,
+    /// <c>spike-65-3</c> a seeded collection with the recorded size ranges, <c>mix-400-12</c> a seeded realistic size mix;
+    /// the number after the prefix is the item count and the one after it the seed.
+    /// </summary>
+    /// <param name="name">The test name.</param>
+    public static IReadOnlyList<CabinetItem> ItemsFor(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        if (name.StartsWith(SamplePrefix, StringComparison.Ordinal))
+        {
+            SyntheticCollections.TryGetSample(name[SamplePrefix.Length..], out var sample);
+
+            return sample;
+        }
+
+        var prefix = name.StartsWith(MixPrefix, StringComparison.Ordinal) ? MixPrefix : SpikePrefix;
+        var parts = name[prefix.Length..].Split('-');
+        var count = int.Parse(parts[0], System.Globalization.CultureInfo.InvariantCulture);
+        var seed = int.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture);
+
+        return prefix == MixPrefix ? SyntheticCollections.SizeMix(seed, count) : SpikeShaped(seed, count);
+    }
+
+    /// <summary>
+    /// How many big boxes stand in a section: a face-out or flat base game whose front, with the widest expansion layer of its
+    /// family beside it, is at least 300 millimetres wide.
+    /// </summary>
+    /// <param name="section">The section to count in.</param>
+    public static int BigBoxes(LayoutSection section)
+    {
+        ArgumentNullException.ThrowIfNull(section);
+
+        return section.Cubbies.Sum(cubby => cubby.Placements.Count(placement =>
+            placement.Kind is PlacementKind.Cover or PlacementKind.FlatBox
+            && placement.WidthMm + cubby.Placements
+                .Where(other => other.Kind == PlacementKind.ExpansionLayer && other.FamilyId == placement.GameId)
+                .Select(other => other.WidthMm)
+                .DefaultIfEmpty(0)
+                .Max() >= BigBoxWidthMm));
+    }
 
     /// <summary>
     /// A seeded collection with a share of expansions in which thirty percent of the base games and forty percent of the
