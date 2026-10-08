@@ -135,7 +135,7 @@ public static class BggXml
     /// <summary>
     /// Writes a single-game answer for each requested id: the matching collection entry when there is one,
     /// otherwise an invented game. Every game carries two designers, two mechanics, its play times and its ratings (the ranked
-    /// rating is zero for every seventh game id); a base game also lists, without the inbound mark, the expansions the
+    /// rating is zero for every seventh game id); every game lists its invented families, a few of which are series; a base game also lists, without the inbound mark, the expansions the
     /// collection holds for it; an expansion lists the games it expands with the inbound mark; and one game carries an
     /// inbound link of a kind that is not an expansion link.
     /// </summary>
@@ -318,6 +318,11 @@ public static class BggXml
             Link("boardgamedesigner", 3010 + item.ObjectId % 4, $"Invented Designer {item.ObjectId % 4 + 6}", inbound: false),
             Link("boardgamemechanic", 2000 + item.ObjectId % 3, $"Example Mechanic {(char)('A' + item.ObjectId % 3)}", inbound: false),
             Link("boardgamemechanic", 2010 + item.ObjectId % 2, $"Example Mechanic {(char)('D' + item.ObjectId % 2)}", inbound: false));
+
+        foreach (var family in SyntheticBggCollection.FamiliesFor(item))
+        {
+            element.Add(Link("boardgamefamily", family.Id, family.Name, inbound: false));
+        }
 
         foreach (var outbound in known.Values
             .Where(other => other.IsExpansion && (other.BaseObjectId == item.ObjectId || other.AlsoExpands?.Contains(item.ObjectId) == true))

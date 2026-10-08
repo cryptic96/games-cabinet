@@ -98,7 +98,8 @@ public static class SnapshotMapper
 
     /// <summary>
     /// The identifier of a collection: the first sixteen lowercase hexadecimal characters of a SHA-256 hash over the mapped
-    /// items in order. It changes whenever anything that is drawn changes and not otherwise.
+    /// items in order. It changes whenever anything that is drawn changes and not otherwise; the families that name a series
+    /// count, because they decide where a game stands.
     /// </summary>
     /// <param name="items">The mapped items, in mapped order.</param>
     public static string Version(IReadOnlyList<CabinetItem> items) => Version(items, ArtRules.Default);
@@ -106,7 +107,7 @@ public static class SnapshotMapper
     /// <summary>
     /// The identifier of a collection as <see cref="Version(IReadOnlyList{CabinetItem})"/> works it out, with the rules the
     /// items were mapped with in front, so a change of rules changes the identifier. Each item's line also holds its colour
-    /// pair and its edge colours.
+    /// pair, its edge colours and the families that name its series.
     /// </summary>
     /// <param name="items">The mapped items, in mapped order.</param>
     /// <param name="rules">The rules the items were mapped with.</param>
@@ -118,7 +119,7 @@ public static class SnapshotMapper
         var lines = items
             .Select(item => string.Create(
                 CultureInfo.InvariantCulture,
-                $"{item.CollectionId}|{item.BggId}|{item.Kind}|{item.Title}|{item.Box.WidthMm}|{item.Box.HeightMm}|{item.Box.DepthMm}|{item.PoseHeightMm}|{VariantUrls(item.Art)}|{ExpansionRefs(item.ExpansionOf)}|{ColourText(item.Colour)}|{EdgeText(item.Art?.Edges)}"))
+                $"{item.CollectionId}|{item.BggId}|{item.Kind}|{item.Title}|{item.Box.WidthMm}|{item.Box.HeightMm}|{item.Box.DepthMm}|{item.PoseHeightMm}|{VariantUrls(item.Art)}|{ExpansionRefs(item.ExpansionOf)}|{ColourText(item.Colour)}|{EdgeText(item.Art?.Edges)}|{SeriesText(item.SeriesFamilies)}"))
             .Prepend(rules.Fingerprint);
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', lines)));
 
@@ -162,7 +163,8 @@ public static class SnapshotMapper
             pairing.TryGetValue(item.CollectionId, out var expansionOf) && item.Kind == ItemKind.Expansion ? expansionOf : [],
             chosen is null ? null : ArtOf(chosen),
             chosen is not null && SpineColour.IsValidPair(chosen.Colour) ? chosen.Colour : null,
-            shaped.PoseHeightMm);
+            shaped.PoseHeightMm,
+            SeriesFamiliesOf(details));
 
         return new MappedItemTrace(
             item,
@@ -175,6 +177,12 @@ public static class SnapshotMapper
             shaped,
             mapped);
     }
+
+    private static List<int> SeriesFamiliesOf(GameDetails? details) =>
+        [.. (details?.Families ?? []).Where(family => SeriesGrouping.IsSeriesFamily(family.Name)).Select(family => family.Id).Distinct()];
+
+    private static string SeriesText(IReadOnlyList<int>? families) =>
+        families is null ? string.Empty : string.Join(',', families.Select(family => family.ToString(CultureInfo.InvariantCulture)));
 
     private static ArtFile WidestFile(ImageRecord chosen) => chosen.Files!.OrderByDescending(file => file.Width).First();
 

@@ -8,12 +8,14 @@ namespace Cabinet.UnitTests.Layout;
 /// Pins how full the desktop cabinet is, next to the phone checks: on realistic collections no section but the last keeps a
 /// bare shelf row, a collection of about sixty-five games has no bare row in the middle of any section, and a large
 /// collection does not end in a run of nearly empty sections because its biggest boxes had too few cubbies to go to.
+/// A section before the last holds at least 25 boxes: placing a series together packs one seeded collection a little less
+/// tightly than game by game, which is why the floor sits below the 30 it had before series stood together.
 /// </summary>
 public class DesktopDensityTests
 {
     private const int LargeCount = 400;
     private const int MediumCount = 65;
-    private const int NonLastSectionFloor = 30;
+    private const int NonLastSectionFloor = 25;
     private const string SamplePrefix = "sample-";
     private const string SpikePrefix = "spike-";
 

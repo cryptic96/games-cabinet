@@ -19,7 +19,7 @@ public class LayoutSettingsTests
 
         var options = LayoutSettings.FromConfiguration(configuration);
 
-        options.Should().Be(new LayoutOptions(25, CoverStrategy.SizeWeighted, 6, 12, true));
+        options.Should().Be(new LayoutOptions(25, CoverStrategy.SizeWeighted, 6, 12, true, true));
         options.Should().Be(LayoutOptions.Default);
     }
 
@@ -131,6 +131,40 @@ public class LayoutSettingsTests
         LayoutSettings.FromConfiguration(Configure()).LieFlatBeforeNewSection.Should().BeTrue();
     }
 
+    [Theory]
+    [InlineData("true", true)]
+    [InlineData("false", false)]
+    [InlineData("FALSE", false)]
+    [InlineData(" True ", true)]
+    [Trait("Category", "Layout")]
+    public void Grouping_series_accepts_true_and_false_in_any_letter_case(string text, bool expected)
+    {
+        LayoutSettings.FromConfiguration(Configure(("Layout:GroupSeries", text))).GroupSeries.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("maybe")]
+    [InlineData("")]
+    [InlineData("  ")]
+    [InlineData("1")]
+    [InlineData("yes")]
+    [Trait("Category", "Layout")]
+    public void Grouping_series_rejects_other_values_naming_the_key(string text)
+    {
+        var act = () => LayoutSettings.FromConfiguration(Configure(("Layout:GroupSeries", text)));
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Layout:GroupSeries*");
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void Grouping_series_defaults_to_true_when_the_key_is_absent_and_false_changes_the_fingerprint()
+    {
+        LayoutSettings.FromConfiguration(Configure()).GroupSeries.Should().BeTrue();
+        LayoutSettings.FromConfiguration(Configure(("Layout:GroupSeries", "false"))).Fingerprint
+            .Should().NotBe(LayoutSettings.FromConfiguration(Configure()).Fingerprint);
+    }
+
     [Fact]
     [Trait("Category", "Layout")]
     public void A_changed_setting_changes_the_fingerprint()
@@ -143,6 +177,7 @@ public class LayoutSettingsTests
             LayoutOptions.Default with { ExpansionStackMax = 7 },
             LayoutOptions.Default with { FewGamesThreshold = 13 },
             LayoutOptions.Default with { LieFlatBeforeNewSection = false },
+            LayoutOptions.Default with { GroupSeries = false },
         }.Select(options => options.Fingerprint).ToList();
 
         fingerprints.Distinct().Should().HaveCount(fingerprints.Count);

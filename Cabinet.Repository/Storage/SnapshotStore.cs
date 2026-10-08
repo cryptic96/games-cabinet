@@ -131,5 +131,6 @@ public sealed class SnapshotStore : ISnapshotStore
             [typeof(ArtEdges)] = ["top", "right", "bottom", "left"],
             [typeof(GameDetails)] = ["enrichedAtUtc", "designers", "mechanics", "expandsGames"],
             [typeof(BaseGameRef)] = ["bggId", "title"],
+            [typeof(FamilyLink)] = ["id", "name"],
         });
 }

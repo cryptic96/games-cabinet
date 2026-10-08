@@ -97,7 +97,7 @@ It prints its address, `http://127.0.0.1:6190/xmlapi2/`, and runs until you stop
 What it answers:
 
 - `GET /xmlapi2/collection` honours `own`, `subtype`, `excludesubtype`, `version`, `showprivate` and `stats`. Like the real service, a request with no subtype filter labels expansions as base games, which is why the sync asks for base games and expansions in two calls.
-- `GET /xmlapi2/thing` answers one invented game for each requested id, and refuses more than 20 ids.
+- `GET /xmlapi2/thing` answers one invented game for each requested id, and refuses more than 20 ids. Every game carries invented family links: two series (three games in one, two in another), a series family that only one game carries, in the 400-entry collection a long series of seven games, and broad families on every game (themes, components, player counts) that must never group anything.
 - `POST /fake/scenario?name=<scenario>&size=<n>` switches the behaviour while it runs. Either parameter may be left out to keep its current value.
 
 Scenarios:
