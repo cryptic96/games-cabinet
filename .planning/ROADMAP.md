@@ -218,7 +218,7 @@ Plans:
   4. Box proportions come from the owned version's real BGG dimensions when available, else from a flat cover's aspect ratio, else from a realistic default, and a 3D shot's outline is never used, so real boxes in the cabinet visibly differ in size and shape.
   5. Each spine takes its colour from its box art (ignoring plain backgrounds around product shots) and shows the title legibly with readable text contrast.
 
-**Plans:** 16/18 plans executed
+**Plans:** 16/23 plans executed
 
 Plans:
 **Wave 1**
@@ -255,7 +255,7 @@ Plans:
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 04-15-PLAN.md — The owner's review of the real collection: sheet, cover shares, tuning (owner-gated; round 2 resumes after 04-18 on v0.4.1)
+- [ ] 04-15-PLAN.md — The owner's review of the real collection: sheet, cover shares, tuning (owner-gated; round 2 ran on v0.4.1, round 3 runs after 04-23 on v0.5.0)
 - [x] 04-17-PLAN.md — Round-1 fixes: landscape flat covers turn real sizes, unsure landscape pictures turn boxes (new setting), detector root-caused for white, transparent and dark-bordered pictures, analysis version 2 (gap closure)
 
 **Wave 8** *(blocked on Wave 7 completion)*
@@ -263,6 +263,26 @@ Plans:
 - [x] 04-18-PLAN.md — Release v0.4.1, deploy and bounded re-measure syncs on the container, games still waiting counted (owner-gated, gap closure)
 
 **Wave 9** *(blocked on Wave 8 completion)*
+
+- [ ] 04-19-PLAN.md — Detector fix from the real round-2 failures: local measurement harness at several sizes, synthetic stand-ins for cut-outs, tight white crops and covers with coloured or dark fields (row 8's main picture included), analysis version 3, wrapped rules line on the review sheet, override-candidate rows recorded (gap closure)
+
+**Wave 10** *(blocked on Wave 9 completion)*
+
+- [ ] 04-20-PLAN.md — Series stand together: BGG family links stored with a one-off details refresh, `Game:`/`Series:` families and title links, series placed as one block, `Layout:GroupSeries` switch, layout version 13 (gap closure)
+
+**Wave 11** *(blocked on Wave 10 completion)*
+
+- [ ] 04-21-PLAN.md — Families with two or more expansions face out (`Layout:CoverFromExpansions`), family columns continue into the next cubby on the same shelf, EXP-03 invariant (gap closure)
+
+**Wave 12** *(blocked on Wave 11 completion)*
+
+- [ ] 04-22-PLAN.md — Desktop density retune on a realistic size mix, phone no worse, local review round of the fake collection (owner-gated, gap closure)
+
+**Wave 13** *(blocked on Wave 12 completion)*
+
+- [ ] 04-23-PLAN.md — Release v0.5.0, deploy and bounded syncs for the picture re-measure and the details refresh, counts only (owner-gated, gap closure)
+
+**Wave 14** *(blocked on Wave 13 completion)*
 
 - [ ] 04-16-PLAN.md — Tuned defaults committed, final release and the owner's deployed check (owner-gated)
 
