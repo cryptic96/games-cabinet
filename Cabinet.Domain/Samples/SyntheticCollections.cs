@@ -67,6 +67,20 @@ public static class SyntheticCollections
         (450, 450, 140),
     ];
 
+    private const int FirstSeriesFamilyId = 9000;
+
+    private static readonly int[][] ReviewSeriesBases = [[4, 18, 33], [9, 41]];
+
+    private static readonly int[][] LargeSeriesBases =
+    [
+        [10, 45, 90, 140, 190, 230, 280],
+        [5, 55, 120],
+        [20, 70],
+        [30, 100, 180, 240],
+        [15, 65, 135],
+        [25, 85],
+    ];
+
     private static readonly int[] ReviewOversizeBases = [3, 31];
     private static readonly int[] LargeOversizeBases = [9, 60, 100, 150, 210, 270];
 
@@ -85,7 +99,9 @@ public static class SyntheticCollections
     /// made like a real collection of that size: forty-nine base games and sixteen expansions, with one family of nine
     /// expansions, one of two, one of one, one expansion for two owned games and three expansions whose base game is not
     /// owned. The sample of four hundred has about a fifth of its items as expansions in families of up to ten. Both
-    /// carry a few base games whose boxes are larger than any section can hold, so the engine's scaling is exercised.
+    /// carry a few base games whose boxes are larger than any section can hold, so the engine's scaling is exercised, and
+    /// a few invented series: the sample of sixty-five has one of three base games and one of two, the sample of four
+    /// hundred has six, the longest of seven base games.
     /// </summary>
     public static bool TryGetSample(string? name, out IReadOnlyList<CabinetItem> items)
     {
@@ -112,8 +128,8 @@ public static class SyntheticCollections
 
             items = name switch
             {
-                ReviewSampleName => WithOversizeBoxes(assembled, ReviewOversizeBases),
-                LargeSampleName => WithOversizeBoxes(assembled, LargeOversizeBases),
+                ReviewSampleName => WithSeries(WithOversizeBoxes(assembled, ReviewOversizeBases), ReviewSeriesBases),
+                LargeSampleName => WithSeries(WithOversizeBoxes(assembled, LargeOversizeBases), LargeSeriesBases),
                 _ => assembled,
             };
 
@@ -292,6 +308,29 @@ public static class SyntheticCollections
             var (width, height, depth) = OversizeFronts[turn % OversizeFronts.Length];
 
             result[index] = result[index] with { Box = new BoxDimensions(width, height, depth) };
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Puts the base games at the listed positions, counting base games only from zero, into invented series: each list is
+    /// one series family, numbered from 9000. Nothing else about the items changes, so the counts and the composition stay
+    /// the same.
+    /// </summary>
+    private static List<CabinetItem> WithSeries(List<CabinetItem> items, int[][] seriesBaseOrdinals)
+    {
+        var baseIndexes = Enumerable.Range(0, items.Count).Where(index => items[index].Kind == ItemKind.Base).ToList();
+        var result = new List<CabinetItem>(items);
+
+        for (var series = 0; series < seriesBaseOrdinals.Length; series++)
+        {
+            foreach (var ordinal in seriesBaseOrdinals[series])
+            {
+                var index = baseIndexes[ordinal];
+
+                result[index] = result[index] with { SeriesFamilies = [FirstSeriesFamilyId + series] };
+            }
         }
 
         return result;

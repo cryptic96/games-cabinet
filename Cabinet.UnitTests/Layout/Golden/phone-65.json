@@ -1,7 +1,7 @@
 {
   "layoutVersion": 13,
   "profile": "phone",
-  "optionsFingerprint": "09a03be9acd0723f",
+  "optionsFingerprint": "32d5a1737adc490c",
   "palette": [
     {
       "background": "#8a2432",
@@ -276,10 +276,23 @@
           "heightMm": 280,
           "placements": [
             {
+              "gameId": 10828,
+              "entryId": 500648,
+              "kind": "spine",
+              "xMm": 0,
+              "yMm": 0,
+              "widthMm": 59,
+              "heightMm": 167,
+              "title": "Grovthan",
+              "label": "Grovthan",
+              "toneIndex": 11,
+              "patternIndex": 5
+            },
+            {
               "gameId": 10788,
               "entryId": 500568,
               "kind": "spine",
-              "xMm": 0,
+              "xMm": 59,
               "yMm": 0,
               "widthMm": 74,
               "heightMm": 229,
@@ -287,19 +300,6 @@
               "label": "Quaydis Yar\u2026",
               "toneIndex": 10,
               "patternIndex": 0
-            },
-            {
-              "gameId": 10529,
-              "entryId": 500382,
-              "kind": "spine",
-              "xMm": 74,
-              "yMm": 0,
-              "widthMm": 59,
-              "heightMm": 273,
-              "title": "Tarntor",
-              "label": "Tarntor",
-              "toneIndex": 0,
-              "patternIndex": 3
             }
           ]
         },
@@ -311,10 +311,23 @@
           "heightMm": 380,
           "placements": [
             {
+              "gameId": 10567,
+              "entryId": 500405,
+              "kind": "spine",
+              "xMm": 0,
+              "yMm": 0,
+              "widthMm": 72,
+              "heightMm": 326,
+              "title": "Cassdis Sulquin",
+              "label": "Cassdis Sulquin",
+              "toneIndex": 3,
+              "patternIndex": 4
+            },
+            {
               "gameId": 10096,
               "entryId": 500080,
               "kind": "spine",
-              "xMm": 0,
+              "xMm": 72,
               "yMm": 0,
               "widthMm": 60,
               "heightMm": 318,
@@ -324,17 +337,30 @@
               "patternIndex": 1
             },
             {
-              "gameId": 10199,
-              "entryId": 500156,
-              "kind": "cover",
-              "xMm": 60,
+              "gameId": 10529,
+              "entryId": 500382,
+              "kind": "spine",
+              "xMm": 132,
               "yMm": 0,
-              "widthMm": 220,
-              "heightMm": 250,
-              "title": "Pellmerethan",
-              "label": "Pellmerethan",
-              "toneIndex": 6,
-              "patternIndex": 2
+              "widthMm": 59,
+              "heightMm": 273,
+              "title": "Tarntor",
+              "label": "Tarntor",
+              "toneIndex": 0,
+              "patternIndex": 3
+            },
+            {
+              "gameId": 10980,
+              "entryId": 500753,
+              "kind": "spine",
+              "xMm": 191,
+              "yMm": 0,
+              "widthMm": 70,
+              "heightMm": 312,
+              "title": "Quayley Orvtor",
+              "label": "Quayley Orvtor",
+              "toneIndex": 7,
+              "patternIndex": 5
             }
           ]
         },
@@ -346,24 +372,11 @@
           "heightMm": 380,
           "placements": [
             {
-              "gameId": 10450,
-              "entryId": 500350,
-              "kind": "flatBox",
-              "xMm": 0,
-              "yMm": 0,
-              "widthMm": 298,
-              "heightMm": 59,
-              "title": "Vossquin Drelford",
-              "label": "Vossquin Drelfo\u2026",
-              "toneIndex": 3,
-              "patternIndex": 3
-            },
-            {
               "gameId": 10175,
               "entryId": 500147,
               "kind": "orphanExpansion",
               "xMm": 0,
-              "yMm": 59,
+              "yMm": 0,
               "widthMm": 281,
               "heightMm": 59,
               "title": "Sulmere Orvmont Keldle",
@@ -379,7 +392,7 @@
               "entryId": 500464,
               "kind": "orphanExpansion",
               "xMm": 0,
-              "yMm": 118,
+              "yMm": 59,
               "widthMm": 254,
               "heightMm": 60,
               "title": "Yardle Casslo",
@@ -395,13 +408,29 @@
               "entryId": 500683,
               "kind": "flatBox",
               "xMm": 0,
-              "yMm": 178,
+              "yMm": 119,
               "widthMm": 184,
               "heightMm": 59,
               "title": "Brinford Quaymont Zimley: Yarthanford Vossthan and Cassnia",
               "label": "Brinford\u2026",
               "toneIndex": 9,
               "patternIndex": 5
+            },
+            {
+              "gameId": 11050,
+              "entryId": 500767,
+              "kind": "orphanExpansion",
+              "xMm": 0,
+              "yMm": 178,
+              "widthMm": 171,
+              "heightMm": 59,
+              "title": "Drelsk Pellmere",
+              "label": "Drelsk P\u2026",
+              "baseTitle": "Wendsk Vossbar",
+              "isExpansion": true,
+              "toneIndex": 2,
+              "patternIndex": 2,
+              "showBaseLine": false
             }
           ]
         },
@@ -410,6 +439,41 @@
           "xMm": 0,
           "yMm": 1020,
           "widthMm": 290,
+          "heightMm": 340,
+          "placements": [
+            {
+              "gameId": 10199,
+              "entryId": 500156,
+              "kind": "cover",
+              "xMm": 0,
+              "yMm": 0,
+              "widthMm": 220,
+              "heightMm": 250,
+              "title": "Pellmerethan",
+              "label": "Pellmerethan",
+              "toneIndex": 6,
+              "patternIndex": 2
+            },
+            {
+              "gameId": 10731,
+              "entryId": 500525,
+              "kind": "spine",
+              "xMm": 220,
+              "yMm": 0,
+              "widthMm": 59,
+              "heightMm": 285,
+              "title": "Jorbar Dreltor",
+              "label": "Jorbar Dreltor",
+              "toneIndex": 4,
+              "patternIndex": 4
+            }
+          ]
+        },
+        {
+          "index": 8,
+          "xMm": 310,
+          "yMm": 1020,
+          "widthMm": 330,
           "heightMm": 340,
           "placements": [
             {
@@ -424,62 +488,6 @@
               "label": "Heskmere",
               "toneIndex": 2,
               "patternIndex": 4
-            }
-          ]
-        },
-        {
-          "index": 8,
-          "xMm": 310,
-          "yMm": 1020,
-          "widthMm": 330,
-          "heightMm": 340,
-          "placements": [
-            {
-              "gameId": 10411,
-              "entryId": 500319,
-              "kind": "spine",
-              "xMm": 0,
-              "yMm": 0,
-              "widthMm": 59,
-              "heightMm": 165,
-              "title": "Sulley Morvexnia",
-              "label": "Sulley M\u2026",
-              "toneIndex": 6,
-              "patternIndex": 2,
-              "familyId": 10411
-            },
-            {
-              "gameId": 10730,
-              "entryId": 500503,
-              "kind": "expansionSpine",
-              "xMm": 59,
-              "yMm": 0,
-              "widthMm": 59,
-              "heightMm": 293,
-              "title": "Jorley",
-              "label": "Jorley",
-              "baseTitle": "Sulley Morvexnia",
-              "isExpansion": true,
-              "toneIndex": 6,
-              "patternIndex": 4,
-              "familyId": 10411,
-              "showBaseLine": false
-            },
-            {
-              "gameId": 10351,
-              "entryId": 500281,
-              "kind": "expansionLayer",
-              "xMm": 118,
-              "yMm": 0,
-              "widthMm": 190,
-              "heightMm": 59,
-              "title": "Tavdis Dreldis Yardis",
-              "label": "Tavdis Dr\u2026",
-              "baseTitle": "Sulley Morvexnia",
-              "isExpansion": true,
-              "toneIndex": 11,
-              "patternIndex": 5,
-              "familyId": 10411
             }
           ]
         },
@@ -504,11 +512,24 @@
               "patternIndex": 2
             },
             {
+              "gameId": 11206,
+              "entryId": 500998,
+              "kind": "flatBox",
+              "xMm": 0,
+              "yMm": 62,
+              "widthMm": 356,
+              "heightMm": 69,
+              "title": "Belbarwyn Zimtor Yarquin: Noxquin Vossthan and",
+              "label": "Belbarwyn Zimtor Y\u2026",
+              "toneIndex": 1,
+              "patternIndex": 3
+            },
+            {
               "gameId": 11156,
               "entryId": 500955,
               "kind": "flatBox",
               "xMm": 0,
-              "yMm": 62,
+              "yMm": 131,
               "widthMm": 349,
               "heightMm": 92,
               "title": "Kelquin",
@@ -521,7 +542,7 @@
               "entryId": 500207,
               "kind": "flatBox",
               "xMm": 0,
-              "yMm": 154,
+              "yMm": 223,
               "widthMm": 344,
               "heightMm": 72,
               "title": "Pelldle",
@@ -530,33 +551,17 @@
               "patternIndex": 1
             },
             {
-              "gameId": 11050,
-              "entryId": 500767,
-              "kind": "orphanExpansion",
-              "xMm": 0,
-              "yMm": 226,
-              "widthMm": 171,
-              "heightMm": 59,
-              "title": "Drelsk Pellmere",
-              "label": "Drelsk P\u2026",
-              "baseTitle": "Wendsk Vossbar",
-              "isExpansion": true,
-              "toneIndex": 2,
-              "patternIndex": 2,
-              "showBaseLine": false
-            },
-            {
-              "gameId": 10567,
-              "entryId": 500405,
+              "gameId": 10829,
+              "entryId": 500675,
               "kind": "spine",
               "xMm": 365,
               "yMm": 0,
-              "widthMm": 72,
-              "heightMm": 326,
-              "title": "Cassdis Sulquin",
-              "label": "Cassdis Sulquin",
-              "toneIndex": 3,
-              "patternIndex": 4
+              "widthMm": 59,
+              "heightMm": 318,
+              "title": "Tarnford Dreldis: Vossvexsk Grovford Grovskra",
+              "label": "Tarnford Dreldis",
+              "toneIndex": 4,
+              "patternIndex": 2
             }
           ]
         },
@@ -568,23 +573,23 @@
           "heightMm": 340,
           "placements": [
             {
-              "gameId": 10731,
-              "entryId": 500525,
+              "gameId": 10943,
+              "entryId": 500734,
               "kind": "spine",
               "xMm": 0,
               "yMm": 0,
-              "widthMm": 59,
-              "heightMm": 285,
-              "title": "Jorbar Dreltor",
-              "label": "Jorbar Dreltor",
+              "widthMm": 70,
+              "heightMm": 296,
+              "title": "Wendven Orvquinlo Wendnia: Sulmere Heskquin Wendvexwyn",
+              "label": "Wendven Orvquin\u2026",
               "toneIndex": 4,
-              "patternIndex": 4
+              "patternIndex": 2
             },
             {
               "gameId": 10638,
               "entryId": 500469,
               "kind": "spine",
-              "xMm": 59,
+              "xMm": 70,
               "yMm": 0,
               "widthMm": 106,
               "heightMm": 327,
@@ -660,23 +665,10 @@
           "heightMm": 380,
           "placements": [
             {
-              "gameId": 10828,
-              "entryId": 500648,
-              "kind": "spine",
-              "xMm": 0,
-              "yMm": 0,
-              "widthMm": 59,
-              "heightMm": 167,
-              "title": "Grovthan",
-              "label": "Grovthan",
-              "toneIndex": 11,
-              "patternIndex": 5
-            },
-            {
               "gameId": 10208,
               "entryId": 500169,
               "kind": "spine",
-              "xMm": 59,
+              "xMm": 0,
               "yMm": 0,
               "widthMm": 96,
               "heightMm": 350,
@@ -690,7 +682,7 @@
               "gameId": 11063,
               "entryId": 500808,
               "kind": "expansionSpine",
-              "xMm": 155,
+              "xMm": 96,
               "yMm": 0,
               "widthMm": 59,
               "heightMm": 157,
@@ -707,7 +699,7 @@
               "gameId": 10238,
               "entryId": 500195,
               "kind": "expansionLayer",
-              "xMm": 214,
+              "xMm": 155,
               "yMm": 0,
               "widthMm": 190,
               "heightMm": 59,
@@ -723,7 +715,7 @@
               "gameId": 10298,
               "entryId": 500243,
               "kind": "expansionLayer",
-              "xMm": 214,
+              "xMm": 155,
               "yMm": 59,
               "widthMm": 190,
               "heightMm": 59,
@@ -739,7 +731,7 @@
               "gameId": 10381,
               "entryId": 500309,
               "kind": "expansionLayer",
-              "xMm": 214,
+              "xMm": 155,
               "yMm": 118,
               "widthMm": 190,
               "heightMm": 59,
@@ -755,7 +747,7 @@
               "gameId": 10462,
               "entryId": 500363,
               "kind": "expansionLayer",
-              "xMm": 214,
+              "xMm": 155,
               "yMm": 177,
               "widthMm": 190,
               "heightMm": 59,
@@ -771,7 +763,7 @@
               "gameId": 10498,
               "entryId": 500379,
               "kind": "expansionLayer",
-              "xMm": 214,
+              "xMm": 155,
               "yMm": 236,
               "widthMm": 190,
               "heightMm": 59,
@@ -787,7 +779,7 @@
               "gameId": 10208,
               "entryId": 500169,
               "kind": "moreMarker",
-              "xMm": 214,
+              "xMm": 155,
               "yMm": 295,
               "widthMm": 190,
               "heightMm": 59,
@@ -798,6 +790,19 @@
               "patternIndex": 0,
               "familyId": 10208,
               "moreCount": 3
+            },
+            {
+              "gameId": 11109,
+              "entryId": 500895,
+              "kind": "spine",
+              "xMm": 345,
+              "yMm": 0,
+              "widthMm": 59,
+              "heightMm": 263,
+              "title": "Jorzel Zimthanley Drello: Brinlo and Pellmere Zimnialey",
+              "label": "Jorzel Zimtha\u2026",
+              "toneIndex": 3,
+              "patternIndex": 5
             }
           ]
         },
@@ -809,10 +814,23 @@
           "heightMm": 380,
           "placements": [
             {
+              "gameId": 11056,
+              "entryId": 500779,
+              "kind": "spine",
+              "xMm": 0,
+              "yMm": 0,
+              "widthMm": 59,
+              "heightMm": 215,
+              "title": "Quaylo: Pelllo of Eldnia",
+              "label": "Quaylo",
+              "toneIndex": 4,
+              "patternIndex": 1
+            },
+            {
               "gameId": 10904,
               "entryId": 500706,
               "kind": "spine",
-              "xMm": 0,
+              "xMm": 59,
               "yMm": 0,
               "widthMm": 90,
               "heightMm": 328,
@@ -820,19 +838,6 @@
               "label": "Grovvex",
               "toneIndex": 1,
               "patternIndex": 4
-            },
-            {
-              "gameId": 10829,
-              "entryId": 500675,
-              "kind": "spine",
-              "xMm": 90,
-              "yMm": 0,
-              "widthMm": 59,
-              "heightMm": 318,
-              "title": "Tarnford Dreldis: Vossvexsk Grovford Grovskra",
-              "label": "Tarnford Dreldis",
-              "toneIndex": 4,
-              "patternIndex": 2
             }
           ]
         }
@@ -852,23 +857,10 @@
           "heightMm": 300,
           "placements": [
             {
-              "gameId": 11056,
-              "entryId": 500779,
-              "kind": "spine",
-              "xMm": 0,
-              "yMm": 0,
-              "widthMm": 59,
-              "heightMm": 215,
-              "title": "Quaylo: Pelllo of Eldnia",
-              "label": "Quaylo",
-              "toneIndex": 4,
-              "patternIndex": 1
-            },
-            {
               "gameId": 11084,
               "entryId": 500813,
               "kind": "spine",
-              "xMm": 59,
+              "xMm": 0,
               "yMm": 0,
               "widthMm": 59,
               "heightMm": 167,
@@ -878,71 +870,10 @@
               "patternIndex": 2
             },
             {
-              "gameId": 10943,
-              "entryId": 500734,
-              "kind": "spine",
-              "xMm": 118,
-              "yMm": 0,
-              "widthMm": 70,
-              "heightMm": 296,
-              "title": "Wendven Orvquinlo Wendnia: Sulmere Heskquin Wendvexwyn",
-              "label": "Wendven Orvquin\u2026",
-              "toneIndex": 4,
-              "patternIndex": 2
-            },
-            {
-              "gameId": 11106,
-              "entryId": 500875,
-              "kind": "spine",
-              "xMm": 188,
-              "yMm": 0,
-              "widthMm": 73,
-              "heightMm": 222,
-              "title": "Casstor",
-              "label": "Casstor",
-              "toneIndex": 4,
-              "patternIndex": 0
-            }
-          ]
-        },
-        {
-          "index": 1,
-          "xMm": 290,
-          "yMm": 0,
-          "widthMm": 350,
-          "heightMm": 300,
-          "placements": [
-            {
-              "gameId": 11109,
-              "entryId": 500895,
-              "kind": "spine",
-              "xMm": 0,
-              "yMm": 0,
-              "widthMm": 59,
-              "heightMm": 263,
-              "title": "Jorzel Zimthanley Drello: Brinlo and Pellmere Zimnialey",
-              "label": "Jorzel Zimtha\u2026",
-              "toneIndex": 3,
-              "patternIndex": 5
-            },
-            {
-              "gameId": 11113,
-              "entryId": 500919,
-              "kind": "spine",
-              "xMm": 59,
-              "yMm": 0,
-              "widthMm": 59,
-              "heightMm": 258,
-              "title": "Suldisford",
-              "label": "Suldisford",
-              "toneIndex": 8,
-              "patternIndex": 5
-            },
-            {
               "gameId": 11100,
               "entryId": 500853,
               "kind": "cover",
-              "xMm": 118,
+              "xMm": 59,
               "yMm": 0,
               "widthMm": 200,
               "heightMm": 279,
@@ -954,6 +885,62 @@
           ]
         },
         {
+          "index": 1,
+          "xMm": 290,
+          "yMm": 0,
+          "widthMm": 350,
+          "heightMm": 300,
+          "placements": [
+            {
+              "gameId": 10411,
+              "entryId": 500319,
+              "kind": "spine",
+              "xMm": 0,
+              "yMm": 0,
+              "widthMm": 59,
+              "heightMm": 165,
+              "title": "Sulley Morvexnia",
+              "label": "Sulley M\u2026",
+              "toneIndex": 6,
+              "patternIndex": 2,
+              "familyId": 10411
+            },
+            {
+              "gameId": 10730,
+              "entryId": 500503,
+              "kind": "expansionSpine",
+              "xMm": 59,
+              "yMm": 0,
+              "widthMm": 59,
+              "heightMm": 293,
+              "title": "Jorley",
+              "label": "Jorley",
+              "baseTitle": "Sulley Morvexnia",
+              "isExpansion": true,
+              "toneIndex": 6,
+              "patternIndex": 4,
+              "familyId": 10411,
+              "showBaseLine": false
+            },
+            {
+              "gameId": 10351,
+              "entryId": 500281,
+              "kind": "expansionLayer",
+              "xMm": 118,
+              "yMm": 0,
+              "widthMm": 190,
+              "heightMm": 59,
+              "title": "Tavdis Dreldis Yardis",
+              "label": "Tavdis Dr\u2026",
+              "baseTitle": "Sulley Morvexnia",
+              "isExpansion": true,
+              "toneIndex": 11,
+              "patternIndex": 5,
+              "familyId": 10411
+            }
+          ]
+        },
+        {
           "index": 2,
           "xMm": 0,
           "yMm": 320,
@@ -961,23 +948,10 @@
           "heightMm": 280,
           "placements": [
             {
-              "gameId": 11181,
-              "entryId": 500978,
-              "kind": "cover",
-              "xMm": 0,
-              "yMm": 0,
-              "widthMm": 200,
-              "heightMm": 250,
-              "title": "Morthan",
-              "label": "Morthan",
-              "toneIndex": 5,
-              "patternIndex": 2
-            },
-            {
               "gameId": 11137,
               "entryId": 500926,
               "kind": "spine",
-              "xMm": 200,
+              "xMm": 0,
               "yMm": 0,
               "widthMm": 59,
               "heightMm": 244,
@@ -985,6 +959,45 @@
               "label": "Wendthanra J\u2026",
               "toneIndex": 4,
               "patternIndex": 0
+            },
+            {
+              "gameId": 11227,
+              "entryId": 501022,
+              "kind": "spine",
+              "xMm": 59,
+              "yMm": 0,
+              "widthMm": 59,
+              "heightMm": 233,
+              "title": "Noxtornia Jortor: Kelthan and and",
+              "label": "Noxtornia J\u2026",
+              "toneIndex": 0,
+              "patternIndex": 2
+            },
+            {
+              "gameId": 11106,
+              "entryId": 500875,
+              "kind": "spine",
+              "xMm": 118,
+              "yMm": 0,
+              "widthMm": 73,
+              "heightMm": 222,
+              "title": "Casstor",
+              "label": "Casstor",
+              "toneIndex": 4,
+              "patternIndex": 0
+            },
+            {
+              "gameId": 11113,
+              "entryId": 500919,
+              "kind": "spine",
+              "xMm": 191,
+              "yMm": 0,
+              "widthMm": 59,
+              "heightMm": 258,
+              "title": "Suldisford",
+              "label": "Suldisford",
+              "toneIndex": 8,
+              "patternIndex": 5
             }
           ]
         },
@@ -994,21 +1007,7 @@
           "yMm": 320,
           "widthMm": 180,
           "heightMm": 280,
-          "placements": [
-            {
-              "gameId": 11227,
-              "entryId": 501022,
-              "kind": "spine",
-              "xMm": 0,
-              "yMm": 0,
-              "widthMm": 59,
-              "heightMm": 233,
-              "title": "Noxtornia Jortor: Kelthan and and",
-              "label": "Noxtornia J\u2026",
-              "toneIndex": 0,
-              "patternIndex": 2
-            }
-          ]
+          "placements": []
         },
         {
           "index": 4,
@@ -1026,17 +1025,17 @@
           "heightMm": 380,
           "placements": [
             {
-              "gameId": 10980,
-              "entryId": 500753,
-              "kind": "spine",
+              "gameId": 10450,
+              "entryId": 500350,
+              "kind": "cover",
               "xMm": 0,
               "yMm": 0,
-              "widthMm": 70,
-              "heightMm": 312,
-              "title": "Quayley Orvtor",
-              "label": "Quayley Orvtor",
-              "toneIndex": 7,
-              "patternIndex": 5
+              "widthMm": 271,
+              "heightMm": 298,
+              "title": "Vossquin Drelford",
+              "label": "Vossquin Drelford",
+              "toneIndex": 3,
+              "patternIndex": 3
             }
           ]
         },
@@ -1090,7 +1089,21 @@
           "yMm": 1020,
           "widthMm": 330,
           "heightMm": 340,
-          "placements": []
+          "placements": [
+            {
+              "gameId": 11181,
+              "entryId": 500978,
+              "kind": "cover",
+              "xMm": 0,
+              "yMm": 0,
+              "widthMm": 200,
+              "heightMm": 250,
+              "title": "Morthan",
+              "label": "Morthan",
+              "toneIndex": 5,
+              "patternIndex": 2
+            }
+          ]
         },
         {
           "index": 9,
@@ -1098,21 +1111,7 @@
           "yMm": 1380,
           "widthMm": 440,
           "heightMm": 340,
-          "placements": [
-            {
-              "gameId": 11206,
-              "entryId": 500998,
-              "kind": "flatBox",
-              "xMm": 0,
-              "yMm": 0,
-              "widthMm": 356,
-              "heightMm": 69,
-              "title": "Belbarwyn Zimtor Yarquin: Noxquin Vossthan and",
-              "label": "Belbarwyn Zimtor Y\u2026",
-              "toneIndex": 1,
-              "patternIndex": 3
-            }
-          ]
+          "placements": []
         },
         {
           "index": 10,

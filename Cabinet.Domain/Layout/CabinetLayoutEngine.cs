@@ -65,7 +65,7 @@ public static class CabinetLayoutEngine
         var context = new BuildContext(design, design.Cubbies, options);
         var sections = new List<List<List<LayoutMember>>> { NewSection(context.Cubbies.Count) };
 
-        foreach (var group in SeriesGrouping.Group([.. members.Select(member => member.Item)]))
+        foreach (var group in SeriesGrouping.Group([.. members.Select(member => member.Item)], options.GroupSeries))
         {
             var series = group.Indices.Select(index => members[index] with { SeriesAnchor = group.AnchorGameId }).ToList();
 

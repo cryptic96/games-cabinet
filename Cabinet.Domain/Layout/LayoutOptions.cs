@@ -24,12 +24,17 @@ public enum CoverStrategy
 /// Whether a game that fits no cubby of the existing sections the way it was chosen to stand may lie flat in the first
 /// cubby that can take it lying down, before a new section is opened. Turning it off may add sections.
 /// </param>
+/// <param name="GroupSeries">
+/// Whether the games of one series (a shared BGG series family or a shared title key) are placed together. Turning it off
+/// places every game on its own, which gives the arrangement made without any series.
+/// </param>
 public sealed record LayoutOptions(
     int CoverSharePercent,
     CoverStrategy CoverStrategy,
     int ExpansionStackMax,
     int FewGamesThreshold,
-    bool LieFlatBeforeNewSection = true)
+    bool LieFlatBeforeNewSection = true,
+    bool GroupSeries = true)
 {
     private const int MaxShare = 100;
     private const int MaxStack = 20;
@@ -38,9 +43,10 @@ public sealed record LayoutOptions(
     private const int StackShift = 16;
     private const int ThresholdShift = 32;
     private const int LieFlatShift = 40;
+    private const int GroupSeriesShift = 41;
 
-    /// <summary>The committed starting values: a quarter of the boxes face out, size weighted, stacks of six, twelve games to leave the all-covers look, and a big box lies flat before a new section opens.</summary>
-    public static LayoutOptions Default { get; } = new(25, CoverStrategy.SizeWeighted, 6, 12, true);
+    /// <summary>The committed starting values: a quarter of the boxes face out, size weighted, stacks of six, twelve games to leave the all-covers look, a big box lies flat before a new section opens, and the games of a series stand together.</summary>
+    public static LayoutOptions Default { get; } = new(25, CoverStrategy.SizeWeighted, 6, 12, true, true);
 
     /// <summary>Sixteen lowercase hexadecimal digits that change whenever any setting changes.</summary>
     public string Fingerprint => StableHash.Hash(Pack(), StableHash.OptionsSalt).ToString("x16", CultureInfo.InvariantCulture);
@@ -68,5 +74,6 @@ public sealed record LayoutOptions(
         | ((long)(int)CoverStrategy << StrategyShift)
         | ((long)ExpansionStackMax << StackShift)
         | ((long)FewGamesThreshold << ThresholdShift)
-        | ((LieFlatBeforeNewSection ? 1L : 0L) << LieFlatShift);
+        | ((LieFlatBeforeNewSection ? 1L : 0L) << LieFlatShift)
+        | ((GroupSeries ? 1L : 0L) << GroupSeriesShift);
 }

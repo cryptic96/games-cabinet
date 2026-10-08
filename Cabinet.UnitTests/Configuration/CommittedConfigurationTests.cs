@@ -41,6 +41,15 @@ public class CommittedConfigurationTests
     }
 
     [Fact]
+    [Trait("Category", "Configuration")]
+    public void The_committed_layout_section_turns_series_grouping_on()
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(RepositoryPaths.ServiceDirectory(), "appsettings.json")));
+
+        document.RootElement.GetProperty("Layout").GetProperty("GroupSeries").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
     public void Secret_detection_flags_a_non_empty_secret_shaped_value()
     {
         using var document = JsonDocument.Parse("""{ "Section": { "ApiToken": "example-value", "Name": "plain" } }""");

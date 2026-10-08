@@ -79,6 +79,35 @@ internal static class LayoutAssertions
             .FirstOrDefault();
     }
 
+    /// <summary>
+    /// Where and how every placement stands, one entry per placement ordered by collection entry, leaving out titles and
+    /// labels, so two layouts of the same boxes can be compared whatever the games are called.
+    /// </summary>
+    public static string Geometry(CabinetLayout layout) =>
+        string.Join(
+            ';',
+            PlacementsWithPosition(layout)
+                .OrderBy(entry => entry.Placement.EntryId)
+                .ThenBy(entry => entry.Placement.GameId)
+                .Select(entry => $"{entry.Placement.EntryId}:{entry.Section}:{entry.Cubby}:{entry.Placement.Kind}:{entry.Placement.XMm}:{entry.Placement.YMm}:{entry.Placement.WidthMm}:{entry.Placement.HeightMm}"));
+
+    /// <summary>
+    /// Whether adding the game to the collection makes it part of a series with an earlier game, by shared title key or
+    /// series family. A game that does not stand on its own, an expansion with an owned base game, never does.
+    /// </summary>
+    public static bool JoinsSeries(IReadOnlyList<CabinetItem> items, CabinetItem next)
+    {
+        var all = items.Append(next).ToList();
+        var topLevel = all
+            .Where(item => item.Kind == ItemKind.Base || OwnedParentOf(item, all) is null)
+            .OrderBy(item => item.CollectionId)
+            .ThenBy(item => item.BggId)
+            .ToList();
+        var index = topLevel.IndexOf(next);
+
+        return index >= 0 && SeriesGrouping.Group(topLevel).Any(group => group.Indices.Count > 1 && group.Indices.Contains(index));
+    }
+
     /// <summary>Every placement of the layout with the section and cubby it stands in.</summary>
     public static IReadOnlyList<(int Section, int Cubby, Placement Placement)> PlacementsWithPosition(CabinetLayout layout) =>
         layout.Sections

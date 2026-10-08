@@ -14,9 +14,10 @@ public static class LayoutSettings
     private const string StackMaxKey = "Layout:ExpansionStackMax";
     private const string ThresholdKey = "Layout:FewGamesThreshold";
     private const string LieFlatKey = "Layout:LieFlatBeforeNewSection";
+    private const string GroupSeriesKey = "Layout:GroupSeries";
 
     /// <summary>
-    /// Reads the five Layout keys. A key that is absent takes the default; a key that is present but out of range, not a
+    /// Reads the six Layout keys. A key that is absent takes the default; a key that is present but out of range, not a
     /// whole number, not a known strategy name, or not true or false where a switch is expected throws.
     /// </summary>
     /// <exception cref="InvalidOperationException">A value is invalid; the message names the full key.</exception>
@@ -31,7 +32,8 @@ public static class LayoutSettings
             ReadStrategy(configuration, defaults.CoverStrategy),
             ReadWholeNumber(configuration, StackMaxKey, 1, 20, defaults.ExpansionStackMax),
             ReadWholeNumber(configuration, ThresholdKey, 0, 100, defaults.FewGamesThreshold),
-            ReadSwitch(configuration, LieFlatKey, defaults.LieFlatBeforeNewSection));
+            ReadSwitch(configuration, LieFlatKey, defaults.LieFlatBeforeNewSection),
+            ReadSwitch(configuration, GroupSeriesKey, defaults.GroupSeries));
     }
 
     private static bool ReadSwitch(IConfiguration configuration, string key, bool fallback)

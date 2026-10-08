@@ -10,7 +10,8 @@ namespace Cabinet.UnitTests.Layout;
 /// changes at most one cubby, and for an expansion of a family that cubby is the base game's. The one accepted exception
 /// is an expansion that makes its family wider: the first expansion for a base game, the first one that lies in a game's
 /// stack, or one that stands upright. That family may move and later cubbies may shift, so only the games ordered before
-/// the base game are held to their exact cubby.
+/// the base game are held to their exact cubby. A game that joins a series is the other accepted exception, tested with
+/// the engine, so these checks leave out the appended games that join one.
 /// </summary>
 public class FamilyStabilityTests
 {
@@ -37,8 +38,12 @@ public class FamilyStabilityTests
 
             var (before, after) = BuildBeforeAndAfter(items, next);
 
-            LayoutAssertions.ChangedCubbies(before, after).Should().HaveCountLessThanOrEqualTo(1, "seed {0}", seed);
             LayoutAssertions.AssertValid(after, [.. items, next]);
+
+            if (!LayoutAssertions.JoinsSeries(items, next))
+            {
+                LayoutAssertions.ChangedCubbies(before, after).Should().HaveCountLessThanOrEqualTo(1, "seed {0}", seed);
+            }
         }
     }
 
@@ -146,8 +151,12 @@ public class FamilyStabilityTests
 
             var (before, after) = BuildBeforeAndAfter(items, next);
 
-            LayoutAssertions.ChangedCubbies(before, after).Should().HaveCountLessThanOrEqualTo(1, "seed {0}", seed);
             LayoutAssertions.AssertValid(after, [.. items, next]);
+
+            if (!LayoutAssertions.JoinsSeries(items, next))
+            {
+                LayoutAssertions.ChangedCubbies(before, after).Should().HaveCountLessThanOrEqualTo(1, "seed {0}", seed);
+            }
         }
     }
 

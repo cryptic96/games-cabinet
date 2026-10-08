@@ -44,6 +44,40 @@ public class SyntheticCollectionsTests
         items.Should().Contain(item => item.Title.Any(char.IsSurrogate), "one title holds an emoji");
     }
 
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void The_sample_of_sixty_five_holds_a_series_of_three_and_one_of_two()
+    {
+        SyntheticCollections.TryGetSample("65", out var items).Should().BeTrue();
+
+        var sizes = SeriesSizes(items);
+
+        sizes.Should().Contain(3).And.Contain(2);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void The_sample_of_four_hundred_holds_at_least_five_series_the_longest_of_seven()
+    {
+        SyntheticCollections.TryGetSample("400", out var items).Should().BeTrue();
+
+        var sizes = SeriesSizes(items);
+
+        sizes.Count(size => size > 1).Should().BeGreaterThanOrEqualTo(5);
+        sizes.Max().Should().BeGreaterThanOrEqualTo(7);
+    }
+
+    private static List<int> SeriesSizes(IReadOnlyList<CabinetItem> items)
+    {
+        var topLevel = items
+            .Where(item => item.Kind == ItemKind.Base || item.ExpansionOf.All(reference => items.All(other => other.BggId != reference.BggId)))
+            .OrderBy(item => item.CollectionId)
+            .ThenBy(item => item.BggId)
+            .ToList();
+
+        return [.. SeriesGrouping.Group(topLevel).Select(group => group.Indices.Count)];
+    }
+
     private static bool IsKatakana(char character) => character is >= '\u30A0' and <= '\u30FF';
 
     private static bool IsHebrew(char character) => character is >= '\u05D0' and <= '\u05EA';
