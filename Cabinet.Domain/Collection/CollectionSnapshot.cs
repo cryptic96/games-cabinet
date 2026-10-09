@@ -38,7 +38,7 @@ public enum ImageStatus
     /// <summary>The picture could not be fetched: the host was unreachable or answered with an error.</summary>
     Failed,
 
-    /// <summary>The bytes were fetched but could not be read as a picture.</summary>
+    /// <summary>The bytes were fetched but could not be read or used as a picture.</summary>
     Undecodable,
 
     /// <summary>The picture was not fetched or not used because it broke a rule: an address, a size or a type.</summary>

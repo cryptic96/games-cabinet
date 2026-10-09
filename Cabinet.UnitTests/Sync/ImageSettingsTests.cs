@@ -25,6 +25,8 @@ public sealed class ImageSettingsTests
         defaults.MaxBytes.Should().Be(12 * 1_048_576L);
         defaults.MaxPixels.Should().Be(36_000_000);
         defaults.DownloadGap.Should().Be(TimeSpan.FromMilliseconds(1000));
+        defaults.DownloadTimeout.Should().Be(TimeSpan.FromSeconds(30));
+        defaults.Limits.RequestTimeout.Should().Be(TimeSpan.FromSeconds(30));
         defaults.MaxDownloadsPerRun.Should().Be(80);
         defaults.RetryFailedAfter.Should().Be(TimeSpan.FromHours(24));
         defaults.PruneGrace.Should().Be(TimeSpan.FromDays(7));
@@ -42,6 +44,7 @@ public sealed class ImageSettingsTests
                 ("Images:MaxMegabytes", "5"),
                 ("Images:MaxMegapixels", "10"),
                 ("Images:DownloadGapMilliseconds", "2500"),
+                ("Images:DownloadTimeoutSeconds", "45"),
                 ("Images:MaxDownloadsPerRun", "3"),
                 ("Images:RetryFailedAfterHours", "48"),
                 ("Images:PruneGraceDays", "14")),
@@ -51,6 +54,8 @@ public sealed class ImageSettingsTests
         options.MaxBytes.Should().Be(5 * 1_048_576L);
         options.MaxPixels.Should().Be(10_000_000);
         options.DownloadGap.Should().Be(TimeSpan.FromMilliseconds(2500));
+        options.DownloadTimeout.Should().Be(TimeSpan.FromSeconds(45));
+        options.Limits.RequestTimeout.Should().Be(TimeSpan.FromSeconds(45));
         options.MaxDownloadsPerRun.Should().Be(3);
         options.RetryFailedAfter.Should().Be(TimeSpan.FromHours(48));
         options.PruneGrace.Should().Be(TimeSpan.FromDays(14));
@@ -63,6 +68,8 @@ public sealed class ImageSettingsTests
     [InlineData("Images:MaxMegapixels", "101")]
     [InlineData("Images:DownloadGapMilliseconds", "499")]
     [InlineData("Images:DownloadGapMilliseconds", "60001")]
+    [InlineData("Images:DownloadTimeoutSeconds", "4")]
+    [InlineData("Images:DownloadTimeoutSeconds", "61")]
     [InlineData("Images:MaxDownloadsPerRun", "0")]
     [InlineData("Images:MaxDownloadsPerRun", "1001")]
     [InlineData("Images:RetryFailedAfterHours", "0")]
@@ -81,6 +88,7 @@ public sealed class ImageSettingsTests
     [InlineData("Images:MaxMegabytes", "1.5")]
     [InlineData("Images:MaxMegapixels", "")]
     [InlineData("Images:DownloadGapMilliseconds", "1e3")]
+    [InlineData("Images:DownloadTimeoutSeconds", "30s")]
     [InlineData("Images:MaxDownloadsPerRun", "80 ")]
     [InlineData("Images:RetryFailedAfterHours", "-")]
     [InlineData("Images:PruneGraceDays", "7d")]

@@ -387,7 +387,7 @@ public sealed class ArtAnalysisTests
     private static ArtFacts Stored(SyntheticArtKind kind) => Stored(SyntheticArt.Encode(kind));
 
     private static ArtFacts Stored(byte[] bytes) =>
-        ArtProcessor.Process(bytes, new ArtLimits(12_000_000, 36_000_000)).Should().BeOfType<ArtProcessing.Done>().Subject.Facts;
+        ArtProcessor.Process(bytes, new ArtLimits(12_000_000, 36_000_000, TimeSpan.FromSeconds(30))).Should().BeOfType<ArtProcessing.Done>().Subject.Facts;
 
     private static ArtFacts Analyse(SyntheticArtKind kind)
     {
