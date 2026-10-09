@@ -5,8 +5,8 @@ milestone_name: milestone
 current_phase: 5
 current_phase_name: Game Detail, Accessibility & Language
 status: planning
-stopped_at: Phase 5 context gathered
-last_updated: "2026-10-09T20:40:18.349Z"
+stopped_at: Phase 5 UI-SPEC approved
+last_updated: "2026-10-09T21:34:45.509Z"
 last_activity: 2026-10-09
 last_activity_desc: Phase 04 complete, transitioned to Phase 5
 progress:
@@ -116,6 +116,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-09T20:40:18.272Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-game-detail-accessibility-language/05-CONTEXT.md
+Last session: 2026-10-09T21:34:45.483Z
+Stopped at: Phase 5 UI-SPEC approved
+Resume file: .planning/phases/05-game-detail-accessibility-language/05-UI-SPEC.md
