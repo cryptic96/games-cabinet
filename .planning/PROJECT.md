@@ -24,15 +24,18 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 - ✓ Manual "sync now" button for every visitor, guarded by one shared, persisted 10-minute window; open pages update live when any sync changes the collection — Phase 3
 - ✓ Storage-location question answered by a one-time, shape-only access check: BGG's private location is not readable with the application token, so locations come from home/VPN-only owner tools — Phase 3
 - ✓ BGG token and username stay on the server; the "Powered by BGG" credit links back on every page — Phase 3
+- ✓ Face-out boxes show the real BGG box art, downloaded once by the server and served from the site itself, and spines take their colour from the art with readable contrast — Phase 4 (v0.5.x, owner-approved on the deployed site)
+- ✓ Box images: the owned version's picture when it is a flat cover, otherwise the game's main picture ("flat covers first", confirmed by the owner on the real collection) — Phase 4; per-game owner overrides follow in the owner-tools phase
+- ✓ Box proportions come from the owned version's real BGG dimensions when available, else from a flat cover's shape, else from an estimate; landscape covers turn their boxes wide — Phase 4
+- ✓ Every owned game carries its BGG details (players, play time, weight, rating, designers, mechanics, minimum age, expansion and family links), refreshed politely within the hourly sync — Phase 4
+- ✓ Series stand together and a base game with two or more owned expansions faces out, its expansions continuing into the next cubby when needed — Phase 4 (owner request during the server review)
 
 ### Active
 
-- [ ] Face-out boxes show the real BGG box art and spines take their colour from it (the mix itself shipped in Phase 2 with generated covers)
 - [ ] Tapping a game pulls the box out of the shelf (animation) and opens a detail card: player count, play time, weight, storage location, expansions, BGG rating, designers, minimum age, mechanics, link to BGG
 - [ ] Each game shows its storage location to every visitor. The access check proved BGG's private field is not readable with the token, so the owner manages locations in home/VPN-only owner tools
 - [ ] Visitors can toggle between one big cabinet and one cabinet per storage location
-- [ ] Box images: the owned version's image if it is a flat cover, otherwise the base game's image (Dutch editions are often 3D perspective shots). The owner can override per game from home/VPN
-- [ ] Box proportions come from the owned version's real BGG dimensions when available
+- [ ] The owner can override the box image per game from home/VPN (candidate rows from the Phase 4 server review are listed in a todo)
 - [ ] Site labels in English and Dutch (browser default, switchable)
 - [ ] Game-night filters: player count, play time, storage location, search by name (non-matching games dim on the shelf)
 - [ ] Before the site goes public: revoke or downgrade the development admin account (passwordless sudo) on the server, and drop the LAN/VPN allow-list from the route
@@ -95,7 +98,7 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 | BGG "owned" collection is the single source of truth | Adding a game on BGG makes it appear on the site, so there is no data entry in the app | — Pending |
 | Storage location: BGG private field if a token spike proves it readable, otherwise home/VPN-only owner tools; visible to all visitors | Owner rejected putting locations in public BGG comments; the private field is likely unreadable via token | — Pending (spike) |
 | Owner tools (image overrides, maybe locations) reachable only from home network/VPN | No accounts needed; nothing writable on the public internet | — Pending |
-| Box image: owned version's image if flat, else base image; owner override per game | Dutch version images are often 3D product shots | — Pending |
+| Box image: owned version's image if flat, else base image; owner override per game | Dutch version images are often 3D product shots | ✓ Good — "flat covers first" confirmed by the owner after three server review rounds (Phase 4); overrides pending (owner tools) |
 | No database: JSON snapshot, image cache and a backed-up owner-data file | Data is small and mostly rebuildable from BGG; lighter than a shared SQL Server | — Pending |
 | English and Dutch site labels | Friends are local; BGG titles stay as-is | — Pending |
 | Game-night and sharing extras deferred to v2 | Keep v1 focused on the cabinet itself | — Pending |
@@ -116,6 +119,10 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 | Layout is a pure, versioned function of the collection, guarded by recorded golden layouts | Same collection, same cabinet; any engine change is a deliberate version bump, and nothing stored depends on the layout | ✓ Good — eight layout versions during Phase 2 with no stored state to migrate |
 | Cabinet furniture uses the "classic" wooden finish, built as CSS on finish-neutral hooks | Owner picked it from mocked-up directions; other finishes and a lit-cubbies toggle stay possible as CSS swaps | ✓ Good (Phase 2); selectable finishes captured as a todo |
 | The app sends its own strict Content-Security-Policy | The proxy sets none, so the policy travels with the app and is tested | ✓ Good (Phase 2 code review) |
+| Box art is downloaded by the server only, token-less, from an allowlisted host, and served as own-origin WebP | Visitors never contact BGG or its image host; the CSP stays `default-src 'self'` | ✓ Good — browser audits found no foreign request (Phase 4) |
+| Real-collection review artefacts (sheets, screenshots, measurements) never enter the repository | The repository is public; only synthetic screenshots are committed | ✓ Good — denylist and history scans clean after three server rounds (Phase 4) |
+| Default cover share 33 percent, series grouped, families with two or more expansions face out | Picked by the owner on the real collection; about a third of games face out | ✓ Good — committed defaults in v0.5.1 (Phase 4) |
+| Phase 4 code-review findings logged as todos rather than fixed, except the picture-pipeline robustness and oversized-picture fixes | Owner's choice; the security audit raised the oversized-picture risk to high | ✓ Fixed in v0.5.2; remaining items tracked as todos |
 
 ## Evolution
 
@@ -135,4 +142,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-07 after Phase 3 (BGG access check, real sync and snapshot; released as v0.3.0)*
+*Last updated: 2026-10-09 after Phase 4 (enrichment, box images and shape; released as v0.5.2)*
