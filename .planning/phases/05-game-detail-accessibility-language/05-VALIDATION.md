@@ -42,12 +42,23 @@ Filled in by the planner/executor from PLAN.md tasks. Requirement-to-test seed f
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD | TBD | TBD | DET-01 | — | N/A | browser + node | `--filter-class "*PullOutTests"`; `node --test build/tests/card-flow.test.mjs`; `history-step.test.mjs` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | DET-02 | XSS via BGG text / link injection | `textContent` only; digits-only BGG id in `href` | unit + integration + node + browser | `--filter-class "*CardRecordsTests"`; `"*CardsEndpointTests"`; `format.test.mjs`; `"*CardContentTests"` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | DET-03 | — | N/A | browser | `--filter-class "*ReducedMotionTests"` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | A11Y-01 | — | N/A | node + browser | `keys.test.mjs`; `--filter-class "*KeyboardTests"` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | A11Y-02 | — | N/A | node + browser | `games-list.test.mjs`; `--filter-class "*GamesListTests"` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | I18N-01 | Open redirect / cookie tampering / shared-cache leak | Allowlisted `en`/`nl`; fixed 303 target; `Vary` header | unit + integration + node + browser | `"*LanguageResolverTests"`; `"*LanguageTests"`; `"*SiteTextParityTests"`; `copy-parity.test.mjs`; `"*LanguageSwitchTests"` | ❌ W0 | ⬜ pending |
+| 01-T1 | 05-01 | 1 | (infra) | T-05-SC | Locked restore, test-only project | browser | `dotnet test --project Cabinet.BrowserTests --filter-class "*CabinetSmokeTests"` | ❌ W0 | ⬜ pending |
+| 01-T2 | 05-01 | 1 | (infra) | T-05-01-02 | SHA-pinned actions, read-only permissions | lint + node | `bash build/lint/checks/20-workflows.sh`; `node --test build/tests/*.test.mjs` | ✅ | ⬜ pending |
+| 02-T1..T3 | 05-02 | 1 | DET-02 | T-05-02-01, -03, -04 | Allowlisted query, field allowlist, no CORS | integration + unit | `--project Cabinet.IntegrationTests --filter-class "*CardsEndpointTests"`; `--project Cabinet.UnitTests --filter-class "*CardRecordsTests"`, `"*SampleCardDetailsTests"` | ❌ W0 | ⬜ pending |
+| 03-T1..T2 | 05-03 | 2 | DET-02 | T-05-03-02 | Details-only change refreshes cards | unit + integration | `"*SnapshotMapperTests"`; `"*CardsEndpointTests"`; `"*ContentSecurityPolicyTests"` | ✅ partly | ⬜ pending |
+| 04-T1..T3 | 05-04 | 1 | I18N-01 | T-05-04-01..06 | Allowlisted `en`/`nl`; fixed 303 target; `Vary`; one HttpOnly cookie; ICU fail-fast | integration + unit | `"*LanguageTests"`; `"*SiteLanguageTests"`; `"*SiteTextTests"` | ❌ W0 | ⬜ pending |
+| 05-T1..T3 | 05-05 | 2 | I18N-01 | T-05-05-01..03 | Shared vectors, parity | node + unit + browser | `page-scripts.test.mjs`; `copy-parity.test.mjs`; `"*SyncStatusTextTests"`; `"*LanguageSwitchTests"` | ❌ W0 | ⬜ pending |
+| 06-T1..T3 | 05-06 | 3 | DET-01, DET-02 | T-05-06-01, -02 | `textContent` only; digits-only BGG id in `href` | browser + node | `"*CardOpenTests"`; `"*BackButtonTests"`; `card-flow.test.mjs` | ❌ W0 | ⬜ pending |
+| 07-T1..T2 | 05-07 | 4 | DET-02 | T-05-07-01..03 | Text only; locations only when sent | node + browser | `format.test.mjs`; `"*CardContentTests"` | ❌ W0 | ⬜ pending |
+| 08-T1..T2 | 05-08 | 4 | A11Y-01 | — | N/A | node + browser | `keys.test.mjs`; `"*KeyboardTests"` | ❌ W0 | ⬜ pending |
+| 09-T1..T2 | 05-09 | 5 | DET-02 | T-05-09-01, -02 | Chip colour validated; text only | node + unit + browser | `card-css.test.mjs`; `"*CardContrastTests"`; `"*CardExpansionTests"`; `"*CardLookTests"` | ❌ W0 | ⬜ pending |
+| 10-T1..T2 | 05-10 | 5 | A11Y-02 | T-05-10-01 | Text only | node + browser | `games-list.test.mjs`; `"*GamesListTests"` | ❌ W0 | ⬜ pending |
+| 11-T1..T3 | 05-11 | 6 | DET-01, DET-03 | T-05-11-01..03 | No View Transition under reduced motion | node + browser | `card-flow.test.mjs`; `"*PullOutTests"`; `"*ReducedMotionTests"` | ❌ W0 | ⬜ pending |
+| 12-T1..T2 | 05-12 | 6 | (polish) | T-05-12-01 | Full title kept in name and card | unit + golden + node + browser | `--filter-trait "Category=Layout"`; `"*SpineLabelTests"`; `page-scripts.test.mjs`; `"*SpineLabelPageTests"` | ✅ partly | ⬜ pending |
+| 13-T1..T3 | 05-13 | 7 | DET-01 | T-05-13-01..03 | No redraw under an open card | node + browser | `card-flow.test.mjs`; `"*CardSyncTests"`; `"*SheetDragTests"` | ❌ W0 | ⬜ pending |
+| 14-T1..T2 | 05-14 | 7 | (polish) | T-05-14-01, -02 | Path check on file names; count-only log | integration + node + browser | `"*ArtFileAuditTests"`; `cabinet-css.test.mjs`; `"*CabinetPolishTests"` | ❌ W0 | ⬜ pending |
+| 15-T1..T4 | 05-15 | 8 | all | T-05-15-01, -02 | Synthetic review material only | full suite + owner | non-browser suite, `node --test build/tests/*.test.mjs`, `dotnet test --project Cabinet.BrowserTests`, `build/lint.sh` | ✅ | ⬜ pending |
+| 16-T1..T5 | 05-16 | 9 | all | T-05-16-01..05 | Attested release, owner publish, counts-only evidence | release + container + owner devices | `gh release view v0.6.0 ...`; container verify command in the plan | ✅ | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 

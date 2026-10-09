@@ -300,7 +300,52 @@ Plans:
   4. A keyboard-only user can move through the games in the cabinet and open any detail card, and a screen-reader user gets an accessible list of all games behind the visual cabinet.
   5. The site's own labels appear in English or Dutch: the default follows the browser language, a visitor can switch, the choice is remembered, and game titles stay exactly as BGG provides them.
 
-**Plans**: TBD
+**Plans:** 16 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 05-01-PLAN.md — Browser test harness: Playwright .NET project, smoke test, CI browser job and node test glob
+- [ ] 05-02-PLAN.md — Card data for every game: `/cabinet/cards` for samples and the synced collection, expansions on every owned base
+- [ ] 05-04-PLAN.md — The page in Dutch from the first byte, the EN · NL toggle and the language cookie
+
+**Wave 2**
+
+- [ ] 05-03-PLAN.md — Synced cards stay fresh: card fields in the collection version, shared 304 helper
+- [ ] 05-05-PLAN.md — Status line and script strings in both languages, shared vectors, toggle script and switch test
+
+**Wave 3**
+
+- [ ] 05-06-PLAN.md — Tracer: a tap opens the card (dialog, sheet shape, cover, BGG link); every close path and Back
+
+**Wave 4**
+
+- [ ] 05-07-PLAN.md — The card tells you everything: game-night strip, location, rating, designers, mechanics, missing details
+- [ ] 05-08-PLAN.md — The cabinet is one tab stop with spatial arrow keys
+
+**Wave 5**
+
+- [ ] 05-09-PLAN.md — Owned expansions, the in-place swap, "+N more" at the expansions, and the index-card look
+- [ ] 05-10-PLAN.md — A games list for screen readers, with a skip link
+
+**Wave 6**
+
+- [ ] 05-11-PLAN.md — The pull-out with View Transitions, plain-fade fallbacks, and reduced motion
+- [ ] 05-12-PLAN.md — No title scraps on thin spines (layout version 15) and the family stack cap documented
+
+**Wave 7**
+
+- [ ] 05-13-PLAN.md — The open card holds still during a sync; the phone sheet drags to close; breakpoint changes close cleanly
+- [ ] 05-14-PLAN.md — Cabinet polish: broken art marked and counted, two-step spine titles, tokens, plinth lip
+
+**Wave 8**
+
+- [ ] 05-15-PLAN.md — Owner review round: synthetic screenshots, English and Dutch table, decisions, docs (owner-gated)
+
+**Wave 9**
+
+- [ ] 05-16-PLAN.md — Release v0.6.0 and the owner's check on real devices (owner-gated)
+
 **UI hint**: yes
 
 ### Phase 6: Owner Tools & Persistence
