@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using Cabinet.FakeBgg.Testing;
 using SkiaSharp;
 
 namespace Cabinet.IntegrationTests.Infrastructure;
@@ -13,16 +14,23 @@ public sealed record RecordedImageRequest(Uri Uri, string? AuthorizationScheme, 
 
 /// <summary>
 /// A transport for tests that answers picture requests from a dictionary of invented bodies, by absolute address, with
-/// not found for every other address, and remembers every request it was given.
+/// not found for every other address, and remembers every request it was given. An address can also be made to send a
+/// body that breaks off part way or one that stalls until the request is cancelled.
 /// </summary>
 public sealed class ScriptedImageHandler : HttpMessageHandler
 {
     private readonly Dictionary<string, (byte[] Bytes, string ContentType)> _bodies = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _broken = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _stalled = new(StringComparer.Ordinal);
     private readonly List<RecordedImageRequest> _requests = [];
+    private readonly TaskCompletionSource _stallReached = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly object _gate = new();
 
     /// <summary>Runs once for every request, after it is recorded and before it is answered; a test uses it to move the clock mid-run.</summary>
     public Action<Uri>? OnRequest { get; set; }
+
+    /// <summary>Completes once a stalled body has been asked for its first bytes and is holding the download.</summary>
+    public Task StallReached => _stallReached.Task;
 
     /// <summary>Every request received so far, oldest first.</summary>
     public IReadOnlyList<RecordedImageRequest> Requests
@@ -45,6 +53,30 @@ public sealed class ScriptedImageHandler : HttpMessageHandler
         lock (_gate)
         {
             _bodies[address] = (bytes, contentType);
+        }
+
+        return this;
+    }
+
+    /// <summary>Makes an address answer with picture headers and the first bytes of a body, and then break off as a dropped connection does.</summary>
+    /// <param name="address">The absolute address.</param>
+    public ScriptedImageHandler ServeBrokenBody(string address)
+    {
+        lock (_gate)
+        {
+            _broken.Add(address);
+        }
+
+        return this;
+    }
+
+    /// <summary>Makes an address answer with picture headers and then send no body at all until the request is cancelled.</summary>
+    /// <param name="address">The absolute address.</param>
+    public ScriptedImageHandler ServeStalledBody(string address)
+    {
+        lock (_gate)
+        {
+            _stalled.Add(address);
         }
 
         return this;
@@ -82,6 +114,8 @@ public sealed class ScriptedImageHandler : HttpMessageHandler
         var userAgent = request.Headers.UserAgent.ToString();
         (byte[] Bytes, string ContentType) body;
         bool found;
+        bool broken;
+        bool stalled;
 
         lock (_gate)
         {
@@ -91,22 +125,36 @@ public sealed class ScriptedImageHandler : HttpMessageHandler
                 request.Headers.Authorization?.Parameter,
                 userAgent.Length == 0 ? null : userAgent));
             found = _bodies.TryGetValue(uri.AbsoluteUri, out body);
+            broken = _broken.Contains(uri.AbsoluteUri);
+            stalled = _stalled.Contains(uri.AbsoluteUri);
         }
 
         OnRequest?.Invoke(uri);
+
+        if (broken || stalled)
+        {
+            Stream troubled = broken ? BreakingBodyStream.DroppedConnection() : new StallingBodyStream(() => _stallReached.TrySetResult());
+
+            return Task.FromResult(Answer(request, new StreamContent(troubled), "image/png"));
+        }
 
         if (!found)
         {
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound) { RequestMessage = request });
         }
 
+        return Task.FromResult(Answer(request, new ByteArrayContent(body.Bytes), body.ContentType));
+    }
+
+    private static HttpResponseMessage Answer(HttpRequestMessage request, HttpContent content, string contentType)
+    {
         var response = new HttpResponseMessage(HttpStatusCode.OK)
         {
-            Content = new ByteArrayContent(body.Bytes),
+            Content = content,
             RequestMessage = request,
         };
-        response.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(body.ContentType);
+        response.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(contentType);
 
-        return Task.FromResult(response);
+        return response;
     }
 }

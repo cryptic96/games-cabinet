@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using Cabinet.FakeBgg.Testing;
 using Cabinet.Repository.Bgg;
 using Cabinet.Repository.Images;
 using FluentAssertions;
@@ -162,6 +163,30 @@ public sealed class ImageDownloaderTests
         await cancelling.Should().ThrowAsync<OperationCanceledException>();
     }
 
+    [Theory]
+    [InlineData("dropped")]
+    [InlineData("io")]
+    [InlineData("compressed")]
+    public async Task A_body_that_breaks_off_part_way_is_a_failure_and_never_an_exception(string kind)
+    {
+        var handler = new StubHandler(_ => Streamed(new BreakingBodyStream(() => BodyFailure(kind))));
+
+        var result = await Downloader(handler).DownloadAsync(Uri("a.png"), TestContext.Current.CancellationToken);
+
+        result.Should().Be(ArtDownload.Failed("unavailable"));
+    }
+
+    [Fact]
+    public async Task A_redirect_whose_location_cannot_be_combined_with_the_address_is_a_failure_by_status()
+    {
+        var handler = new StubHandler(_ => Redirect("///"));
+
+        var result = await Downloader(handler).DownloadAsync(Uri("a.png"), TestContext.Current.CancellationToken);
+
+        result.Should().Be(ArtDownload.Failed("status"));
+        handler.Requests.Should().ContainSingle();
+    }
+
     [Fact]
     public async Task Two_downloads_through_a_one_second_pacer_start_at_least_a_second_apart()
     {
@@ -246,6 +271,21 @@ public sealed class ImageDownloaderTests
 
         return response;
     }
+
+    private static HttpResponseMessage Streamed(Stream body)
+    {
+        var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(body) };
+        response.Content.Headers.ContentType = MediaTypeHeaderValue.Parse("image/png");
+
+        return response;
+    }
+
+    private static Exception BodyFailure(string kind) => kind switch
+    {
+        "dropped" => new HttpIOException(HttpRequestError.ResponseEnded, "The response ended prematurely."),
+        "io" => new IOException("The connection was reset."),
+        _ => new InvalidDataException("The compressed body is broken."),
+    };
 
     private static HttpResponseMessage Redirect(string location)
     {

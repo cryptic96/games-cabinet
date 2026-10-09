@@ -18,8 +18,10 @@ public sealed record ArtSyncResult(CollectionSnapshot Snapshot, int Stored, int 
 /// picture pacer, resizes and stores them, measures each one once, and records how each attempt ended and what was
 /// measured. Every game offers two pictures, the one of its owned edition and its main picture, each distinct address once. It starts at most a fixed number of
 /// downloads per run and none after the deadline, so a large collection fills in over several runs and a slow host cannot
-/// hold the run. A picture that goes wrong is only recorded; it never fails the run. It logs counts only, never an
-/// address, a title or an identifier.
+/// hold the run. A picture that goes wrong in any way while it is fetched, read, measured or stored is only recorded, as
+/// failed when nothing more specific applies, and the step goes on with the next picture; it never fails the run. Only
+/// cancelling the run stops the step. It logs counts, and the exception type of a picture that failed in an unforeseen
+/// way, never an address, a title or an identifier.
 /// </summary>
 /// <param name="sourceFactory">Creates the picture source for each run, so a pooled connection never outlives its handler's lifetime.</param>
 /// <param name="cache">Where the resized pictures are stored.</param>
@@ -77,7 +79,7 @@ public sealed class ArtSync(
 
                 source ??= sourceFactory();
                 attempts++;
-                images[address] = await FetchAsync(source, address, counts, cancellationToken);
+                images[address] = await AttemptAsync(source, address, counts, cancellationToken);
                 uncommitted++;
 
                 if (uncommitted >= CommitEvery)
@@ -145,10 +147,29 @@ public sealed class ArtSync(
             || record.AnalysisVersion != ArtProcessor.AnalysisVersion;
     }
 
-    private async Task<ImageRecord> FetchAsync(IArtSource source, string address, Counts counts, CancellationToken cancellationToken)
+    /// <summary>
+    /// Fetches, processes and stores one picture and returns the record of how that went. Whatever goes wrong with this one
+    /// picture becomes a failed record with the usual retry time; only cancelling the run is passed on.
+    /// </summary>
+    private async Task<ImageRecord> AttemptAsync(IArtSource source, string address, Counts counts, CancellationToken cancellationToken)
     {
         var attemptedAt = time.GetUtcNow();
 
+        try
+        {
+            return await FetchAsync(source, address, attemptedAt, counts, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            logger.LogWarning("A box picture failed unexpectedly: {ExceptionType}", exception.GetType().Name);
+            counts.Failed++;
+
+            return new ImageRecord(address, ImageStatus.Failed, attemptedAt);
+        }
+    }
+
+    private async Task<ImageRecord> FetchAsync(IArtSource source, string address, DateTimeOffset attemptedAt, Counts counts, CancellationToken cancellationToken)
+    {
         if (!Uri.TryCreate(address, UriKind.Absolute, out var uri))
         {
             counts.Refused++;

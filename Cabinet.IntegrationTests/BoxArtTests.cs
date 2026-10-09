@@ -19,6 +19,7 @@ public sealed class BoxArtTests
 {
     private const long FirstEntryId = SyntheticBggCollection.FirstCollId;
     private const string FirstVersionImage = "https://example.org/images/version-900001.jpg";
+    private const string SecondVersionImage = "https://example.org/images/version-900002.jpg";
     private const string LayoutPath = "/cabinet/layout?profile=desktop";
 
     private static readonly Dictionary<string, string?> AllowExampleHost = new() { ["Images:AllowedHosts"] = "example.org" };
@@ -261,6 +262,38 @@ public sealed class BoxArtTests
         await SyncRounds.PressAndWait(client, clock);
         images.Requests.Count.Should().Be(requests);
     }
+
+    [Fact]
+    public async Task A_picture_whose_body_breaks_off_is_recorded_as_failed_and_the_next_picture_is_still_fetched_in_the_same_run()
+    {
+        var images = new ScriptedImageHandler()
+            .ServeBrokenBody(FirstVersionImage)
+            .ServePicture(SecondVersionImage, 600, 800);
+        var clock = SyncHarness.NewClock();
+        await using var factory = SyncHarness.CreateFactory(
+            ScriptedBggHandler.ForCollection(SyntheticBggCollection.Create(5)),
+            clock,
+            AllowExampleHost,
+            images);
+        using var client = factory.CreatePublicClient();
+
+        await SyncRounds.PressAndWait(client, clock, advance: false);
+        var firstRun = RequestedAddresses(images);
+        var firstResult = (await SyncHarness.ReadStatus(client)).LastResult;
+        await SyncRounds.PressAndWait(client, clock);
+        var secondRun = RequestedAddresses(images).Skip(firstRun.Count).ToList();
+        clock.Advance(TimeSpan.FromHours(24));
+        await SyncRounds.PressAndWait(client, clock);
+        var thirdRun = RequestedAddresses(images).Skip(firstRun.Count + secondRun.Count).ToList();
+
+        firstRun.Should().StartWith(FirstVersionImage).And.Contain(SecondVersionImage);
+        firstResult.Should().Be("changed");
+        secondRun.Should().NotContain(FirstVersionImage, "the broken picture was recorded as failed and waits for the retry time");
+        thirdRun.Should().Contain(FirstVersionImage).And.NotContain(SecondVersionImage);
+    }
+
+    private static List<string> RequestedAddresses(ScriptedImageHandler images) =>
+        [.. images.Requests.Select(request => request.Uri.AbsoluteUri)];
 
     private static async Task<string> RawStatusLine(int port, string target)
     {

@@ -394,6 +394,15 @@ fetched, was refused or could not be read is recorded and tried again only after
 sends no picture request at all. A picture trouble never makes a sync fail and
 never holds the collection back.
 
+Each picture is handled on its own. When one goes wrong in any way, for example
+its connection drops part way through the download, its body cannot be read, it
+redirects to an address that cannot be used, or something fails while it is
+processed or stored, only that picture is recorded as failed, with the usual
+retry time, and the run goes straight on to the next picture. A broken picture
+therefore never blocks the pictures after it. Only the end of the run itself, when
+the service stops or the run reaches its overall time limit, stops the picture
+step early.
+
 Files in the `art` directory that no stored record refers to any more are
 deleted after a successful run, but only once they are older than
 `Images__PruneGraceDays`, so a page that is still loading an old picture keeps

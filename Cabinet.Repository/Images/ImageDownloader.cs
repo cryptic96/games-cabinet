@@ -69,7 +69,9 @@ public sealed class ImagePacer : IImagePacer
 /// <summary>
 /// Fetches pictures politely and safely. It sends no credentials, goes only to addresses the policy allows, follows a
 /// redirect at most three times and checks every target again, refuses a body that is too big or not a picture, and waits
-/// its turn on the picture pacer before each request. A visitor never reaches it: only the sync calls it.
+/// its turn on the picture pacer before each request. A connection that fails or breaks off part way, a body that cannot
+/// be read and a redirect target that is not a usable address all end as a failed download, never as an exception. A
+/// visitor never reaches it: only the sync calls it.
 /// </summary>
 public sealed class ImageDownloader : IArtSource
 {
@@ -153,14 +155,14 @@ public sealed class ImageDownloader : IArtSource
 
             if (IsRedirect(response.StatusCode))
             {
-                return response.Headers.Location is { } location
-                    ? (null, new Uri(target, location))
+                return response.Headers.Location is { } location && Uri.TryCreate(target, location, out var next)
+                    ? (null, next)
                     : (ArtDownload.Failed("status"), null);
             }
 
             return (await ReadAnswerAsync(response, cancellationToken), null);
         }
-        catch (HttpRequestException)
+        catch (Exception exception) when (exception is HttpRequestException or IOException or InvalidDataException)
         {
             return (ArtDownload.Failed("unavailable"), null);
         }
