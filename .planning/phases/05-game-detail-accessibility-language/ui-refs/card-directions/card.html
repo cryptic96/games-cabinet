@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en" class="dir-a">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Card directions mockup</title>
+<style>
+:root {
+  --wood-dark: #3b2416; --wood-mid: #6b4226; --wood-light: #d9b98a; --ink: #2a1a10;
+  --wood-edge: #8c5d38; --wall-text: #efe3c2; --chrome-muted: #b9aa8e;
+  --game-bg: #177587; --game-fg: #ffffff;
+  --cover-ratio: 1.24;
+  --dim: rgb(20 10 4 / 0.62);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; min-height: 100vh;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px; font-weight: 400; line-height: 1.5;
+  background: #3b2416 url(backdrop-desktop.png) 0 0 / 1440px auto no-repeat;
+}
+.dim { position: fixed; inset: 0; background: var(--dim); }
+.card {
+  position: fixed; left: 50%; top: 50%; translate: -50% -50%;
+  width: min(640px, calc(100vw - 48px)); max-height: calc(100vh - 64px); overflow: auto;
+}
+h2, h3, p, ul, dl, dd { margin: 0; padding: 0; }
+ul { list-style: none; }
+h2 { font-size: 24px; font-weight: 600; line-height: 1.2; }
+h3 { font-size: 14px; font-weight: 600; line-height: 1.5; }
+.head { position: relative; display: grid; grid-template-columns: 208px 1fr; gap: 24px; align-items: end; padding: 24px; }
+.cover img { display: block; width: 100%; aspect-ratio: var(--cover-ratio); }
+.year { font-size: 16px; margin-top: 4px; }
+.close {
+  position: absolute; top: 8px; right: 8px; width: 44px; height: 44px; border: 0; border-radius: 50%;
+  display: grid; place-items: center; background: transparent; color: inherit; cursor: pointer; z-index: 2;
+}
+.close svg { width: 20px; height: 20px; }
+.icon { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.strip { display: grid; grid-template-columns: repeat(4, 1fr); }
+.fact { display: grid; justify-items: center; text-align: center; gap: 4px; padding: 16px 8px; }
+.fact .v { font-weight: 600; line-height: 1.2; }
+.fact .l { font-size: 14px; line-height: 1.2; }
+.body { display: grid; gap: 24px; padding: 24px; }
+.exp-list { margin-top: 4px; }
+.exp-list button {
+  display: flex; align-items: center; gap: 16px; width: 100%; min-height: 44px; padding: 8px 0;
+  border: 0; background: none; color: inherit; font: inherit; text-align: start; cursor: pointer;
+}
+.exp-list .chip { flex: none; width: 10px; height: 28px; border-radius: 1px; }
+.exp-list .t { flex: 1; }
+.exp-list .chev { flex: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
+.meta { display: grid; grid-template-columns: max-content 1fr; gap: 8px 24px; }
+.meta dt { font-size: 14px; line-height: 24px; }
+.mech { font-size: 14px; }
+.bgg a { color: inherit; text-decoration: underline; text-underline-offset: 3px; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; }
+.bgg svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; }
+.handle { display: none; }
+
+/* ---------- A: the back of a game box ---------- */
+.dir-a .card {
+  background: #f4ecda; color: var(--ink); border-radius: 4px;
+  box-shadow: inset 1px 1px 0 rgb(255 255 255 / 0.7), inset -1px -1px 0 rgb(60 35 15 / 0.25),
+    0 0 0 1px rgb(20 10 4 / 0.35), 0 2px 3px rgb(20 10 4 / 0.5), 0 28px 56px -16px rgb(20 10 4 / 0.8);
+}
+.dir-a .head {
+  background-color: var(--game-bg); color: var(--game-fg); border-radius: 4px 4px 0 0;
+  background-image: linear-gradient(to top, transparent 8px, rgb(255 255 255 / 0.4) 8px 9px, transparent 9px);
+  padding-bottom: 32px;
+}
+.dir-a .cover img { box-shadow: 0 0 0 1px rgb(0 0 0 / 0.3), 0 10px 18px -8px rgb(0 0 0 / 0.6); }
+.dir-a .close { background: rgb(0 0 0 / 0.18); color: var(--game-fg); }
+.dir-a .handle { color: var(--game-fg); }
+.dir-a .strip { border-bottom: 1px solid rgb(42 26 16 / 0.16); }
+.dir-a .fact + .fact { border-inline-start: 1px solid rgb(42 26 16 / 0.16); }
+.dir-a .fact .icon { color: var(--game-bg); }
+.dir-a .fact .l, .dir-a .meta dt { color: #5e3d26; }
+.dir-a h3 { color: #5e3d26; text-transform: uppercase; letter-spacing: 0.06em; }
+.dir-a .exp-list li + li { border-top: 1px solid rgb(42 26 16 / 0.12); }
+.dir-a .bgg { border-top: 1px solid rgb(42 26 16 / 0.16); padding-top: 8px; }
+
+/* ---------- B: an index card ---------- */
+.dir-b .card {
+  --rule: 28px;
+  background-color: #fbf8f0; color: var(--ink); border-radius: 2px;
+  box-shadow: 0 1px 1px rgb(20 10 4 / 0.4), 0 18px 32px -12px rgb(20 10 4 / 0.7), inset 0 0 0 1px rgb(120 90 60 / 0.12);
+}
+.dir-b .head { border-bottom: 3px double #c0504a; padding-bottom: 20px; }
+.dir-b .cover { background: #fff; padding: 8px; box-shadow: 0 1px 2px rgb(20 10 4 / 0.35), 0 6px 12px -6px rgb(20 10 4 / 0.4);
+  background-image:
+    linear-gradient(135deg, #6b4a33 0 14px, transparent 14px), linear-gradient(225deg, #6b4a33 0 14px, transparent 14px),
+    linear-gradient(45deg, #6b4a33 0 14px, transparent 14px), linear-gradient(315deg, #6b4a33 0 14px, transparent 14px);
+  background-position: top left, top right, bottom left, bottom right; background-size: 20px 20px; background-repeat: no-repeat; }
+.dir-b .year { color: #6a4a36; }
+.dir-b .strip, .dir-b .body {
+  background-image: repeating-linear-gradient(to bottom, transparent 0 calc(var(--rule) - 1px), rgb(84 132 196 / 0.32) calc(var(--rule) - 1px) var(--rule));
+  background-position: 0 -6px; line-height: var(--rule);
+}
+.dir-b .strip { grid-template-columns: repeat(2, 1fr); grid-auto-rows: var(--rule); padding: var(--rule) 24px 0; gap: 0 24px; }
+.dir-b .fact { display: flex; align-items: center; gap: 8px; padding: 0; height: var(--rule); text-align: start; }
+.dir-b .fact .v, .dir-b .fact .l { line-height: var(--rule); }
+.dir-b .fact .l { color: #6a4a36; font-size: 14px; }
+.dir-b .fact .icon { width: 22px; height: 22px; translate: 0 -3px; }
+.dir-b .body { gap: 0; padding: 0 24px var(--rule); }
+.dir-b .body > * { margin-top: var(--rule); }
+.dir-b h3 { color: #6a4a36; line-height: var(--rule); }
+.dir-b .where { display: grid; grid-template-columns: 9rem 1fr; }
+.dir-b .where h3, .dir-b .meta dt { font-size: 14px; color: #6a4a36; font-weight: 600; }
+.dir-b .meta { grid-template-columns: 9rem 1fr; gap: 0; }
+.dir-b .meta dt { line-height: var(--rule); font-weight: 400; }
+.dir-b .exp-list { margin-top: 0; }
+.dir-b .exp-list button { min-height: 0; height: var(--rule); padding: 0; align-items: center; }
+.dir-b .exp-list .chip { height: 16px; width: 8px; translate: 0 -3px; }
+.dir-b .exp-list .chev { translate: 0 -3px; }
+.dir-b .bgg a { min-height: var(--rule); }
+.dir-b .punch { display: block; width: 14px; height: 14px; border-radius: 50%; margin: 0 auto; translate: 0 -10px; background: #1c120b; box-shadow: inset 0 2px 3px rgb(0 0 0 / 0.7), 0 1px 0 rgb(255 255 255 / 0.9); }
+
+/* ---------- C: a specimen drawer from the cabinet ---------- */
+.dir-c .card {
+  padding: 16px; border-radius: 3px; color: var(--wall-text);
+  background-color: var(--wood-mid);
+  background-image:
+    linear-gradient(to bottom, rgb(255 245 230 / 0.22) 0 1px, rgb(255 245 230 / 0.06) 1px 18%, transparent 45%, rgb(20 10 4 / 0.2)),
+    repeating-linear-gradient(to bottom, rgb(40 20 8 / 0.08) 0 1px, transparent 1px 7px),
+    repeating-linear-gradient(to bottom, rgb(40 20 8 / 0.07) 0 1px, transparent 1px 11px);
+  box-shadow: 0 0 0 1px rgb(20 10 4 / 0.6), 0 2px 3px rgb(20 10 4 / 0.6), 0 30px 60px -16px rgb(0 0 0 / 0.85);
+}
+.dir-c .inner {
+  border-radius: 1px; background-color: #241913;
+  background-image: linear-gradient(to bottom, rgb(5 2 1 / 0.55), transparent 48px),
+    repeating-radial-gradient(circle at 0 0, rgb(255 240 220 / 0.025) 0 1px, transparent 1px 3px);
+  box-shadow: 0 0 0 1px rgb(20 10 4 / 0.7), 0 -1px 0 1px rgb(255 235 205 / 0.12), inset 0 2px 4px rgb(0 0 0 / 0.7), inset 0 -1px 0 rgb(255 230 200 / 0.1);
+}
+.dir-c .cover img { box-shadow: 0 1px 1px rgb(0 0 0 / 0.6), 0 12px 20px -8px rgb(0 0 0 / 0.75); }
+.dir-c .year, .dir-c .fact .l, .dir-c .meta dt, .dir-c h3 { color: var(--chrome-muted); }
+.dir-c .close { top: 20px; right: 20px; background: rgb(255 255 255 / 0.06); }
+.dir-c .strip { gap: 8px; padding: 0 24px; }
+.dir-c .fact { border-radius: 3px; background: rgb(0 0 0 / 0.25); box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.55), inset 0 -1px 0 rgb(255 230 200 / 0.08); }
+.dir-c .exp-list li + li { border-top: 1px solid rgb(239 227 194 / 0.12); }
+
+/* ---------- Phone: bottom sheet ---------- */
+@media (max-width: 40rem) {
+  body { background-image: url(backdrop-phone.png); background-size: 390px auto; }
+  .card { left: 0; right: 0; top: auto; bottom: 0; translate: none; width: 100%; max-height: 90vh; border-radius: 12px 12px 0 0 !important; }
+  .handle { display: block; position: absolute; top: 8px; left: 50%; translate: -50% 0; width: 40px; height: 5px; border-radius: 3px; background: currentColor; opacity: 0.5; z-index: 2; }
+  .head { grid-template-columns: 128px 1fr; gap: 16px; padding: 28px 16px 16px; }
+  h2 { font-size: 24px; padding-inline-end: 32px; }
+  .close { top: 16px; right: 8px; }
+  .strip { grid-template-columns: repeat(2, 1fr); }
+  .dir-a .fact:nth-child(3) { border-inline-start: 0; }
+  .dir-a .fact:nth-child(n+3) { border-top: 1px solid rgb(42 26 16 / 0.16); }
+  .body { padding: 16px 16px 32px; }
+  .dir-a .head { border-radius: 12px 12px 0 0; padding-bottom: 24px; }
+  .dir-b .strip { grid-template-columns: 1fr; padding: var(--rule) 16px 0; }
+  .dir-b .body { padding: 0 16px var(--rule); }
+  .dir-b .where, .dir-b .meta { grid-template-columns: 7rem 1fr; }
+  .dir-c .card { padding: 8px 8px 0; }
+  .dir-c .inner { border-radius: 8px 8px 0 0; }
+  .dir-c .strip { padding: 0 16px; }
+  .dir-c .close { top: 20px; right: 12px; }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-players" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.6 2.7-6 6-6s6 2.4 6 6"/><circle cx="16.8" cy="9" r="2.6"/><path d="M16 14.2c3 .2 5.2 2.4 5.2 5.8"/></symbol>
+  <symbol id="i-time" viewBox="0 0 24 24"><circle cx="12" cy="12.5" r="8.5"/><path d="M12 8v4.5l3 2"/><path d="M9.5 2.5h5"/></symbol>
+  <symbol id="i-weight" viewBox="0 0 24 24"><path d="M9 8.5a3 3 0 1 1 6 0"/><path d="M6.8 8.5h10.4l2.3 11.5H4.5z"/></symbol>
+  <symbol id="i-age" viewBox="0 0 24 24"><circle cx="9.5" cy="8" r="3.2"/><path d="M3.5 20c0-3.6 2.7-6 6-6s6 2.4 6 6"/><path d="M19 4.5v6M16 7.5h6"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M5 5l14 14M19 5L5 19" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></symbol>
+  <symbol id="i-out" viewBox="0 0 16 16"><path d="M6 3H3v10h10v-3M9 3h4v4M13 3L7 9"/></symbol>
+</svg>
+<div class="dim"></div>
+<div class="card" role="dialog" aria-labelledby="t">
+ <div class="inner">
+  <span class="handle"></span>
+  <button class="close" data-k="close" aria-label="Close"><svg><use href="#i-close"/></svg></button>
+  <header class="head">
+    <div class="cover"><img src="cover.svg" alt=""></div>
+    <div><h2 id="t">Lantern &amp; Harbour</h2><p class="year">2019</p></div>
+  </header>
+  <ul class="strip">
+    <li class="fact"><svg class="icon"><use href="#i-players"/></svg><span class="v">2–4</span><span class="l" data-k="players"></span></li>
+    <li class="fact"><svg class="icon"><use href="#i-time"/></svg><span class="v">60–90 min</span><span class="l" data-k="time"></span></li>
+    <li class="fact"><svg class="icon"><use href="#i-weight"/></svg><span class="v" data-k="wword"></span><span class="l" data-k="wnum"></span></li>
+    <li class="fact"><svg class="icon"><use href="#i-age"/></svg><span class="v">10+</span><span class="l" data-k="age"></span></li>
+  </ul>
+  <div class="body">
+    <section class="where"><h3 data-k="stored"></h3><p data-k="place"></p></section>
+    <section class="exp"><h3 data-k="exps"></h3>
+      <ul class="exp-list">
+        <li><button><span class="chip" style="background:#7a3b52"></span><span class="t">Lantern &amp; Harbour: Night Market</span><svg class="chev"><use href="#i-chev"/></svg></button></li>
+        <li><button><span class="chip" style="background:#c9a227"></span><span class="t">Lantern &amp; Harbour: The Keeper's Guild</span><svg class="chev"><use href="#i-chev"/></svg></button></li>
+      </ul>
+    </section>
+    <dl class="meta">
+      <dt data-k="rating"></dt><dd data-k="ratingv"></dd>
+      <dt data-k="designers"></dt><dd>Mira Kovač, Jonas Ebbesen</dd>
+      <dt data-k="mechanics"></dt><dd class="mech" lang="en">End Game Bonuses · Hand Management · Network and Route Building · Pick-up and Deliver · Set Collection · Variable Player Powers</dd>
+    </dl>
+    <p class="bgg"><a href="#"><span data-k="link"></span><svg><use href="#i-out"/></svg></a></p>
+  </div>
+  <span class="punch-wrap"></span>
+ </div>
+</div>
+<script>
+const q = new URLSearchParams(location.search);
+document.documentElement.className = 'dir-' + (q.get('d') || 'a');
+const lang = q.get('lang') || 'en';
+document.documentElement.lang = lang;
+const T = {
+  en: { close: 'Close', players: 'players', time: 'play time', wword: 'Medium-light', wnum: 'weight 2.4 / 5', age: 'age',
+        stored: 'Stored in', place: 'Study, shelf 3', exps: 'Owned expansions', rating: 'BGG rating', ratingv: '7.8 / 10',
+        designers: 'Designers', mechanics: 'Mechanics', link: 'View on BoardGameGeek' },
+  nl: { close: 'Sluiten', players: 'spelers', time: 'speelduur', wword: 'Vrij licht', wnum: 'zwaarte 2,4 / 5', age: 'leeftijd',
+        stored: 'Staat in', place: 'Studeerkamer, plank 3', exps: 'Uitbreidingen in de kast', rating: 'BGG-score', ratingv: '7,8 / 10',
+        designers: 'Ontwerpers', mechanics: 'Mechanismen', link: 'Bekijk op BoardGameGeek' } }[lang];
+for (const el of document.querySelectorAll('[data-k]')) {
+  const v = T[el.dataset.k];
+  if (el.classList.contains('close')) el.setAttribute('aria-label', v); else el.textContent = v;
+}
+if (q.get('d') === 'b') { const p = document.createElement('span'); p.className = 'punch'; document.querySelector('.punch-wrap').replaceWith(p); }
+</script>
+</body>
+</html>

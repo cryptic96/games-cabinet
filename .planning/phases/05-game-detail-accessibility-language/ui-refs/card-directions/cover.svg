@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 500" width="620" height="500">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0c3440"/>
+      <stop offset="0.55" stop-color="#177587"/>
+      <stop offset="1" stop-color="#e9a95a"/>
+    </linearGradient>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0f5664"/>
+      <stop offset="1" stop-color="#082a33"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffd98a" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#ffd98a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="beam" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fff2c4" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#fff2c4" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="620" height="500" fill="url(#sky)"/>
+  <circle cx="500" cy="92" r="30" fill="#f6e7c1"/>
+  <polygon points="452,196 620,120 620,232" fill="url(#beam)"/>
+  <rect y="300" width="620" height="200" fill="url(#sea)"/>
+  <path d="M0 300 Q 80 270 150 296 L 220 282 L 260 300 Z" fill="#0a2b33"/>
+  <g fill="#0a2b33">
+    <rect x="430" y="196" width="40" height="110"/>
+    <polygon points="424,196 476,196 466,176 434,176"/>
+    <rect x="440" y="160" width="20" height="18"/>
+    <polygon points="436,160 464,160 450,144"/>
+  </g>
+  <rect x="442" y="163" width="16" height="12" fill="#ffe7a6"/>
+  <circle cx="450" cy="169" r="34" fill="url(#glow)"/>
+  <g fill="#0a2b33">
+    <rect x="60" y="250" width="70" height="50"/>
+    <polygon points="54,250 136,250 95,222"/>
+    <rect x="140" y="262" width="56" height="38"/>
+    <polygon points="134,262 202,262 168,240"/>
+    <path d="M250 330 L 360 330 L 345 352 L 265 352 Z"/>
+    <rect x="300" y="272" width="4" height="58"/>
+    <polygon points="306,276 306,326 346,326" fill="#f1dfb8"/>
+  </g>
+  <g fill="#ffd98a">
+    <circle cx="82" cy="272" r="5"/><circle cx="110" cy="272" r="5"/><circle cx="160" cy="280" r="4"/><circle cx="182" cy="280" r="4"/>
+  </g>
+  <g fill="url(#glow)">
+    <circle cx="82" cy="272" r="18"/><circle cx="110" cy="272" r="18"/><circle cx="170" cy="280" r="20"/>
+  </g>
+  <g stroke="#f1c27a" stroke-opacity="0.35" stroke-width="3" fill="none">
+    <path d="M40 380 q 20 -8 40 0 t 40 0"/><path d="M300 410 q 20 -8 40 0 t 40 0 t 40 0"/><path d="M120 450 q 20 -8 40 0 t 40 0"/><path d="M430 340 q 20 -8 40 0"/>
+  </g>
+  <rect x="0" y="0" width="620" height="96" fill="#082a33" fill-opacity="0.55"/>
+  <text x="310" y="62" text-anchor="middle" font-family="Georgia, 'DejaVu Serif', serif" font-size="44" font-weight="700" letter-spacing="3" fill="#f6e7c1">LANTERN &amp; HARBOUR</text>
+</svg>
