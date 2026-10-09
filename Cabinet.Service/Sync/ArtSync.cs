@@ -9,7 +9,7 @@ namespace Cabinet.Service.Sync;
 /// <param name="Stored">How many pictures were fetched and stored.</param>
 /// <param name="Failed">How many could not be fetched.</param>
 /// <param name="Refused">How many were refused by a rule.</param>
-/// <param name="Undecodable">How many could not be read as pictures.</param>
+/// <param name="Undecodable">How many could not be read or used as pictures.</param>
 /// <param name="Waiting">How many are still due, because the run ran out of downloads or time.</param>
 public sealed record ArtSyncResult(CollectionSnapshot Snapshot, int Stored, int Failed, int Refused, int Undecodable, int Waiting);
 

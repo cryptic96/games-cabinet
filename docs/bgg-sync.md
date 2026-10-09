@@ -359,9 +359,9 @@ are due. The server downloads them by itself, never a visitor:
   without the BGG token or any other credential;
 - at most one request at a time, with a pause between requests that is
   independent of the pause the BGG API gets;
-- with a size limit on the download, a pixel limit that is checked from the file
-  header before anything is decoded, and a limit of three redirects, each target
-  checked against the host list again.
+- with a size limit on the download, a pixel limit and a shape check that are
+  both read from the file header before anything is decoded, and a limit of
+  three redirects, each target checked against the host list again.
 
 Each picture is shrunk, never cropped or recoloured, into WebP files 480 and 240
 pixels wide (a smaller picture keeps its own width) and stored in the `art`
@@ -371,6 +371,19 @@ one-year, immutable cache, and a changed picture is a new address that the
 browser fetches fresh. The original download is not kept. A visitor's browser
 only ever asks the site itself for pictures; nothing a visitor sends can name an
 address to fetch, and there is no resizing address.
+
+A JPEG or WebP picture is decoded at a reduced size; a PNG is decoded whole, so
+the pixel limit is what bounds the memory it takes. Each picture is then measured
+once, for the art detector and the spine colour described below. The
+measurements run on a small working copy that is at most 96 pixels wide and 960
+pixels tall: a picture narrower than 96 pixels keeps its own width and is never
+enlarged, and a very tall picture is shrunk until it fits the height. The copy
+never holds more than about 92,000 pixels, whatever the size or shape of the
+picture. A picture whose header names a shape no box has, with one side more
+than ten times the other, is not decoded at all and is recorded as unusable, the
+same way as a file that is not a picture. Anything else that goes wrong while
+one picture is decoded, shrunk, measured or encoded is recorded the same way for
+that picture alone.
 
 A run downloads at most `Images__MaxDownloadsPerRun` pictures and starts none
 after six minutes have passed since the run began, so a large collection fills

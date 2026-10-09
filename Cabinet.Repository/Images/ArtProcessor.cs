@@ -18,7 +18,7 @@ public abstract record ArtProcessing
     /// <param name="Facts">What the analysis learned about the picture.</param>
     public sealed record Done(IReadOnlyList<EncodedArt> Variants, ArtFacts Facts) : ArtProcessing;
 
-    /// <summary>The bytes could not be read as a picture.</summary>
+    /// <summary>The bytes could not be read or used as a picture: they are not a picture, the picture has a shape no box has, or the picture work failed.</summary>
     public sealed record Unreadable : ArtProcessing;
 
     /// <summary>The picture was not decoded because it broke a rule.</summary>
@@ -30,7 +30,7 @@ public abstract record ArtProcessing
     /// <param name="facts">What the analysis learned about the picture.</param>
     public static ArtProcessing Processed(IReadOnlyList<EncodedArt> variants, ArtFacts facts) => new Done(variants, facts);
 
-    /// <summary>The bytes could not be read as a picture.</summary>
+    /// <summary>The bytes could not be read or used as a picture.</summary>
     public static ArtProcessing Undecodable { get; } = new Unreadable();
 
     /// <summary>The picture was refused by a rule.</summary>
@@ -40,8 +40,9 @@ public abstract record ArtProcessing
 
 /// <summary>
 /// Turns downloaded bytes into the two small pictures the site serves and measures the picture once. The picture is only
-/// ever scaled down, never cropped or recoloured; the original bytes are not kept. The pixel count is read from the file header and checked
-/// before anything is decoded, and the decode itself is scaled so a large picture never fills memory.
+/// ever scaled down, never cropped or recoloured; the original bytes are not kept. The pixel count and the shape are read
+/// from the file header and checked before anything is decoded. The decode itself is scaled down where the format allows
+/// it, as JPEG and WebP do; a PNG is decoded whole, so the pixel cap is what bounds it.
 /// </summary>
 public static class ArtProcessor
 {
@@ -60,15 +61,25 @@ public static class ArtProcessor
     private const int HashCharacters = 16;
 
     /// <summary>
-    /// Reads, checks, decodes and resizes the picture. A source at least 480 pixels wide gives a 480 and a 240 pixel wide
-    /// file; a source between 240 and 480 gives a 240 pixel file only; a narrower one gives one file at its own width.
+    /// Reads, checks, decodes, resizes and measures the picture. A source at least 480 pixels wide gives a 480 and a 240
+    /// pixel wide file; a source between 240 and 480 gives a 240 pixel file only; a narrower one gives one file at its own
+    /// width. A picture whose header names a shape no box has, one side more than <see cref="ArtAnalysis.MaxAspectRatio"/>
+    /// times the other, is not decoded and comes out undecodable. Any failure while decoding, resizing, measuring or
+    /// encoding comes out undecodable too, so one bad picture never throws.
     /// </summary>
     /// <param name="bytes">The downloaded bytes.</param>
     /// <param name="limits">The limits; only the pixel cap is used here.</param>
-    public static ArtProcessing Process(byte[] bytes, ArtLimits limits)
+    public static ArtProcessing Process(byte[] bytes, ArtLimits limits) => Process(bytes, limits, ArtAnalysis.Analyse);
+
+    /// <summary>Processes the picture as <see cref="Process(byte[], ArtLimits)"/> does, with the given step in place of <see cref="ArtAnalysis.Analyse"/>.</summary>
+    /// <param name="bytes">The downloaded bytes.</param>
+    /// <param name="limits">The limits; only the pixel cap is used here.</param>
+    /// <param name="measure">Measures the decoded picture.</param>
+    public static ArtProcessing Process(byte[] bytes, ArtLimits limits, Func<SKBitmap, ArtFacts> measure)
     {
         ArgumentNullException.ThrowIfNull(bytes);
         ArgumentNullException.ThrowIfNull(limits);
+        ArgumentNullException.ThrowIfNull(measure);
 
         try
         {
@@ -85,11 +96,16 @@ public static class ArtProcessor
                 return ArtProcessing.Refused("pixels");
             }
 
+            if (!ArtAnalysis.HasUsableShape(codec.Info.Width, codec.Info.Height))
+            {
+                return ArtProcessing.Undecodable;
+            }
+
             using var decoded = Decode(codec);
 
-            return decoded is null ? ArtProcessing.Undecodable : ArtProcessing.Processed(Resize(decoded), ArtAnalysis.Analyse(decoded));
+            return decoded is null ? ArtProcessing.Undecodable : ArtProcessing.Processed(Resize(decoded), measure(decoded));
         }
-        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or IOException or NotSupportedException)
+        catch (Exception)
         {
             return ArtProcessing.Undecodable;
         }
