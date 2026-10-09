@@ -4,10 +4,14 @@ using Cabinet.Repository.Bgg;
 
 namespace Cabinet.Repository.Images;
 
-/// <summary>The most a downloaded picture may weigh and the most pixels it may hold.</summary>
+/// <summary>The most a downloaded picture may weigh, the most pixels it may hold and the longest one request for it may take.</summary>
 /// <param name="MaxBytes">The most bytes a download may have, announced or streamed.</param>
 /// <param name="MaxPixels">The most pixels, width times height, a picture may report before it is decoded.</param>
-public sealed record ArtLimits(long MaxBytes, long MaxPixels);
+/// <param name="RequestTimeout">
+/// The longest one request for a picture may take, from sending it to the last byte of its body; each redirect is a
+/// request of its own.
+/// </param>
+public sealed record ArtLimits(long MaxBytes, long MaxPixels, TimeSpan RequestTimeout);
 
 /// <summary>How a download ended.</summary>
 public abstract record ArtDownload
@@ -69,9 +73,11 @@ public sealed class ImagePacer : IImagePacer
 /// <summary>
 /// Fetches pictures politely and safely. It sends no credentials, goes only to addresses the policy allows, follows a
 /// redirect at most three times and checks every target again, refuses a body that is too big or not a picture, and waits
-/// its turn on the picture pacer before each request. A connection that fails or breaks off part way, a body that cannot
-/// be read and a redirect target that is not a usable address all end as a failed download, never as an exception. A
-/// visitor never reaches it: only the sync calls it.
+/// its turn on the picture pacer before each request. Every request, headers and body together, has its own time limit
+/// on the injected clock, so a host that stalls part way cannot hold the sync. A connection that fails or breaks off part
+/// way, a body that cannot be read, a request that runs out of time and a redirect target that is not a usable address
+/// all end as a failed download, never as an exception; only cancelling the caller's token is passed on. A visitor never
+/// reaches it: only the sync calls it.
 /// </summary>
 public sealed class ImageDownloader : IArtSource
 {
@@ -84,26 +90,30 @@ public sealed class ImageDownloader : IArtSource
     private readonly ArtSourcePolicy _policy;
     private readonly ArtLimits _limits;
     private readonly IImagePacer _pacer;
+    private readonly TimeProvider _time;
     private readonly string _userAgent;
 
     /// <summary>Creates the downloader.</summary>
     /// <param name="http">The client; it must not add credentials and must not follow redirects itself.</param>
     /// <param name="policy">Which addresses may be fetched.</param>
-    /// <param name="limits">How big a download may be.</param>
+    /// <param name="limits">How big a download may be and how long one request for it may take.</param>
     /// <param name="pacer">Spaces the requests out.</param>
     /// <param name="bgg">The BGG options, used only for the User-Agent text.</param>
-    public ImageDownloader(HttpClient http, ArtSourcePolicy policy, ArtLimits limits, IImagePacer pacer, BggOptions bgg)
+    /// <param name="time">The clock the time limit of each request runs on.</param>
+    public ImageDownloader(HttpClient http, ArtSourcePolicy policy, ArtLimits limits, IImagePacer pacer, BggOptions bgg, TimeProvider time)
     {
         ArgumentNullException.ThrowIfNull(http);
         ArgumentNullException.ThrowIfNull(policy);
         ArgumentNullException.ThrowIfNull(limits);
         ArgumentNullException.ThrowIfNull(pacer);
         ArgumentNullException.ThrowIfNull(bgg);
+        ArgumentNullException.ThrowIfNull(time);
 
         _http = http;
         _policy = policy;
         _limits = limits;
         _pacer = pacer;
+        _time = time;
         _userAgent = BggTransport.UserAgent(bgg);
     }
 
@@ -144,6 +154,8 @@ public sealed class ImageDownloader : IArtSource
     private async Task<(ArtDownload? Result, Uri? Redirect)> FetchOnceAsync(Uri target, CancellationToken cancellationToken)
     {
         using var lease = await _pacer.WaitTurnAsync(cancellationToken);
+        using var timeLimit = new CancellationTokenSource(_limits.RequestTimeout, _time);
+        using var requestEnds = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeLimit.Token);
 
         try
         {
@@ -151,7 +163,7 @@ public sealed class ImageDownloader : IArtSource
             request.Headers.TryAddWithoutValidation("User-Agent", _userAgent);
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("image/*"));
 
-            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, requestEnds.Token);
 
             if (IsRedirect(response.StatusCode))
             {
@@ -160,7 +172,7 @@ public sealed class ImageDownloader : IArtSource
                     : (ArtDownload.Failed("status"), null);
             }
 
-            return (await ReadAnswerAsync(response, cancellationToken), null);
+            return (await ReadAnswerAsync(response, requestEnds.Token), null);
         }
         catch (Exception exception) when (exception is HttpRequestException or IOException or InvalidDataException)
         {

@@ -12,7 +12,7 @@ namespace Cabinet.UnitTests.Images;
 [Trait("Category", "Images")]
 public sealed class ReviewCaseVerdictTests
 {
-    private static readonly ArtLimits Limits = new(12_000_000, 36_000_000);
+    private static readonly ArtLimits Limits = new(12_000_000, 36_000_000, TimeSpan.FromSeconds(30));
 
     private static readonly IReadOnlySet<SyntheticArtKind> FlatKinds = new HashSet<SyntheticArtKind>
     {

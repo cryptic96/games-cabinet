@@ -292,6 +292,35 @@ public sealed class BoxArtTests
         thirdRun.Should().Contain(FirstVersionImage).And.NotContain(SecondVersionImage);
     }
 
+    [Fact]
+    public async Task A_picture_whose_body_stalls_fails_at_its_time_limit_and_the_run_goes_on_to_the_next_picture()
+    {
+        var images = new ScriptedImageHandler()
+            .ServeStalledBody(FirstVersionImage)
+            .ServePicture(SecondVersionImage, 600, 800);
+        var clock = SyncHarness.NewClock();
+        var settings = new Dictionary<string, string?>(AllowExampleHost) { ["Images:DownloadTimeoutSeconds"] = "10" };
+        await using var factory = SyncHarness.CreateFactory(
+            ScriptedBggHandler.ForCollection(SyntheticBggCollection.Create(5)),
+            clock,
+            settings,
+            images);
+        using var client = factory.CreatePublicClient();
+
+        using var press = await client.PostAsync(SyncHarness.SyncRoute, content: null, TestContext.Current.CancellationToken);
+        press.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        await images.StallReached.WaitAsync(SyncHarness.DefaultWait, TestContext.Current.CancellationToken);
+        clock.Advance(TimeSpan.FromSeconds(10));
+        await SyncHarness.WaitForRunToEnd(client);
+        var firstRun = RequestedAddresses(images);
+        var firstResult = (await SyncHarness.ReadStatus(client)).LastResult;
+        await SyncRounds.PressAndWait(client, clock);
+
+        firstRun.Should().StartWith(FirstVersionImage).And.Contain(SecondVersionImage);
+        firstResult.Should().Be("changed");
+        RequestedAddresses(images).Skip(firstRun.Count).Should().NotContain(FirstVersionImage, "the stalled picture was recorded as failed and waits for the retry time");
+    }
+
     private static List<string> RequestedAddresses(ScriptedImageHandler images) =>
         [.. images.Requests.Select(request => request.Uri.AbsoluteUri)];
 

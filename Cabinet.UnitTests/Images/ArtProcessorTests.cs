@@ -14,7 +14,7 @@ public sealed class ArtProcessorTests
 {
     private const long AllocationBudgetBytes = 8 * 1024 * 1024;
 
-    private static readonly ArtLimits Limits = new(12_000_000, 36_000_000);
+    private static readonly ArtLimits Limits = new(12_000_000, 36_000_000, TimeSpan.FromSeconds(30));
 
     [Fact]
     public void Bytes_that_are_not_a_picture_are_undecodable()
@@ -28,8 +28,8 @@ public sealed class ArtProcessorTests
     {
         var picture = Png(100, 100);
 
-        ArtProcessor.Process(picture, new ArtLimits(12_000_000, 9_999)).Should().Be(ArtProcessing.Refused("pixels"));
-        ArtProcessor.Process(picture, new ArtLimits(12_000_000, 10_000)).Should().BeOfType<ArtProcessing.Done>();
+        ArtProcessor.Process(picture, new ArtLimits(12_000_000, 9_999, TimeSpan.FromSeconds(30))).Should().Be(ArtProcessing.Refused("pixels"));
+        ArtProcessor.Process(picture, new ArtLimits(12_000_000, 10_000, TimeSpan.FromSeconds(30))).Should().BeOfType<ArtProcessing.Done>();
     }
 
     [Fact]

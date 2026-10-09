@@ -12,7 +12,7 @@ namespace Cabinet.UnitTests.Review;
 internal sealed class ReviewFixture : IDisposable
 {
     private static readonly DateTimeOffset Moment = new(2030, 1, 1, 0, 0, 0, TimeSpan.Zero);
-    private static readonly ArtLimits Limits = new(12_000_000, 36_000_000);
+    private static readonly ArtLimits Limits = new(12_000_000, 36_000_000, TimeSpan.FromSeconds(30));
 
     private readonly TemporaryDirectory _state = new();
     private readonly ArtCache _cache;

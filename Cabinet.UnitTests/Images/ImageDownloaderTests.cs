@@ -15,7 +15,7 @@ public sealed class ImageDownloaderTests
     private const string Host = "cf.example.org";
     private const long MaxBytes = 1000;
 
-    private static readonly ArtLimits Limits = new(MaxBytes, 1_000_000);
+    private static readonly ArtLimits Limits = new(MaxBytes, 1_000_000, TimeSpan.FromSeconds(30));
     private static readonly ArtSourcePolicy Policy = new(new HashSet<string>(StringComparer.Ordinal) { Host });
     private static readonly BggOptions Bgg = new(BggOptions.DefaultBaseUri, "sentinel-user-name", "sentinel-token-value", null, BggOptions.MinimumRequestGap, false, "0.0.0-test");
 
@@ -188,6 +188,50 @@ public sealed class ImageDownloaderTests
     }
 
     [Fact]
+    public async Task A_body_that_stalls_fails_by_timeout_once_the_request_time_limit_has_passed()
+    {
+        var clock = new FakeTimeProvider();
+        var body = new StallingBodyStream();
+        var download = Downloader(new StubHandler(_ => Streamed(body)), time: clock)
+            .DownloadAsync(Uri("a.png"), TestContext.Current.CancellationToken);
+        await body.Reached.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        clock.Advance(Limits.RequestTimeout - TimeSpan.FromMilliseconds(1));
+        await Task.Delay(TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken);
+        download.IsCompleted.Should().BeFalse("the time limit has not passed yet");
+        clock.Advance(TimeSpan.FromMilliseconds(1));
+
+        (await download.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken)).Should().Be(ArtDownload.Failed("timeout"));
+    }
+
+    [Fact]
+    public async Task Headers_that_never_come_fail_by_timeout_once_the_request_time_limit_has_passed()
+    {
+        var clock = new FakeTimeProvider();
+        var handler = new SilentHandler();
+        var download = Downloader(handler, time: clock).DownloadAsync(Uri("a.png"), TestContext.Current.CancellationToken);
+        await handler.Reached.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        clock.Advance(Limits.RequestTimeout);
+
+        (await download.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken)).Should().Be(ArtDownload.Failed("timeout"));
+    }
+
+    [Fact]
+    public async Task Cancelling_the_run_during_a_stalled_body_is_passed_on_and_not_called_a_timeout()
+    {
+        using var run = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var body = new StallingBodyStream();
+        var download = Downloader(new StubHandler(_ => Streamed(body)), time: new FakeTimeProvider()).DownloadAsync(Uri("a.png"), run.Token);
+        await body.Reached.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        await run.CancelAsync();
+        var waiting = () => download.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        await waiting.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
     public async Task Two_downloads_through_a_one_second_pacer_start_at_least_a_second_apart()
     {
         var (fake, clock) = NewClock();
@@ -237,8 +281,8 @@ public sealed class ImageDownloaderTests
 
     private static Uri Uri(string name) => new($"https://{Host}/{name}");
 
-    private static ImageDownloader Downloader(StubHandler handler, IImagePacer? pacer = null) =>
-        new(new HttpClient(handler), Policy, Limits, pacer ?? new NoWaitPacer(), Bgg);
+    private static ImageDownloader Downloader(HttpMessageHandler handler, IImagePacer? pacer = null, TimeProvider? time = null) =>
+        new(new HttpClient(handler), Policy, Limits, pacer ?? new NoWaitPacer(), Bgg, time ?? TimeProvider.System);
 
     private static (FakeTimeProvider Fake, TimerCountingClock Clock) NewClock()
     {
@@ -325,6 +369,21 @@ public sealed class ImageDownloaderTests
                 request.Headers.Accept.ToString()));
 
             return Task.FromResult(respond(request));
+        }
+    }
+
+    private sealed class SilentHandler : HttpMessageHandler
+    {
+        private readonly TaskCompletionSource _reached = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task Reached => _reached.Task;
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            _reached.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+
+            return new HttpResponseMessage(HttpStatusCode.OK);
         }
     }
 
