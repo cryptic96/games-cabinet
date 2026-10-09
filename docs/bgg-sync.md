@@ -359,9 +359,12 @@ are due. The server downloads them by itself, never a visitor:
   without the BGG token or any other credential;
 - at most one request at a time, with a pause between requests that is
   independent of the pause the BGG API gets;
-- with a size limit on the download, a pixel limit that is checked from the file
-  header before anything is decoded, and a limit of three redirects, each target
-  checked against the host list again.
+- with a size limit on the download, a pixel limit and a shape check that are
+  both read from the file header before anything is decoded, and a limit of
+  three redirects, each target checked against the host list again;
+- with a time limit on every request, headers and body together, set by
+  `Images__DownloadTimeoutSeconds`; each redirect is a request of its own, so a
+  host that stalls part way through a picture cannot hold the sync.
 
 Each picture is shrunk, never cropped or recoloured, into WebP files 480 and 240
 pixels wide (a smaller picture keeps its own width) and stored in the `art`
@@ -372,6 +375,19 @@ browser fetches fresh. The original download is not kept. A visitor's browser
 only ever asks the site itself for pictures; nothing a visitor sends can name an
 address to fetch, and there is no resizing address.
 
+A JPEG or WebP picture is decoded at a reduced size; a PNG is decoded whole, so
+the pixel limit is what bounds the memory it takes. Each picture is then measured
+once, for the art detector and the spine colour described below. The
+measurements run on a small working copy that is at most 96 pixels wide and 960
+pixels tall: a picture narrower than 96 pixels keeps its own width and is never
+enlarged, and a very tall picture is shrunk until it fits the height. The copy
+never holds more than about 92,000 pixels, whatever the size or shape of the
+picture. A picture whose header names a shape no box has, with one side more
+than ten times the other, is not decoded at all and is recorded as unusable, the
+same way as a file that is not a picture. Anything else that goes wrong while
+one picture is decoded, shrunk, measured or encoded is recorded the same way for
+that picture alone.
+
 A run downloads at most `Images__MaxDownloadsPerRun` pictures and starts none
 after six minutes have passed since the run began, so a large collection fills
 in over several runs and a slow host cannot hold a sync back. Games that are
@@ -380,6 +396,16 @@ fetched, was refused or could not be read is recorded and tried again only after
 `Images__RetryFailedAfterHours`. A second sync with an unchanged collection
 sends no picture request at all. A picture trouble never makes a sync fail and
 never holds the collection back.
+
+Each picture is handled on its own. When one goes wrong in any way, for example
+its connection drops part way through the download, its host stalls past the
+time limit, its body cannot be read, it redirects to an address that cannot be
+used, or something fails while it is processed or stored, only that picture is
+recorded as failed, with the usual retry time, and the run goes straight on to
+the next picture. A broken picture
+therefore never blocks the pictures after it. Only the end of the run itself, when
+the service stops or the run reaches its overall time limit, stops the picture
+step early.
 
 Files in the `art` directory that no stored record refers to any more are
 deleted after a successful run, but only once they are older than
@@ -395,6 +421,7 @@ Optional settings for the env file:
 | `Images__MaxMegabytes` | `12` | 1 to 50 | The largest picture download accepted. |
 | `Images__MaxMegapixels` | `36` | 1 to 100 | The most pixels, in millions, a picture may hold. |
 | `Images__DownloadGapMilliseconds` | `1000` | 500 to 60000 | The least time between two picture requests. |
+| `Images__DownloadTimeoutSeconds` | `30` | 5 to 60 | The longest one picture request may take, headers and body together; each redirect is a request of its own. A request that runs out of time counts as a failed picture. |
 | `Images__MaxDownloadsPerRun` | `80` | 1 to 1000 | The most pictures one sync run downloads. |
 | `Images__RetryFailedAfterHours` | `24` | 1 to 720 | How long a failed picture waits before it is tried again. |
 | `Images__PruneGraceDays` | `7` | 1 to 365 | How long an unused file is kept before it is deleted. |

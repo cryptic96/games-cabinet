@@ -15,13 +15,22 @@ public sealed record ArtFacts(ArtFeatures Features, RgbColour Main, RgbColour To
 
 /// <summary>
 /// Measures a decoded picture once: whether it looks like a photographed 3D box, its main colour with plain backgrounds
-/// ignored, and the four colours that fill the bars around fitted art. All per-pixel work runs on a small copy, so the
-/// cost never depends on the size of the original.
+/// ignored, and the four colours that fill the bars around fitted art. All per-pixel work runs on a small copy that is
+/// bounded in width, in height and so in pixels, so the cost never depends on the size or the shape of the original.
 /// </summary>
 public static class ArtAnalysis
 {
-    /// <summary>The width of the working copy in pixels.</summary>
+    /// <summary>The widest the working copy ever is, in pixels; a narrower picture keeps its own width and is never scaled up.</summary>
     public const int AnalysisWidth = 96;
+
+    /// <summary>The most times longer one side of a picture may be than the other for it to have the shape of box art.</summary>
+    public const int MaxAspectRatio = 10;
+
+    /// <summary>
+    /// The tallest the working copy ever is, in pixels: the height of the tallest usable shape at the full copy width, so a
+    /// picture of usable shape is never squeezed further, and no copy holds more than this times <see cref="AnalysisWidth"/> pixels.
+    /// </summary>
+    public const int MaxAnalysisHeight = AnalysisWidth * MaxAspectRatio;
 
     /// <summary>The share of the border a colour must hold to count as a backdrop colour.</summary>
     public const double RingClusterMinShare = 0.10;
@@ -119,6 +128,35 @@ public static class ArtAnalysis
             EdgeColour(pixels, width, height, Edge.Left, main));
     }
 
+    /// <summary>Whether a picture of this size has the shape of box art: its longer side at most <see cref="MaxAspectRatio"/> times its shorter side.</summary>
+    /// <param name="width">The width of the picture in pixels.</param>
+    /// <param name="height">The height of the picture in pixels.</param>
+    public static bool HasUsableShape(int width, int height) =>
+        width > 0 && height > 0 && Math.Max(width, height) <= (long)MaxAspectRatio * Math.Min(width, height);
+
+    /// <summary>
+    /// The size of the working copy of a picture: no wider than <see cref="AnalysisWidth"/> or than the picture, no taller
+    /// than <see cref="MaxAnalysisHeight"/>, at least one pixel each way, and with the picture's aspect ratio as near as
+    /// whole pixels allow. A picture is only ever scaled down for it, whatever its shape.
+    /// </summary>
+    /// <param name="width">The width of the picture in pixels.</param>
+    /// <param name="height">The height of the picture in pixels.</param>
+    public static (int Width, int Height) WorkingSize(int width, int height)
+    {
+        var pictureWidth = Math.Max(1, width);
+        var pictureHeight = Math.Max(1, height);
+        var copyWidth = Math.Min(AnalysisWidth, pictureWidth);
+        var copyHeight = Scaled(pictureHeight, copyWidth, pictureWidth);
+
+        if (copyHeight > MaxAnalysisHeight)
+        {
+            copyWidth = Scaled(pictureWidth, MaxAnalysisHeight, pictureHeight);
+            copyHeight = MaxAnalysisHeight;
+        }
+
+        return (copyWidth, copyHeight);
+    }
+
     private enum Edge
     {
         Top,
@@ -127,10 +165,12 @@ public static class ArtAnalysis
         Left,
     }
 
+    private static int Scaled(int length, int target, int source) =>
+        Math.Max(1, (int)Math.Round((double)length * target / source, MidpointRounding.AwayFromZero));
+
     private static (SKColor[] Pixels, int Width, int Height) WorkingCopy(SKBitmap source)
     {
-        var width = AnalysisWidth;
-        var height = Math.Max(1, (int)Math.Round((double)source.Height * AnalysisWidth / Math.Max(1, source.Width), MidpointRounding.AwayFromZero));
+        var (width, height) = WorkingSize(source.Width, source.Height);
         var sampling = new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear);
 
         using var resized = source.Resize(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul), sampling)

@@ -8,6 +8,7 @@ namespace Cabinet.Service.Sync;
 /// <param name="MaxBytes">The most bytes a picture download may have.</param>
 /// <param name="MaxPixels">The most pixels a picture may hold before it is refused undecoded.</param>
 /// <param name="DownloadGap">The least time between two picture requests.</param>
+/// <param name="DownloadTimeout">The longest one picture request may take, headers and body together; each redirect is a request of its own.</param>
 /// <param name="MaxDownloadsPerRun">The most pictures one sync run fetches.</param>
 /// <param name="RetryFailedAfter">How long a picture that failed, was refused or could not be read waits before it is tried again.</param>
 /// <param name="PruneGrace">How long a stored file that nothing refers to is kept before it is deleted.</param>
@@ -18,6 +19,7 @@ public sealed record ImageOptions(
     long MaxBytes,
     long MaxPixels,
     TimeSpan DownloadGap,
+    TimeSpan DownloadTimeout,
     int MaxDownloadsPerRun,
     TimeSpan RetryFailedAfter,
     TimeSpan PruneGrace,
@@ -28,7 +30,7 @@ public sealed record ImageOptions(
     public ArtSourcePolicy Policy => new(AllowedHosts, DevelopmentOrigin);
 
     /// <summary>The download limits these options describe.</summary>
-    public ArtLimits Limits => new(MaxBytes, MaxPixels);
+    public ArtLimits Limits => new(MaxBytes, MaxPixels, DownloadTimeout);
 }
 
 /// <summary>
@@ -44,6 +46,7 @@ public static class ImageSettings
     private const string MegabytesKey = "Images:MaxMegabytes";
     private const string MegapixelsKey = "Images:MaxMegapixels";
     private const string GapKey = "Images:DownloadGapMilliseconds";
+    private const string TimeoutKey = "Images:DownloadTimeoutSeconds";
     private const string PerRunKey = "Images:MaxDownloadsPerRun";
     private const string RetryKey = "Images:RetryFailedAfterHours";
     private const string GraceKey = "Images:PruneGraceDays";
@@ -72,6 +75,7 @@ public static class ImageSettings
             ReadWholeNumber(configuration, MegabytesKey, 1, 50, 12) * BytesPerMegabyte,
             ReadWholeNumber(configuration, MegapixelsKey, 1, 100, 36) * PixelsPerMegapixel,
             TimeSpan.FromMilliseconds(ReadWholeNumber(configuration, GapKey, 500, 60_000, 1000)),
+            TimeSpan.FromSeconds(ReadWholeNumber(configuration, TimeoutKey, 5, 60, 30)),
             ReadWholeNumber(configuration, PerRunKey, 1, 1000, 80),
             TimeSpan.FromHours(ReadWholeNumber(configuration, RetryKey, 1, 720, 24)),
             TimeSpan.FromDays(ReadWholeNumber(configuration, GraceKey, 1, 365, 7)),

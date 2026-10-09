@@ -12,7 +12,9 @@ namespace Cabinet.UnitTests.Images;
 [Trait("Category", "Images")]
 public sealed class ArtProcessorTests
 {
-    private static readonly ArtLimits Limits = new(12_000_000, 36_000_000);
+    private const long AllocationBudgetBytes = 8 * 1024 * 1024;
+
+    private static readonly ArtLimits Limits = new(12_000_000, 36_000_000, TimeSpan.FromSeconds(30));
 
     [Fact]
     public void Bytes_that_are_not_a_picture_are_undecodable()
@@ -26,8 +28,8 @@ public sealed class ArtProcessorTests
     {
         var picture = Png(100, 100);
 
-        ArtProcessor.Process(picture, new ArtLimits(12_000_000, 9_999)).Should().Be(ArtProcessing.Refused("pixels"));
-        ArtProcessor.Process(picture, new ArtLimits(12_000_000, 10_000)).Should().BeOfType<ArtProcessing.Done>();
+        ArtProcessor.Process(picture, new ArtLimits(12_000_000, 9_999, TimeSpan.FromSeconds(30))).Should().Be(ArtProcessing.Refused("pixels"));
+        ArtProcessor.Process(picture, new ArtLimits(12_000_000, 10_000, TimeSpan.FromSeconds(30))).Should().BeOfType<ArtProcessing.Done>();
     }
 
     [Fact]
@@ -59,9 +61,67 @@ public sealed class ArtProcessorTests
     }
 
     [Fact]
-    public void A_very_wide_source_is_scaled_to_its_own_ratio_and_never_to_zero_height()
+    public void A_wide_source_at_the_shape_limit_is_scaled_to_its_own_ratio()
     {
-        Variants(Png(2000, 3)).Select(variant => (variant.Width, variant.Height)).Should().Equal((480, 1), (240, 1));
+        Variants(Png(2000, 200)).Select(variant => (variant.Width, variant.Height)).Should().Equal((480, 48), (240, 24));
+    }
+
+    [Theory]
+    [InlineData(1000, 100)]
+    [InlineData(100, 1000)]
+    public void A_picture_with_one_side_exactly_ten_times_the_other_is_still_used(int width, int height)
+    {
+        ArtProcessor.Process(Png(width, height), Limits).Should().BeOfType<ArtProcessing.Done>();
+    }
+
+    [Theory]
+    [InlineData(1001, 100)]
+    [InlineData(100, 1001)]
+    [InlineData(2000, 3)]
+    public void A_picture_with_one_side_more_than_ten_times_the_other_is_unusable(int width, int height)
+    {
+        ArtProcessor.Process(Png(width, height), Limits).Should().BeSameAs(ArtProcessing.Undecodable);
+    }
+
+    [Theory]
+    [InlineData(1, 16383)]
+    [InlineData(4, 16383)]
+    [InlineData(16383, 1)]
+    [InlineData(16383, 4)]
+    public void A_hairline_picture_is_refused_as_unusable_without_filling_memory(int width, int height)
+    {
+        var picture = Png(width, height);
+        var before = GC.GetAllocatedBytesForCurrentThread();
+
+        var outcome = ArtProcessor.Process(picture, Limits);
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        allocated.Should().BeLessThan(AllocationBudgetBytes, "a hairline picture must never be measured on a copy hundreds of megabytes large");
+        outcome.Should().BeSameAs(ArtProcessing.Undecodable);
+    }
+
+    [Theory]
+    [InlineData("allocation")]
+    [InlineData("memory")]
+    [InlineData("index")]
+    [InlineData("null")]
+    [InlineData("argument")]
+    public void A_failure_inside_the_picture_work_gives_an_undecodable_outcome_instead_of_an_exception(string failure)
+    {
+        var outcome = ArtProcessor.Process(Png(100, 100), Limits, _ => throw Failure(failure));
+
+        outcome.Should().BeSameAs(ArtProcessing.Undecodable);
+    }
+
+    [Fact]
+    public void The_measurement_step_is_given_the_decoded_picture_and_its_facts_are_kept()
+    {
+        using var decoded = SKBitmap.Decode(Png(100, 100));
+        var facts = ArtAnalysis.Analyse(decoded);
+
+        var outcome = ArtProcessor.Process(Png(100, 100), Limits, bitmap => (bitmap.Width, bitmap.Height) == (100, 100) ? facts : throw new InvalidOperationException("wrong picture"));
+
+        outcome.Should().BeOfType<ArtProcessing.Done>().Which.Facts.Should().BeSameAs(facts);
     }
 
     [Fact]
@@ -138,6 +198,15 @@ public sealed class ArtProcessorTests
 
     private static IReadOnlyList<EncodedArt> Variants(byte[] picture) =>
         ArtProcessor.Process(picture, Limits).Should().BeOfType<ArtProcessing.Done>().Which.Variants;
+
+    private static Exception Failure(string kind) => kind switch
+    {
+        "allocation" => new Exception("Unable to allocate pixels for the bitmap."),
+        "memory" => new OutOfMemoryException(),
+        "index" => new IndexOutOfRangeException(),
+        "null" => new NullReferenceException(),
+        _ => new ArgumentException("invented failure"),
+    };
 
     private static byte[] Png(int width, int height, SKColor? fill = null, bool transparentCorner = false)
     {

@@ -218,7 +218,7 @@ Plans:
   4. Box proportions come from the owned version's real BGG dimensions when available, else from a flat cover's aspect ratio, else from a realistic default, and a 3D shot's outline is never used, so real boxes in the cabinet visibly differ in size and shape.
   5. Each spine takes its colour from its box art (ignoring plain backgrounds around product shots) and shows the title legibly with readable text contrast.
 
-**Plans:** 22/23 plans executed
+**Plans:** 23/23 plans executed
 
 Plans:
 **Wave 1**
@@ -284,7 +284,7 @@ Plans:
 
 **Wave 14** *(blocked on Wave 13 completion)*
 
-- [ ] 04-16-PLAN.md — Tuned defaults committed, final release and the owner's deployed check (owner-gated)
+- [x] 04-16-PLAN.md — Tuned defaults committed, final release and the owner's deployed check (owner-gated)
 
 ### Phase 5: Game Detail, Accessibility & Language
 
@@ -364,7 +364,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 1. Repo, Guardrails & Walking-Skeleton Deploy | 15/15 | Complete    | 2026-10-04 |
 | 2. Layout Engine & Cabinet Prototype | 9/9 | Complete    | 2026-10-06 |
 | 3. BGG Access Spike, Real Sync & Snapshot | 15/15 | Complete    | 2026-10-07 |
-| 4. Enrichment, Box Images & Shape | 22/23 | In Progress|  |
+| 4. Enrichment, Box Images & Shape | 23/23 | In Progress|  |
 | 5. Game Detail, Accessibility & Language | 0/0 | Not started | - |
 | 6. Owner Tools & Persistence | 0/0 | Not started | - |
 | 7. Game-Night Filters & Location Cabinets | 0/0 | Not started | - |

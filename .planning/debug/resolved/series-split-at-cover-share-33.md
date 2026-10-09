@@ -1,8 +1,8 @@
 ---
-status: awaiting_human_verify
+status: resolved
 trigger: "At the committed cover share of 33 the series grouping rule breaks: the saga series of the 65-item synthetic BGG collection lands in cubbies 0 and 2 (not neighbours); with the code default at 33, FamilyStabilityTests first-expansion fails at seed 75."
 created: 2026-10-08T00:00:00Z
-updated: 2026-10-08T03:30:00Z
+updated: 2026-10-08T00:00:00Z
 ---
 
 ## Current Focus
@@ -127,3 +127,9 @@ files_changed:
   - Cabinet.UnitTests/Layout/Golden/*
   - Cabinet.IntegrationTests/SeriesTests.cs
   - docs/cabinet-layout.md
+
+## Resolution
+
+- Verified by the owner on 2026-10-08: the deployed cabinet on v0.5.1 (layout version 14, committed cover share 33) "looks right" on desktop and phone.
+- The owner accepted the narrow exception that a family inside a series may keep its "+N more" marker so the series stays together.
+- Fix: `bea7815` (merged via PR #14, release v0.5.1).
