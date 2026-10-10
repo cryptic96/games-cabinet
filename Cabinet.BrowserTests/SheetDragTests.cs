@@ -6,11 +6,19 @@ using Microsoft.Playwright;
 namespace Cabinet.BrowserTests;
 
 /// <summary>
+/// Runs its tests one at a time after every parallel test has finished, because a drag's release speed comes from the browser's
+/// own event times, and on a busy machine the gaps between the steps of a scripted drag stretch until a fast flick reads as slow.
+/// </summary>
+[CollectionDefinition(nameof(GestureSpeedCollection), DisableParallelization = true)]
+public sealed class GestureSpeedCollection;
+
+/// <summary>
 /// Proves in a real browser that on a phone the card sheet closes with a downward drag from its grip strip or header and springs back
 /// from a short one, that reading and scrolling its content never closes it, and that a viewport change across the phone breakpoint
 /// closes an open card with the plain fade before the cabinet is drawn again.
 /// </summary>
 [Trait("Category", "Browser")]
+[Collection(nameof(GestureSpeedCollection))]
 public sealed partial class SheetDragTests : CabinetPageTest
 {
     private const string OpenCard = "dialog.card-dialog[open]";
