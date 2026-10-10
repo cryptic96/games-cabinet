@@ -313,6 +313,106 @@ html:has(dialog[open]) {
   color: var(--paper-label);
 }
 
+:where(.card-ruled) :where(ul, dl, dd, li) {
+  margin: 0;
+  padding: 0;
+  line-height: 28px;
+}
+
+.card-ruled dd,
+.card-ruled dt,
+.card-ruled .v,
+.card-ruled .l {
+  overflow-wrap: anywhere;
+  unicode-bidi: isolate;
+}
+
+.card-ruled [dir="auto"] {
+  unicode-bidi: plaintext;
+}
+
+/**
+ * The game-night strip: up to four entries in two columns, one per line on a phone. Each entry hangs on its icon, so a label that
+ * wraps stays in flow after the value and the icon stays on the first line.
+ */
+.facts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  column-gap: 24px;
+  margin-block-end: var(--ruling);
+  list-style: none;
+}
+
+.fact {
+  position: relative;
+  padding-inline-start: 32px;
+  list-style: none;
+}
+
+.fact-icon {
+  position: absolute;
+  top: 2px;
+  inset-inline-start: 0;
+  width: 24px;
+  height: 24px;
+  color: var(--ink);
+}
+
+.fact .v {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.fact .l {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--paper-label);
+}
+
+/**
+ * The label-and-value groups below the strip: a label column and the value wrapping beside it, so the label stays on the first line.
+ */
+.card-where,
+.card-meta {
+  display: grid;
+  grid-template-columns: 9rem 1fr;
+  column-gap: 8px;
+  margin-block-end: var(--ruling);
+}
+
+.card-ruled dt {
+  align-self: start;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--paper-label);
+}
+
+.card-where dt {
+  font-weight: 600;
+}
+
+.card-ruled dd {
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.mech {
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+  list-style: none;
+}
+
+.mech li {
+  display: inline;
+  font-size: 14px;
+}
+
+.mech li:not(:last-child)::after {
+  content: "\00a0\00b7" / "";
+}
+
 .card-link a {
   display: inline-flex;
   align-items: center;
@@ -392,6 +492,15 @@ html:has(dialog[open]) {
 
   .card-ruled {
     padding: var(--ruling) 16px calc(32px + env(safe-area-inset-bottom));
+  }
+
+  .facts {
+    grid-template-columns: 1fr;
+  }
+
+  .card-where,
+  .card-meta {
+    grid-template-columns: 7rem 1fr;
   }
 }
 
