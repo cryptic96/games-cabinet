@@ -1,0 +1,402 @@
+/**
+ * The detail card. One native dialog is a transparent frame the size of the screen, so a tap anywhere outside the paper lands on
+ * the dialog itself; the paper is the card inside it. Above 40rem the card is a paper index card centred over a plain dim; at 40rem
+ * or narrower it is a sheet anchored to the bottom of the screen. Every colour, rhythm and timing is a custom property of the page.
+ */
+.card-dialog {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  inset: 0;
+  overflow: hidden;
+}
+
+.card-dialog[open] {
+  display: grid;
+  place-items: center;
+}
+
+.card-dialog::backdrop {
+  background: var(--dim);
+}
+
+html:has(dialog[open]) {
+  overflow: hidden;
+  scrollbar-gutter: stable;
+}
+
+.card {
+  position: relative;
+  width: min(640px, 100vw - 48px);
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background-color: var(--paper);
+  color: var(--ink);
+  border-radius: 2px;
+  box-shadow:
+    0 1px 1px rgb(20 10 4 / 0.4),
+    0 18px 32px -12px rgb(20 10 4 / 0.7),
+    inset 0 0 0 1px var(--paper-edge);
+}
+
+@supports (max-height: 1dvh) {
+  .card {
+    max-height: calc(100dvh - 64px);
+  }
+}
+
+.card :focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.card .card-title:focus,
+.card .card-title:focus-visible {
+  outline: none;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.card-grip {
+  display: none;
+}
+
+/**
+ * The close button stays in view while the card scrolls. It sits in a wrapper with no height of its own, so it takes no room in
+ * the card, and it has a solid paper background so ruled text that scrolls under it is hidden instead of colliding with the cross.
+ */
+.card-close-wrap {
+  position: sticky;
+  top: 8px;
+  z-index: 3;
+  display: flex;
+  justify-content: flex-end;
+  height: 0;
+  padding-inline-end: 8px;
+}
+
+.card-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.card-close svg {
+  width: 20px;
+  height: 20px;
+}
+
+/**
+ * The header is the typed zone above the red rule: the cover on the left, the title and year on the right. A long title wraps and
+ * the header grows; the year is always the last line. The row is as tall as the cover frame rounded up to a whole ruling where the
+ * browser can do that, so the ruled area below starts on the rhythm.
+ */
+.card-head {
+  --cover-w: 192px;
+  --cover-frame-h: calc(var(--cover-w) / var(--cover-ratio, 1) + 16px);
+  display: grid;
+  grid-template-columns: 208px 1fr;
+  gap: 24px;
+  align-items: start;
+  margin: 0;
+  padding: var(--ruling) 24px 16px;
+  border-bottom: 3px double var(--paper-red);
+}
+
+.card-head > * {
+  grid-column: auto;
+}
+
+@supports (min-height: round(up, 10px, 28px)) {
+  .card-head {
+    grid-template-rows: minmax(round(up, var(--cover-frame-h), var(--ruling)), auto);
+  }
+}
+
+.card-titles {
+  align-self: end;
+  min-width: 0;
+  padding-inline-end: 32px;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 28px;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.card-year {
+  margin: 0;
+  font-size: 16px;
+  line-height: 28px;
+  color: var(--paper-label);
+}
+
+/**
+ * The cover is a photo on an index card: a white border with four brown corner mounts painted under the picture, so they show on
+ * the border only. The picture is never cropped, stretched or covered.
+ */
+.card-cover {
+  min-width: 0;
+  padding: 8px;
+  background-color: var(--paper-photo);
+  background-image:
+    linear-gradient(135deg, var(--paper-mount) 0 14px, transparent 14px),
+    linear-gradient(225deg, var(--paper-mount) 0 14px, transparent 14px),
+    linear-gradient(45deg, var(--paper-mount) 0 14px, transparent 14px),
+    linear-gradient(315deg, var(--paper-mount) 0 14px, transparent 14px);
+  background-position: top left, top right, bottom left, bottom right;
+  background-size: 20px 20px;
+  background-repeat: no-repeat;
+  box-shadow:
+    0 1px 2px rgb(20 10 4 / 0.35),
+    0 6px 12px -6px rgb(20 10 4 / 0.4);
+}
+
+.card-art {
+  position: relative;
+  width: 100%;
+  aspect-ratio: var(--cover-ratio, 1);
+  overflow: hidden;
+  background: var(--bg, var(--wood-edge));
+  color: var(--fg, #ffffff);
+}
+
+.card-art[data-fit] {
+  background: var(--edge-t, var(--bg, var(--wood-edge)));
+}
+
+.card-art[data-fit="width"] {
+  background: linear-gradient(to bottom, var(--edge-t, var(--bg)) 50%, var(--edge-b, var(--bg)) 50%);
+}
+
+.card-art[data-fit="height"] {
+  background: linear-gradient(to right, var(--edge-l, var(--bg)) 50%, var(--edge-r, var(--bg)) 50%);
+}
+
+.card-art > img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  user-select: none;
+}
+
+/**
+ * The generated cover of a game without a usable picture: its colour, a pattern chosen from the game's own hash and a solid plate
+ * holding the title.
+ */
+.card-art[data-pattern]::before {
+  --pattern: color-mix(in srgb, var(--fg) 14%, transparent);
+  --tile: 24px;
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-size: var(--tile) var(--tile);
+}
+
+.card-art[data-pattern="stripes"]::before {
+  background-image: repeating-linear-gradient(90deg, var(--pattern) 0 6px, transparent 6px var(--tile));
+  background-size: auto;
+}
+
+.card-art[data-pattern="chevrons"]::before {
+  background-image:
+    linear-gradient(135deg, var(--pattern) 25%, transparent 25%),
+    linear-gradient(225deg, var(--pattern) 25%, transparent 25%),
+    linear-gradient(315deg, var(--pattern) 25%, transparent 25%),
+    linear-gradient(45deg, var(--pattern) 25%, transparent 25%);
+  background-position: calc(var(--tile) / -2) 0, calc(var(--tile) / -2) 0, 0 0, 0 0;
+}
+
+.card-art[data-pattern="dots"]::before {
+  background-image: radial-gradient(circle at 50% 50%, var(--pattern) 0 22%, transparent 24%);
+}
+
+.card-art[data-pattern="rings"]::before {
+  background-image: radial-gradient(circle at 50% 50%, transparent 0 28%, var(--pattern) 30% 40%, transparent 42%);
+}
+
+.card-art[data-pattern="diagonal"]::before {
+  background-image: repeating-linear-gradient(45deg, var(--pattern) 0 3px, transparent 3px 10px);
+  background-size: auto;
+}
+
+.card-art[data-pattern="plain"]::before {
+  background-image: none;
+}
+
+.card-plate {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-height: 100%;
+  min-height: 40%;
+  padding: 8px;
+  overflow: hidden;
+  background: var(--bg);
+  translate: 0 -50%;
+}
+
+.card-plate-label {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+  line-clamp: 6;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+/**
+ * The ruled area is one background, so every ruling is continuous. Every text line is exactly one ruling tall and every vertical
+ * space inside it is a whole number of rulings, so wrapped text always ends on a rule.
+ */
+.card-ruled {
+  padding: var(--ruling) 24px calc(2 * var(--ruling));
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0 calc(var(--ruling) - 1px),
+    var(--paper-rule) calc(var(--ruling) - 1px) var(--ruling)
+  );
+  background-position: 0 calc(-1 * var(--ruling-drop));
+  line-height: var(--ruling);
+}
+
+.card-ruled p {
+  margin: 0;
+  line-height: var(--ruling);
+}
+
+.card-note {
+  font-size: 14px;
+  color: var(--paper-label);
+}
+
+.card-link a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: calc(var(--hit-rows) * var(--ruling));
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.card-link svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+@media (max-height: 30rem) {
+  .card-head {
+    --cover-w: 112px;
+    grid-template-columns: 128px 1fr;
+  }
+}
+
+/**
+ * At 40rem or narrower the card is a sheet: full width, anchored to the bottom, rounded on top and at most nine tenths of the
+ * screen tall, scrolling inside. The grip strip with its handle stays at the top while the content scrolls under it.
+ */
+@media (max-width: 40rem) {
+  .card-dialog[open] {
+    place-items: end center;
+  }
+
+  .card {
+    width: 100%;
+    max-height: 90vh;
+    border-radius: 12px 12px 0 0;
+    box-shadow:
+      0 -12px 32px -12px rgb(20 10 4 / 0.7),
+      inset 0 0 0 1px var(--paper-edge);
+  }
+
+  @supports (max-height: 1dvh) {
+    .card {
+      max-height: 90dvh;
+    }
+  }
+
+  .card-grip {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: block;
+    height: var(--ruling);
+    margin-bottom: calc(-1 * var(--ruling));
+    border-radius: 12px 12px 0 0;
+    background: var(--paper);
+  }
+
+  .card-grip::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 40px;
+    height: 4px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--paper-label) 70%, var(--paper));
+    translate: -50% 0;
+  }
+
+  .card-head {
+    --cover-w: 112px;
+    grid-template-columns: 128px 1fr;
+    gap: 16px;
+    padding-inline: 16px;
+  }
+
+  .card-ruled {
+    padding: var(--ruling) 16px calc(32px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (forced-colors: active) {
+  .card {
+    border: 1px solid CanvasText;
+  }
+}

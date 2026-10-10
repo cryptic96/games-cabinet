@@ -1,5 +1,6 @@
 @page
 @model Cabinet.Service.Pages.IndexModel
+@inject Microsoft.AspNetCore.Mvc.ViewFeatures.IFileVersionProvider FileVersions
 <header>
     <h1>@Model.Language.Text.SiteName</h1>
     <nav class="lang-toggle" aria-label="@Model.Language.Text.LanguageLabel">
@@ -68,6 +69,7 @@
     {
         <div id="cabinet" class="cabinet"></div>
     }
+    <dialog class="card-dialog" aria-labelledby="card-title" data-icons="@FileVersions.AddFileVersionToPath(Request.PathBase, "/img/icons.svg")"></dialog>
     <noscript><p class="cabinet-message">@Model.Language.Text.NoScript</p></noscript>
 </main>
 @section Scripts {
