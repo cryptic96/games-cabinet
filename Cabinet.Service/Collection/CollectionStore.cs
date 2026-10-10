@@ -43,7 +43,7 @@ public sealed class CollectionState
 
     /// <summary>
     /// Creates the view of a stored collection as <see cref="FromSnapshot(CollectionSnapshot)"/> does, choosing each game's
-    /// picture with the given rules; the rules are part of the version, so a change of rules is a new collection version.
+    /// picture with the given rules; the rules and everything the detail card shows are part of the version, so a change of either is a new collection version.
     /// </summary>
     /// <param name="snapshot">The stored collection.</param>
     /// <param name="rules">The rules that choose each game's picture.</param>
@@ -54,7 +54,7 @@ public sealed class CollectionState
 
         var items = SnapshotMapper.ToCabinetItems(snapshot, rules);
 
-        return new CollectionState(items, SnapshotMapper.Version(items, rules), snapshot.CapturedAtUtc, snapshot);
+        return new CollectionState(items, SnapshotMapper.Version(items, rules, snapshot), snapshot.CapturedAtUtc, snapshot);
     }
 
     /// <summary>The view before any collection has been synced: no items and no version.</summary>

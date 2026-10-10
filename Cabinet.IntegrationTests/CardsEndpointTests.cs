@@ -5,7 +5,9 @@ using Cabinet.Domain.Collection;
 using Cabinet.Domain.Layout;
 using Cabinet.IntegrationTests.Infrastructure;
 using Cabinet.Repository.Storage;
+using Cabinet.Service.Collection;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Cabinet.IntegrationTests;
@@ -137,6 +139,62 @@ public sealed class CardsEndpointTests
         game.GetProperty("expansions").EnumerateArray().Select(link => link.GetProperty("gameId").GetInt32()).Should().Equal(ExpansionGameId);
         expansion.GetProperty("bases").EnumerateArray().Select(link => link.GetProperty("gameId").GetInt32()).Should().Equal(BaseGameId);
         document.RootElement.GetProperty("layout").GetString().Should().Be(layout.Headers.ETag!.Tag);
+    }
+
+    [Fact]
+    public async Task A_sync_that_only_changes_the_designers_gives_new_cards_without_a_restart()
+    {
+        using var storage = new TemporaryDirectory();
+        new SnapshotStore(storage.FullPath, NullLogger<SnapshotStore>.Instance).Save(InventedSnapshot());
+        await using var factory = new CabinetWebApplicationFactory(new Dictionary<string, string?> { ["Storage:Directory"] = storage.FullPath });
+        using var client = factory.CreatePublicClient();
+        using var before = await client.GetAsync("/cabinet/cards?profile=desktop", TestContext.Current.CancellationToken);
+        using var layoutBefore = await client.GetAsync("/cabinet/layout?profile=desktop", TestContext.Current.CancellationToken);
+        var changed = InventedSnapshot();
+        changed = changed with
+        {
+            Games = changed.Games!.ToDictionary(
+                entry => entry.Key,
+                entry => entry.Key == BaseGameId ? entry.Value with { Designers = ["Another Invented Designer"] } : entry.Value),
+        };
+
+        factory.ServingServices.GetRequiredService<CollectionStore>().Replace(CollectionState.FromSnapshot(changed));
+        using var after = await client.GetAsync("/cabinet/cards?profile=desktop", TestContext.Current.CancellationToken);
+        using var layoutAfter = await client.GetAsync("/cabinet/layout?profile=desktop", TestContext.Current.CancellationToken);
+        using var document = JsonDocument.Parse(await after.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var game = document.RootElement.GetProperty("cards").EnumerateArray().Single(record => record.GetProperty("gameId").GetInt32() == BaseGameId);
+
+        after.Headers.ETag.Should().NotBe(before.Headers.ETag);
+        layoutAfter.Headers.ETag.Should().NotBe(layoutBefore.Headers.ETag);
+        game.GetProperty("designers").EnumerateArray().Select(name => name.GetString()).Should().Equal("Another Invented Designer");
+        document.RootElement.GetProperty("layout").GetString().Should().Be(layoutAfter.Headers.ETag!.Tag);
+    }
+
+    [Fact]
+    public async Task A_wildcard_tag_answers_not_modified()
+    {
+        await using var factory = new CabinetWebApplicationFactory(PrototypeOn);
+        using var client = factory.CreatePublicClient();
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/cabinet/cards?sample=65&profile=desktop");
+        request.Headers.IfNoneMatch.Add(EntityTagHeaderValue.Any);
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotModified);
+    }
+
+    [Fact]
+    public async Task A_weak_form_of_the_tag_answers_not_modified()
+    {
+        await using var factory = new CabinetWebApplicationFactory(PrototypeOn);
+        using var client = factory.CreatePublicClient();
+
+        using var first = await client.GetAsync("/cabinet/cards?sample=65&profile=desktop", TestContext.Current.CancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/cabinet/cards?sample=65&profile=desktop");
+        request.Headers.IfNoneMatch.Add(new EntityTagHeaderValue(first.Headers.ETag!.Tag, isWeak: true));
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotModified);
     }
 
     [Fact]
