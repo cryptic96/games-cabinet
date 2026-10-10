@@ -321,6 +321,19 @@ function redrawWhenCardIsClosed() {
   return redrawWaitingForCard;
 }
 
+/**
+ * Draws the cabinet again for the profile the viewport now matches. A card that is open is closed at once with the plain fade, with
+ * no box flying, before the cabinet is loaded, so no card is left floating over a cabinet drawn for the other profile.
+ * @returns {Promise<void>}
+ */
+async function reloadForNewProfile() {
+  if (cardControls !== null) {
+    await cardControls.closeCard({ path: 'fade' });
+  }
+
+  await load();
+}
+
 if (syncRoot !== null) {
   const sync = initSyncStatus(syncRoot, { onCollectionChanged: redrawWhenCardIsClosed });
 
@@ -346,6 +359,6 @@ if (skipLink !== null && gamesList !== null) {
 }
 
 if (mount !== null) {
-  phoneQuery.addEventListener('change', load);
+  phoneQuery.addEventListener('change', reloadForNewProfile);
   load();
 }

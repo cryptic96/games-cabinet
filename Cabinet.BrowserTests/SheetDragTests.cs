@@ -7,7 +7,8 @@ namespace Cabinet.BrowserTests;
 
 /// <summary>
 /// Proves in a real browser that on a phone the card sheet closes with a downward drag from its grip strip or header and springs back
-/// from a short one, and that reading and scrolling its content never closes it.
+/// from a short one, that reading and scrolling its content never closes it, and that a viewport change across the phone breakpoint
+/// closes an open card with the plain fade before the cabinet is drawn again.
 /// </summary>
 [Trait("Category", "Browser")]
 public sealed partial class SheetDragTests : CabinetPageTest
@@ -18,6 +19,16 @@ public sealed partial class SheetDragTests : CabinetPageTest
     private const int PhoneWidth = 390;
     private const int PhoneHeight = 800;
     private const int SpringWaitMilliseconds = 400;
+    private const string TransitionSpy = """
+        window.__pullSpy = { calls: 0 };
+        (() => {
+          const original = document.startViewTransition.bind(document);
+          document.startViewTransition = (callback) => {
+            window.__pullSpy.calls += 1;
+            return original(callback);
+          };
+        })();
+        """;
     private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
 
     /// <inheritdoc />
@@ -143,12 +154,50 @@ public sealed partial class SheetDragTests : CabinetPageTest
         await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(1);
     }
 
+    [Fact]
+    public async Task Crossing_the_phone_breakpoint_with_a_card_open_closes_it_with_the_plain_fade_and_draws_the_phone_cabinet()
+    {
+        await Page.SetViewportSizeAsync(1440, 900);
+        var address = await OpenCardAsync();
+        (await TransitionCallsAsync()).Should().Be(1);
+        var layoutRequests = new List<string>();
+        Page.Request += (_, request) =>
+        {
+            if (request.Url.Contains("/cabinet/layout", StringComparison.Ordinal))
+            {
+                lock (layoutRequests)
+                {
+                    layoutRequests.Add(request.Url);
+                }
+            }
+        };
+
+        await Page.SetViewportSizeAsync(PhoneWidth, PhoneHeight);
+
+        await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(0);
+        await Expect(Page.Locator("#cabinet .placement").First).ToBeVisibleAsync();
+        lock (layoutRequests)
+        {
+            layoutRequests.Should().ContainSingle().Which.Should().Contain("profile=phone");
+        }
+
+        (await TransitionCallsAsync()).Should().Be(1);
+        await WaitUntilTheCardStepIsGoneAsync();
+        Page.Url.Should().Be(address);
+
+        await Page.GoBackAsync();
+
+        Page.Url.Should().Be(BlankPage);
+        ConsoleErrors.Should().BeEmpty();
+    }
+
     [GeneratedRegex("^(none|0px( 0px)?)$")]
     private static partial Regex AtRest();
 
     private async Task<string> OpenCardAsync()
     {
         await StartAsync(PrototypeOn);
+        await Page.AddInitScriptAsync(TransitionSpy);
         await Page.GotoAsync(BlankPage);
         var address = await GotoCabinetAsync("/?sample=65");
 
@@ -161,6 +210,8 @@ public sealed partial class SheetDragTests : CabinetPageTest
 
     private async Task<LocatorBoundingBoxResult> BoxOfAsync(string selector) =>
         (await Page.Locator(selector).First.BoundingBoxAsync())!;
+
+    private Task<int> TransitionCallsAsync() => Page.EvaluateAsync<int>("window.__pullSpy.calls");
 
     private async Task WaitUntilTheCardStepIsGoneAsync()
     {
