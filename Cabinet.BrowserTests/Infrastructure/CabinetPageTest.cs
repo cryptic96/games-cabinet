@@ -93,8 +93,9 @@ public abstract class CabinetPageTest : PageTest
     }
 
     /// <summary>
-    /// Saves a full-page screenshot as <c>{name}.png</c> in the directory named by the <c>CABINET_SCREENSHOT_DIR</c>
-    /// environment variable, and does nothing when the variable is not set.
+    /// Saves a screenshot as <c>{name}.png</c> in the directory named by the <c>CABINET_SCREENSHOT_DIR</c> environment
+    /// variable, and does nothing when the variable is not set. The shot covers the whole page, except while a dialog is open:
+    /// a full-page capture resizes the viewport, which moves the open card and drops focus, so the visible window is saved instead.
     /// </summary>
     /// <param name="name">The file name without extension.</param>
     protected async Task SaveScreenshotAsync(string name)
@@ -106,7 +107,8 @@ public abstract class CabinetPageTest : PageTest
         }
 
         Directory.CreateDirectory(directory);
-        await Page.ScreenshotAsync(new PageScreenshotOptions { Path = Path.Combine(directory, $"{name}.png"), FullPage = true });
+        var dialogOpen = await Page.Locator("dialog[open]").CountAsync() > 0;
+        await Page.ScreenshotAsync(new PageScreenshotOptions { Path = Path.Combine(directory, $"{name}.png"), FullPage = !dialogOpen });
     }
 
     /// <inheritdoc />
