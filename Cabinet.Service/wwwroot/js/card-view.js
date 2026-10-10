@@ -619,8 +619,9 @@ function buildOwnedExpansions(record, copy, iconsUrl, onSwap) {
 
 /**
  * Builds the card of one game: the grip strip of the phone sheet, the close button, the header with cover, title and year, and the
- * ruled area with the game-night strip or the quiet note, the location, the rating, designers and mechanics, and the link to
- * BoardGameGeek last. Whatever is missing is left out.
+ * ruled area with, for an expansion, the row or rows back to its base games first, then the game-night strip or the quiet note,
+ * the location, for a base game its owned expansions, the rating, designers and mechanics, the link to BoardGameGeek, and the
+ * punched hole last. Whatever is missing is left out.
  * @param {object} record The card record, or the least a card can show when the data did not arrive.
  * @param {object} copy The visitor-facing strings.
  * @param {{ iconsUrl?: string, palette?: object[], onSwap?: (entryId: string) => void }} [options] The sprite address, the colour
@@ -696,6 +697,11 @@ export function buildCard(record, copy, options = {}) {
   if (link !== null) {
     ruled.append(link);
   }
+
+  const hole = document.createElement('div');
+  hole.className = 'card-hole';
+  hole.setAttribute('aria-hidden', 'true');
+  ruled.append(hole);
 
   card.append(grip, closeWrap, head, ruled);
 

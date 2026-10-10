@@ -293,7 +293,7 @@ html:has(dialog[open]) {
  * space inside it is a whole number of rulings, so wrapped text always ends on a rule.
  */
 .card-ruled {
-  padding: var(--ruling) 24px calc(2 * var(--ruling));
+  padding: var(--ruling) 24px 0;
   background-image: repeating-linear-gradient(
     to bottom,
     transparent 0 calc(var(--ruling) - 1px),
@@ -360,14 +360,20 @@ html:has(dialog[open]) {
   color: var(--ink);
 }
 
+/**
+ * The value and the label are inline text of different sizes on one line. Their own line boxes are left out of the line height so
+ * the entry's line, which is exactly one ruling, decides the height; otherwise the two sizes together make a line a pixel taller.
+ */
 .fact .v {
   font-size: 16px;
   font-weight: 600;
+  line-height: 0;
 }
 
 .fact .l {
   font-size: 14px;
   font-weight: 400;
+  line-height: 0;
   color: var(--paper-label);
 }
 
@@ -414,20 +420,67 @@ html:has(dialog[open]) {
   content: "\00a0\00b7" / "";
 }
 
+/**
+ * The link to the game's page is a row like the others: its text on the first ruled line, the external icon after the text so a
+ * longer translation wraps with the icon at its end, and the whole row is the tap area, one or two rulings tall.
+ */
+.card-link,
+.exp-row {
+  min-height: calc(var(--hit-rows) * var(--ruling));
+}
+
 .card-link a {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  display: block;
   min-height: calc(var(--hit-rows) * var(--ruling));
   color: var(--ink);
   text-decoration: underline;
   text-underline-offset: 3px;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .card-link svg {
-  flex: none;
+  display: inline;
   width: 14px;
   height: 14px;
+  margin-inline-start: 4px;
+  vertical-align: -2px;
+}
+
+@media (hover: hover) {
+  .exp-row:hover,
+  .card-link a:hover {
+    background: rgb(42 26 16 / 0.06);
+  }
+}
+
+.exp-row:active,
+.card-link a:active {
+  background: rgb(42 26 16 / 0.06);
+}
+
+/**
+ * The punched hole at the foot of the card: a trailing block two rulings tall holding one small circle that reads as a hole in the
+ * paper, lit from the upper left like everything else. It is decoration only and takes no press.
+ */
+.card-ruled > .card-hole {
+  display: grid;
+  place-items: center;
+  height: calc(2 * var(--ruling));
+  margin-block-start: 0;
+  pointer-events: none;
+}
+
+.card-hole::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 70% 75%, #3a2415 0, var(--paper-hole) 60%, #160a04 100%);
+  box-shadow:
+    inset 1px 2px 2px rgb(0 0 0 / 0.55),
+    inset -1px -1px 0 rgb(255 235 205 / 0.22),
+    0 0 0 1px rgb(120 90 60 / 0.28),
+    0 1px 0 rgb(255 255 255 / 0.9);
 }
 
 /**
@@ -450,6 +503,7 @@ html:has(dialog[open]) {
   line-height: var(--ruling);
   text-align: start;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .exp-chip {
@@ -562,7 +616,7 @@ html:has(dialog[open]) {
   }
 
   .card-ruled {
-    padding: var(--ruling) 16px calc(32px + env(safe-area-inset-bottom));
+    padding: var(--ruling) 16px env(safe-area-inset-bottom);
   }
 
   .card-expansions-title {

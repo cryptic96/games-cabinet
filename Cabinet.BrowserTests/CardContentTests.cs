@@ -59,7 +59,7 @@ public sealed class CardContentTests : CabinetPageTest
         (await Page.Locator(".card-meta ul.mech").GetAttributeAsync("role")).Should().Be("list");
 
         var order = await Page.Locator(".card-ruled").EvaluateAsync<string[]>("ruled => Array.from(ruled.children).map(child => child.className)");
-        order.Where(name => name != "card-owned").Should().Equal("facts", "card-where", "card-meta", "card-link");
+        order.Where(name => name is not ("card-owned" or "card-hole")).Should().Equal("facts", "card-where", "card-meta", "card-link");
         (await Page.EvaluateAsync<string>("getComputedStyle(document.querySelector('.card-ruled .fact')).lineHeight")).Should().Be("28px");
         ConsoleErrors.Should().BeEmpty();
     }
