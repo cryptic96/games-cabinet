@@ -69,3 +69,115 @@ export function indexPlacements(layout) {
 
   return index;
 }
+
+/** How long a re-open waits for the pop of the previous close before it goes on, in milliseconds. */
+const REOPEN_WAIT_MS = 150;
+
+/**
+ * The one history step a card takes. Opening pushes a step with no address, so Back closes the card; closing in any other way
+ * removes that step again with one Back, and the pop that causes is swallowed, so no dead step is left behind and a second Back
+ * leaves the page as it would have before.
+ * @param {object} parts What the step needs from the page.
+ * @param {{ pushState: Function, back: Function, replaceState: Function }} parts.history The browser history.
+ * @param {(callback: Function, delay: number) => unknown} parts.setTimer Starts a timer.
+ * @param {(timer: unknown) => void} parts.clearTimer Stops a timer.
+ * @returns {{ opened: Function, closedHere: Function, popped: Function, beforeOpen: Function, clearStale: Function }} The controls.
+ */
+export function createHistoryStep({ history, setTimer, clearTimer }) {
+  let hasStep = false;
+  let ignorePop = false;
+  let waiting = [];
+
+  /**
+   * Releases every re-open that is waiting for the pending pop.
+   */
+  function releaseWaiting() {
+    const released = waiting;
+
+    waiting = [];
+
+    for (const release of released) {
+      release();
+    }
+  }
+
+  return {
+    /**
+     * Records that a card opened and pushes its step, unless one already stands.
+     */
+    opened() {
+      if (hasStep) {
+        return;
+      }
+
+      history.pushState({ card: true }, '');
+      hasStep = true;
+    },
+
+    /**
+     * Records a close that did not come from history and removes the step with one Back, whose pop will be ignored.
+     */
+    closedHere() {
+      if (!hasStep) {
+        return;
+      }
+
+      hasStep = false;
+      ignorePop = true;
+      history.back();
+    },
+
+    /**
+     * Decides what a pop means: the one a close here caused is ignored, any other closes the card and ends the step.
+     * @returns {'ignore' | 'close'}
+     */
+    popped() {
+      if (ignorePop) {
+        ignorePop = false;
+        releaseWaiting();
+
+        return 'ignore';
+      }
+
+      hasStep = false;
+
+      return 'close';
+    },
+
+    /**
+     * Gives a promise that is settled when a new card may push its step: at once when no pop is pending, otherwise on that pop or
+     * after a short wait, whichever comes first, so the stack never holds two steps. When the wait runs out the pop is given up
+     * on, so a late one closes the card instead of leaving the page.
+     * @returns {Promise<void>}
+     */
+    beforeOpen() {
+      if (!ignorePop) {
+        return Promise.resolve();
+      }
+
+      return new Promise((resolve) => {
+        const release = () => {
+          clearTimer(timer);
+          resolve();
+        };
+        const timer = setTimer(() => {
+          waiting = waiting.filter((entry) => entry !== release);
+          ignorePop = false;
+          resolve();
+        }, REOPEN_WAIT_MS);
+
+        waiting.push(release);
+      });
+    },
+
+    /**
+     * Removes a card step left in the history by a reload or a restore, which no card stands behind.
+     * @param {object | null} state The history state found on load.
+     */
+    clearStale(state) {
+      if (state !== null && state !== undefined && state.card === true) {
+        history.replaceState(null, '');
+      }
+    },
+  };
+}

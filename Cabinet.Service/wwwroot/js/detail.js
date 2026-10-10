@@ -3,7 +3,7 @@
  * on the box that opened it. The card is built from data already in memory, so opening it never waits for the network.
  */
 import { buildCard } from './card-view.js';
-import { sourceEntry } from './card-flow.js';
+import { createHistoryStep, sourceEntry } from './card-flow.js';
 
 /**
  * Wires the dialog to the cabinet.
@@ -17,9 +17,18 @@ import { sourceEntry } from './card-flow.js';
  * @returns {{ openCard: Function, closeCard: Function, isOpen: Function, whenClosed: Function }} The controls.
  */
 export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette = () => [], iconsUrl = '' }) {
+  const steps = createHistoryStep({
+    history: window.history,
+    setTimer: (callback, delay) => window.setTimeout(callback, delay),
+    clearTimer: (timer) => window.clearTimeout(timer),
+  });
   let opener = null;
+  let opening = false;
+  let pressedOnFrame = false;
   let closedPromise = null;
   let resolveClosed = null;
+
+  steps.clearStale(window.history.state);
 
   /**
    * Finds the box that opened the card: the element itself while it is still on the page, otherwise the box with the same entry id
@@ -39,28 +48,39 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
   }
 
   /**
-   * Opens the card of an entry over the cabinet and moves focus to its title.
+   * Opens the card of an entry over the cabinet, takes the one history step and moves focus to its title. A card that is open or
+   * opening is left alone. A close that just happened is given a moment to finish removing its own step first.
    * @param {string | number} entryId The collection entry to show.
    * @param {{ opener?: HTMLElement }} [from] The box that was tapped, so focus can return to it.
+   * @returns {Promise<void>}
    */
-  function openCard(entryId, { opener: element } = {}) {
-    if (dialog.open) {
+  async function openCard(entryId, { opener: element } = {}) {
+    if (dialog.open || opening) {
       return;
     }
 
-    const record = getRecord(String(entryId));
+    opening = true;
 
-    if (record === null || record === undefined) {
-      return;
+    try {
+      await steps.beforeOpen();
+
+      const record = getRecord(String(entryId));
+
+      if (dialog.open || record === null || record === undefined) {
+        return;
+      }
+
+      opener = { element, entryId: String(entryId), kind: element?.dataset.kind ?? '' };
+
+      const card = buildCard(record, getCopy(), { iconsUrl, palette: getPalette() });
+
+      dialog.replaceChildren(card);
+      dialog.showModal();
+      steps.opened();
+      card.querySelector('.card-title').focus({ preventScroll: true });
+    } finally {
+      opening = false;
     }
-
-    opener = { element, entryId: String(entryId), kind: element?.dataset.kind ?? '' };
-
-    const card = buildCard(record, getCopy(), { iconsUrl, palette: getPalette() });
-
-    dialog.replaceChildren(card);
-    dialog.showModal();
-    card.querySelector('.card-title').focus({ preventScroll: true });
   }
 
   /**
@@ -97,6 +117,8 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
   }
 
   dialog.addEventListener('close', () => {
+    steps.closedHere();
+
     const box = findOpener();
 
     if (box !== null) {
@@ -112,10 +134,22 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
     }
   });
 
-  dialog.addEventListener('click', (event) => {
-    if (event.target.closest('.card-close') !== null) {
+  window.addEventListener('popstate', () => {
+    if (steps.popped() === 'close') {
       closeCard();
     }
+  });
+
+  dialog.addEventListener('pointerdown', (event) => {
+    pressedOnFrame = event.target === dialog;
+  });
+
+  dialog.addEventListener('click', (event) => {
+    if (event.target.closest('.card-close') !== null || (event.target === dialog && pressedOnFrame)) {
+      closeCard();
+    }
+
+    pressedOnFrame = false;
   });
 
   mount.addEventListener('click', (event) => {
