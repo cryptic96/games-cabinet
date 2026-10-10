@@ -7,12 +7,18 @@ import { renderCabinet } from './render.js';
 import { COPY } from './copy.js';
 import { initSyncStatus, fetchStatus } from './sync.js';
 import { startLive } from './live.js';
+import { initCardDialog } from './detail.js';
+import { indexPlacements, recordFromPlacement } from './card-flow.js';
 
 const mount = document.getElementById('cabinet');
 const syncRoot = document.querySelector('.sync');
+const dialog = document.querySelector('.card-dialog');
 const phoneQuery = window.matchMedia('(max-width: 40rem)');
 
 let latestLoad = 0;
+let cardRecords = new Map();
+let drawnPlacements = new Map();
+let drawnPalette = [];
 
 /**
  * Returns the profile name the layout endpoint expects for the current viewport.
@@ -30,6 +36,83 @@ function layoutUrl() {
   const sample = mount.dataset.sample;
 
   return '/cabinet/layout?profile=' + currentProfile() + (sample ? '&sample=' + encodeURIComponent(sample) : '');
+}
+
+/**
+ * Builds the card data address for the current profile and the mount's sample, if it carries one.
+ * @returns {string}
+ */
+function cardsUrl() {
+  const sample = mount.dataset.sample;
+
+  return '/cabinet/cards?profile=' + currentProfile() + (sample ? '&sample=' + encodeURIComponent(sample) : '');
+}
+
+/**
+ * Gives the card record of an entry: the record the card data holds, or the least the drawn box knows when the data did not
+ * arrive or does not hold that entry.
+ * @param {string} entryId The collection entry id as text.
+ * @returns {object | null} The record, or null when the entry is not on screen either.
+ */
+function recordFor(entryId) {
+  const record = cardRecords.get(entryId);
+
+  if (record !== undefined) {
+    return record;
+  }
+
+  const placement = drawnPlacements.get(entryId);
+
+  return placement === undefined ? null : recordFromPlacement(placement);
+}
+
+/**
+ * Fetches the card data of the layout just drawn, once more when it belongs to a different layout than the one on screen, and
+ * keeps it in memory so a tap finds it ready. It never shows anything and ignores every failure: a card without its data still
+ * opens with what the drawn box knows. A newer load or redraw supersedes it.
+ * @param {number} epoch The load counter when the layout was drawn.
+ * @param {string | null} etag The entity tag of the layout on screen, when the response carried one.
+ * @returns {Promise<void>}
+ */
+async function fetchCards(epoch, etag) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await fetch(cardsUrl(), { priority: 'low' });
+
+      if (epoch !== latestLoad) {
+        return;
+      }
+
+      if (!response.ok) {
+        return;
+      }
+
+      const body = await response.json();
+
+      if (epoch !== latestLoad) {
+        return;
+      }
+
+      if (etag === null || body.layout === etag) {
+        cardRecords = new Map(body.cards.map((record) => [String(record.entryId), record]));
+
+        return;
+      }
+    } catch {
+      return;
+    }
+  }
+}
+
+/**
+ * Remembers what the layout just drawn holds and starts fetching the card data that goes with it.
+ * @param {object} layout The layout drawn.
+ * @param {string | null} etag The entity tag of the layout response.
+ */
+function afterDraw(layout, etag) {
+  drawnPlacements = indexPlacements(layout);
+  drawnPalette = layout.palette ?? [];
+  fetchCards(latestLoad, etag);
 }
 
 /**
@@ -73,6 +156,7 @@ function showError() {
 async function load() {
   latestLoad += 1;
   const thisLoad = latestLoad;
+  cardRecords = new Map();
   showLoading();
 
   try {
@@ -94,6 +178,7 @@ async function load() {
     }
 
     renderCabinet(mount, layout, COPY);
+    afterDraw(layout, response.headers.get('ETag'));
   } catch {
     if (thisLoad === latestLoad) {
       showError();
@@ -103,12 +188,12 @@ async function load() {
 
 /**
  * Fetches the layout for the current profile and the mount's sample, if it carries one.
- * @returns {Promise<object | null>} The layout, or null when the answer is not a success.
+ * @returns {Promise<{ layout: object, etag: string | null } | null>} The layout and its entity tag, or null when the answer is not a success.
  */
 async function fetchLayout() {
   const response = await fetch(layoutUrl());
 
-  return response.ok ? response.json() : null;
+  return response.ok ? { layout: await response.json(), etag: response.headers.get('ETag') } : null;
 }
 
 /**
@@ -139,19 +224,22 @@ async function redraw() {
   const thisRedraw = latestLoad;
 
   try {
-    const layout = await fetchLayout();
+    const fetched = await fetchLayout();
 
     if (thisRedraw !== latestLoad) {
       return false;
     }
 
-    if (layout === null) {
+    if (fetched === null) {
       return abandonRedraw();
     }
+
+    const { layout, etag } = fetched;
 
     const focused = mount.contains(document.activeElement) ? document.activeElement.dataset.entryId : undefined;
 
     renderCabinet(mount, layout, COPY);
+    afterDraw(layout, etag);
 
     const filling = document.querySelector('.cabinet-filling');
 
@@ -192,6 +280,17 @@ if (syncRoot !== null) {
   const sync = initSyncStatus(syncRoot, { onCollectionChanged: redraw });
 
   startLive({ applyStatus: sync.applyStatus, fetchStatus });
+}
+
+if (mount !== null && dialog !== null) {
+  initCardDialog({
+    dialog,
+    mount,
+    getRecord: recordFor,
+    getCopy: () => COPY,
+    getPalette: () => drawnPalette,
+    iconsUrl: dialog.dataset.icons ?? '',
+  });
 }
 
 if (mount !== null) {

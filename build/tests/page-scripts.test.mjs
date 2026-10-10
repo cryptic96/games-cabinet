@@ -1790,6 +1790,7 @@ async function startCabinetPage({ firstLayout, status }) {
   const documentHandlers = {};
   const windowHandlers = {};
   const layoutRequests = [];
+  const cardRequests = [];
   const replaced = [];
   const fire = (handlers, type) => (handlers[type] ?? []).forEach((handler) => handler());
   const syncElements = { '.sync-exact': page.createElement('p'), '.sync-stale': page.createElement('p'), '.sync-note': note };
@@ -1820,9 +1821,15 @@ async function startCabinetPage({ firstLayout, status }) {
   };
   globalThis.document = page;
   globalThis.CSS = { escape: (value) => value };
-  globalThis.fetch = (url) => {
+  globalThis.fetch = (url, init) => {
     if (url === '/cabinet/status') {
       return Promise.resolve(answer(200, { ...status(), serverTimeUtc: isoAt(clock.elapsed()) }));
+    }
+
+    if (url.startsWith('/cabinet/cards?')) {
+      cardRequests.push({ url, init });
+
+      return Promise.resolve(answer(200, { layout: '', cards: [] }));
     }
 
     assert.equal(url, CABINET_LAYOUT_ROUTE);
@@ -1851,6 +1858,7 @@ async function startCabinetPage({ firstLayout, status }) {
     note,
     replaced,
     layoutRequests,
+    cardRequests,
     settle,
     boxes: () => mount.descendants().filter((node) => node.tagName === 'BUTTON'),
     box: (entryId) => mount.querySelector('[data-entry-id="' + entryId + '"]'),
@@ -2117,4 +2125,23 @@ test('a click on the current language, with a modifier key or a non-primary butt
 test('a page without a toggle gets no handler and no error', () => {
   assert.doesNotThrow(() => initLanguageToggle(null));
   assert.doesNotThrow(() => initLanguageToggle(undefined));
+});
+
+test('the card data is fetched once right after the cabinet draws, at low priority, and again after the cabinet is redrawn', async () => {
+  let version = 'v1';
+
+  try {
+    const cabinet = await startCabinetPage({ firstLayout: layoutOfEntries([1, 2]), status: () => ({ running: false, snapshotVersion: version }) });
+
+    assert.deepEqual(cabinet.cardRequests, [{ url: '/cabinet/cards?profile=desktop', init: { priority: 'low' } }]);
+
+    version = 'v2';
+    await cabinet.comeOnline();
+    cabinet.layoutRequests.shift().resolve(answer(200, layoutOfEntries([3])));
+    await cabinet.settle();
+
+    assert.equal(cabinet.cardRequests.length, 2);
+  } finally {
+    leaveCabinetPage();
+  }
 });

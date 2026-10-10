@@ -86,6 +86,10 @@ const ENGLISH = Object.freeze({
   errorBody: 'Check your connection and try again.',
   retry: 'Try again',
   untitled: 'Untitled game',
+  close: 'Close',
+  bggLink: 'View on BoardGameGeek',
+  newTabHint: '(opens in a new tab)',
+  noDetails: 'More details arrive after the next sync.',
 
   /**
    * How long ago the collection was synced: just now under a minute or for a time in the future, then whole minutes, whole
@@ -233,6 +237,10 @@ const DUTCH = Object.freeze({
   errorBody: 'Controleer je verbinding en probeer het opnieuw.',
   retry: 'Opnieuw proberen',
   untitled: 'Spel zonder titel',
+  close: 'Sluiten',
+  bggLink: 'Bekijk op BoardGameGeek',
+  newTabHint: '(opent in een nieuw tabblad)',
+  noDetails: 'Meer details volgen na de volgende synchronisatie.',
 
   /**
    * How long ago the collection was synced, with the time first and the verb last: just now under a minute or for a time in the
