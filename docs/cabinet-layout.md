@@ -49,6 +49,13 @@ run on otherwise, when the next game of its series needs the room that second
 column would take (see the series rules below). A cubby takes at most one family
 that continues next door, and at most one such column.
 
+Each column of a family's expansion stack has its own cap, the setting
+`Layout:ExpansionStackMax`. A family whose expansions continue into the next
+cubby may therefore show two full stacks, up to twice the setting, and this is
+intended: a large family shows more of its expansions instead of hiding them
+behind "+N more" as soon as the first column is full. The ones that fit in
+neither column stay behind the marker.
+
 Games of one series stand next to each other. Two things make games a series.
 The first is BoardGameGeek's family names: only families whose name starts with
 `Game: ` (a game, its spin-offs and standalone games) or `Series: ` (a named
@@ -399,6 +406,17 @@ version back and record again. Look at the changed files before committing them.
 the automated workflows.
 
 ## What the page shows
+
+The text on a spine or a flat box is the title cut at its first colon or spaced
+dash and shortened to what the box has room for, with an ellipsis. A shortened
+label always shows at least five characters before its ellipsis; when the room
+allows fewer, the box shows no text at all, only its colour and rules. A scrap
+such as "Ex..." reads as noise rather than as a title, and the full title is
+never lost: it stays in the box's accessible name and tooltip and on the card one
+tap away. A title that fits is never shortened or hidden, however short it is.
+Characters are counted as the reader sees them, so an emoji or a letter with an
+accent counts as one and is never split. Changing this rule changes the layout
+version, because only the label text of the recorded layouts changes.
 
 The deployed site always draws the owner's synced collection. Layouts for it
 are built once per collection version and screen profile and kept with that
