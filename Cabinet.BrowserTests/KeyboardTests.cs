@@ -186,6 +186,182 @@ public sealed class KeyboardTests : CabinetPageTest
         await Expect(Page.Locator("#cabinet-hint")).ToHaveTextAsync("Use the arrow keys to move between games and press Enter to open one.");
     }
 
+    [Fact]
+    public async Task In_a_big_cabinet_End_brings_the_last_box_into_view_and_it_is_still_one_tab_stop()
+    {
+        await OpenAsync("/?sample=400", 1440, 900);
+
+        await Expect(Page.Locator(Boxes + "[tabindex=\"0\"]")).ToHaveCountAsync(1);
+        await Page.Locator(Boxes).First.FocusAsync();
+        var before = await Page.EvaluateAsync<double>("window.scrollY");
+
+        await Page.Keyboard.PressAsync("End");
+
+        await Expect(Page.Locator(Boxes).Last).ToBeFocusedAsync();
+        await Expect(Page.Locator(Boxes).Last).ToBeInViewportAsync();
+        (await Page.EvaluateAsync<double>("window.scrollY")).Should().BeGreaterThan(before);
+        var last = await FocusedAsync();
+        last.Top.Should().BeGreaterThanOrEqualTo(0);
+        last.Bottom.Should().BeLessThanOrEqualTo(900);
+        await Expect(Page.Locator(Boxes + "[tabindex=\"0\"]")).ToHaveCountAsync(1);
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task At_the_end_of_a_shelf_the_arrow_key_does_nothing()
+    {
+        await OpenAsync("/?sample=65", 1440, 900);
+
+        await Page.Locator(Boxes + "[data-shelf]").First.FocusAsync();
+        var shelf = (await FocusedAsync()).Shelf;
+        var previous = await FocusedAsync();
+
+        for (var step = 0; step < 200; step++)
+        {
+            await Page.Keyboard.PressAsync("ArrowRight");
+            var current = await FocusedAsync();
+            if (current.EntryId == previous.EntryId && current.Kind == previous.Kind)
+            {
+                break;
+            }
+
+            current.Shelf.Should().Be(shelf);
+            previous = current;
+        }
+
+        await Page.Keyboard.PressAsync("ArrowRight");
+        var after = await FocusedAsync();
+        after.EntryId.Should().Be(previous.EntryId);
+        after.Kind.Should().Be(previous.Kind);
+        await SaveScreenshotAsync("keyboard-focus-desktop");
+    }
+
+    [Fact]
+    public async Task On_a_phone_Down_reaches_a_box_on_the_next_shelf()
+    {
+        await OpenAsync("/?sample=65", 390, 800);
+
+        await Page.Locator(Boxes).Nth(await IndexOfBoxWithBoxBelowAsync()).FocusAsync();
+        var start = await FocusedAsync();
+
+        await Page.Keyboard.PressAsync("ArrowDown");
+        var next = await FocusedAsync();
+
+        next.IsBox.Should().BeTrue();
+        next.Shelf.Should().NotBe(start.Shelf);
+        next.Top.Should().BeGreaterThanOrEqualTo(start.Bottom - 2);
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_focused_more_marker_holds_the_tab_stop_and_its_base_box_does_not()
+    {
+        await OpenAsync("/?sample=400", 1440, 900);
+
+        var marker = Page.Locator(Boxes + "[data-kind=\"moreMarker\"]").First;
+        var entryId = await marker.GetAttributeAsync("data-entry-id");
+        await marker.FocusAsync();
+
+        await Expect(marker).ToHaveAttributeAsync("tabindex", "0");
+        await Expect(Page.Locator($"{Boxes}[data-entry-id=\"{entryId}\"]:not([data-kind=\"moreMarker\"])")).ToHaveAttributeAsync("tabindex", "-1");
+        await Expect(Page.Locator(Boxes + "[tabindex=\"0\"]")).ToHaveCountAsync(1);
+    }
+
+    [Fact]
+    public async Task An_empty_cabinet_has_no_tab_stop_and_Tab_goes_straight_to_the_footer_credit()
+    {
+        await Page.SetViewportSizeAsync(1440, 900);
+        await StartAsync(PrototypeOn);
+        await OpenWithoutBoxesAsync("/?sample=0");
+
+        await Expect(Page.Locator(Boxes)).ToHaveCountAsync(0);
+
+        await Page.Locator(LastLinkBeforeCabinet).FocusAsync();
+        await Page.Keyboard.PressAsync("Tab");
+
+        await Expect(Page.Locator(".bgg-credit")).ToBeFocusedAsync();
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_single_box_is_the_one_tab_stop_and_every_arrow_stays_on_it()
+    {
+        await OpenAsync("/?sample=1", 1440, 900);
+
+        var only = Page.Locator(Boxes);
+        await Expect(only).ToHaveCountAsync(1);
+        await Expect(only).ToHaveAttributeAsync("tabindex", "0");
+
+        await only.FocusAsync();
+        foreach (var key in new[] { "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End" })
+        {
+            await Page.Keyboard.PressAsync(key);
+            await Expect(only).ToBeFocusedAsync();
+        }
+    }
+
+    [Fact]
+    public async Task After_the_cabinet_is_drawn_again_the_box_that_held_the_tab_stop_still_holds_it()
+    {
+        await OpenAsync("/?sample=65", 1440, 900);
+        var onDesktop = await BoxKeysAsync();
+
+        await ChangeProfileAsync(390, 800, "phone");
+        var onPhone = await BoxKeysAsync();
+        await ChangeProfileAsync(1440, 900, "desktop");
+
+        var shared = onDesktop.Intersect(onPhone).Skip(4).First().Split('|');
+        var box = Page.Locator($"{Boxes}[data-entry-id=\"{shared[0]}\"][data-kind=\"{shared[1]}\"]");
+        await box.FocusAsync();
+        await Expect(box).ToHaveAttributeAsync("tabindex", "0");
+
+        await ChangeProfileAsync(390, 800, "phone");
+
+        await Expect(box).ToHaveAttributeAsync("tabindex", "0");
+        await Expect(Page.Locator(Boxes + "[tabindex=\"0\"]")).ToHaveCountAsync(1);
+    }
+
+    [Theory]
+    [InlineData("/?sample=5", 1440, 900)]
+    [InlineData("/?sample=5", 390, 800)]
+    [InlineData("/?sample=12", 1440, 900)]
+    [InlineData("/?sample=12", 390, 800)]
+    [InlineData("/?sample=65", 1440, 900)]
+    [InlineData("/?sample=65", 390, 800)]
+    [InlineData("/?sample=400", 1440, 900)]
+    [InlineData("/?sample=400", 390, 800)]
+    [InlineData("/?sample=edge", 1440, 900)]
+    [InlineData("/?sample=edge", 390, 800)]
+    public async Task Every_box_can_be_reached_from_the_first_one_with_the_arrow_keys(string path, int width, int height)
+    {
+        await OpenAsync(path, width, height);
+
+        var unreachable = await Page.EvaluateAsync<int>(
+            "(async () => { const { nextBox } = await import('/js/keys.js'); const rects = [...document.querySelectorAll('#cabinet .placement')].map((b) => { const r = b.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, shelf: b.dataset.shelf }; }); const seen = new Set([0]); const queue = [0]; while (queue.length > 0) { const at = queue.shift(); for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']) { const to = nextBox(rects, at, key); if (!seen.has(to)) { seen.add(to); queue.push(to); } } } return rects.length - seen.size; })()");
+
+        unreachable.Should().Be(0);
+    }
+
+    private async Task OpenWithoutBoxesAsync(string path)
+    {
+        var drawn = Page.WaitForResponseAsync(response => response.Url.Contains("/cabinet/layout", StringComparison.Ordinal));
+        await Page.GotoAsync($"http://127.0.0.1:{PublicPort}{path}");
+        await drawn;
+        await Expect(Page.Locator("#cabinet .cabinet-loading")).ToHaveCountAsync(0);
+    }
+
+    private async Task ChangeProfileAsync(int width, int height, string profile)
+    {
+        var drawn = Page.WaitForResponseAsync(response => response.Url.Contains($"/cabinet/layout?profile={profile}", StringComparison.Ordinal));
+        await Page.SetViewportSizeAsync(width, height);
+        await drawn;
+        await Expect(Page.Locator("#cabinet .cabinet-loading")).ToHaveCountAsync(0);
+        await Expect(Page.Locator(Boxes).First).ToBeAttachedAsync();
+    }
+
+    private async Task<IReadOnlyList<string>> BoxKeysAsync() => await Page.EvaluateAsync<string[]>(
+        "[...document.querySelectorAll('#cabinet .placement')].map((b) => b.dataset.entryId + '|' + b.dataset.kind)");
+
     private async Task OpenAsync(string path, int width, int height)
     {
         await Page.SetViewportSizeAsync(width, height);

@@ -134,3 +134,24 @@ test('a box with no area is still reachable', () => {
   assert.equal(nextBox(rects, 0, 'ArrowRight'), 1);
   assert.equal(nextBox(rects, 1, 'ArrowRight'), 2);
 });
+
+test('down at the bottom of a column carries on at the top of the next section standing beside it, and up comes back', () => {
+  const rects = [
+    box(0, 100, 40, 200, '0:1'),
+    box(0, 340, 40, 200, '0:0'),
+    box(300, 140, 40, 100, '1:1'),
+    box(300, 260, 40, 100, '1:0'),
+  ];
+
+  assert.equal(nextBox(rects, 1, 'ArrowDown'), 2);
+  assert.equal(nextBox(rects, 2, 'ArrowUp'), 1);
+  assert.equal(nextBox(rects, 0, 'ArrowDown'), 1);
+  assert.equal(nextBox(rects, 2, 'ArrowDown'), 3);
+});
+
+test('down in the last section and up in the first section stay where they are', () => {
+  const rects = [box(0, 100, 40, 200, '0:0'), box(300, 100, 40, 200, '1:0')];
+
+  assert.equal(nextBox(rects, 1, 'ArrowDown'), 1);
+  assert.equal(nextBox(rects, 0, 'ArrowUp'), 0);
+});

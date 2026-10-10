@@ -87,7 +87,8 @@ function beats(fit, best) {
 /**
  * Picks the box a key moves to. Left and right stay on the current shelf and stop at its ends; up and down look at every box
  * above or below, so a pile or a stack is walked one box at a time before the next shelf, and a section below or above is reached
- * the same way. Home and End give the first and the last box.
+ * the same way; where nothing lies that way, they carry on in the next or previous section. Home and End give the first and the
+ * last box.
  * @param {{ left: number, top: number, right: number, bottom: number, shelf: string }[]} rects The boxes' rectangles in document order.
  * @param {number} currentIndex The index of the box that has focus.
  * @param {string} key The key pressed.
@@ -126,6 +127,62 @@ export function nextBox(rects, currentIndex, key) {
 
     if (fit !== null && (best === null || beats(fit, best))) {
       best = fit;
+      bestIndex = index;
+    }
+  });
+
+  if (best === null && !horizontal) {
+    return nextSectionBox(rects, currentIndex, key);
+  }
+
+  return bestIndex;
+}
+
+/**
+ * Gives the section number a box stands in, read from its shelf value, or -1 when it has none.
+ * @param {{ shelf: string }} rect A box's rectangle.
+ * @returns {number}
+ */
+function sectionOf(rect) {
+  const section = Number.parseInt(String(rect.shelf), 10);
+
+  return Number.isNaN(section) ? -1 : section;
+}
+
+/**
+ * Picks the box for an up or down key when nothing lies in that direction on screen, which happens at the end of a column when the
+ * sections stand side by side: down continues at the top of the next section and up at the bottom of the previous one, so every
+ * section can be reached from the keyboard. The box nearest across breaks a tie.
+ * @param {{ left: number, top: number, right: number, bottom: number, shelf: string }[]} rects The boxes' rectangles in document order.
+ * @param {number} currentIndex The index of the box that has focus.
+ * @param {string} key ArrowUp or ArrowDown.
+ * @returns {number} The index to focus, or the current one when there is no other section that way.
+ */
+function nextSectionBox(rects, currentIndex, key) {
+  const from = rects[currentIndex];
+  const own = sectionOf(from);
+  const down = key === 'ArrowDown';
+  const sections = rects.map(sectionOf).filter((section) => own >= 0 && section >= 0 && (down ? section > own : section < own));
+
+  if (sections.length === 0) {
+    return currentIndex;
+  }
+
+  const target = down ? Math.min(...sections) : Math.max(...sections);
+  const centre = (from.left + from.right) / 2;
+  let bestIndex = currentIndex;
+  let best = null;
+
+  rects.forEach((to, index) => {
+    if (sectionOf(to) !== target) {
+      return;
+    }
+
+    const edge = down ? to.top : -to.bottom;
+    const offset = Math.abs(centre - (to.left + to.right) / 2);
+
+    if (best === null || edge < best.edge - TOLERANCE || (edge <= best.edge + TOLERANCE && offset < best.offset - TOLERANCE)) {
+      best = { edge, offset };
       bestIndex = index;
     }
   });
