@@ -14,7 +14,8 @@ import { createHistoryStep, sourceEntry } from './card-flow.js';
  * @param {() => object} parts.getCopy Gives the visitor-facing strings.
  * @param {() => object[]} [parts.getPalette] Gives the colour table of the layout on screen.
  * @param {string} [parts.iconsUrl] The address of the icon sprite.
- * @returns {{ openCard: Function, closeCard: Function, isOpen: Function, whenClosed: Function }} The controls.
+ * @returns {{ openCard: Function, closeCard: Function, swapTo: Function, showsOtherGame: Function, isOpen: Function, whenClosed: Function }}
+ * The controls.
  */
 export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette = () => [], iconsUrl = '' }) {
   const steps = createHistoryStep({
@@ -23,6 +24,8 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
     clearTimer: (timer) => window.clearTimeout(timer),
   });
   let opener = null;
+  let shownEntryId = null;
+  let swapping = false;
   let opening = false;
   let pressedOnFrame = false;
   let closedPromise = null;
@@ -48,13 +51,96 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
   }
 
   /**
-   * Opens the card of an entry over the cabinet, takes the one history step and moves focus to its title. A card that is open or
-   * opening is left alone. A close that just happened is given a moment to finish removing its own step first.
+   * Gives what a card is built with: the sprite, the colour table on screen and the swap a row asks for.
+   * @returns {{ iconsUrl: string, palette: object[], onSwap: Function }}
+   */
+  function cardOptions() {
+    return { iconsUrl, palette: getPalette(), onSwap: swapTo };
+  }
+
+  /**
+   * Gives the length of the swap fade in milliseconds, read from the page's own timing token so the script and the style sheet
+   * never disagree.
+   * @returns {number}
+   */
+  function swapFadeMs() {
+    const raw = getComputedStyle(document.documentElement).getPropertyValue('--swap-fade').trim();
+    const value = Number.parseFloat(raw);
+
+    if (!Number.isFinite(value)) {
+      return 0;
+    }
+
+    return raw.endsWith('ms') ? value : value * 1000;
+  }
+
+  /**
+   * Shows another game in the card that is open, in place: the header and the ruled area fade out, are rebuilt from the other
+   * game's record, scroll back to the top and fade in, and focus moves to the new title, which the dialog's name follows. No second
+   * pull-out and no new history step, so Back still closes the whole card. Only entries the card data holds are shown.
    * @param {string | number} entryId The collection entry to show.
-   * @param {{ opener?: HTMLElement }} [from] The box that was tapped, so focus can return to it.
    * @returns {Promise<void>}
    */
-  async function openCard(entryId, { opener: element } = {}) {
+  async function swapTo(entryId) {
+    const card = dialog.querySelector('.card');
+    const id = String(entryId);
+
+    if (!dialog.open || swapping || card === null || id === shownEntryId) {
+      return;
+    }
+
+    const record = getRecord(id);
+
+    if (record === null || record === undefined) {
+      return;
+    }
+
+    swapping = true;
+
+    try {
+      card.dataset.swap = '';
+      await new Promise((resolve) => window.setTimeout(resolve, swapFadeMs()));
+
+      if (!dialog.open || !card.isConnected) {
+        return;
+      }
+
+      const next = buildCard(record, getCopy(), cardOptions());
+
+      card.querySelector('.card-head').replaceWith(next.querySelector('.card-head'));
+      card.querySelector('.card-ruled').replaceWith(next.querySelector('.card-ruled'));
+      card.scrollTop = 0;
+      shownEntryId = id;
+      void getComputedStyle(card.querySelector('.card-ruled')).opacity;
+      delete card.dataset.swap;
+      card.querySelector('.card-title').focus({ preventScroll: true });
+    } finally {
+      swapping = false;
+
+      if (card.isConnected) {
+        delete card.dataset.swap;
+      }
+    }
+  }
+
+  /**
+   * Tells whether the card shows another game than the box it was opened from, which happens after a swap.
+   * @returns {boolean}
+   */
+  function showsOtherGame() {
+    return dialog.open && opener !== null && shownEntryId !== null && shownEntryId !== opener.entryId;
+  }
+
+  /**
+   * Opens the card of an entry over the cabinet, takes the one history step and moves focus to its title, or to the heading of the
+   * owned expansions when the card is opened at them. A card that is open or opening is left alone. A close that just happened is
+   * given a moment to finish removing its own step first.
+   * @param {string | number} entryId The collection entry to show.
+   * @param {{ opener?: HTMLElement, atExpansions?: boolean }} [from] The box that was tapped, so focus can return to it, and whether
+   * the card opens at its list of owned expansions.
+   * @returns {Promise<void>}
+   */
+  async function openCard(entryId, { opener: element, atExpansions = false } = {}) {
     if (dialog.open || opening) {
       return;
     }
@@ -72,12 +158,21 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
 
       opener = { element, entryId: String(entryId), kind: element?.dataset.kind ?? '' };
 
-      const card = buildCard(record, getCopy(), { iconsUrl, palette: getPalette() });
+      const card = buildCard(record, getCopy(), cardOptions());
 
+      shownEntryId = String(entryId);
       dialog.replaceChildren(card);
       dialog.showModal();
       steps.opened();
-      card.querySelector('.card-title').focus({ preventScroll: true });
+
+      const heading = atExpansions ? card.querySelector('.card-expansions-title') : null;
+
+      if (heading === null) {
+        card.querySelector('.card-title').focus({ preventScroll: true });
+      } else {
+        heading.scrollIntoView({ block: 'start', behavior: 'instant' });
+        heading.focus({ preventScroll: true });
+      }
     } finally {
       opening = false;
     }
@@ -126,6 +221,7 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
     }
 
     opener = null;
+    shownEntryId = null;
 
     if (resolveClosed !== null) {
       resolveClosed();
@@ -159,10 +255,10 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
       return;
     }
 
-    const { entryId } = sourceEntry(box.dataset.kind, box.dataset.entryId);
+    const { entryId, atExpansions } = sourceEntry(box.dataset.kind, box.dataset.entryId);
 
-    openCard(entryId, { opener: box });
+    openCard(entryId, { opener: box, atExpansions });
   });
 
-  return { openCard, closeCard, isOpen, whenClosed };
+  return { openCard, closeCard, swapTo, showsOtherGame, isOpen, whenClosed };
 }

@@ -303,20 +303,23 @@ html:has(dialog[open]) {
   line-height: var(--ruling);
 }
 
-.card-ruled p {
-  margin: 0;
-  line-height: var(--ruling);
-}
-
 .card-note {
   font-size: 14px;
   color: var(--paper-label);
 }
 
-:where(.card-ruled) :where(ul, dl, dd, li) {
+:where(.card-ruled) :where(p, h3, ul, dl, dd, li) {
   margin: 0;
   padding: 0;
-  line-height: 28px;
+  line-height: var(--ruling);
+}
+
+/**
+ * Groups are separated by exactly one blank ruled line and nothing else: the only vertical space between two groups is this
+ * margin, and the first group has none because the area's own padding is already one ruling.
+ */
+.card-ruled > * + * {
+  margin-block-start: var(--ruling);
 }
 
 .card-ruled dd,
@@ -339,7 +342,6 @@ html:has(dialog[open]) {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   column-gap: 24px;
-  margin-block-end: var(--ruling);
   list-style: none;
 }
 
@@ -377,7 +379,6 @@ html:has(dialog[open]) {
   display: grid;
   grid-template-columns: 9rem 1fr;
   column-gap: 8px;
-  margin-block-end: var(--ruling);
 }
 
 .card-ruled dt {
@@ -427,6 +428,76 @@ html:has(dialog[open]) {
   flex: none;
   width: 14px;
   height: 14px;
+}
+
+/**
+ * Pressable rows that swap the card to another owned game: the owned expansions of a base game and the owned base games of an
+ * expansion. A row is one button, text on the first ruled line; its colour chip and chevron sit inside its line and never change
+ * the line box. A long title wraps over whole rulings and the whole row stays one tap area.
+ */
+.exp-row {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding-block: 0;
+  padding-inline: 16px 24px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 16px;
+  line-height: var(--ruling);
+  text-align: start;
+  cursor: pointer;
+}
+
+.exp-chip {
+  position: absolute;
+  top: 4px;
+  inset-inline-start: 0;
+  width: 8px;
+  height: 16px;
+  background: var(--chip);
+  box-shadow: inset 0 0 0 1px rgb(42 26 16 / 0.35);
+}
+
+.exp-chev {
+  position: absolute;
+  top: 6px;
+  inset-inline-end: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--ink);
+}
+
+.exp-title {
+  overflow-wrap: anywhere;
+}
+
+.card-expansions,
+.card-bases-list {
+  list-style: none;
+}
+
+.card-expansions-title,
+.card-bases-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--paper-label);
+}
+
+.card-expansions-title:focus {
+  outline: none;
+}
+
+.card-head,
+.card-ruled {
+  transition: opacity var(--swap-fade);
+}
+
+.card[data-swap] :is(.card-head, .card-ruled) {
+  opacity: 0;
 }
 
 @media (max-height: 30rem) {
@@ -492,6 +563,10 @@ html:has(dialog[open]) {
 
   .card-ruled {
     padding: var(--ruling) 16px calc(32px + env(safe-area-inset-bottom));
+  }
+
+  .card-expansions-title {
+    scroll-margin-block-start: var(--ruling);
   }
 
   .facts {

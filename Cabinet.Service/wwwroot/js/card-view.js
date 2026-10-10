@@ -461,17 +461,176 @@ function buildMeta(record, copy) {
 }
 
 /**
+ * Keeps the entries of a card list that can be shown: objects, so a half-written entry never reaches the page.
+ * @param {unknown} list The list from the record.
+ * @returns {object[]}
+ */
+function usableLinks(list) {
+  return Array.isArray(list) ? list.filter((link) => link !== null && typeof link === 'object') : [];
+}
+
+/**
+ * Tells whether a link names an owned entry the card can swap to.
+ * @param {object} link The link from the record.
+ * @returns {boolean}
+ */
+function isOwnedLink(link) {
+  return (Number.isInteger(link.entryId) && link.entryId >= 0) || (typeof link.entryId === 'string' && GAME_ID.test(link.entryId));
+}
+
+/**
+ * Builds the small colour chip of a row: that game's own box colour, set as a custom property only when it is a lowercase
+ * hexadecimal triple, and the neutral wood colour otherwise. It is decoration, so screen readers skip it.
+ * @param {object} link The link from the record.
+ * @returns {HTMLSpanElement}
+ */
+function buildChip(link) {
+  const chip = document.createElement('span');
+  chip.className = 'exp-chip';
+  chip.setAttribute('aria-hidden', 'true');
+  chip.style.setProperty('--chip', typeof link.chip === 'string' && ART_COLOUR.test(link.chip) ? link.chip : FALLBACK_TONE.background);
+
+  return chip;
+}
+
+/**
+ * Builds one pressable row that swaps the card to another owned game: the game's chip, its text and a chevron. The whole row is
+ * one button.
+ * @param {object} link The link from the record; it names an owned entry.
+ * @param {string} text The text of the row.
+ * @param {boolean} ownText True when the text is the BGG title alone, which then takes its own text direction.
+ * @param {string} iconsUrl The address of the icon sprite.
+ * @param {(entryId: string) => void} onSwap Called with the entry id when the row is pressed.
+ * @returns {HTMLButtonElement}
+ */
+function buildSwapRow(link, text, ownText, iconsUrl, onSwap) {
+  const label = document.createElement('span');
+  label.className = 'exp-title';
+  label.textContent = text;
+
+  if (ownText) {
+    label.setAttribute('dir', 'auto');
+  }
+
+  const chevron = buildIcon(iconsUrl, 'i-chev');
+  chevron.classList.add('exp-chev');
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'exp-row';
+  button.dataset.entryId = String(link.entryId);
+  button.append(buildChip(link), label, chevron);
+  button.addEventListener('click', () => onSwap(String(link.entryId)));
+
+  return button;
+}
+
+/**
+ * Builds the first group of an expansion's card: a pressable row back to its one owned base game, a heading with one row per owned
+ * base game when there are several, a plain line when the base game is not owned, or just the word for an expansion whose base
+ * game is not known.
+ * @param {object} record The card record of the expansion.
+ * @param {object} copy The visitor-facing strings.
+ * @param {string} iconsUrl The address of the icon sprite.
+ * @param {(entryId: string) => void} onSwap Called with the entry id when a row is pressed.
+ * @returns {HTMLDivElement}
+ */
+function buildBases(record, copy, iconsUrl, onSwap) {
+  const group = document.createElement('div');
+  group.className = 'card-bases';
+
+  const bases = usableLinks(record.bases);
+  const owned = bases.filter(isOwnedLink);
+
+  if (owned.length === 1) {
+    const base = owned[0];
+
+    group.append(buildSwapRow(base, copy.expansionFor(titleOrFallback(base.title, copy.untitled)), false, iconsUrl, onSwap));
+    group.firstElementChild.classList.add('base-row');
+  } else if (owned.length > 1) {
+    const heading = document.createElement('h3');
+    heading.className = 'card-bases-title';
+    heading.textContent = copy.expansionForHeading;
+
+    const list = document.createElement('ul');
+    list.className = 'card-bases-list';
+
+    for (const link of owned) {
+      const item = document.createElement('li');
+      item.append(buildSwapRow(link, titleOrFallback(link.title, copy.untitled), true, iconsUrl, onSwap));
+      item.firstElementChild.classList.add('base-row');
+      list.append(item);
+    }
+
+    group.append(heading, list);
+  } else if (bases.length > 0) {
+    for (const link of bases) {
+      const line = document.createElement('p');
+      line.className = 'card-expansion-of';
+      line.textContent = copy.expansionFor(titleOrFallback(link.title, copy.untitled));
+      group.append(line);
+    }
+  } else {
+    const line = document.createElement('p');
+    line.className = 'card-expansion-of';
+    line.textContent = copy.expansionLabel;
+    group.append(line);
+  }
+
+  return group;
+}
+
+/**
+ * Builds the owned-expansions group of a base game, or returns null when it has none: a heading that can take focus after a tap on
+ * the marker that counts hidden expansions, and one pressable row per owned expansion in collection order, all of them.
+ * @param {object} record The card record of the base game.
+ * @param {object} copy The visitor-facing strings.
+ * @param {string} iconsUrl The address of the icon sprite.
+ * @param {(entryId: string) => void} onSwap Called with the entry id when a row is pressed.
+ * @returns {HTMLDivElement | null}
+ */
+function buildOwnedExpansions(record, copy, iconsUrl, onSwap) {
+  const expansions = usableLinks(record.expansions).filter(isOwnedLink);
+
+  if (expansions.length === 0) {
+    return null;
+  }
+
+  const heading = document.createElement('h3');
+  heading.className = 'card-expansions-title';
+  heading.tabIndex = -1;
+  heading.textContent = copy.ownedExpansions;
+
+  const list = document.createElement('ul');
+  list.className = 'card-expansions';
+
+  for (const link of expansions) {
+    const item = document.createElement('li');
+    item.append(buildSwapRow(link, titleOrFallback(link.title, copy.untitled), true, iconsUrl, onSwap));
+    list.append(item);
+  }
+
+  const group = document.createElement('div');
+  group.className = 'card-owned';
+  group.append(heading, list);
+
+  return group;
+}
+
+/**
  * Builds the card of one game: the grip strip of the phone sheet, the close button, the header with cover, title and year, and the
  * ruled area with the game-night strip or the quiet note, the location, the rating, designers and mechanics, and the link to
  * BoardGameGeek last. Whatever is missing is left out.
  * @param {object} record The card record, or the least a card can show when the data did not arrive.
  * @param {object} copy The visitor-facing strings.
- * @param {{ iconsUrl?: string, palette?: object[] }} [options] The sprite address and the colour table of the layout on screen.
+ * @param {{ iconsUrl?: string, palette?: object[], onSwap?: (entryId: string) => void }} [options] The sprite address, the colour
+ * table of the layout on screen and what to call when a row asks to show another game.
  * @returns {HTMLDivElement} The card element.
  */
 export function buildCard(record, copy, options = {}) {
   const iconsUrl = options.iconsUrl ?? '';
   const palette = options.palette ?? [];
+  const onSwap = options.onSwap ?? (() => {});
   const titleText = titleOrFallback(record.title, copy.untitled);
 
   const card = document.createElement('div');
@@ -517,7 +676,16 @@ export function buildCard(record, copy, options = {}) {
   const ruled = document.createElement('div');
   ruled.className = 'card-ruled';
 
-  for (const part of [buildStripOrNote(record, copy, iconsUrl), buildWhere(record, copy), buildMeta(record, copy)]) {
+  const isExpansion = record.isExpansion === true;
+  const parts = [
+    isExpansion ? buildBases(record, copy, iconsUrl, onSwap) : null,
+    buildStripOrNote(record, copy, iconsUrl),
+    buildWhere(record, copy),
+    isExpansion ? null : buildOwnedExpansions(record, copy, iconsUrl, onSwap),
+    buildMeta(record, copy),
+  ];
+
+  for (const part of parts) {
     if (part !== null) {
       ruled.append(part);
     }
