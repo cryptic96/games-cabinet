@@ -1,19 +1,22 @@
 @inject BuildInfo Build
+@{
+    var language = SiteLanguage.Resolve(Context);
+}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="@language.Code">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
-    <title>Games Cabinet</title>
+    <title>@language.Text.SiteName</title>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/cabinet.css" asp-append-version="true" />
 </head>
 <body>
     @RenderBody()
     <footer>
-        <p class="version">Version @Build.Version (@Build.ShortCommit)</p>
-        <a class="bgg-credit" href="https://boardgamegeek.com" rel="noopener"><img src="~/img/powered-by-bgg.svg" alt="Powered by BGG" width="342" height="76" asp-append-version="true" /></a>
+        <p class="version">@language.Text.Version(Build.Version, Build.ShortCommit)</p>
+        <a class="bgg-credit" href="https://boardgamegeek.com" rel="noopener"><img src="~/img/powered-by-bgg.svg" alt="@language.Text.LogoAlt" width="342" height="76" asp-append-version="true" /></a>
     </footer>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
