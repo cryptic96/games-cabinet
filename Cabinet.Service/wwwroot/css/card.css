@@ -805,3 +805,15 @@ html[data-pull-kind="turn-x"]::view-transition-new(pull) {
     opacity: 0;
   }
 }
+
+/**
+ * A visitor who prefers less motion never gets a view transition from the script; this block also silences every view-transition
+ * animation in case one is started some other way. The plain fades above are allowed, and so is the swap cross-fade.
+ */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

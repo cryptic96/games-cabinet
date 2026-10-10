@@ -528,6 +528,16 @@
   outline-offset: 2px;
 }
 
+/**
+ * The box of the card that is open, for a visitor who prefers less motion: it stays in its slot and is marked with a plain light
+ * outline instead of flying out. The colour is the wall text colour, not the accent.
+ */
+.placement[data-open] {
+  z-index: 2;
+  outline: 2px solid var(--wall-text);
+  outline-offset: 2px;
+}
+
 .cabinet-message {
   margin: 0 0 0.5rem;
   text-align: center;
