@@ -737,3 +737,71 @@ html[data-pull-kind="turn-x"]::view-transition-new(pull) {
     opacity: 0;
   }
 }
+
+/**
+ * The plain fades: the dialog and its dim fade together over the length of a timing token. They are used where a box cannot be
+ * flown, and by visitors who prefer less motion. Only opacity changes, and the held end state keeps the card gone until the dialog
+ * is closed.
+ */
+.card-dialog[data-fade="open"],
+.card-dialog[data-fade="open"]::backdrop {
+  animation: card-fade-in var(--fallback-open) ease-out both;
+}
+
+.card-dialog[data-fade="close"],
+.card-dialog[data-fade="close"]::backdrop {
+  animation: card-fade-out var(--fallback-close) ease-in both;
+}
+
+.card-dialog[data-fade="reduced-open"],
+.card-dialog[data-fade="reduced-open"]::backdrop {
+  animation: card-fade-in var(--card-fade-reduced) linear both;
+}
+
+.card-dialog[data-fade="reduced-close"],
+.card-dialog[data-fade="reduced-close"]::backdrop {
+  animation: card-fade-out var(--card-fade-reduced) linear both;
+}
+
+@keyframes card-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes card-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/**
+ * On a phone the sheet is its own snapshot while a pull-out runs, so it rises with the cover's flight and sinks on close.
+ */
+@media (max-width: 40rem) {
+  html[data-pull-kind] .card {
+    view-transition-name: card;
+  }
+
+  ::view-transition-new(card) {
+    animation: card-rise var(--pull-dur) var(--pull-ease-out) both;
+  }
+
+  ::view-transition-old(card) {
+    animation: card-sink var(--pull-dur) var(--pull-ease-in) both;
+  }
+}
+
+@keyframes card-rise {
+  from {
+    translate: 0 32px;
+    opacity: 0;
+  }
+}
+
+@keyframes card-sink {
+  to {
+    translate: 0 32px;
+    opacity: 0;
+  }
+}
