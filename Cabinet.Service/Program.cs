@@ -49,6 +49,7 @@ builder.Services.AddRazorPages();
 builder.Services.AddCabinetLayout(builder.Configuration, builder.Environment);
 builder.Services.AddCabinetSync(builder.Configuration, builder.Environment);
 builder.Services.AddCabinetLive(builder.Configuration);
+builder.Services.AddSingleton<ArtFileAudit>();
 
 var buildInfo = BuildInfo.Parse(
     typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
@@ -87,12 +88,14 @@ app.UseHealthChecks("/health", opsPort, new HealthCheckOptions
     {
         context.Response.ContentType = "application/json";
         var build = context.RequestServices.GetRequiredService<BuildInfo>();
+        var audit = context.RequestServices.GetRequiredService<ArtFileAudit>();
 
         return context.Response.WriteAsJsonAsync(new
         {
             status = result.Status.ToString(),
             version = build.Version,
             commit = build.Commit,
+            missingArt = audit.CountMissing(),
         });
     }
 });
