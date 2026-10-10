@@ -4,12 +4,13 @@
  */
 import './language.js';
 import { renderCabinet } from './render.js';
-import { COPY } from './copy.js';
+import { COPY, pageLanguage } from './copy.js';
 import { initSyncStatus, fetchStatus } from './sync.js';
 import { startLive } from './live.js';
 import { initCardDialog } from './detail.js';
 import { indexPlacements, recordFromPlacement } from './card-flow.js';
 import { initRoving } from './keys.js';
+import { initGamesList } from './games-list.js';
 
 const mount = document.getElementById('cabinet');
 const syncRoot = document.querySelector('.sync');
@@ -17,6 +18,18 @@ const dialog = document.querySelector('.card-dialog');
 const phoneQuery = window.matchMedia('(max-width: 40rem)');
 
 const roving = mount === null ? null : initRoving(mount);
+const listSection = document.querySelector('.games-list');
+const skipLink = document.querySelector('.skip-link');
+let cardControls = null;
+
+const gamesList = listSection === null
+  ? null
+  : initGamesList({
+    section: listSection,
+    copy: COPY,
+    language: pageLanguage(),
+    openCard: (entryId, from) => cardControls?.openCard(entryId, from),
+  });
 
 let latestLoad = 0;
 let cardRecords = new Map();
@@ -98,6 +111,7 @@ async function fetchCards(epoch, etag) {
 
       if (etag === null || body.layout === etag) {
         cardRecords = new Map(body.cards.map((record) => [String(record.entryId), record]));
+        gamesList?.showCards(body.cards);
 
         return;
       }
@@ -115,6 +129,7 @@ async function fetchCards(epoch, etag) {
 function afterDraw(layout, etag) {
   drawnPlacements = indexPlacements(layout);
   drawnPalette = layout.palette ?? [];
+  gamesList?.showTitles(drawnPlacements);
   fetchCards(latestLoad, etag);
 }
 
@@ -289,13 +304,20 @@ if (syncRoot !== null) {
 }
 
 if (mount !== null && dialog !== null) {
-  initCardDialog({
+  cardControls = initCardDialog({
     dialog,
     mount,
     getRecord: recordFor,
     getCopy: () => COPY,
     getPalette: () => drawnPalette,
     iconsUrl: dialog.dataset.icons ?? '',
+  });
+}
+
+if (skipLink !== null && gamesList !== null) {
+  skipLink.addEventListener('click', (event) => {
+    event.preventDefault();
+    gamesList.focusStart();
   });
 }
 
