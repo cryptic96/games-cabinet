@@ -3,10 +3,22 @@
  * on the box that opened it. The card is built from data already in memory, so opening it never waits for the network.
  */
 import { buildCard } from './card-view.js';
-import { choosePath, createCloseGate, createHistoryStep, isMostlyOnScreen, pullKind, sourceEntry } from './card-flow.js';
+import { choosePath, createCloseGate, createHistoryStep, dragOutcome, isMostlyOnScreen, pullKind, resist, sourceEntry } from './card-flow.js';
 
 /** The media query that says the visitor prefers less motion. */
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
+
+/** The media query that makes the card a sheet at the bottom of the screen. */
+const PHONE = '(max-width: 40rem)';
+
+/** How far back, in milliseconds, the speed of a drag is measured. */
+const SPEED_WINDOW_MS = 80;
+
+/** The parts of the sheet a drag may start on. */
+const DRAG_ZONES = '.card-grip, .card-head';
+
+/** The elements inside a drag zone that keep their own press. */
+const PRESSABLE = 'a, button, input, select, textarea, summary, [role="button"], [role="link"]';
 
 /** The longest the pull-out waits for the cover picture to decode, in milliseconds. */
 const COVER_WAIT_MS = 200;
@@ -46,6 +58,7 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
   let pressedOnFrame = false;
   let warmedCover = null;
   let forcedPath = null;
+  let drag = null;
   const gate = createCloseGate();
 
   steps.clearStale(window.history.state);
@@ -540,6 +553,124 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
   }
 
   /**
+   * Starts a drag of the sheet when a press lands on its grip strip or its header on a phone and nothing is moving. The content
+   * below the header, the close button, links and rows never start one, so reading and scrolling never close the sheet.
+   * @param {PointerEvent} event The press.
+   */
+  function startDrag(event) {
+    const card = dialog.querySelector('.card');
+
+    if (drag !== null || !dialog.open || moving || opening || card === null || !event.isPrimary || event.button !== 0) {
+      return;
+    }
+
+    const zone = event.target.closest(DRAG_ZONES);
+
+    if (zone === null || !card.contains(zone) || event.target.closest(PRESSABLE) !== null) {
+      return;
+    }
+
+    if (!window.matchMedia(PHONE).matches || card.hasAttribute('data-springing')) {
+      return;
+    }
+
+    try {
+      zone.setPointerCapture(event.pointerId);
+    } catch {
+      return;
+    }
+
+    card.dataset.moving = '';
+    drag = {
+      pointerId: event.pointerId,
+      card,
+      startY: event.clientY,
+      offset: 0,
+      samples: [{ at: event.timeStamp, y: event.clientY }],
+    };
+  }
+
+  /**
+   * Moves the sheet with the finger and keeps the last moments of the movement, so the speed at release can be told.
+   * @param {PointerEvent} event The movement.
+   */
+  function moveDrag(event) {
+    if (drag === null || event.pointerId !== drag.pointerId) {
+      return;
+    }
+
+    drag.offset = resist(event.clientY - drag.startY);
+    drag.card.style.setProperty('--sheet-dy', drag.offset + 'px');
+    drag.samples.push({ at: event.timeStamp, y: event.clientY });
+    drag.samples = drag.samples.filter((sample) => event.timeStamp - sample.at <= SPEED_WINDOW_MS);
+  }
+
+  /**
+   * Gives how fast the finger was moving down over the last moments before it lifted, in pixels per millisecond; zero when it had
+   * rested for longer than the measured window.
+   * @param {PointerEvent} event The release.
+   * @returns {number}
+   */
+  function releaseSpeed(event) {
+    const recent = drag.samples.filter((sample) => event.timeStamp - sample.at <= SPEED_WINDOW_MS);
+
+    if (recent.length === 0 || !(event.timeStamp > recent[0].at)) {
+      return 0;
+    }
+
+    return (event.clientY - recent[0].y) / (event.timeStamp - recent[0].at);
+  }
+
+  /**
+   * Lets the sheet go back to rest: over the spring token's length, or at once for a visitor who prefers less motion.
+   * @param {HTMLElement} card The sheet.
+   */
+  function springBack(card) {
+    if (window.matchMedia(REDUCED_MOTION).matches) {
+      card.style.setProperty('--sheet-dy', '0px');
+      delete card.dataset.moving;
+
+      return;
+    }
+
+    card.dataset.springing = '';
+    delete card.dataset.moving;
+    card.style.setProperty('--sheet-dy', '0px');
+    window.setTimeout(() => {
+      delete card.dataset.springing;
+    }, tokenMs('--sheet-spring'));
+  }
+
+  /**
+   * Ends a drag: a long or fast enough pull down closes the card the normal way, from where the finger left the sheet, and
+   * anything else, including a cancelled press, lets the sheet spring back.
+   * @param {PointerEvent} event The release or the cancel.
+   */
+  function endDrag(event) {
+    if (drag === null || event.pointerId !== drag.pointerId) {
+      return;
+    }
+
+    const { card, offset } = drag;
+    const outcome = event.type === 'pointerup'
+      ? dragOutcome({ dy: offset, height: card.getBoundingClientRect().height, velocity: releaseSpeed(event) })
+      : 'spring';
+
+    drag = null;
+
+    if (!card.isConnected || !dialog.open) {
+      return;
+    }
+
+    if (outcome === 'close') {
+      delete card.dataset.moving;
+      closeCard();
+    } else {
+      springBack(card);
+    }
+  }
+
+  /**
    * Tells whether a card is open.
    * @returns {boolean}
    */
@@ -577,7 +708,12 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
 
   dialog.addEventListener('pointerdown', (event) => {
     pressedOnFrame = event.target === dialog;
+    startDrag(event);
   });
+
+  dialog.addEventListener('pointermove', moveDrag);
+  dialog.addEventListener('pointerup', endDrag);
+  dialog.addEventListener('pointercancel', endDrag);
 
   dialog.addEventListener('click', (event) => {
     if (event.target.closest('.card-close') !== null || (event.target === dialog && pressedOnFrame)) {

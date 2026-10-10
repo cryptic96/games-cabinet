@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const source = readFileSync(new URL('../../Cabinet.Service/wwwroot/js/card-flow.js', import.meta.url), 'utf8');
-const { createHistoryStep, sourceEntry, recordFromPlacement, indexPlacements, pullKind, choosePath, isMostlyOnScreen, createCloseGate } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+const { createHistoryStep, sourceEntry, recordFromPlacement, indexPlacements, pullKind, choosePath, isMostlyOnScreen, createCloseGate, dragOutcome, resist } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 
 /**
  * A stand-in for the browser history that records every call.
@@ -354,4 +354,35 @@ test('closing a gate nobody waits on does nothing', () => {
   gate.closed();
 
   assert.equal(gate.isOpen(), false);
+});
+
+test('a drag of a quarter of the height or more closes the sheet and a shorter slow one springs back', () => {
+  assert.equal(dragOutcome({ dy: 200, height: 800, velocity: 0 }), 'close');
+  assert.equal(dragOutcome({ dy: 320, height: 800, velocity: 0.1 }), 'close');
+  assert.equal(dragOutcome({ dy: 199, height: 800, velocity: 0.59 }), 'spring');
+  assert.equal(dragOutcome({ dy: 80, height: 800, velocity: 0 }), 'spring');
+  assert.equal(dragOutcome({ dy: 0, height: 800, velocity: 0 }), 'spring');
+});
+
+test('a fast downward release closes the sheet whatever the distance', () => {
+  assert.equal(dragOutcome({ dy: 30, height: 800, velocity: 0.6 }), 'close');
+  assert.equal(dragOutcome({ dy: 30, height: 800, velocity: 1.5 }), 'close');
+  assert.equal(dragOutcome({ dy: 30, height: 800, velocity: 0.59 }), 'spring');
+});
+
+test('an upward drag never closes the sheet, however fast', () => {
+  assert.equal(dragOutcome({ dy: -50, height: 800, velocity: 2 }), 'spring');
+  assert.equal(dragOutcome({ dy: -900, height: 800, velocity: 0 }), 'spring');
+  assert.equal(dragOutcome({ dy: Number.NaN, height: 800, velocity: 2 }), 'spring');
+});
+
+test('a sheet with no height closes only on speed', () => {
+  assert.equal(dragOutcome({ dy: 10, height: 0, velocity: 0 }), 'spring');
+  assert.equal(dragOutcome({ dy: 10, height: 0, velocity: 0.7 }), 'close');
+});
+
+test('a downward drag is followed one to one and an upward drag a quarter of the way', () => {
+  assert.equal(resist(120), 120);
+  assert.equal(resist(0), 0);
+  assert.equal(resist(-80), -20);
 });

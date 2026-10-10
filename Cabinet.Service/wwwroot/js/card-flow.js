@@ -302,3 +302,39 @@ export function createCloseGate() {
     },
   };
 }
+
+/** The share of the sheet's height a drag must cover to close it. */
+export const DRAG_CLOSE_SHARE = 0.25;
+
+/** The downward speed, in pixels per millisecond, that closes the sheet whatever the distance. */
+export const DRAG_CLOSE_VELOCITY = 0.6;
+
+/** How much of an upward drag the sheet follows: one part in this many. */
+const UPWARD_RESISTANCE = 4;
+
+/**
+ * Decides what a released drag of the sheet does: a drag that went far enough down, or that was fast enough at the end, closes the
+ * card; anything else lets the sheet spring back. A drag upward never closes it.
+ * @param {{ dy: number, height: number, velocity: number }} drag How far the sheet was moved down, how tall it is, and how fast it
+ * was moving down at release, in pixels per millisecond.
+ * @returns {'close' | 'spring'}
+ */
+export function dragOutcome({ dy, height, velocity }) {
+  if (!(dy >= 0)) {
+    return 'spring';
+  }
+
+  const farEnough = height > 0 && dy >= DRAG_CLOSE_SHARE * height;
+
+  return farEnough || velocity >= DRAG_CLOSE_VELOCITY ? 'close' : 'spring';
+}
+
+/**
+ * Gives the offset the sheet follows for a finger offset: downward movement is followed one to one and upward movement only a
+ * quarter of the way, so pulling the sheet up feels stiff.
+ * @param {number} dy The finger's vertical movement since the press, downward positive.
+ * @returns {number}
+ */
+export function resist(dy) {
+  return dy >= 0 ? dy : dy / UPWARD_RESISTANCE;
+}
