@@ -155,8 +155,8 @@
   border: 0;
   font: inherit;
   cursor: pointer;
-  background: var(--bg, #8c5d38);
-  color: var(--fg, #ffffff);
+  background: var(--bg, var(--box-fallback-bg));
+  color: var(--fg, var(--box-fallback-fg));
   overflow: hidden;
   scroll-margin: 16px;
   box-shadow:
@@ -215,11 +215,33 @@
   display: block;
   writing-mode: vertical-rl;
   font-weight: 600;
-  font-size: clamp(12px, calc(var(--w) * var(--u) * 0.5), 16px);
+  font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-height: calc(100% - 2 * var(--rule-inset));
+}
+
+/**
+ * Every box that is not a generated cover is a size container, so its title can step to a larger size by the width or
+ * height the box is actually drawn at. One-line titles use only two sizes, which keeps a shelf of thin spines even:
+ * spines and upright expansion titles are 12px under 26px wide and 16px from there; flat boxes, layers and orphan
+ * expansion titles are 12px under 28px tall and 14px from there. A two-line upright expansion keeps its own rule.
+ */
+.placement:is(
+  [data-kind="spine"],
+  [data-kind="expansionSpine"],
+  [data-kind="flatBox"],
+  [data-kind="expansionLayer"],
+  [data-kind="orphanExpansion"]
+) {
+  container-type: size;
+}
+
+@container (min-width: 26px) {
+  .placement[data-kind="spine"] .placement-label {
+    font-size: 16px;
+  }
 }
 
 .placement[data-kind="cover"]::before {
@@ -348,20 +370,20 @@
  * cropped, stretched or drawn over, and the box fills what it leaves with the colours along the picture's edges, falling
  * back to the box colour when those are not known. The light inset edge is not drawn, only the outer contact shadow.
  */
-.placement[data-art] {
+.placement[data-art="true"] {
   background: var(--edge-t, var(--bg));
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.5);
 }
 
-.placement[data-art][data-fit="width"] {
+.placement[data-art="true"][data-fit="width"] {
   background: linear-gradient(to bottom, var(--edge-t, var(--bg)) 50%, var(--edge-b, var(--bg)) 50%);
 }
 
-.placement[data-art][data-fit="height"] {
+.placement[data-art="true"][data-fit="height"] {
   background: linear-gradient(to right, var(--edge-l, var(--bg)) 50%, var(--edge-r, var(--bg)) 50%);
 }
 
-.placement[data-kind="cover"][data-art]::before {
+.placement[data-kind="cover"][data-art="true"]::before {
   content: none;
 }
 
@@ -404,7 +426,7 @@
   min-width: 0;
   padding: 0 var(--rule-inset);
   font-weight: 600;
-  font-size: clamp(12px, calc(var(--h) * var(--u) * 0.5), 14px);
+  font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -423,6 +445,7 @@
 .placement[data-kind="orphanExpansion"] .placement-label {
   flex: 0 0 auto;
   max-width: 100%;
+  font-size: clamp(12px, calc(var(--h) * var(--u) * 0.5), 14px);
   line-height: 1.2;
 }
 
@@ -447,7 +470,10 @@
 
 .placement[data-kind="cover"] .cover-plate:has(.placement-sub) {
   flex-direction: column;
-  gap: 2px;
+}
+
+.placement[data-kind="cover"] .cover-plate:has(> * + *) {
+  gap: 4px;
 }
 
 .placement[data-kind="cover"] .placement-sub {
@@ -485,9 +511,15 @@
 }
 
 .placement[data-kind="expansionSpine"][data-lines="1"] .placement-label {
-  font-size: clamp(12px, calc(var(--w) * var(--u) * 0.5), 16px);
+  font-size: 12px;
   line-height: 1;
   text-overflow: ellipsis;
+}
+
+@container (min-width: 26px) {
+  .placement[data-kind="expansionSpine"][data-lines="1"] .placement-label {
+    font-size: 16px;
+  }
 }
 
 /**
@@ -502,7 +534,15 @@
 
 .placement[data-kind="orphanExpansion"][data-lines="1"] .placement-label {
   flex: 1 1 auto;
+  font-size: 12px;
   line-height: 1;
+}
+
+@container (min-height: 28px) {
+  .placement:is([data-kind="flatBox"], [data-kind="expansionLayer"]) .placement-label,
+  .placement[data-kind="orphanExpansion"][data-lines="1"] .placement-label {
+    font-size: 14px;
+  }
 }
 
 /**
@@ -596,7 +636,7 @@
   --gd-fine: rgb(40 20 8 / calc(0.08 * var(--grain-k) * var(--grain-fine)));
   --gl: rgb(255 240 220 / calc(0.04 * var(--grain-k)));
   --ga: rgb(40 20 8 / calc(0.05 * var(--grain-k)));
-  --wood: var(--wood-mid, #6b4226);
+  --wood: var(--wood-mid);
   --grain-h:
     repeating-linear-gradient(to bottom, var(--gd-fine) 0 var(--lw), transparent var(--lw) calc(15 * var(--u))),
     repeating-linear-gradient(to bottom, var(--gd) 0 var(--lw), transparent var(--lw) calc(23 * var(--u))),
@@ -614,6 +654,7 @@
   .section > * {
     --grain-k: 0.5;
     --grain-fine: 0;
+    --arch-lit: 0.22;
   }
 }
 
@@ -652,7 +693,7 @@
   background-size: auto, auto, var(--span) 100%, var(--span) 100%, var(--span) 100%;
   background-position: 0 0, 0 0, var(--ox) 0, var(--ox) 0, var(--ox) 0;
   background-repeat: no-repeat;
-  box-shadow: 1px 0 0 color-mix(in oklch, var(--wood-edge, #8c5d38), white 6%);
+  box-shadow: 1px 0 0 color-mix(in oklch, var(--wood-edge), white 6%);
 }
 
 .cubby::before {
@@ -663,7 +704,7 @@
   background-image:
     linear-gradient(
       to bottom,
-      var(--wood-edge, #8c5d38) 0 1px,
+      var(--wood-edge) 0 1px,
       rgb(255 245 230 / 0.06) 1px,
       transparent 45%,
       rgb(20 10 4 / 0.30) 100%
@@ -764,7 +805,7 @@
   background-image:
     linear-gradient(
       to bottom,
-      color-mix(in oklch, var(--wood-edge, #8c5d38), white 12%) 0 1px,
+      color-mix(in oklch, var(--wood-edge), white 12%) 0 1px,
       rgb(255 240 220 / 0.10) 1px 14%,
       rgb(20 10 4 / 0.38) 14% calc(14% + 1px),
       rgb(20 10 4 / 0.30) calc(14% + 1px) 20%,
@@ -818,7 +859,7 @@
   background: linear-gradient(to bottom, rgb(8 4 2 / var(--arch-alpha-top)), rgb(30 16 8 / var(--arch-alpha-bottom)));
   box-shadow:
     inset 0 calc(6 * var(--u)) calc(8 * var(--u)) rgb(0 0 0 / 0.45),
-    inset var(--lw) var(--lw) 0 rgb(255 235 210 / var(--arch-lit)),
+    calc(-1 * var(--lw)) calc(-1 * var(--lw)) 0 0 rgb(255 235 210 / var(--arch-lit)),
     inset calc(-1 * var(--lw)) calc(-1 * var(--lw)) 0 rgb(10 5 2 / 0.5);
 }
 

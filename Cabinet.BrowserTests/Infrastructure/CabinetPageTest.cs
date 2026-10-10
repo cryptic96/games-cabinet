@@ -52,9 +52,12 @@ public abstract class CabinetPageTest : PageTest
     /// published output, so the page context asks for the identity encoding.
     /// </summary>
     /// <param name="settings">Synthetic configuration values, such as the switch that enables the sample collections.</param>
-    protected async Task<CabinetWebApplicationFactory> StartAsync(IReadOnlyDictionary<string, string?> settings)
+    /// <param name="configureServices">Replaces services before the host starts, such as the source of the collection; null leaves them as they are.</param>
+    protected async Task<CabinetWebApplicationFactory> StartAsync(
+        IReadOnlyDictionary<string, string?> settings,
+        Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>? configureServices = null)
     {
-        var factory = new CabinetWebApplicationFactory(settings);
+        var factory = new CabinetWebApplicationFactory(settings, configureServices);
         _factory = factory;
 
         await Page.Context.SetExtraHTTPHeadersAsync(new Dictionary<string, string> { ["Accept-Encoding"] = "identity" });
