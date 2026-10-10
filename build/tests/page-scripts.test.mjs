@@ -5,7 +5,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { copyFileSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -229,7 +229,7 @@ const PAGE_FOLDER = mkdtempSync(join(tmpdir(), 'cabinet-page-scripts-'));
 
 writeFileSync(join(PAGE_FOLDER, 'package.json'), '{"type":"module"}');
 
-for (const name of ['copy.js', 'status.js', 'sync.js', 'live.js', 'render.js', 'cabinet.js']) {
+for (const name of readdirSync(new URL('../../Cabinet.Service/wwwroot/js/', import.meta.url)).filter((file) => file.endsWith('.js'))) {
   copyFileSync(new URL('../../Cabinet.Service/wwwroot/js/' + name, import.meta.url), join(PAGE_FOLDER, name));
 }
 
@@ -2045,4 +2045,76 @@ test('the stylesheet carries the apron arch tokens, the length registration of t
       `${lines} lines`,
     );
   }
+});
+
+const { initLanguageToggle } = await import(pathToFileURL(join(PAGE_FOLDER, 'language.js')).href);
+
+/**
+ * A language toggle with a click handler the test can run without a browser, and a record of what the browser would have done.
+ * @param {{ fetch: () => Promise<object> }} actions The answer the request gets.
+ * @returns {{ click: (current: boolean, overrides?: object) => Promise<{ prevented?: boolean }>, calls: string[] }} The toggle.
+ */
+function createToggle(actions) {
+  const calls = [];
+  const handlers = [];
+  const toggle = { addEventListener: (type, handler) => handlers.push(handler) };
+  const target = (current) => ({
+    closest: () => ({ href: 'http://127.0.0.1/language/nl', getAttribute: () => (current ? 'true' : null) }),
+  });
+
+  initLanguageToggle(toggle, {
+    fetch: async (address, options) => {
+      calls.push(`fetch ${address} ${options.redirect}`);
+
+      return actions.fetch();
+    },
+    reload: () => calls.push('reload'),
+    assign: (address) => calls.push(`assign ${address}`),
+  });
+
+  return {
+    calls,
+    async click(current, overrides = {}) {
+      const event = { button: 0, target: target(current), defaultPrevented: false, preventDefault() { this.prevented = true; }, ...overrides };
+
+      await handlers[0](event);
+
+      return event;
+    },
+  };
+}
+
+test('a plain click on the other language asks the server and reloads the same address', async () => {
+  const toggle = createToggle({ fetch: async () => ({ type: 'opaqueredirect', ok: false }) });
+  const event = await toggle.click(false);
+
+  assert.equal(event.prevented, true);
+  assert.deepEqual(toggle.calls, ['fetch http://127.0.0.1/language/nl manual', 'reload']);
+});
+
+test('a failed request or a refused answer follows the link instead', async () => {
+  const failing = createToggle({ fetch: async () => Promise.reject(new TypeError('offline')) });
+
+  await failing.click(false);
+  assert.deepEqual(failing.calls, ['fetch http://127.0.0.1/language/nl manual', 'assign http://127.0.0.1/language/nl']);
+
+  const refused = createToggle({ fetch: async () => ({ type: 'basic', ok: false }) });
+
+  await refused.click(false);
+  assert.deepEqual(refused.calls, ['fetch http://127.0.0.1/language/nl manual', 'assign http://127.0.0.1/language/nl']);
+});
+
+test('a click on the current language, with a modifier key or a non-primary button is left to the browser', async () => {
+  const toggle = createToggle({ fetch: async () => ({ type: 'opaqueredirect', ok: false }) });
+
+  for (const event of [await toggle.click(true), await toggle.click(false, { ctrlKey: true }), await toggle.click(false, { metaKey: true }), await toggle.click(false, { button: 1 })]) {
+    assert.equal(event.prevented, undefined);
+  }
+
+  assert.deepEqual(toggle.calls, []);
+});
+
+test('a page without a toggle gets no handler and no error', () => {
+  assert.doesNotThrow(() => initLanguageToggle(null));
+  assert.doesNotThrow(() => initLanguageToggle(undefined));
 });

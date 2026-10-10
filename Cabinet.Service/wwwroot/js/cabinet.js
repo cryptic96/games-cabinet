@@ -2,6 +2,7 @@
  * Entry point of the cabinet page: fetches the layout for the viewport's profile (and the mount's sample when it carries one), hands it to the
  * renderer, and shows loading and error states. The profile follows one media query; nothing else listens to resize.
  */
+import './language.js';
 import { renderCabinet } from './render.js';
 import { COPY } from './copy.js';
 import { initSyncStatus, fetchStatus } from './sync.js';
