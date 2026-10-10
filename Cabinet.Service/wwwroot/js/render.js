@@ -186,15 +186,24 @@ function buildSubLabel(placement, copy) {
 
 /**
  * Returns the text drawn on a placement. The marker shows its hidden count; the rest show the label the layout
- * prepared, or the fallback when it is blank.
+ * prepared. An empty label on a box with a real title stays empty, so a thin box shows only its colour and rules; the
+ * untitled fallback is used only when the title itself is blank.
  * @param {object} placement One placement from the layout.
  * @param {object} copy The visitor-facing strings.
  * @returns {string}
  */
 function labelText(placement, copy) {
-  return placement.kind === 'moreMarker'
-    ? copy.moreLabel(placement.moreCount)
-    : textOrFallback(placement.label, copy.untitled);
+  if (placement.kind === 'moreMarker') {
+    return copy.moreLabel(placement.moreCount);
+  }
+
+  const hasTitle = textOrFallback(placement.title, '') !== '';
+
+  if (!hasTitle) {
+    return copy.untitled;
+  }
+
+  return typeof placement.label === 'string' ? placement.label : '';
 }
 
 /**

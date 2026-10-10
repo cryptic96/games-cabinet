@@ -1466,6 +1466,25 @@ test('an expansion whose base game is not known says it is an expansion in its n
   assert.equal(cover.querySelector('.placement-sub').textContent, 'Expansion');
 });
 
+test('a box with a real title and an empty label draws no text and keeps the full title in its name and tooltip', () => {
+  const [thin] = drawPlacements([
+    { kind: 'spine', gameId: 12, entryId: 120, title: 'Invented Harbour Tides', label: '', isExpansion: false },
+  ]);
+
+  assert.equal(thin.querySelector('.placement-label').textContent, '');
+  assert.equal(thin.getAttribute('aria-label'), 'Invented Harbour Tides');
+  assert.equal(thin.title, 'Invented Harbour Tides');
+});
+
+test('a box with a blank title and an empty label reads as an untitled game', () => {
+  const [blank] = drawPlacements([
+    { kind: 'spine', gameId: 13, entryId: 130, title: '  ', label: '', isExpansion: false },
+  ]);
+
+  assert.equal(blank.querySelector('.placement-label').textContent, COPY.untitled);
+  assert.equal(blank.getAttribute('aria-label'), COPY.untitled);
+});
+
 test('an expansion whose base game is not owned names that game on its second line and in its name', () => {
   const [orphan] = drawPlacements([
     { kind: 'orphanExpansion', gameId: 9, entryId: 90, title: 'Invented Harbour Tides', label: 'Invented Harbour Tides', isExpansion: true, baseTitle: 'Invented Harbour', showBaseLine: true },
