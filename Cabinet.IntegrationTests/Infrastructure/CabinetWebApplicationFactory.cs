@@ -335,12 +335,23 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
                 _ = Server;
                 return;
             }
-            catch (IOException exception) when (exception.InnerException is AddressInUseException && attempt < MaxBindAttempts)
+            catch (Exception exception) when (IsPortClash(exception) && attempt < MaxBindAttempts)
             {
                 (PublicPort, OpsPort) = _pickPorts();
             }
         }
     }
+
+    /// <summary>
+    /// Tells whether a host failed to start because one of its ports was already in use. Kestrel reports a clash it finds
+    /// while binding as an IOException around an AddressInUseException. On Linux two sockets that allow address reuse can
+    /// both bind the same free port when two hosts start at the same moment; the clash then only shows when the second one
+    /// starts listening, and Kestrel lets that through as a bare SocketException.
+    /// </summary>
+    /// <param name="exception">The exception the start failed with.</param>
+    internal static bool IsPortClash(Exception exception) =>
+        exception is IOException { InnerException: AddressInUseException }
+            or SocketException { SocketErrorCode: SocketError.AddressAlreadyInUse };
 
     /// <summary>Asks the system for two free loopback ports, holding the first while taking the second so they differ.</summary>
     internal static (int Public, int Ops) PickFreeLoopbackPorts()

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using Cabinet.IntegrationTests.Infrastructure;
 using FluentAssertions;
+using Microsoft.AspNetCore.Connections;
 
 namespace Cabinet.IntegrationTests;
 
@@ -33,6 +34,24 @@ public class TestHostPortTests
         factory.PublicPort.Should().NotBe(takenPort);
         pageResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         healthResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public void A_port_clash_found_when_listening_is_retried_like_one_found_when_binding()
+    {
+        var foundWhenBinding = new IOException("Failed to bind.", new AddressInUseException("Address already in use"));
+        var foundWhenListening = new SocketException((int)SocketError.AddressAlreadyInUse);
+
+        CabinetWebApplicationFactory.IsPortClash(foundWhenBinding).Should().BeTrue();
+        CabinetWebApplicationFactory.IsPortClash(foundWhenListening).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Other_start_failures_are_not_retried_as_port_clashes()
+    {
+        CabinetWebApplicationFactory.IsPortClash(new IOException("Disk full.")).Should().BeFalse();
+        CabinetWebApplicationFactory.IsPortClash(new SocketException((int)SocketError.AccessDenied)).Should().BeFalse();
+        CabinetWebApplicationFactory.IsPortClash(new InvalidOperationException("Bad setting.")).Should().BeFalse();
     }
 
     [Fact]
