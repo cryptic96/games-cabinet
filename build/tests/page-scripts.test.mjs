@@ -1307,10 +1307,10 @@ class FakeElement {
   }
 
   matches(selector) {
-    const entry = /^\[data-entry-id="(.*)"\]$/.exec(selector);
+    const attributes = [...selector.matchAll(/\[data-([a-z-]+)="(.*?)"\]/g)];
 
-    if (entry !== null) {
-      return this.dataset.entryId === entry[1];
+    if (attributes.length > 0) {
+      return attributes.every(([, name, value]) => this.dataset[name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] === value);
     }
 
     return selector.startsWith('.') && this.className.split(' ').includes(selector.slice(1));
@@ -1318,6 +1318,24 @@ class FakeElement {
 
   querySelector(selector) {
     return this.descendants().find((node) => node.matches(selector)) ?? null;
+  }
+
+  querySelectorAll(selector) {
+    return this.descendants().filter((node) => node.matches(selector));
+  }
+
+  closest(selector) {
+    for (let node = this; node !== null; node = node.parent) {
+      if (node.matches(selector)) {
+        return node;
+      }
+    }
+
+    return null;
+  }
+
+  get isConnected() {
+    return !this.removed;
   }
 
   contains(node) {
@@ -1934,6 +1952,141 @@ test('when the focused entry is gone after a redraw the focus leaves the cabinet
   } finally {
     leaveCabinetPage();
   }
+});
+
+const MARKER_AND_BASE = [
+  { gameId: 10, entryId: 1, title: 'Invented Lighthouse', label: 'Invented Lighthouse' },
+  { kind: 'moreMarker', gameId: 10, entryId: 1, baseTitle: 'Invented Lighthouse', moreCount: 2, xMm: 40 },
+  { gameId: 20, entryId: 2, title: 'Invented Orchard', label: 'Invented Orchard', xMm: 80 },
+];
+
+const tabIndexes = (cabinet) => cabinet.boxes().map((box) => box.getAttribute('tabindex'));
+
+test('a focused marker returns to the marker, not to its base box, after a redraw', async () => {
+  let version = 'v1';
+
+  try {
+    const cabinet = await startCabinetPage({ firstLayout: layoutWith(MARKER_AND_BASE), status: () => ({ running: false, snapshotVersion: version }) });
+    const marker = cabinet.boxes().find((box) => box.dataset.kind === 'moreMarker');
+
+    marker.focus();
+    version = 'v2';
+    await cabinet.comeOnline();
+    cabinet.layoutRequests.shift().resolve(answer(200, layoutWith(MARKER_AND_BASE)));
+    await cabinet.settle();
+
+    const drawn = cabinet.boxes().find((box) => box.dataset.kind === 'moreMarker');
+
+    assert.notEqual(drawn, marker);
+    assert.equal(cabinet.page.activeElement, drawn);
+  } finally {
+    leaveCabinetPage();
+  }
+});
+
+test('the cabinet is one tab stop: the first box holds it, a focused box takes it, and a redraw keeps it on the same box and kind', async () => {
+  let version = 'v1';
+
+  try {
+    const cabinet = await startCabinetPage({ firstLayout: layoutWith(MARKER_AND_BASE), status: () => ({ running: false, snapshotVersion: version }) });
+    const focusin = cabinet.mount.listeners.find((listener) => listener.type === 'focusin').handler;
+
+    assert.deepEqual(tabIndexes(cabinet), ['0', '-1', '-1']);
+
+    const marker = cabinet.boxes().find((box) => box.dataset.kind === 'moreMarker');
+
+    focusin({ target: marker });
+
+    assert.deepEqual(tabIndexes(cabinet), ['-1', '0', '-1']);
+
+    version = 'v2';
+    await cabinet.comeOnline();
+    cabinet.layoutRequests.shift().resolve(answer(200, layoutWith(MARKER_AND_BASE)));
+    await cabinet.settle();
+
+    assert.deepEqual(tabIndexes(cabinet), ['-1', '0', '-1']);
+  } finally {
+    leaveCabinetPage();
+  }
+});
+
+test('when the box that held the tab stop is gone after a redraw the first box takes it, and an empty cabinet has no tab stop', async () => {
+  let version = 'v1';
+
+  try {
+    const cabinet = await startCabinetPage({ firstLayout: layoutWith(MARKER_AND_BASE), status: () => ({ running: false, snapshotVersion: version }) });
+    const focusin = cabinet.mount.listeners.find((listener) => listener.type === 'focusin').handler;
+
+    focusin({ target: cabinet.box('2') });
+    version = 'v2';
+    await cabinet.comeOnline();
+    cabinet.layoutRequests.shift().resolve(answer(200, layoutWith(MARKER_AND_BASE.slice(0, 2))));
+    await cabinet.settle();
+
+    assert.deepEqual(tabIndexes(cabinet), ['0', '-1']);
+
+    version = 'v3';
+    await cabinet.comeOnline();
+    cabinet.layoutRequests.shift().resolve(answer(200, layoutWith([])));
+    await cabinet.settle();
+
+    assert.deepEqual(tabIndexes(cabinet), []);
+  } finally {
+    leaveCabinetPage();
+  }
+});
+
+/**
+ * Draws a layout into a fresh mount on a fake document and returns the drawn boxes.
+ * @param {object} layout The layout to draw.
+ * @returns {FakeElement[]} The placement buttons in drawing order.
+ */
+function drawLayout(layout) {
+  const previous = globalThis.document;
+  const page = createFakeDocument();
+  const mount = page.createElement('div');
+
+  globalThis.document = page;
+
+  try {
+    renderCabinet(mount, layout, COPY);
+  } finally {
+    globalThis.document = previous;
+  }
+
+  return mount.descendants().filter((node) => node.tagName === 'BUTTON');
+}
+
+test('every drawn box carries the shelf it stands on as section and shelf ordinal, and no two shelves share a value', () => {
+  const placement = (entryId, xMm) => ({ ...PLACEMENT_DEFAULTS, gameId: entryId, entryId, title: 'Invented Lighthouse', label: 'Invented Lighthouse', xMm });
+  const cubby = (yMm, ...placements) => ({ xMm: 0, yMm, widthMm: 600, heightMm: 300, placements });
+  const section = (index, ...cubbies) => ({ index, widthMm: 600, heightMm: 900, frameMm: 20, cubbies });
+  const boxes = drawLayout({
+    palette: [],
+    sections: [
+      section(0, cubby(0, placement(1, 0), placement(2, 40)), cubby(320, placement(3, 0)), cubby(640, placement(4, 0))),
+      section(1, cubby(0, placement(5, 0)), cubby(320, placement(6, 0))),
+    ],
+  });
+
+  const shelfOf = (entryId) => boxes.find((box) => box.dataset.entryId === String(entryId)).dataset.shelf;
+
+  assert.deepEqual([1, 2, 3, 4, 5, 6].map(shelfOf), ['0:0', '0:0', '0:1', '0:2', '1:0', '1:1']);
+  assert.ok(boxes.every((box) => /^\d+:\d+$/.test(box.dataset.shelf)));
+  assert.equal(new Set(boxes.map((box) => box.dataset.shelf)).size, 5);
+});
+
+test('seven shelves in a section keep seven different shelf values although the board tone repeats', () => {
+  const cubbies = [0, 1, 2, 3, 4, 5, 6].map((row) => ({
+    xMm: 0,
+    yMm: row * 320,
+    widthMm: 600,
+    heightMm: 300,
+    placements: [{ ...PLACEMENT_DEFAULTS, gameId: row + 1, entryId: row + 1, title: 'Invented Lighthouse', label: 'Invented Lighthouse' }],
+  }));
+  const boxes = drawLayout({ palette: [], sections: [{ index: 0, widthMm: 600, heightMm: 2300, frameMm: 20, cubbies }] });
+
+  assert.equal(new Set(boxes.map((box) => box.dataset.shelf)).size, 7);
 });
 
 test('a status with the version already on screen fetches no layout', async () => {

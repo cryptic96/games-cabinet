@@ -63,12 +63,13 @@
     }
     @if (Model.ShowingSample)
     {
-        <div id="cabinet" class="cabinet" data-sample="@Model.SampleName"></div>
+        <div id="cabinet" class="cabinet" role="group" aria-label="@Model.Language.Text.CabinetLabel" aria-describedby="cabinet-hint" data-sample="@Model.SampleName"></div>
     }
     else
     {
-        <div id="cabinet" class="cabinet"></div>
+        <div id="cabinet" class="cabinet" role="group" aria-label="@Model.Language.Text.CabinetLabel" aria-describedby="cabinet-hint"></div>
     }
+    <p id="cabinet-hint" class="visually-hidden">@Model.Language.Text.CabinetHint</p>
     <dialog class="card-dialog" aria-labelledby="card-title" data-icons="@FileVersions.AddFileVersionToPath(Request.PathBase, "/img/icons.svg")"></dialog>
     <noscript><p class="cabinet-message">@Model.Language.Text.NoScript</p></noscript>
 </main>

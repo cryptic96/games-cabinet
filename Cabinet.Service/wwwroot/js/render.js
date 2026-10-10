@@ -390,7 +390,15 @@ function buildCubby(cubby, copy, palette, section, rowTops) {
   setNumber(element, '--y', cubby.yMm);
   setNumber(element, '--w', cubby.widthMm);
   setNumber(element, '--h', cubby.heightMm);
-  element.append(...cubby.placements.map((placement) => buildPlacement(placement, copy, palette)));
+
+  const shelf = section.index + ':' + rowTops.indexOf(cubby.yMm);
+  const boxes = cubby.placements.map((placement) => buildPlacement(placement, copy, palette));
+
+  for (const box of boxes) {
+    box.dataset.shelf = shelf;
+  }
+
+  element.append(...boxes);
 
   return element;
 }
