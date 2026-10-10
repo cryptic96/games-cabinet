@@ -6,7 +6,7 @@ How to work on this repository without leaking personal data, and how to run the
 
 - The .NET SDK version pinned in `global.json`. The pin allows newer feature bands, so any current SDK of the same major version works.
 - Docker, for the containerised lint and secret-scanning tools that `build/lint.sh` and `build/scan-history.sh` run.
-- Node.js, only to run the page script tests (`node --test build/tests/page-scripts.test.mjs`). The site itself has no Node toolchain.
+- Node.js, only to run the page script tests (`node --test build/tests/*.test.mjs`). The site itself has no Node toolchain.
 - `git` and `bash`. The hooks and scripts are plain bash with no other dependencies.
 
 ## Enable the personal-data hooks
@@ -175,9 +175,36 @@ Bgg__BaseUri=http://127.0.0.1:6190/xmlapi2/ dotnet run --project Cabinet.Service
 
 Use any dummy username and token. The base address override is honoured only in Development; in any other environment it is ignored and the app logs a warning. The token is sent only over HTTPS to the BGG API host, so a dummy token never reaches the fake, and nothing a visitor sends can change the username or the address the app calls.
 
+## Browser tests
+
+`Cabinet.BrowserTests` drives a real Chromium with Playwright against the cabinet host, which the tests start in the same process on a loopback port. They cover what only a browser can show: the cabinet drawing its boxes, animations starting or not, focus moving, history steps and tab order. They use the invented sample collections and the fake BGG only, never a token or a real collection, because the screenshots they write are kept as a public build artifact.
+
+Every browser test class carries the `Category=Browser` trait, which is how the solution-wide run leaves them out: the release build and the main test job need no browser, and the browser tests run in their own job.
+
+Install the browser once, after building the project. Playwright bundles its own Node driver, so no PowerShell is needed:
+
+```
+dotnet build Cabinet.BrowserTests
+Cabinet.BrowserTests/bin/Debug/net10.0/.playwright/node/linux-x64/node \
+  Cabinet.BrowserTests/bin/Debug/net10.0/.playwright/package/cli.js install chromium-headless-shell
+```
+
+On a machine that is missing the system libraries the browser needs, add `--with-deps` after `install`; that needs administrator rights.
+
+Run them:
+
+```
+dotnet test --project Cabinet.BrowserTests
+```
+
+Set `CABINET_SCREENSHOT_DIR` to a directory to keep the full-page screenshots the tests take; without it they are not written.
+
+The test host serves module scripts without a content type when the browser accepts compressed responses, so the shared base class asks for the identity encoding. A new browser test should derive from `CabinetPageTest` to inherit that, the recording of console errors and request hosts, and the screenshot helper.
+
 ## Running the checks
 
 - Lint and script tests: `build/lint.sh`
-- .NET tests: `dotnet test --solution Cabinet.slnx`
-- Page script tests: `node --test build/tests/page-scripts.test.mjs`
+- .NET tests without a browser, exactly as CI runs them: `dotnet test --solution Cabinet.slnx --no-restore --filter-not-trait "Category=Browser" --ignore-exit-code 8` (the browser project then runs zero tests, which the test platform reports as exit code 8)
+- Page script tests: `node --test build/tests/*.test.mjs`
+- Browser tests: `dotnet test --project Cabinet.BrowserTests` (see "Browser tests")
 - Hook tests alone: `bash build/tests/githooks-test.sh`
