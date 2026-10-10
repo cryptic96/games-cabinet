@@ -638,3 +638,182 @@ html:has(dialog[open]) {
     border: 1px solid CanvasText;
   }
 }
+
+/**
+ * The pull-out. The script only sets attributes; every view-transition name comes from the rule below, so no style is ever written
+ * by script. The box and the cover spot are the one named snapshot, `pull`: the box is the old state and the cover spot the new
+ * one on opening, and the other way round on closing. Everything else is the page itself, cross-faded by the root group.
+ */
+[data-pulling] {
+  view-transition-name: pull;
+}
+
+html[data-pull-dir="close"] {
+  --pull-dur: var(--pull-close);
+}
+
+::view-transition-group(root),
+::view-transition-group(pull),
+::view-transition-group(card) {
+  animation-duration: var(--pull-dur);
+}
+
+::view-transition-group(pull) {
+  animation-timing-function: var(--pull-ease-out);
+}
+
+::view-transition-image-pair(pull) {
+  animation: pull-lift var(--pull-dur) var(--pull-ease-out) both;
+}
+
+::view-transition-old(pull),
+::view-transition-new(pull) {
+  height: 100%;
+  object-fit: contain;
+  mix-blend-mode: normal;
+}
+
+html[data-pull-kind="lift"]::view-transition-old(pull),
+html[data-pull-kind="lift"]::view-transition-new(pull) {
+  animation-duration: var(--pull-dur);
+}
+
+html[data-pull-kind="turn-y"]::view-transition-old(pull) {
+  animation: pull-away-y calc(var(--pull-dur) * var(--pull-flip-share)) var(--pull-ease-in) both;
+}
+
+html[data-pull-kind="turn-y"]::view-transition-new(pull) {
+  animation: pull-in-y calc(var(--pull-dur) * (1 - var(--pull-flip-share))) var(--pull-ease-out)
+    calc(var(--pull-dur) * var(--pull-flip-share)) both;
+}
+
+html[data-pull-kind="turn-x"]::view-transition-old(pull) {
+  animation: pull-away-x calc(var(--pull-dur) * var(--pull-flip-share)) var(--pull-ease-in) both;
+}
+
+html[data-pull-kind="turn-x"]::view-transition-new(pull) {
+  animation: pull-in-x calc(var(--pull-dur) * (1 - var(--pull-flip-share))) var(--pull-ease-out)
+    calc(var(--pull-dur) * var(--pull-flip-share)) both;
+}
+
+@keyframes pull-lift {
+  0% {
+    scale: 1;
+  }
+
+  40% {
+    scale: var(--pull-lift);
+  }
+
+  100% {
+    scale: 1;
+  }
+}
+
+@keyframes pull-away-y {
+  to {
+    transform: perspective(var(--pull-perspective)) rotateY(-90deg);
+    opacity: 0;
+  }
+}
+
+@keyframes pull-in-y {
+  from {
+    transform: perspective(var(--pull-perspective)) rotateY(90deg);
+    opacity: 0;
+  }
+}
+
+@keyframes pull-away-x {
+  to {
+    transform: perspective(var(--pull-perspective)) rotateX(90deg);
+    opacity: 0;
+  }
+}
+
+@keyframes pull-in-x {
+  from {
+    transform: perspective(var(--pull-perspective)) rotateX(-90deg);
+    opacity: 0;
+  }
+}
+
+/**
+ * The plain fades: the dialog and its dim fade together over the length of a timing token. They are used where a box cannot be
+ * flown, and by visitors who prefer less motion. Only opacity changes, and the held end state keeps the card gone until the dialog
+ * is closed.
+ */
+.card-dialog[data-fade="open"],
+.card-dialog[data-fade="open"]::backdrop {
+  animation: card-fade-in var(--fallback-open) ease-out both;
+}
+
+.card-dialog[data-fade="close"],
+.card-dialog[data-fade="close"]::backdrop {
+  animation: card-fade-out var(--fallback-close) ease-in both;
+}
+
+.card-dialog[data-fade="reduced-open"],
+.card-dialog[data-fade="reduced-open"]::backdrop {
+  animation: card-fade-in var(--card-fade-reduced) linear both;
+}
+
+.card-dialog[data-fade="reduced-close"],
+.card-dialog[data-fade="reduced-close"]::backdrop {
+  animation: card-fade-out var(--card-fade-reduced) linear both;
+}
+
+@keyframes card-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes card-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/**
+ * On a phone the sheet is its own snapshot while a pull-out runs, so it rises with the cover's flight and sinks on close.
+ */
+@media (max-width: 40rem) {
+  html[data-pull-kind] .card {
+    view-transition-name: card;
+  }
+
+  ::view-transition-new(card) {
+    animation: card-rise var(--pull-dur) var(--pull-ease-out) both;
+  }
+
+  ::view-transition-old(card) {
+    animation: card-sink var(--pull-dur) var(--pull-ease-in) both;
+  }
+}
+
+@keyframes card-rise {
+  from {
+    translate: 0 32px;
+    opacity: 0;
+  }
+}
+
+@keyframes card-sink {
+  to {
+    translate: 0 32px;
+    opacity: 0;
+  }
+}
+
+/**
+ * A visitor who prefers less motion never gets a view transition from the script; this block also silences every view-transition
+ * animation in case one is started some other way. The plain fades above are allowed, and so is the swap cross-fade.
+ */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

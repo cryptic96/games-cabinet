@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const source = readFileSync(new URL('../../Cabinet.Service/wwwroot/js/card-flow.js', import.meta.url), 'utf8');
-const { createHistoryStep, sourceEntry, recordFromPlacement, indexPlacements } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+const { createHistoryStep, sourceEntry, recordFromPlacement, indexPlacements, pullKind, choosePath, isMostlyOnScreen } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 
 /**
  * A stand-in for the browser history that records every call.
@@ -224,4 +224,56 @@ test('the placement index skips the marker, keeps the first box of an entry and 
   assert.deepEqual([...index.keys()], ['1', '2']);
   assert.equal(index.get('1').title, 'First');
   assert.equal(index.get('2').title, 'Second');
+});
+
+test('upright spines turn about the vertical axis, lying boxes tip about the horizontal axis and covers only lift', () => {
+  assert.equal(pullKind('spine'), 'turn-y');
+  assert.equal(pullKind('expansionSpine'), 'turn-y');
+  assert.equal(pullKind('flatBox'), 'turn-x');
+  assert.equal(pullKind('expansionLayer'), 'turn-x');
+  assert.equal(pullKind('orphanExpansion'), 'turn-x');
+  assert.equal(pullKind('cover'), 'lift');
+});
+
+test('reduced motion decides the path whatever else is true', () => {
+  for (const hasViewTransition of [true, false]) {
+    for (const boxOnScreen of [true, false]) {
+      for (const swapped of [true, false]) {
+        assert.equal(choosePath({ reducedMotion: true, hasViewTransition, boxOnScreen, swapped }), 'reduced');
+      }
+    }
+  }
+});
+
+test('a browser without view transitions gets the plain fade', () => {
+  assert.equal(choosePath({ reducedMotion: false, hasViewTransition: false, boxOnScreen: true, swapped: false }), 'fade');
+});
+
+test('a box that is less than half on screen gets the plain fade', () => {
+  assert.equal(choosePath({ reducedMotion: false, hasViewTransition: true, boxOnScreen: false, swapped: false }), 'fade');
+});
+
+test('a swapped card gets the plain fade on close', () => {
+  assert.equal(choosePath({ reducedMotion: false, hasViewTransition: true, boxOnScreen: true, swapped: true }), 'fade');
+});
+
+test('everything in order gets the view transition, and a missing swapped flag means not swapped', () => {
+  assert.equal(choosePath({ reducedMotion: false, hasViewTransition: true, boxOnScreen: true, swapped: false }), 'view-transition');
+  assert.equal(choosePath({ reducedMotion: false, hasViewTransition: true, boxOnScreen: true }), 'view-transition');
+});
+
+test('a box is mostly on screen at exactly half its area and not just below it', () => {
+  const viewport = { width: 100, height: 100 };
+
+  assert.equal(isMostlyOnScreen({ left: 10, top: 10, width: 20, height: 20 }, viewport), true);
+  assert.equal(isMostlyOnScreen({ left: 90, top: 10, width: 20, height: 20 }, viewport), true);
+  assert.equal(isMostlyOnScreen({ left: 91, top: 10, width: 20, height: 20 }, viewport), false);
+  assert.equal(isMostlyOnScreen({ left: -10, top: 90, width: 20, height: 20 }, viewport), false);
+});
+
+test('a box fully outside the viewport or with no area is not on screen', () => {
+  const viewport = { width: 100, height: 100 };
+
+  assert.equal(isMostlyOnScreen({ left: 0, top: 150, width: 20, height: 20 }, viewport), false);
+  assert.equal(isMostlyOnScreen({ left: 0, top: 0, width: 0, height: 20 }, viewport), false);
 });

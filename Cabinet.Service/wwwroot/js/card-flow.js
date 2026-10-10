@@ -18,6 +18,68 @@ export function sourceEntry(kind, entryId) {
   return { entryId, atExpansions: kind === 'moreMarker' };
 }
 
+/** The box kinds that stand upright with the spine facing out and so turn about the vertical axis. */
+const UPRIGHT_KINDS = ['spine', 'expansionSpine'];
+
+/** The box kinds that lie flat with the spine facing out and so tip about the horizontal axis. */
+const LYING_KINDS = ['flatBox', 'expansionLayer', 'orphanExpansion'];
+
+/**
+ * Says how a box moves when it is pulled out: an upright spine turns about the vertical axis, a lying box tips about the horizontal
+ * axis, and a box that already shows its cover only lifts.
+ * @param {string} kind The kind of the box.
+ * @returns {'turn-y' | 'turn-x' | 'lift'}
+ */
+export function pullKind(kind) {
+  if (UPRIGHT_KINDS.includes(kind)) {
+    return 'turn-y';
+  }
+
+  return LYING_KINDS.includes(kind) ? 'turn-x' : 'lift';
+}
+
+/**
+ * Tells whether at least half of a box's area lies inside the viewport, which is the least a box needs to be flown from or to.
+ * @param {{ left: number, top: number, width: number, height: number }} rect The box's rectangle in viewport coordinates.
+ * @param {{ width: number, height: number }} viewport The size of the viewport.
+ * @returns {boolean}
+ */
+export function isMostlyOnScreen(rect, viewport) {
+  const area = rect.width * rect.height;
+
+  if (!(area > 0)) {
+    return false;
+  }
+
+  const visibleWidth = Math.min(rect.left + rect.width, viewport.width) - Math.max(rect.left, 0);
+  const visibleHeight = Math.min(rect.top + rect.height, viewport.height) - Math.max(rect.top, 0);
+
+  if (visibleWidth <= 0 || visibleHeight <= 0) {
+    return false;
+  }
+
+  return visibleWidth * visibleHeight * 2 >= area;
+}
+
+/**
+ * Decides how a card opens or closes. A visitor who prefers reduced motion always gets the short fade with a highlighted box and
+ * never a view transition; otherwise the pull-out is used unless the browser lacks view transitions, the box is less than half on
+ * screen, or the card shows another game than the box it came from, in which case a plain fade takes its place.
+ * @param {object} situation What is known at the moment of the tap.
+ * @param {boolean} situation.reducedMotion Whether the visitor prefers reduced motion.
+ * @param {boolean} situation.hasViewTransition Whether the browser can run a view transition.
+ * @param {boolean} situation.boxOnScreen Whether the box to fly is at least half on screen.
+ * @param {boolean} [situation.swapped] Whether the card shows another game than its source box.
+ * @returns {'reduced' | 'view-transition' | 'fade'}
+ */
+export function choosePath({ reducedMotion, hasViewTransition, boxOnScreen, swapped = false }) {
+  if (reducedMotion) {
+    return 'reduced';
+  }
+
+  return hasViewTransition && boxOnScreen && !swapped ? 'view-transition' : 'fade';
+}
+
 /**
  * Builds the least a card can show from one drawn box: identity, title, kind, colours and picture. It is what the card shows when
  * the card data did not arrive or failed, so the card still opens with its cover, title and link.

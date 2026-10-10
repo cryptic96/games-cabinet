@@ -171,6 +171,14 @@
   }
 }
 
+/**
+ * A box that is out of the shelf while its card is open. It is hidden with visibility, never opacity or display, so its slot keeps
+ * its size and the empty cubby shows behind the dim.
+ */
+.placement[data-out] {
+  visibility: hidden;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .placement {
     transition: none;
@@ -517,6 +525,16 @@
 .placement:focus-visible {
   z-index: 2;
   outline: 2px solid var(--wood-light);
+  outline-offset: 2px;
+}
+
+/**
+ * The box of the card that is open, for a visitor who prefers less motion: it stays in its slot and is marked with a plain light
+ * outline instead of flying out. The colour is the wall text colour, not the accent.
+ */
+.placement[data-open] {
+  z-index: 2;
+  outline: 2px solid var(--wall-text);
   outline-offset: 2px;
 }
 
