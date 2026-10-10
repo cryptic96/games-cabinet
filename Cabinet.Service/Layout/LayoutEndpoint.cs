@@ -1,4 +1,5 @@
 using Cabinet.Domain.Layout;
+using Cabinet.Service.Cards;
 using Cabinet.Service.Collection;
 using Cabinet.Service.Prototype;
 using Microsoft.Net.Http.Headers;
@@ -37,15 +38,17 @@ public static class LayoutEndpoint
             .AddSingleton(ArtSettings.FromConfiguration(configuration))
             .AddSingleton(SampleCatalog.FromConfiguration(configuration, environment))
             .AddSingleton<LayoutCache>()
+            .AddSingleton<CardCache>()
             .AddSingleton<CollectionStore>();
     }
 
-    /// <summary>Maps the layout route; it answers 404 for an unknown or missing profile name.</summary>
+    /// <summary>Maps the layout route and the card route; each answers 404 for an unknown or missing profile name.</summary>
     public static IEndpointRouteBuilder MapCabinetLayout(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
         endpoints.MapGet(Route, Handle);
+        endpoints.MapGet(CardsEndpoint.Route, CardsEndpoint.Handle);
 
         return endpoints;
     }
