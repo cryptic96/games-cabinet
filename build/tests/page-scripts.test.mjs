@@ -1307,10 +1307,10 @@ class FakeElement {
   }
 
   matches(selector) {
-    const entry = /^\[data-entry-id="(.*)"\]$/.exec(selector);
+    const attributes = [...selector.matchAll(/\[data-([a-z-]+)="(.*?)"\]/g)];
 
-    if (entry !== null) {
-      return this.dataset.entryId === entry[1];
+    if (attributes.length > 0) {
+      return attributes.every(([, name, value]) => this.dataset[name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] === value);
     }
 
     return selector.startsWith('.') && this.className.split(' ').includes(selector.slice(1));
@@ -1318,6 +1318,14 @@ class FakeElement {
 
   querySelector(selector) {
     return this.descendants().find((node) => node.matches(selector)) ?? null;
+  }
+
+  querySelectorAll(selector) {
+    return this.descendants().filter((node) => node.matches(selector));
+  }
+
+  get isConnected() {
+    return !this.removed;
   }
 
   contains(node) {

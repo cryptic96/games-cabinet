@@ -100,7 +100,8 @@ public partial class CabinetPageTests
         html.Should().Contain("The games are being copied over from BoardGameGeek. Check back in a few minutes.");
         html.Should().Contain("class=\"cabinet-message cabinet-filling\"");
         html.IndexOf("cabinet-filling", StringComparison.Ordinal).Should().BeLessThan(html.IndexOf("id=\"cabinet\"", StringComparison.Ordinal));
-        html.Should().MatchRegex("<div id=\"cabinet\" class=\"cabinet\"></div>");
+        html.Should().MatchRegex("<div id=\"cabinet\" class=\"cabinet\" role=\"group\" aria-label=\"Cabinet\" aria-describedby=\"cabinet-hint\"></div>");
+        html.Should().Contain("<p id=\"cabinet-hint\" class=\"visually-hidden\">Use the arrow keys to move between games and press Enter to open one.</p>");
         html.Should().NotContain("data-sample");
         html.Should().Contain("type=\"module\"");
         html.Should().NotContain("sample-switcher");

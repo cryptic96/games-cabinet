@@ -9,11 +9,14 @@ import { initSyncStatus, fetchStatus } from './sync.js';
 import { startLive } from './live.js';
 import { initCardDialog } from './detail.js';
 import { indexPlacements, recordFromPlacement } from './card-flow.js';
+import { initRoving } from './keys.js';
 
 const mount = document.getElementById('cabinet');
 const syncRoot = document.querySelector('.sync');
 const dialog = document.querySelector('.card-dialog');
 const phoneQuery = window.matchMedia('(max-width: 40rem)');
+
+const roving = mount === null ? null : initRoving(mount);
 
 let latestLoad = 0;
 let cardRecords = new Map();
@@ -178,6 +181,7 @@ async function load() {
     }
 
     renderCabinet(mount, layout, COPY);
+    roving.refresh();
     afterDraw(layout, response.headers.get('ETag'));
   } catch {
     if (thisLoad === latestLoad) {
@@ -213,7 +217,7 @@ function whenVisible() {
 /**
  * Redraws the cabinet quietly after the collection changed: no loading line, no error state, no animation. The old cabinet stays
  * until the new layout is ready and is swapped for it in one step, together with the being-filled message. Keyboard focus returns
- * to the box with the same entry id when it still exists. Any failure leaves the old cabinet and says nothing. A newer load or
+ * to the box with the same entry id and kind when it still exists. Any failure leaves the old cabinet and says nothing. A newer load or
  * redraw supersedes this one.
  * @returns {Promise<boolean>} True when the new cabinet is on screen; false when nothing changed on screen.
  */
@@ -236,9 +240,11 @@ async function redraw() {
 
     const { layout, etag } = fetched;
 
-    const focused = mount.contains(document.activeElement) ? document.activeElement.dataset.entryId : undefined;
+    const active = document.activeElement;
+    const focused = mount.contains(active) ? { entryId: active.dataset.entryId, kind: active.dataset.kind } : undefined;
 
     renderCabinet(mount, layout, COPY);
+    roving.refresh();
     afterDraw(layout, etag);
 
     const filling = document.querySelector('.cabinet-filling');
@@ -248,7 +254,7 @@ async function redraw() {
     }
 
     if (focused !== undefined) {
-      const same = mount.querySelector('[data-entry-id="' + CSS.escape(focused) + '"]');
+      const same = mount.querySelector('[data-entry-id="' + CSS.escape(focused.entryId) + '"][data-kind="' + CSS.escape(focused.kind) + '"]');
 
       if (same !== null) {
         same.focus({ preventScroll: true });
