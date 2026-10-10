@@ -66,6 +66,27 @@ public class SyncStatusTextTests
     }
 
     [Fact]
+    public void The_Dutch_exact_time_is_written_in_utc_with_the_Dutch_month_and_om()
+    {
+        var moment = new DateTimeOffset(2026, 10, 6, 14, 32, 0, TimeSpan.FromHours(2));
+
+        SyncStatusText.ExactUtc(moment, SiteLanguage.Dutch).Should().Be("6 oktober 2026 om 12:32 UTC");
+        SyncStatusText.ExactUtc(moment, SiteLanguage.English).Should().Be("6 October 2026 at 12:32 UTC");
+    }
+
+    [Fact]
+    public void The_stale_notes_read_in_both_languages()
+    {
+        SyncStatusText.StaleRecent("X", SiteLanguage.English).Should().Be("Showing the last sync from X. Recent syncs haven't gone through.");
+        SyncStatusText.StaleRecent("X", SiteLanguage.Dutch)
+            .Should().Be("Je ziet de laatste synchronisatie van X. Recente synchronisaties zijn niet gelukt.");
+        SyncStatusText.StaleHeldBack("X", SiteLanguage.English)
+            .Should().Be("Showing the last sync from X. A much smaller collection from BGG is waiting for the next sync to confirm.");
+        SyncStatusText.StaleHeldBack("X", SiteLanguage.Dutch)
+            .Should().Be("Je ziet de laatste synchronisatie van X. Een veel kleinere collectie van BGG wacht op bevestiging bij de volgende synchronisatie.");
+    }
+
+    [Fact]
     public void Never_synced_is_never_stale()
     {
         SyncStatusText.IsStale(null, Synced, ThreeHours, heldBack: false).Should().BeFalse();

@@ -1,8 +1,8 @@
 /**
  * The language and region the exact sync time is written in on the English page: English words with the Dutch date order and
- * 24-hour clock.
+ * 24-hour clock. The Dutch page uses nl-NL.
  */
-export const TIME_LOCALE = 'en-NL';
+const TIME_LOCALE = 'en-NL';
 
 const SECONDS_PER_MINUTE = 60;
 const SECONDS_PER_HOUR = 3600;
@@ -53,14 +53,32 @@ function englishWaitPhrase(remainingMs) {
   return minutes === 1 ? '1 minute' : `${minutes} minutes`;
 }
 
-const ENGLISH_EXACT_FORMAT = new Intl.DateTimeFormat(TIME_LOCALE, {
+/**
+ * The length of a wait in Dutch: less than a minute under 60 seconds, otherwise whole minutes rounded up.
+ * @param {number} remainingMs Milliseconds left in the window.
+ * @returns {string}
+ */
+function dutchWaitPhrase(remainingMs) {
+  if (remainingMs < MILLISECONDS_PER_MINUTE) {
+    return 'minder dan een minuut';
+  }
+
+  const minutes = Math.ceil(remainingMs / MILLISECONDS_PER_MINUTE);
+
+  return minutes === 1 ? '1 minuut' : `${minutes} minuten`;
+}
+
+const EXACT_OPTIONS = {
   day: 'numeric',
   month: 'long',
   year: 'numeric',
   hour: '2-digit',
   minute: '2-digit',
   timeZoneName: 'short',
-});
+};
+
+const ENGLISH_EXACT_FORMAT = new Intl.DateTimeFormat(TIME_LOCALE, EXACT_OPTIONS);
+const DUTCH_EXACT_FORMAT = new Intl.DateTimeFormat('nl-NL', EXACT_OPTIONS);
 
 const ENGLISH = Object.freeze({
   loading: 'Loading the cabinet...',
@@ -210,7 +228,11 @@ const ENGLISH = Object.freeze({
 });
 
 const DUTCH = Object.freeze({
-  ...ENGLISH,
+  loading: 'De kast wordt geladen...',
+  errorHeading: 'De kast kon niet worden geladen.',
+  errorBody: 'Controleer je verbinding en probeer het opnieuw.',
+  retry: 'Opnieuw proberen',
+  untitled: 'Spel zonder titel',
 
   /**
    * How long ago the collection was synced, with the time first and the verb last: just now under a minute or for a time in the
@@ -230,6 +252,129 @@ const DUTCH = Object.freeze({
     }
 
     return capitalise(dutchRelative.format(-count, unit)) + ' gesynchroniseerd';
+  },
+
+  /**
+   * The exact moment in the visitor's own time zone, for example 6 oktober 2026 om 14:32 CEST.
+   * @param {Date} date The moment to write.
+   * @returns {string}
+   */
+  exactTime(date) {
+    return DUTCH_EXACT_FORMAT.format(date);
+  },
+
+  /**
+   * The exact-time line under the status.
+   * @param {string} exact The exact time from exactTime.
+   * @returns {string}
+   */
+  lastSynced(exact) {
+    return `Laatst gesynchroniseerd op ${exact}`;
+  },
+
+  /**
+   * The note shown when recent syncs have not gone through.
+   * @param {string} exact The exact time from exactTime.
+   * @returns {string}
+   */
+  staleRecent(exact) {
+    return `Je ziet de laatste synchronisatie van ${exact}. Recente synchronisaties zijn niet gelukt.`;
+  },
+
+  /**
+   * The note shown while a suspicious result waits for the next sync to confirm.
+   * @param {string} exact The exact time from exactTime.
+   * @returns {string}
+   */
+  staleHeldBack(exact) {
+    return `Je ziet de laatste synchronisatie van ${exact}. Een veel kleinere collectie van BGG wacht op bevestiging bij de volgende synchronisatie.`;
+  },
+
+  syncNow: 'Nu synchroniseren',
+  syncing: 'Bezig met synchroniseren...',
+  noteChanged: 'Collectie bijgewerkt. Het kan een paar minuten duren voordat BGG recente wijzigingen laat zien.',
+  noteUnchanged: 'Geen wijzigingen gevonden. Het kan een paar minuten duren voordat BGG recente wijzigingen laat zien.',
+  noteFailed: 'BGG reageerde niet. De laatste collectie blijft zichtbaar.',
+  noteHeldBack: 'BGG gaf veel minder spellen terug dan eerder, dus de laatste collectie blijft zichtbaar.',
+  noteRunning: 'Er loopt al een synchronisatie.',
+  noteOffline: 'De synchronisatie kon niet starten. Controleer je verbinding en probeer het opnieuw.',
+
+  /**
+   * The button text during the shared window.
+   * @param {string} text The countdown from countdownText.
+   * @returns {string}
+   */
+  syncAgainIn(text) {
+    return `Opnieuw synchroniseren over ${text}`;
+  },
+
+  /**
+   * The button's accessible name during the shared window: whole minutes rounded up, and less than a minute in the last one.
+   * @param {number} remainingMs Milliseconds left in the window.
+   * @returns {string}
+   */
+  syncAgainName(remainingMs) {
+    return `Opnieuw synchroniseren over ${dutchWaitPhrase(remainingMs)}`;
+  },
+
+  /**
+   * The sentence given when the button is pressed during the shared window.
+   * @param {number} remainingMs Milliseconds left in the window.
+   * @returns {string}
+   */
+  youCanSyncAgain(remainingMs) {
+    return `Je kunt over ${dutchWaitPhrase(remainingMs)} opnieuw synchroniseren.`;
+  },
+
+  /** Sub-label of an expansion whose base game is not known. */
+  expansionLabel: 'Uitbreiding',
+
+  /**
+   * Sub-label of an expansion whose base game is not owned.
+   * @param {string} base The base game title.
+   * @returns {string}
+   */
+  expansionFor(base) {
+    return `Uitbreiding op ${base}`;
+  },
+
+  /**
+   * Accessible name of an expansion whose base game is not known.
+   * @param {string} title The expansion title.
+   * @returns {string}
+   */
+  expansionName(title) {
+    return `${title}, uitbreiding`;
+  },
+
+  /**
+   * Accessible name of one expansion layer in a stack.
+   * @param {string} title The expansion title.
+   * @param {string} base The base game title.
+   * @returns {string}
+   */
+  layerName(title, base) {
+    return `${title}, uitbreiding op ${base}`;
+  },
+
+  /**
+   * Text on the marker that counts hidden expansions.
+   * @param {number} n How many expansions are hidden.
+   * @returns {string}
+   */
+  moreLabel(n) {
+    return `+${n} meer`;
+  },
+
+  /**
+   * Accessible name of the marker that counts hidden expansions. It starts with the text the marker shows, so a
+   * visitor who speaks what they see finds it.
+   * @param {number} n How many expansions are hidden.
+   * @param {string} base The base game title.
+   * @returns {string}
+   */
+  moreName(n, base) {
+    return n === 1 ? `+${n} meer uitbreiding op ${base}` : `+${n} meer uitbreidingen op ${base}`;
   },
 });
 
