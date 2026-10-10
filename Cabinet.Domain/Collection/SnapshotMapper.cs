@@ -30,6 +30,8 @@ public sealed record MappedItemTrace(
 public static class SnapshotMapper
 {
     private const int VersionLength = 16;
+    private const char FieldSeparator = '\u001E';
+    private const char ItemSeparator = '\u001F';
 
     /// <summary>
     /// Maps every stored item to an item to draw, ordered by collection entry and then by game, so the same collection in
@@ -99,7 +101,8 @@ public static class SnapshotMapper
     /// <summary>
     /// The identifier of a collection: the first sixteen lowercase hexadecimal characters of a SHA-256 hash over the mapped
     /// items in order. It changes whenever anything that is drawn changes and not otherwise; the families that name a series
-    /// count, because they decide where a game stands.
+    /// count, because they decide where a game stands. The overload that takes the stored collection also counts what the
+    /// detail card shows.
     /// </summary>
     /// <param name="items">The mapped items, in mapped order.</param>
     public static string Version(IReadOnlyList<CabinetItem> items) => Version(items, ArtRules.Default);
@@ -116,15 +119,65 @@ public static class SnapshotMapper
         ArgumentNullException.ThrowIfNull(items);
         ArgumentNullException.ThrowIfNull(rules);
 
-        var lines = items
-            .Select(item => string.Create(
-                CultureInfo.InvariantCulture,
-                $"{item.CollectionId}|{item.BggId}|{item.Kind}|{item.Title}|{item.Box.WidthMm}|{item.Box.HeightMm}|{item.Box.DepthMm}|{item.PoseHeightMm}|{VariantUrls(item.Art)}|{ExpansionRefs(item.ExpansionOf)}|{ColourText(item.Colour)}|{EdgeText(item.Art?.Edges)}|{SeriesText(item.SeriesFamilies)}"))
-            .Prepend(rules.Fingerprint);
+        return HashOf(items.Select(DrawnText).Prepend(rules.Fingerprint));
+    }
+
+    /// <summary>
+    /// The identifier of a collection as <see cref="Version(IReadOnlyList{CabinetItem}, ArtRules)"/> works it out, with
+    /// everything the detail card shows added to each item's line: the year, the location, the player counts, the play
+    /// times, the minimum age, the weight and the average rating, the designers and mechanics, and the games an expansion
+    /// expands. It changes whenever anything drawn or shown on the card changes. The time the details were read, the ranked
+    /// rating, the details version and families that name no series are not shown and do not change it.
+    /// </summary>
+    /// <param name="items">The mapped items, in mapped order.</param>
+    /// <param name="rules">The rules the items were mapped with.</param>
+    /// <param name="snapshot">The stored collection the items were mapped from.</param>
+    public static string Version(IReadOnlyList<CabinetItem> items, ArtRules rules, CollectionSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        ArgumentNullException.ThrowIfNull(rules);
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        var entries = snapshot.Items
+            .GroupBy(entry => (entry.CollectionId, entry.GameId))
+            .ToDictionary(group => group.Key, group => group.First());
+
+        return HashOf(items
+            .Select(item => $"{DrawnText(item)}|{CardText(item, entries, snapshot.Games)}")
+            .Prepend(rules.Fingerprint));
+    }
+
+    private static string HashOf(IEnumerable<string> lines)
+    {
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', lines)));
 
         return Convert.ToHexStringLower(hash)[..VersionLength];
     }
+
+    private static string DrawnText(CabinetItem item) =>
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"{item.CollectionId}|{item.BggId}|{item.Kind}|{item.Title}|{item.Box.WidthMm}|{item.Box.HeightMm}|{item.Box.DepthMm}|{item.PoseHeightMm}|{VariantUrls(item.Art)}|{ExpansionRefs(item.ExpansionOf)}|{ColourText(item.Colour)}|{EdgeText(item.Art?.Edges)}|{SeriesText(item.SeriesFamilies)}");
+
+    private static string CardText(
+        CabinetItem item,
+        IReadOnlyDictionary<(long CollectionId, int GameId), SnapshotItem> entries,
+        IReadOnlyDictionary<int, GameDetails>? games)
+    {
+        entries.TryGetValue((item.CollectionId, item.BggId), out var entry);
+        GameDetails? details = null;
+        _ = games?.TryGetValue(item.BggId, out details);
+
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"{entry?.Year}{FieldSeparator}{entry?.Location}{FieldSeparator}{details?.MinPlayers}{FieldSeparator}{details?.MaxPlayers}{FieldSeparator}{details?.PlayingTime}{FieldSeparator}{details?.MinPlayTime}{FieldSeparator}{details?.MaxPlayTime}{FieldSeparator}{details?.MinAge}{FieldSeparator}{details?.Weight}{FieldSeparator}{details?.Average}{FieldSeparator}{NamesText(details?.Designers)}{FieldSeparator}{NamesText(details?.Mechanics)}{FieldSeparator}{ExpansionIds(details?.ExpandsGames)}");
+    }
+
+    private static string NamesText(IReadOnlyList<string>? names) =>
+        names is null ? string.Empty : string.Join(ItemSeparator, names);
+
+    private static string ExpansionIds(IReadOnlyList<BaseGameRef>? references) =>
+        references is null ? string.Empty : string.Join(',', references.Select(reference => reference.BggId.ToString(CultureInfo.InvariantCulture)));
 
     private static MappedItemTrace Trace(
         SnapshotItem item,

@@ -1,8 +1,8 @@
 using Cabinet.Domain.Layout;
 using Cabinet.Service.Cards;
 using Cabinet.Service.Collection;
+using Cabinet.Service.Hosting;
 using Cabinet.Service.Prototype;
-using Microsoft.Net.Http.Headers;
 
 namespace Cabinet.Service.Layout;
 
@@ -79,16 +79,8 @@ public static class LayoutEndpoint
         context.Response.Headers.ETag = cached.ETag;
         context.Response.Headers.CacheControl = "no-cache";
 
-        return MatchesIfNoneMatch(context.Request, cached.ETag)
+        return EntityTags.MatchesIfNoneMatch(context.Request, cached.ETag)
             ? Results.StatusCode(StatusCodes.Status304NotModified)
             : Results.Content(cached.Json, "application/json");
-    }
-
-    private static bool MatchesIfNoneMatch(HttpRequest request, string eTag)
-    {
-        var requested = request.GetTypedHeaders().IfNoneMatch;
-
-        return requested.Any(candidate =>
-            candidate.Equals(EntityTagHeaderValue.Any) || candidate.Compare(new EntityTagHeaderValue(eTag), useStrongComparison: false));
     }
 }
