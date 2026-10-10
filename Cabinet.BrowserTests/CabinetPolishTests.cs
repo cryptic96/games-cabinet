@@ -23,6 +23,61 @@ public sealed class CabinetPolishTests : CabinetPageTest
         () => document.querySelectorAll('#cabinet .placement[data-art="true"]').length
         """;
 
+    private const string UprightTitleSizes = """
+        () => [...new Set([...document.querySelectorAll(
+          '#cabinet .placement[data-kind="spine"] .placement-label, #cabinet .placement[data-kind="expansionSpine"][data-lines="1"] .placement-label')]
+          .filter((label) => (label.textContent ?? '').trim() !== '')
+          .map((label) => parseFloat(getComputedStyle(label).fontSize)))]
+        """;
+
+    private const string FlatTitleSizes = """
+        () => [...new Set([...document.querySelectorAll(
+          '#cabinet .placement:is([data-kind="flatBox"], [data-kind="expansionLayer"]) .placement-label, #cabinet .placement[data-kind="orphanExpansion"][data-lines="1"] .placement-label')]
+          .filter((label) => (label.textContent ?? '').trim() !== '')
+          .map((label) => parseFloat(getComputedStyle(label).fontSize)))]
+        """;
+
+    private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
+
+    [Theory]
+    [InlineData("/?sample=65", 1440, 900, "polish-desktop-65")]
+    [InlineData("/?sample=65", 390, 800, "polish-phone-65")]
+    [InlineData("/?sample=400", 1440, 900, "polish-desktop-400")]
+    [InlineData("/?sample=400", 390, 800, "polish-phone-400")]
+    public async Task One_line_titles_use_two_sizes_and_the_page_never_scrolls_sideways(string path, int width, int height, string screenshot)
+    {
+        await Page.SetViewportSizeAsync(width, height);
+        await StartAsync(PrototypeOn);
+        await GotoCabinetAsync(path);
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        var upright = await Page.EvaluateAsync<double[]>(UprightTitleSizes);
+        var flat = await Page.EvaluateAsync<double[]>(FlatTitleSizes);
+        var scrollWidth = await Page.EvaluateAsync<int>("() => document.documentElement.scrollWidth");
+
+        upright.Should().NotBeEmpty();
+        upright.Should().BeSubsetOf([12d, 16d]);
+        flat.Should().BeSubsetOf([12d, 14d]);
+        scrollWidth.Should().BeLessThanOrEqualTo(width);
+        await SaveScreenshotAsync(screenshot);
+    }
+
+    [Fact]
+    public async Task The_plinth_lip_is_visible_on_a_phone()
+    {
+        await Page.SetViewportSizeAsync(390, 800);
+        await StartAsync(PrototypeOn);
+        await GotoCabinetAsync("/?sample=65");
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        var plinth = Page.Locator("#cabinet .section-base").First;
+        await plinth.ScrollIntoViewIfNeededAsync();
+        var litness = await plinth.EvaluateAsync<string>("(element) => getComputedStyle(element, '::before').getPropertyValue('--arch-lit').trim()");
+
+        litness.Should().Be("0.22");
+        await SaveScreenshotAsync("plinth-lip-390");
+    }
+
     [Fact]
     public async Task A_picture_that_cannot_load_is_marked_failed_and_shows_the_generated_cover()
     {

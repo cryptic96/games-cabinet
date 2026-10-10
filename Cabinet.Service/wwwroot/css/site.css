@@ -4,6 +4,8 @@
   --wood-light: #d9b98a;
   --ink: #2a1a10;
   --wood-edge: #8c5d38;
+  --box-fallback-bg: var(--wood-edge);
+  --box-fallback-fg: #ffffff;
   --wall-text: #efe3c2;
   --chrome-line: color-mix(in srgb, var(--wall-text) 60%, var(--wood-dark));
   --chrome-muted: color-mix(in srgb, var(--wall-text) 70%, var(--wood-dark));

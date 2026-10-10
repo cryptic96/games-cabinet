@@ -27,3 +27,10 @@ The phase 4 UI review (`.planning/phases/04-enrichment-box-images-shape/04-UI-RE
 ## Solution
 
 Take the click affordance with the detail phase. Handle the title scraps and the token and spacing items in a small polish pass, re-recording goldens if a floor changes, and judge the desktop balance in the next owner review.
+
+## Closed (phase 5)
+
+- Title scraps: an empty label on a box too thin for five characters, in the layout engine; the name and tooltip keep the full title.
+- Hover with no action: the card opens on click or tap (the card plans); the hover lift stays for fine pointers.
+- Plinth lip, hex fallbacks, cover plate gap, uneven spine title sizes, failed picture marker and the missing-picture count: plan 05-14 (`cabinet.css`, `site.css`, `render.js`, `ArtFileAudit`, health `missingArt`).
+- Uneven desktop sections: left to the owner's review round, not changed.
