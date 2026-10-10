@@ -100,6 +100,25 @@ test('the Dutch sentences with arguments equal the copy contract', () => {
   assert.equal(nl.staleHeldBack('x'), 'Je ziet de laatste synchronisatie van x. Een veel kleinere collectie van BGG wacht op bevestiging bij de volgende synchronisatie.');
 });
 
+test('the card strings equal the copy contract in both languages', () => {
+  assert.deepEqual([en.close, en.bggLink, en.newTabHint, en.noDetails], ['Close', 'View on BoardGameGeek', '(opens in a new tab)', 'More details arrive after the next sync.']);
+  assert.deepEqual([nl.close, nl.bggLink, nl.newTabHint, nl.noDetails], ['Sluiten', 'Bekijk op BoardGameGeek', '(opent in een nieuw tabblad)', 'Meer details volgen na de volgende synchronisatie.']);
+  assert.deepEqual([...en.weightWords], ['Light', 'Medium-light', 'Medium', 'Medium-heavy', 'Heavy']);
+  assert.deepEqual([...nl.weightWords], ['Licht', 'Vrij licht', 'Gemiddeld', 'Vrij zwaar', 'Zwaar']);
+  assert.deepEqual([...nl.weightWordsLower], ['licht', 'vrij licht', 'gemiddeld', 'vrij zwaar', 'zwaar']);
+  assert.deepEqual([nl.playTimeLabel, nl.ageLabel, nl.storedIn, nl.ownedExpansions, nl.ratingLabel, nl.expansionForHeading], ['speelduur', 'min. leeftijd', 'Staat in', 'Uitbreidingen in de kast', 'BGG-score', 'Uitbreiding op']);
+  assert.equal(nl.weightLabel('2,4'), 'zwaarte 2,4 / 5');
+  assert.equal(en.weightLabel('2.4'), 'weight 2.4 / 5');
+  assert.deepEqual([nl.playersLabel(1), nl.playersLabel(2), en.playersLabel(1), en.playersLabel(4)], ['speler', 'spelers', 'player', 'players']);
+  assert.deepEqual([nl.designersLabel(1), nl.designersLabel(2), nl.mechanicsLabel(1), nl.mechanicsLabel(9)], ['Ontwerper', 'Ontwerpers', 'Mechanisme', 'Mechanismen']);
+  assert.equal(nl.listPlayers('2–4', 4), '2–4 spelers');
+  assert.equal(en.listPlayers('1', 1), '1 player');
+  assert.equal(nl.listMinutes('60–90'), '60–90 minuten');
+  assert.equal(en.listMinutes('45'), '45 minutes');
+  assert.equal(nl.listExpansionFor('B'), 'uitbreiding op B');
+  assert.deepEqual([en.numberLocale, nl.numberLocale], ['en', 'nl']);
+});
+
 test('the exact time follows the language: English words on the English page, Dutch month and om on the Dutch page', () => {
   const moment = new Date('2030-01-15T12:00:00Z');
 

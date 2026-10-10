@@ -7,6 +7,36 @@
   --wall-text: #efe3c2;
   --chrome-line: color-mix(in srgb, var(--wall-text) 60%, var(--wood-dark));
   --chrome-muted: color-mix(in srgb, var(--wall-text) 70%, var(--wood-dark));
+  --paper: #fbf8f0;
+  --paper-label: #6a4a36;
+  --paper-rule: rgb(84 132 196 / 0.32);
+  --paper-red: #c0504a;
+  --paper-mount: #6b4a33;
+  --paper-photo: #ffffff;
+  --paper-edge: rgb(120 90 60 / 0.12);
+  --paper-hole: #23140b;
+  --dim: rgb(20 10 4 / 0.62);
+  --ruling: 28px;
+  --ruling-drop: 4px;
+  --hit-rows: 1;
+  --pull-open: 350ms;
+  --pull-close: 250ms;
+  --pull-dur: var(--pull-open);
+  --pull-ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --pull-ease-in: cubic-bezier(0.5, 0, 0.9, 0.4);
+  --pull-flip-share: 0.45;
+  --pull-perspective: 900px;
+  --pull-lift: 1.06;
+  --card-fade-reduced: 150ms;
+  --swap-fade: 120ms;
+  --fallback-open: 200ms;
+  --fallback-close: 150ms;
+}
+
+@media (any-pointer: coarse), (max-width: 40rem) {
+  :root {
+    --hit-rows: 2;
+  }
 }
 
 * {

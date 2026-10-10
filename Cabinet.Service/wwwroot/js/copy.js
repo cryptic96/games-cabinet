@@ -90,6 +90,81 @@ const ENGLISH = Object.freeze({
   bggLink: 'View on BoardGameGeek',
   newTabHint: '(opens in a new tab)',
   noDetails: 'More details arrive after the next sync.',
+  playTimeLabel: 'play time',
+  minutesShort: 'min',
+  weightWords: Object.freeze(['Light', 'Medium-light', 'Medium', 'Medium-heavy', 'Heavy']),
+  weightWordsLower: Object.freeze(['light', 'medium-light', 'medium', 'medium-heavy', 'heavy']),
+  ageLabel: 'min. age',
+  storedIn: 'Stored in',
+  ownedExpansions: 'Owned expansions',
+  ratingLabel: 'BGG rating',
+  expansionForHeading: 'Expansion for',
+  listExpansion: 'expansion',
+  numberLocale: 'en',
+
+  /**
+   * The label after the number of players: singular for exactly one.
+   * @param {number} count The largest number of players of the game.
+   * @returns {string}
+   */
+  playersLabel(count) {
+    return count === 1 ? 'player' : 'players';
+  },
+
+  /**
+   * The label of the weight fact.
+   * @param {string} text The weight, already written with the page's decimal separator.
+   * @returns {string}
+   */
+  weightLabel(text) {
+    return `weight ${text} / 5`;
+  },
+
+  /**
+   * The heading of the designers row: singular for exactly one.
+   * @param {number} count How many designers there are.
+   * @returns {string}
+   */
+  designersLabel(count) {
+    return count === 1 ? 'Designer' : 'Designers';
+  },
+
+  /**
+   * The heading of the mechanics row: singular for exactly one.
+   * @param {number} count How many mechanics there are.
+   * @returns {string}
+   */
+  mechanicsLabel(count) {
+    return count === 1 ? 'Mechanic' : 'Mechanics';
+  },
+
+  /**
+   * The players part of a games list entry.
+   * @param {string} text The number or range of players.
+   * @param {number} count The largest number of players of the game.
+   * @returns {string}
+   */
+  listPlayers(text, count) {
+    return `${text} ${count === 1 ? 'player' : 'players'}`;
+  },
+
+  /**
+   * The play time part of a games list entry, with the unit written out in full so a screen reader does not say minimum.
+   * @param {string} text The time or range of times.
+   * @returns {string}
+   */
+  listMinutes(text) {
+    return `${text} minutes`;
+  },
+
+  /**
+   * The expansion part of a games list entry that names its base game.
+   * @param {string} base The base game title.
+   * @returns {string}
+   */
+  listExpansionFor(base) {
+    return `expansion for ${base}`;
+  },
 
   /**
    * How long ago the collection was synced: just now under a minute or for a time in the future, then whole minutes, whole
@@ -241,6 +316,81 @@ const DUTCH = Object.freeze({
   bggLink: 'Bekijk op BoardGameGeek',
   newTabHint: '(opent in een nieuw tabblad)',
   noDetails: 'Meer details volgen na de volgende synchronisatie.',
+  playTimeLabel: 'speelduur',
+  minutesShort: 'min',
+  weightWords: Object.freeze(['Licht', 'Vrij licht', 'Gemiddeld', 'Vrij zwaar', 'Zwaar']),
+  weightWordsLower: Object.freeze(['licht', 'vrij licht', 'gemiddeld', 'vrij zwaar', 'zwaar']),
+  ageLabel: 'min. leeftijd',
+  storedIn: 'Staat in',
+  ownedExpansions: 'Uitbreidingen in de kast',
+  ratingLabel: 'BGG-score',
+  expansionForHeading: 'Uitbreiding op',
+  listExpansion: 'uitbreiding',
+  numberLocale: 'nl',
+
+  /**
+   * The label after the number of players: singular for exactly one.
+   * @param {number} count The largest number of players of the game.
+   * @returns {string}
+   */
+  playersLabel(count) {
+    return count === 1 ? 'speler' : 'spelers';
+  },
+
+  /**
+   * The label of the weight fact.
+   * @param {string} text The weight, already written with the page's decimal separator.
+   * @returns {string}
+   */
+  weightLabel(text) {
+    return `zwaarte ${text} / 5`;
+  },
+
+  /**
+   * The heading of the designers row: singular for exactly one.
+   * @param {number} count How many designers there are.
+   * @returns {string}
+   */
+  designersLabel(count) {
+    return count === 1 ? 'Ontwerper' : 'Ontwerpers';
+  },
+
+  /**
+   * The heading of the mechanics row: singular for exactly one.
+   * @param {number} count How many mechanics there are.
+   * @returns {string}
+   */
+  mechanicsLabel(count) {
+    return count === 1 ? 'Mechanisme' : 'Mechanismen';
+  },
+
+  /**
+   * The players part of a games list entry.
+   * @param {string} text The number or range of players.
+   * @param {number} count The largest number of players of the game.
+   * @returns {string}
+   */
+  listPlayers(text, count) {
+    return `${text} ${count === 1 ? 'speler' : 'spelers'}`;
+  },
+
+  /**
+   * The play time part of a games list entry, with the unit written out in full so a screen reader does not say minimum.
+   * @param {string} text The time or range of times.
+   * @returns {string}
+   */
+  listMinutes(text) {
+    return `${text} minuten`;
+  },
+
+  /**
+   * The expansion part of a games list entry that names its base game.
+   * @param {string} base The base game title.
+   * @returns {string}
+   */
+  listExpansionFor(base) {
+    return `uitbreiding op ${base}`;
+  },
 
   /**
    * How long ago the collection was synced, with the time first and the verb last: just now under a minute or for a time in the

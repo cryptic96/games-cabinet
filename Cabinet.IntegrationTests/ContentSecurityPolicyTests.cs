@@ -26,6 +26,7 @@ public class ContentSecurityPolicyTests
     [InlineData("/js/render.js", HttpStatusCode.OK)]
     [InlineData("/lib/signalr/signalr.min.js", HttpStatusCode.OK)]
     [InlineData("/img/powered-by-bgg.svg", HttpStatusCode.OK)]
+    [InlineData("/img/icons.svg", HttpStatusCode.OK)]
     [InlineData("/cabinet/status", HttpStatusCode.OK)]
     [InlineData("/cabinet/layout?profile=tablet", HttpStatusCode.NotFound)]
     [InlineData("/no-such-page", HttpStatusCode.NotFound)]
