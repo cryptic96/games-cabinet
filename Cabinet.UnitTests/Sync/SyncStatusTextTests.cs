@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Cabinet.Service.Language;
 using Cabinet.Service.Pages;
 using FluentAssertions;
 
@@ -11,13 +12,13 @@ public class SyncStatusTextTests
     private static readonly DateTimeOffset Synced = new(2030, 1, 15, 12, 0, 0, TimeSpan.Zero);
     private static readonly TimeSpan ThreeHours = TimeSpan.FromHours(3);
 
-    public static TheoryData<int, string> SharedCases()
+    public static TheoryData<string, int, string> SharedCases()
     {
-        var data = new TheoryData<int, string>();
+        var data = new TheoryData<string, int, string>();
 
-        foreach (var (seconds, text) in ReadCases())
+        foreach (var (language, seconds, text) in ReadCases())
         {
-            data.Add(seconds, text);
+            data.Add(language, seconds, text);
         }
 
         return data;
@@ -25,15 +26,36 @@ public class SyncStatusTextTests
 
     [Theory]
     [MemberData(nameof(SharedCases))]
-    public void Relative_text_follows_the_shared_case_table(int elapsedSeconds, string expected)
+    public void Relative_text_follows_the_shared_case_table(string language, int elapsedSeconds, string expected)
     {
-        SyncStatusText.Relative(TimeSpan.FromSeconds(elapsedSeconds)).Should().Be(expected);
+        SiteLanguage.TryGet(language, out var site).Should().BeTrue();
+
+        SyncStatusText.Relative(TimeSpan.FromSeconds(elapsedSeconds), site).Should().Be(expected);
     }
 
     [Fact]
-    public void The_shared_case_table_covers_every_unit_boundary()
+    public void The_English_overload_without_a_language_still_matches_the_English_rows()
     {
-        ReadCases().Select(entry => entry.Seconds).Should().Contain([-30, 59, 60, 3599, 3600, 86399, 86400, 172800]);
+        foreach (var (_, seconds, text) in ReadCases().Where(entry => entry.Language == SiteLanguage.English.Code))
+        {
+            SyncStatusText.Relative(TimeSpan.FromSeconds(seconds)).Should().Be(text);
+        }
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("nl")]
+    public void The_shared_case_table_covers_every_unit_boundary(string language)
+    {
+        ReadCases().Where(entry => entry.Language == language).Select(entry => entry.Seconds)
+            .Should().Contain([-30, 59, 60, 3599, 3600, 86399, 86400, 172800]);
+    }
+
+    [Fact]
+    public void Never_synced_reads_in_both_languages()
+    {
+        SyncStatusText.NeverSyncedText(SiteLanguage.English).Should().Be("Not synced yet");
+        SyncStatusText.NeverSyncedText(SiteLanguage.Dutch).Should().Be("Nog niet gesynchroniseerd");
     }
 
     [Fact]
@@ -69,12 +91,15 @@ public class SyncStatusTextTests
         SyncStatusText.IsStale(Synced, Synced - TimeSpan.FromMinutes(1), ThreeHours, heldBack: false).Should().BeFalse();
     }
 
-    private static List<(int Seconds, string Text)> ReadCases()
+    private static List<(string Language, int Seconds, string Text)> ReadCases()
     {
         using var document = JsonDocument.Parse(File.ReadAllText(FindFixture()));
 
         return document.RootElement.EnumerateArray()
-            .Select(entry => (entry.GetProperty("elapsedSeconds").GetInt32(), entry.GetProperty("text").GetString()!))
+            .Select(entry => (
+                entry.GetProperty("language").GetString()!,
+                entry.GetProperty("elapsedSeconds").GetInt32(),
+                entry.GetProperty("text").GetString()!))
             .ToList();
     }
 

@@ -21,7 +21,7 @@ async function loadPageScript(name) {
   return import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 }
 
-const { COPY } = await loadPageScript('copy.js');
+const { COPY, copyFor } = await loadPageScript('copy.js');
 const { serverOffsetMs, elapsedSeconds, isStale, buttonState, countdownText, pressOutcome, shouldRedraw, reconnectDelayMs, isOutdatedStatus, ownSyncStillWaiting } = await loadPageScript('status.js');
 const cases = JSON.parse(readFileSync(new URL('./fixtures/relative-time-cases.json', import.meta.url), 'utf8'));
 
@@ -29,9 +29,9 @@ const SYNCED = '2030-01-15T12:00:00.000Z';
 const SYNCED_MS = Date.parse(SYNCED);
 const THREE_HOURS = 3 * 60 * 60;
 
-for (const { elapsedSeconds: seconds, text } of cases) {
-  test(`${seconds} seconds reads as "${text}"`, () => {
-    assert.equal(COPY.syncedAgo(seconds), text);
+for (const { language = 'en', elapsedSeconds: seconds, text } of cases) {
+  test(`${seconds} seconds reads as "${text}" in ${language}`, () => {
+    assert.equal(copyFor(language).syncedAgo(seconds), text);
   });
 }
 

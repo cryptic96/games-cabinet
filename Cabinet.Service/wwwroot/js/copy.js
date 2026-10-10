@@ -1,32 +1,49 @@
 /**
- * The language and region the exact sync time is written in: English words with the Dutch date order and 24-hour clock.
- * Swapping this one constant is how a translated page changes the format.
+ * The language and region the exact sync time is written in on the English page: English words with the Dutch date order and
+ * 24-hour clock.
  */
 export const TIME_LOCALE = 'en-NL';
 
 const SECONDS_PER_MINUTE = 60;
 const SECONDS_PER_HOUR = 3600;
 const SECONDS_PER_DAY = 86400;
-
-const relativeFormat = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
-
-const exactFormat = new Intl.DateTimeFormat(TIME_LOCALE, {
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-  timeZoneName: 'short',
-});
-
 const MILLISECONDS_PER_MINUTE = 60000;
 
+const englishRelative = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+const dutchRelative = new Intl.RelativeTimeFormat('nl', { numeric: 'always' });
+
 /**
- * The length of a wait in words: less than a minute under 60 seconds, otherwise whole minutes rounded up.
+ * The length of a time in whole units rounded down, as the number and the unit name Intl.RelativeTimeFormat takes.
+ * @param {number} elapsedSeconds Seconds since the last good sync, at least one minute.
+ * @returns {{ count: number, unit: string }}
+ */
+function wholeUnits(elapsedSeconds) {
+  if (elapsedSeconds < SECONDS_PER_HOUR) {
+    return { count: Math.floor(elapsedSeconds / SECONDS_PER_MINUTE), unit: 'minute' };
+  }
+
+  if (elapsedSeconds < SECONDS_PER_DAY) {
+    return { count: Math.floor(elapsedSeconds / SECONDS_PER_HOUR), unit: 'hour' };
+  }
+
+  return { count: Math.floor(elapsedSeconds / SECONDS_PER_DAY), unit: 'day' };
+}
+
+/**
+ * Upper-cases the first letter of a sentence.
+ * @param {string} text The sentence.
+ * @returns {string}
+ */
+function capitalise(text) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/**
+ * The length of a wait in English: less than a minute under 60 seconds, otherwise whole minutes rounded up.
  * @param {number} remainingMs Milliseconds left in the window.
  * @returns {string}
  */
-function waitPhrase(remainingMs) {
+function englishWaitPhrase(remainingMs) {
   if (remainingMs < MILLISECONDS_PER_MINUTE) {
     return 'less than a minute';
   }
@@ -36,10 +53,16 @@ function waitPhrase(remainingMs) {
   return minutes === 1 ? '1 minute' : `${minutes} minutes`;
 }
 
-/**
- * Every visitor-facing string the cabinet scripts show lives here, so wording changes and translation touch one file.
- */
-export const COPY = Object.freeze({
+const ENGLISH_EXACT_FORMAT = new Intl.DateTimeFormat(TIME_LOCALE, {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  timeZoneName: 'short',
+});
+
+const ENGLISH = Object.freeze({
   loading: 'Loading the cabinet...',
   errorHeading: 'The cabinet could not be loaded.',
   errorBody: 'Check your connection and try again.',
@@ -57,15 +80,9 @@ export const COPY = Object.freeze({
       return 'Synced just now';
     }
 
-    if (elapsedSeconds < SECONDS_PER_HOUR) {
-      return 'Synced ' + relativeFormat.format(-Math.floor(elapsedSeconds / SECONDS_PER_MINUTE), 'minute');
-    }
+    const { count, unit } = wholeUnits(elapsedSeconds);
 
-    if (elapsedSeconds < SECONDS_PER_DAY) {
-      return 'Synced ' + relativeFormat.format(-Math.floor(elapsedSeconds / SECONDS_PER_HOUR), 'hour');
-    }
-
-    return 'Synced ' + relativeFormat.format(-Math.floor(elapsedSeconds / SECONDS_PER_DAY), 'day');
+    return 'Synced ' + englishRelative.format(-count, unit);
   },
 
   /**
@@ -74,7 +91,7 @@ export const COPY = Object.freeze({
    * @returns {string}
    */
   exactTime(date) {
-    return exactFormat.format(date);
+    return ENGLISH_EXACT_FORMAT.format(date);
   },
 
   /**
@@ -128,7 +145,7 @@ export const COPY = Object.freeze({
    * @returns {string}
    */
   syncAgainName(remainingMs) {
-    return `Sync again in ${waitPhrase(remainingMs)}`;
+    return `Sync again in ${englishWaitPhrase(remainingMs)}`;
   },
 
   /**
@@ -137,7 +154,7 @@ export const COPY = Object.freeze({
    * @returns {string}
    */
   youCanSyncAgain(remainingMs) {
-    return `You can sync again in ${waitPhrase(remainingMs)}.`;
+    return `You can sync again in ${englishWaitPhrase(remainingMs)}.`;
   },
 
   /** Sub-label of an expansion whose base game is not known. */
@@ -191,3 +208,57 @@ export const COPY = Object.freeze({
     return n === 1 ? `+${n} more expansion for ${base}` : `+${n} more expansions for ${base}`;
   },
 });
+
+const DUTCH = Object.freeze({
+  ...ENGLISH,
+
+  /**
+   * How long ago the collection was synced, with the time first and the verb last: just now under a minute or for a time in the
+   * future, then whole minutes, whole hours up to a day, then whole days, where one day reads as yesterday.
+   * @param {number} elapsedSeconds Seconds since the last good sync; negative when the time is in the future.
+   * @returns {string}
+   */
+  syncedAgo(elapsedSeconds) {
+    if (elapsedSeconds < SECONDS_PER_MINUTE) {
+      return 'Zojuist gesynchroniseerd';
+    }
+
+    const { count, unit } = wholeUnits(elapsedSeconds);
+
+    if (unit === 'day' && count === 1) {
+      return 'Gisteren gesynchroniseerd';
+    }
+
+    return capitalise(dutchRelative.format(-count, unit)) + ' gesynchroniseerd';
+  },
+});
+
+/**
+ * Every visitor-facing string the cabinet scripts show, once per page language. Both tables have the same keys, which a test checks.
+ */
+export const COPY_BY_LANGUAGE = Object.freeze({ en: ENGLISH, nl: DUTCH });
+
+/**
+ * The string table for a language code; any code that is not Dutch or English gets English.
+ * @param {string} language The language code.
+ * @returns {object}
+ */
+export function copyFor(language) {
+  return Object.hasOwn(COPY_BY_LANGUAGE, language) ? COPY_BY_LANGUAGE[language] : COPY_BY_LANGUAGE.en;
+}
+
+/**
+ * The language the server wrote the page in, read from the document's language. Dutch when it starts with nl, otherwise English,
+ * and English when there is no document.
+ * @returns {string}
+ */
+export function pageLanguage() {
+  const language = globalThis.document?.documentElement?.lang ?? '';
+
+  return language.toLowerCase().startsWith('nl') ? 'nl' : 'en';
+}
+
+/**
+ * The strings in the language of this page.
+ */
+export const COPY = copyFor(pageLanguage());

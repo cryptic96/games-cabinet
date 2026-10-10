@@ -57,11 +57,11 @@ public class IndexModel(SampleCatalog catalog, CollectionStore store, SyncStatus
 
     /// <summary>The first-paint text of the relative-time button, for example <c>Synced 12 minutes ago</c>.</summary>
     public string RelativeText => Status.LastSyncedUtc is { } last
-        ? SyncStatusText.Relative(Status.ServerTimeUtc - last)
-        : SyncStatusText.NeverSynced;
+        ? SyncStatusText.Relative(Status.ServerTimeUtc - last, Language)
+        : SyncStatusText.NeverSyncedText(Language);
 
     /// <summary>The last good sync written out in UTC, or empty before the first sync.</summary>
-    public string ExactText => Status.LastSyncedUtc is { } last ? SyncStatusText.ExactUtc(last) : string.Empty;
+    public string ExactText => Status.LastSyncedUtc is { } last ? SyncStatusText.ExactUtc(last, Language) : string.Empty;
 
     /// <summary>Whether the note about showing an older sync is visible on first paint.</summary>
     public bool StaleNoteVisible => SyncStatusText.IsStale(
@@ -74,8 +74,8 @@ public class IndexModel(SampleCatalog catalog, CollectionStore store, SyncStatus
     public string StaleNoteText => !StaleNoteVisible
         ? string.Empty
         : Status.HeldBack
-            ? SyncStatusText.StaleHeldBack(ExactText)
-            : SyncStatusText.StaleRecent(ExactText);
+            ? SyncStatusText.StaleHeldBack(ExactText, Language)
+            : SyncStatusText.StaleRecent(ExactText, Language);
 
     /// <summary>Every sample name, in the order the switcher lists them.</summary>
     public IReadOnlyList<string> SampleNames => catalog.Names;
