@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Cabinet.Domain.Cards;
 using Cabinet.Domain.Layout;
+using Cabinet.Domain.Samples;
 using Cabinet.Service.Layout;
 using Cabinet.Service.Prototype;
 
@@ -54,7 +55,7 @@ public sealed class CardCache(SampleCatalog catalog, LayoutCache layouts)
     private CachedCards Build(string sample, SectionDesign design)
     {
         var items = catalog.ItemsOf(sample);
-        var cards = CardRecords.Build(items, null, design);
+        var cards = CardRecords.Build(items, SampleCardDetails.SnapshotFor(sample, items), design);
 
         return CachedCards.From(new CardsDocument(layouts.Get(sample, design).ETag, cards));
     }

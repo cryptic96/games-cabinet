@@ -101,7 +101,9 @@ public static class CardRecords
         ArgumentNullException.ThrowIfNull(items);
         ArgumentNullException.ThrowIfNull(design);
 
-        return items.Select(item => ToRecord(item, snapshot, design)).ToList();
+        var context = new BuildContext(items, snapshot);
+
+        return items.Select(item => ToRecord(item, context, design)).ToList();
     }
 
     /// <summary>Serialises the document with the same options as the layout, so the same cards always give the same bytes.</summary>
@@ -113,34 +115,160 @@ public static class CardRecords
         return JsonSerializer.Serialize(document, LayoutJson.Options);
     }
 
-    private static CardRecord ToRecord(CabinetItem item, CollectionSnapshot? snapshot, SectionDesign design)
+    private static CardRecord ToRecord(CabinetItem item, BuildContext context, SectionDesign design)
     {
-        _ = snapshot;
+        var stored = context.StoredItem(item.CollectionId);
+        var details = context.DetailsOf(item.BggId);
+        var isExpansion = item.Kind == ItemKind.Expansion;
 
         return new CardRecord(
             item.CollectionId,
             item.BggId,
             item.Title,
-            null,
-            item.Kind == ItemKind.Expansion,
+            stored?.Year,
+            isExpansion,
             RatioOf(item.Box),
             CoverOf(item, design),
             item.Colour,
             SpinePalette.ToneFor(item.BggId),
             SpinePalette.PatternFor(item.BggId),
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            [],
-            [],
-            [],
-            []);
+            stored?.Location,
+            Positive(details?.MinPlayers),
+            Positive(details?.MaxPlayers),
+            Positive(details?.PlayingTime),
+            Positive(details?.MinPlayTime),
+            Positive(details?.MaxPlayTime),
+            Positive(details?.MinAge),
+            OneDecimal(details?.Weight),
+            OneDecimal(details?.Average),
+            details?.Designers ?? [],
+            details?.Mechanics ?? [],
+            isExpansion ? [] : context.ExpansionsOf(item.BggId),
+            isExpansion ? context.BasesOf(details) : []);
+    }
+
+    private static int? Positive(int? value) => value > 0 ? value : null;
+
+    private static double? OneDecimal(double? value) =>
+        value is > 0 ? Math.Round(value.Value, 1, MidpointRounding.AwayFromZero) : null;
+
+    private static CardLink LinkTo(CabinetItem item) =>
+        new(item.CollectionId, item.BggId, item.Title, ChipOf(item));
+
+    private static string ChipOf(CabinetItem item) => item.Colour?.Background ?? ChipOf(item.BggId);
+
+    private static string ChipOf(int bggId) => SpinePalette.Tones[SpinePalette.ToneFor(bggId)].Background;
+
+    private sealed class BuildContext
+    {
+        private readonly IReadOnlyDictionary<long, SnapshotItem> _stored;
+        private readonly IReadOnlyDictionary<long, CabinetItem> _itemsByEntry;
+        private readonly IReadOnlyDictionary<int, GameDetails>? _games;
+        private readonly IReadOnlyDictionary<int, long> _ownedBases;
+        private readonly Dictionary<int, IReadOnlyList<CardLink>> _expansionsByBase = [];
+
+        public BuildContext(IReadOnlyList<CabinetItem> items, CollectionSnapshot? snapshot)
+        {
+            var stored = new Dictionary<long, SnapshotItem>();
+            foreach (var snapshotItem in snapshot?.Items ?? [])
+            {
+                stored.TryAdd(snapshotItem.CollectionId, snapshotItem);
+            }
+
+            var byEntry = new Dictionary<long, CabinetItem>();
+            foreach (var item in items)
+            {
+                byEntry.TryAdd(item.CollectionId, item);
+            }
+
+            _stored = stored;
+            _itemsByEntry = byEntry;
+            _games = snapshot?.Games;
+            _ownedBases = OwnedBases(snapshot);
+            BuildExpansionLists(items);
+        }
+
+        public SnapshotItem? StoredItem(long entryId) => _stored.GetValueOrDefault(entryId);
+
+        public GameDetails? DetailsOf(int gameId) => _games?.GetValueOrDefault(gameId);
+
+        public IReadOnlyList<CardLink> ExpansionsOf(int gameId) =>
+            _expansionsByBase.GetValueOrDefault(gameId) ?? [];
+
+        public IReadOnlyList<CardLink> BasesOf(GameDetails? details)
+        {
+            if (details is null || details.ExpandsGames.Count == 0)
+            {
+                return [];
+            }
+
+            var owned = details.ExpandsGames
+                .Where(reference => _ownedBases.ContainsKey(reference.BggId))
+                .DistinctBy(reference => reference.BggId)
+                .OrderBy(reference => reference.BggId)
+                .Select(reference => OwnedLink(reference))
+                .ToList();
+
+            return owned.Count > 0
+                ? owned
+                : details.ExpandsGames
+                    .DistinctBy(reference => reference.BggId)
+                    .Select(reference => new CardLink(null, reference.BggId, reference.Title, null))
+                    .ToList();
+        }
+
+        private static Dictionary<int, long> OwnedBases(CollectionSnapshot? snapshot)
+        {
+            if (snapshot is null)
+            {
+                return [];
+            }
+
+            var expansionEntries = snapshot.Items
+                .Where(item => item.Kind == ItemKind.Expansion)
+                .Select(item => item.CollectionId)
+                .ToHashSet();
+
+            return snapshot.Items
+                .Where(item => item.Kind == ItemKind.Base && !expansionEntries.Contains(item.CollectionId))
+                .GroupBy(item => item.GameId)
+                .ToDictionary(group => group.Key, group => group.Min(item => item.CollectionId));
+        }
+
+        private CardLink OwnedLink(BaseGameRef reference)
+        {
+            var entryId = _ownedBases[reference.BggId];
+
+            return _itemsByEntry.TryGetValue(entryId, out var item)
+                ? LinkTo(item)
+                : new CardLink(entryId, reference.BggId, reference.Title, ChipOf(reference.BggId));
+        }
+
+        private void BuildExpansionLists(IReadOnlyList<CabinetItem> items)
+        {
+            var lists = new Dictionary<int, List<CardLink>>();
+
+            foreach (var expansion in items.Where(item => item.Kind == ItemKind.Expansion))
+            {
+                var details = DetailsOf(expansion.BggId);
+
+                foreach (var reference in (details?.ExpandsGames ?? []).DistinctBy(reference => reference.BggId))
+                {
+                    if (!lists.TryGetValue(reference.BggId, out var list))
+                    {
+                        list = [];
+                        lists[reference.BggId] = list;
+                    }
+
+                    list.Add(LinkTo(expansion));
+                }
+            }
+
+            foreach (var (gameId, list) in lists)
+            {
+                _expansionsByBase[gameId] = list;
+            }
+        }
     }
 
     private static double RatioOf(BoxDimensions box) =>
