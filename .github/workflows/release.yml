@@ -38,8 +38,11 @@ jobs:
       - name: Restore packages
         run: dotnet restore Cabinet.slnx --locked-mode
 
+      # Browser tests gate the pull request, so a tag build needs no browser.
+      # The browser project then runs zero tests, which the test platform
+      # reports as exit code 8; that one code is ignored here.
       - name: Run tests
-        run: dotnet test --solution Cabinet.slnx --no-restore
+        run: dotnet test --solution Cabinet.slnx --no-restore --filter-not-trait "Category=Browser" --ignore-exit-code 8
         env:
           CI: true
 
