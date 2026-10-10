@@ -1624,7 +1624,7 @@ test('a picture that fails to load is swapped for the generated cover, keeping t
   }
 
   assert.equal(image.removed, true);
-  assert.equal(cover.dataset.art, undefined);
+  assert.equal(cover.dataset.art, 'failed');
   assert.equal(cover.dataset.fit, undefined);
   assert.equal(cover.dataset.pattern, 'dots');
   assert.equal(cover.querySelector('.cover-art'), null);
@@ -1756,7 +1756,7 @@ test('a cover with art takes the art colour and a failed picture keeps it while 
     globalThis.document = previous;
   }
 
-  assert.equal(cover.dataset.art, undefined);
+  assert.equal(cover.dataset.art, 'failed');
   assert.equal(cover.properties.get('--bg'), ART_COLOUR.background);
   assert.equal(cover.properties.get('--fg'), ART_COLOUR.text);
 

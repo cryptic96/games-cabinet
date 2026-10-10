@@ -297,8 +297,45 @@ function abandonRedraw() {
   return false;
 }
 
+let redrawWaitingForCard = null;
+
+/**
+ * Redraws the cabinet quietly once no card is open. While a card is open nothing under it is redrawn, refetched or replaced; the
+ * redraw waits until the card has closed and its box is back in its slot. Changes that arrive during that wait share the one
+ * pending redraw, which fetches the newest layout when the wait is over.
+ * @returns {Promise<boolean>} What the redraw reports: true when the new cabinet is on screen.
+ */
+function redrawWhenCardIsClosed() {
+  if (redrawWaitingForCard !== null) {
+    return redrawWaitingForCard;
+  }
+
+  const closed = cardControls === null ? Promise.resolve() : cardControls.whenClosed();
+
+  redrawWaitingForCard = closed.then(() => {
+    redrawWaitingForCard = null;
+
+    return redraw();
+  });
+
+  return redrawWaitingForCard;
+}
+
+/**
+ * Draws the cabinet again for the profile the viewport now matches. A card that is open is closed at once with the plain fade, with
+ * no box flying, before the cabinet is loaded, so no card is left floating over a cabinet drawn for the other profile.
+ * @returns {Promise<void>}
+ */
+async function reloadForNewProfile() {
+  if (cardControls !== null) {
+    await cardControls.closeCard({ path: 'fade' });
+  }
+
+  await load();
+}
+
 if (syncRoot !== null) {
-  const sync = initSyncStatus(syncRoot, { onCollectionChanged: redraw });
+  const sync = initSyncStatus(syncRoot, { onCollectionChanged: redrawWhenCardIsClosed });
 
   startLive({ applyStatus: sync.applyStatus, fetchStatus });
 }
@@ -322,6 +359,6 @@ if (skipLink !== null && gamesList !== null) {
 }
 
 if (mount !== null) {
-  phoneQuery.addEventListener('change', load);
+  phoneQuery.addEventListener('change', reloadForNewProfile);
   load();
 }

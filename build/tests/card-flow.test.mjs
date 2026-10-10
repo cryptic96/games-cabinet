@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const source = readFileSync(new URL('../../Cabinet.Service/wwwroot/js/card-flow.js', import.meta.url), 'utf8');
-const { createHistoryStep, sourceEntry, recordFromPlacement, indexPlacements, pullKind, choosePath, isMostlyOnScreen } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+const { createHistoryStep, sourceEntry, recordFromPlacement, indexPlacements, pullKind, choosePath, isMostlyOnScreen, createCloseGate, dragOutcome, resist } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 
 /**
  * A stand-in for the browser history that records every call.
@@ -276,4 +276,113 @@ test('a box fully outside the viewport or with no area is not on screen', () => 
 
   assert.equal(isMostlyOnScreen({ left: 0, top: 150, width: 20, height: 20 }, viewport), false);
   assert.equal(isMostlyOnScreen({ left: 0, top: 0, width: 0, height: 20 }, viewport), false);
+});
+
+test('with no card open the close gate is already settled', async () => {
+  const gate = createCloseGate();
+
+  assert.equal(gate.isOpen(), false);
+  await gate.whenClosed();
+});
+
+test('everyone waiting during one open period shares one promise that closing settles', async () => {
+  const gate = createCloseGate();
+  const settled = [];
+
+  gate.opened();
+  const first = gate.whenClosed();
+  const second = gate.whenClosed();
+
+  first.then(() => settled.push('first'));
+  second.then(() => settled.push('second'));
+  await Promise.resolve();
+
+  assert.equal(first, second);
+  assert.equal(gate.isOpen(), true);
+  assert.deepEqual(settled, []);
+
+  gate.closed();
+  await first;
+  await second;
+
+  assert.deepEqual(settled, ['first', 'second']);
+  assert.equal(gate.isOpen(), false);
+});
+
+test('opening again during the same open period keeps the same promise', () => {
+  const gate = createCloseGate();
+
+  gate.opened();
+  const first = gate.whenClosed();
+  gate.opened();
+
+  assert.equal(gate.whenClosed(), first);
+});
+
+test('a card opened after a close gets a new promise, and an old one stays settled', async () => {
+  const gate = createCloseGate();
+
+  gate.opened();
+  const first = gate.whenClosed();
+  gate.closed();
+  await first;
+  gate.opened();
+  const second = gate.whenClosed();
+
+  assert.notEqual(second, first);
+
+  let settled = false;
+
+  second.then(() => {
+    settled = true;
+  });
+  await Promise.resolve();
+
+  assert.equal(settled, false);
+
+  gate.closed();
+  await second;
+
+  assert.equal(settled, true);
+});
+
+test('closing a gate nobody waits on does nothing', () => {
+  const gate = createCloseGate();
+
+  gate.opened();
+  gate.closed();
+  gate.closed();
+
+  assert.equal(gate.isOpen(), false);
+});
+
+test('a drag of a quarter of the height or more closes the sheet and a shorter slow one springs back', () => {
+  assert.equal(dragOutcome({ dy: 200, height: 800, velocity: 0 }), 'close');
+  assert.equal(dragOutcome({ dy: 320, height: 800, velocity: 0.1 }), 'close');
+  assert.equal(dragOutcome({ dy: 199, height: 800, velocity: 0.59 }), 'spring');
+  assert.equal(dragOutcome({ dy: 80, height: 800, velocity: 0 }), 'spring');
+  assert.equal(dragOutcome({ dy: 0, height: 800, velocity: 0 }), 'spring');
+});
+
+test('a fast downward release closes the sheet whatever the distance', () => {
+  assert.equal(dragOutcome({ dy: 30, height: 800, velocity: 0.6 }), 'close');
+  assert.equal(dragOutcome({ dy: 30, height: 800, velocity: 1.5 }), 'close');
+  assert.equal(dragOutcome({ dy: 30, height: 800, velocity: 0.59 }), 'spring');
+});
+
+test('an upward drag never closes the sheet, however fast', () => {
+  assert.equal(dragOutcome({ dy: -50, height: 800, velocity: 2 }), 'spring');
+  assert.equal(dragOutcome({ dy: -900, height: 800, velocity: 0 }), 'spring');
+  assert.equal(dragOutcome({ dy: Number.NaN, height: 800, velocity: 2 }), 'spring');
+});
+
+test('a sheet with no height closes only on speed', () => {
+  assert.equal(dragOutcome({ dy: 10, height: 0, velocity: 0 }), 'spring');
+  assert.equal(dragOutcome({ dy: 10, height: 0, velocity: 0.7 }), 'close');
+});
+
+test('a downward drag is followed one to one and an upward drag a quarter of the way', () => {
+  assert.equal(resist(120), 120);
+  assert.equal(resist(0), 0);
+  assert.equal(resist(-80), -20);
 });

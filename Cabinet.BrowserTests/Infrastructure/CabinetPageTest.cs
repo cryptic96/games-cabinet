@@ -53,11 +53,20 @@ public abstract class CabinetPageTest : PageTest
     /// </summary>
     /// <param name="settings">Synthetic configuration values, such as the switch that enables the sample collections.</param>
     /// <param name="configureServices">Replaces services before the host starts, such as the source of the collection; null leaves them as they are.</param>
-    protected async Task<CabinetWebApplicationFactory> StartAsync(
+    protected Task<CabinetWebApplicationFactory> StartAsync(
         IReadOnlyDictionary<string, string?> settings,
-        Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>? configureServices = null)
+        Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>? configureServices = null) =>
+        StartAsync(new CabinetWebApplicationFactory(settings, configureServices));
+
+    /// <summary>
+    /// Uses a host the test built itself, such as one whose BGG answers are scripted, and prepares the page to talk to it exactly
+    /// as the overload that takes settings does. The test base disposes the host with the page.
+    /// </summary>
+    /// <param name="factory">The running host.</param>
+    protected async Task<CabinetWebApplicationFactory> StartAsync(CabinetWebApplicationFactory factory)
     {
-        var factory = new CabinetWebApplicationFactory(settings, configureServices);
+        ArgumentNullException.ThrowIfNull(factory);
+
         _factory = factory;
 
         await Page.Context.SetExtraHTTPHeadersAsync(new Dictionary<string, string> { ["Accept-Encoding"] = "identity" });

@@ -3,6 +3,10 @@
  * the dialog itself; the paper is the card inside it. Above 40rem the card is a paper index card centred over a plain dim; at 40rem
  * or narrower it is a sheet anchored to the bottom of the screen. Every colour, rhythm and timing is a custom property of the page.
  */
+:root {
+  --sheet-spring: 200ms;
+}
+
 .card-dialog {
   width: 100%;
   height: 100%;
@@ -583,6 +587,23 @@ html:has(dialog[open]) {
     .card {
       max-height: 90dvh;
     }
+  }
+
+  .card {
+    translate: 0 var(--sheet-dy, 0px);
+  }
+
+  .card[data-moving] {
+    will-change: transform;
+  }
+
+  .card[data-springing] {
+    transition: translate var(--sheet-spring) var(--pull-ease-out);
+  }
+
+  .card-grip,
+  .card-head {
+    touch-action: none;
   }
 
   .card-grip {
