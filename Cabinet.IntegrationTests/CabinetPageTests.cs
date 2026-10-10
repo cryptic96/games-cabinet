@@ -144,7 +144,7 @@ public partial class CabinetPageTests
         var html = await client.GetStringAsync("/?sample=65", TestContext.Current.CancellationToken);
         var hrefs = SampleLink().Matches(html).Select(match => match.Groups["name"].Value).ToList();
 
-        html.Should().Contain("<nav aria-label=\"Collection to show\">");
+        html.Should().Contain("<nav class=\"sample-switcher\" aria-label=\"Collection to show\">");
         html.Should().NotContain("Sample collection size");
         hrefs.Should().Equal(SyntheticCollections.SampleNames);
         html.Should().Contain("<a href=\"/\">Synced</a>");
@@ -162,7 +162,7 @@ public partial class CabinetPageTests
         var html = await client.GetStringAsync("/", TestContext.Current.CancellationToken);
         var navigation = html[html.IndexOf("<nav", StringComparison.Ordinal)..html.IndexOf("</nav>", StringComparison.Ordinal)];
 
-        html.Should().Contain("<nav aria-label=\"Collection to show\">");
+        html.Should().Contain("<nav class=\"sample-switcher\" aria-label=\"Collection to show\">");
         navigation.Should().Contain("<a href=\"/\" aria-current=\"page\">Synced</a>");
         CurrentLink().Matches(navigation).Should().ContainSingle();
         navigation.IndexOf(">Synced</a>", StringComparison.Ordinal)

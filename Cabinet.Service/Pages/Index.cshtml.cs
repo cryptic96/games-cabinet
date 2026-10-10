@@ -1,5 +1,6 @@
 using System.Globalization;
 using Cabinet.Service.Collection;
+using Cabinet.Service.Language;
 using Cabinet.Service.Prototype;
 using Cabinet.Service.Sync;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -15,6 +16,9 @@ namespace Cabinet.Service.Pages;
 /// <param name="statusService">Tells the page when the collection was last synced, for the status line.</param>
 public class IndexModel(SampleCatalog catalog, CollectionStore store, SyncStatusService statusService) : PageModel
 {
+    /// <summary>The language the page is written in, chosen once for this request.</summary>
+    public SiteLanguage Language { get; private set; } = SiteLanguage.English;
+
     /// <summary>Whether the invented collections and their switcher are available.</summary>
     public bool PrototypeEnabled => catalog.Enabled;
 
@@ -82,6 +86,9 @@ public class IndexModel(SampleCatalog catalog, CollectionStore store, SyncStatus
     /// <summary>Shows the requested sample when the catalog honours it; any other value shows the synced collection.</summary>
     public void OnGet(string? sample)
     {
+        Language = SiteLanguage.Resolve(HttpContext);
+        Response.Headers.ContentLanguage = Language.Code;
+        Response.Headers.Append("Vary", "Accept-Language, Cookie");
         ShowingSample = catalog.TryResolve(sample, out var name);
         SampleName = ShowingSample ? name : string.Empty;
         ItemCount = ShowingSample ? catalog.ItemCount(name) : 0;
