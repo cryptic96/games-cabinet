@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 
 namespace Cabinet.IntegrationTests.Infrastructure;
@@ -29,6 +30,7 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
     private readonly string? _ownedStorageDirectory;
     private readonly bool _backgroundSyncOnServingHost;
     private readonly RealNetworkGuard _networkGuard = new();
+    private readonly HashSet<IFileProvider> _environmentFileProviders = new(ReferenceEqualityComparer.Instance);
     private IHost? _realHost;
 
     /// <summary>Creates the factory and picks two free loopback ports so clients can be built before the host starts.</summary>
@@ -191,6 +193,7 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
         }
 
         _realHost = realHost;
+        KeepEnvironmentFileProviders(realHost);
 
         try
         {
@@ -199,6 +202,7 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
 
             testHost.Start();
             WaitUntilApplicationStarted(testHost);
+            KeepEnvironmentFileProviders(testHost);
             var testHostAddresses = testHost.Services.GetRequiredService<IServer>()
                 .Features.Get<IServerAddressesFeature>()!.Addresses;
             testHostAddresses.Clear();
@@ -245,6 +249,7 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
 
         if (disposing)
         {
+            DisposeEnvironmentFileProviders();
             DeleteOwnedStorageDirectory();
             _networkGuard.ThrowIfAnyRefused();
         }
@@ -263,6 +268,40 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
         DeleteOwnedStorageDirectory();
         _networkGuard.ThrowIfAnyRefused();
     }
+
+    /// <summary>
+    /// Remembers the content root and web root file providers of a started host so they are disposed with the factory.
+    /// A host never disposes them itself, because a real process has one host and exits. Here every test builds new
+    /// hosts in one long-lived process, and on Linux the web root provider holds an inotify instance from the first
+    /// file-version lookup a page makes; left alone, each factory would leak one, and a full browser run would reach the
+    /// per-user inotify limit, after which new hosts fail to build or their pages fail to render.
+    /// </summary>
+    private void KeepEnvironmentFileProviders(IHost host)
+    {
+        var environment = host.Services.GetRequiredService<IWebHostEnvironment>();
+        foreach (var provider in Flatten(environment.WebRootFileProvider).Concat(Flatten(environment.ContentRootFileProvider)))
+        {
+            _environmentFileProviders.Add(provider);
+        }
+    }
+
+    /// <summary>
+    /// Disposes the remembered host file providers once both hosts have stopped, releasing their file watchers. It runs from
+    /// <see cref="Dispose(bool)"/>, which the asynchronous dispose of the base factory also ends with.
+    /// </summary>
+    private void DisposeEnvironmentFileProviders()
+    {
+        foreach (var provider in _environmentFileProviders)
+        {
+            (provider as IDisposable)?.Dispose();
+        }
+
+        _environmentFileProviders.Clear();
+    }
+
+    /// <summary>Lists the providers a composite file provider is made of, so the disposable ones inside it are reached too.</summary>
+    private static IEnumerable<IFileProvider> Flatten(IFileProvider provider) =>
+        provider is CompositeFileProvider composite ? composite.FileProviders.SelectMany(Flatten) : [provider];
 
     private void DeleteOwnedStorageDirectory()
     {
