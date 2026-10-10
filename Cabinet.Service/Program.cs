@@ -4,6 +4,7 @@ using Cabinet.Domain;
 using Cabinet.Repository.Images;
 using Cabinet.Service.Collection;
 using Cabinet.Service.Hosting;
+using Cabinet.Service.Language;
 using Cabinet.Service.Layout;
 using Cabinet.Service.Live;
 using Cabinet.Service.Review;
@@ -71,6 +72,8 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     }
 });
 
+SiteLanguage.EnsureAvailable();
+
 var app = builder.Build();
 
 var opsPort = OpsEndpoint.FromConfiguration(app.Configuration);
@@ -101,6 +104,7 @@ app.UseRouting();
 app.MapStaticAssets();
 app.MapRazorPages().WithStaticAssets();
 app.MapCabinetLayout();
+app.MapCabinetLanguage();
 app.MapCabinetSync();
 app.MapCabinetLive();
 

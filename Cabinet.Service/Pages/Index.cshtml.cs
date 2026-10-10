@@ -83,6 +83,16 @@ public class IndexModel(SampleCatalog catalog, CollectionStore store, SyncStatus
     /// <summary>The text of a switcher link for the sample name.</summary>
     public string LabelFor(string name) => SampleCatalog.Label(name);
 
+    /// <summary>
+    /// The address a language toggle item points at. It carries the sample name only while a sample is shown, and never anything
+    /// the visitor typed.
+    /// </summary>
+    /// <param name="code">The language code the item switches to.</param>
+    public string LanguageHref(string code) =>
+        ShowingSample
+            ? $"{LanguageEndpoint.RouteBase}/{code}?sample={Uri.EscapeDataString(SampleName)}"
+            : $"{LanguageEndpoint.RouteBase}/{code}";
+
     /// <summary>Shows the requested sample when the catalog honours it; any other value shows the synced collection.</summary>
     public void OnGet(string? sample)
     {

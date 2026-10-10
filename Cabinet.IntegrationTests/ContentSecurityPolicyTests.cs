@@ -38,6 +38,18 @@ public class ContentSecurityPolicyTests
     }
 
     [Fact]
+    public async Task The_language_switch_redirect_carries_the_strict_policy()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        using var client = LanguageTests.PlainClient(factory);
+
+        using var response = await client.GetAsync("/language/en", TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.SeeOther);
+        PolicyOf(response).Should().Be(ExpectedPolicy);
+    }
+
+    [Fact]
     public async Task The_live_negotiation_carries_the_strict_policy_and_no_cross_origin_permission()
     {
         await using var factory = new CabinetWebApplicationFactory();
