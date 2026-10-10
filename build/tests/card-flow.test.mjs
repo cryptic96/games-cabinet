@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const source = readFileSync(new URL('../../Cabinet.Service/wwwroot/js/card-flow.js', import.meta.url), 'utf8');
-const { createHistoryStep, sourceEntry, recordFromPlacement, indexPlacements, pullKind, choosePath, isMostlyOnScreen } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+const { createHistoryStep, sourceEntry, recordFromPlacement, indexPlacements, pullKind, choosePath, isMostlyOnScreen, createCloseGate } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 
 /**
  * A stand-in for the browser history that records every call.
@@ -276,4 +276,82 @@ test('a box fully outside the viewport or with no area is not on screen', () => 
 
   assert.equal(isMostlyOnScreen({ left: 0, top: 150, width: 20, height: 20 }, viewport), false);
   assert.equal(isMostlyOnScreen({ left: 0, top: 0, width: 0, height: 20 }, viewport), false);
+});
+
+test('with no card open the close gate is already settled', async () => {
+  const gate = createCloseGate();
+
+  assert.equal(gate.isOpen(), false);
+  await gate.whenClosed();
+});
+
+test('everyone waiting during one open period shares one promise that closing settles', async () => {
+  const gate = createCloseGate();
+  const settled = [];
+
+  gate.opened();
+  const first = gate.whenClosed();
+  const second = gate.whenClosed();
+
+  first.then(() => settled.push('first'));
+  second.then(() => settled.push('second'));
+  await Promise.resolve();
+
+  assert.equal(first, second);
+  assert.equal(gate.isOpen(), true);
+  assert.deepEqual(settled, []);
+
+  gate.closed();
+  await first;
+  await second;
+
+  assert.deepEqual(settled, ['first', 'second']);
+  assert.equal(gate.isOpen(), false);
+});
+
+test('opening again during the same open period keeps the same promise', () => {
+  const gate = createCloseGate();
+
+  gate.opened();
+  const first = gate.whenClosed();
+  gate.opened();
+
+  assert.equal(gate.whenClosed(), first);
+});
+
+test('a card opened after a close gets a new promise, and an old one stays settled', async () => {
+  const gate = createCloseGate();
+
+  gate.opened();
+  const first = gate.whenClosed();
+  gate.closed();
+  await first;
+  gate.opened();
+  const second = gate.whenClosed();
+
+  assert.notEqual(second, first);
+
+  let settled = false;
+
+  second.then(() => {
+    settled = true;
+  });
+  await Promise.resolve();
+
+  assert.equal(settled, false);
+
+  gate.closed();
+  await second;
+
+  assert.equal(settled, true);
+});
+
+test('closing a gate nobody waits on does nothing', () => {
+  const gate = createCloseGate();
+
+  gate.opened();
+  gate.closed();
+  gate.closed();
+
+  assert.equal(gate.isOpen(), false);
 });

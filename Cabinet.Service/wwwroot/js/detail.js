@@ -3,7 +3,7 @@
  * on the box that opened it. The card is built from data already in memory, so opening it never waits for the network.
  */
 import { buildCard } from './card-view.js';
-import { choosePath, createHistoryStep, isMostlyOnScreen, pullKind, sourceEntry } from './card-flow.js';
+import { choosePath, createCloseGate, createHistoryStep, isMostlyOnScreen, pullKind, sourceEntry } from './card-flow.js';
 
 /** The media query that says the visitor prefers less motion. */
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
@@ -44,9 +44,9 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
   let moving = false;
   let closeWhenSettled = false;
   let pressedOnFrame = false;
-  let closedPromise = null;
-  let resolveClosed = null;
   let warmedCover = null;
+  let forcedPath = null;
+  const gate = createCloseGate();
 
   steps.clearStale(window.history.state);
 
@@ -363,6 +363,7 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
     }
 
     opening = true;
+    gate.opened();
 
     try {
       await steps.beforeOpen();
@@ -408,6 +409,10 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
       }
     } finally {
       opening = false;
+
+      if (!dialog.open) {
+        gate.closed();
+      }
     }
 
     if (closeWhenSettled) {
@@ -427,12 +432,8 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
     shownEntryId = null;
     moving = false;
     closeWhenSettled = false;
-
-    if (resolveClosed !== null) {
-      resolveClosed();
-      closedPromise = null;
-      resolveClosed = null;
-    }
+    forcedPath = null;
+    gate.closed();
   }
 
   /**
@@ -492,8 +493,10 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
     const returnTo = findOpener();
     const box = findPullBox();
     const art = dialog.querySelector('.card-art');
-    const path = decidePath({ box, art, swapped: showsOtherGame() });
+    const decided = decidePath({ box, art, swapped: showsOtherGame() });
+    const path = forcedPath === 'fade' && decided === 'view-transition' ? 'fade' : decided;
 
+    forcedPath = null;
     moving = true;
 
     try {
@@ -508,20 +511,32 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
   }
 
   /**
-   * Closes the card. A close asked for while the card is still opening waits until it has finished opening.
+   * Closes the card. A close asked for while the card is still opening waits until it has finished opening. With the path `fade` the
+   * card always closes with the plain fade and the box does not fly, which is how a card closes when the page is about to be drawn
+   * again for another profile.
+   * @param {{ path?: 'fade' }} [how] How to close; leave out for the way that suits now.
+   * @returns {Promise<void>} Settled once no card is open and its box is back, at once when no card is open.
    */
-  function closeCard() {
-    if (!dialog.open) {
-      return;
+  function closeCard({ path } = {}) {
+    const pending = opening || moving;
+
+    if (!dialog.open && !(path === 'fade' && pending)) {
+      return Promise.resolve();
     }
 
-    if (moving || opening) {
+    if (path === 'fade') {
+      forcedPath = 'fade';
+    }
+
+    if (pending) {
       closeWhenSettled = true;
 
-      return;
+      return gate.whenClosed();
     }
 
     runClose();
+
+    return gate.whenClosed();
   }
 
   /**
@@ -538,19 +553,15 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
    * @returns {Promise<void>}
    */
   function whenClosed() {
-    if (!dialog.open && !moving && !opening) {
-      return Promise.resolve();
-    }
-
-    closedPromise ??= new Promise((resolve) => {
-      resolveClosed = resolve;
-    });
-
-    return closedPromise;
+    return gate.whenClosed();
   }
 
   dialog.addEventListener('close', () => {
     steps.closedHere();
+
+    if (!moving && !opening) {
+      gate.closed();
+    }
   });
 
   dialog.addEventListener('cancel', (event) => {

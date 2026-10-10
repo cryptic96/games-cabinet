@@ -52,9 +52,18 @@ public abstract class CabinetPageTest : PageTest
     /// published output, so the page context asks for the identity encoding.
     /// </summary>
     /// <param name="settings">Synthetic configuration values, such as the switch that enables the sample collections.</param>
-    protected async Task<CabinetWebApplicationFactory> StartAsync(IReadOnlyDictionary<string, string?> settings)
+    protected Task<CabinetWebApplicationFactory> StartAsync(IReadOnlyDictionary<string, string?> settings) =>
+        StartAsync(new CabinetWebApplicationFactory(settings));
+
+    /// <summary>
+    /// Uses a host the test built itself, such as one whose BGG answers are scripted, and prepares the page to talk to it exactly
+    /// as <see cref="StartAsync(IReadOnlyDictionary{string, string})"/> does. The test base disposes the host with the page.
+    /// </summary>
+    /// <param name="factory">The running host.</param>
+    protected async Task<CabinetWebApplicationFactory> StartAsync(CabinetWebApplicationFactory factory)
     {
-        var factory = new CabinetWebApplicationFactory(settings);
+        ArgumentNullException.ThrowIfNull(factory);
+
         _factory = factory;
 
         await Page.Context.SetExtraHTTPHeadersAsync(new Dictionary<string, string> { ["Accept-Encoding"] = "identity" });

@@ -243,3 +243,62 @@ export function createHistoryStep({ history, setTimer, clearTimer }) {
     },
   };
 }
+
+/**
+ * Tracks whether a card is open and lets anyone ask to be told when it has closed and its box is back in its slot. While a card is
+ * open every caller gets the one promise of that open period, and closing settles it; a card opened again gets a new promise.
+ * @returns {{ opened: Function, closed: Function, whenClosed: Function, isOpen: Function }} The controls.
+ */
+export function createCloseGate() {
+  let open = false;
+  let promise = null;
+  let release = null;
+
+  return {
+    /**
+     * Records that a card is opening or open. Calling it again during the same open period changes nothing.
+     */
+    opened() {
+      open = true;
+    },
+
+    /**
+     * Records that the card is gone and its box is back, and settles everyone who is waiting.
+     */
+    closed() {
+      open = false;
+
+      if (release !== null) {
+        release();
+      }
+
+      promise = null;
+      release = null;
+    },
+
+    /**
+     * Gives a promise that is settled once the card is closed: already settled when none is open, the same one for every caller
+     * during one open period otherwise.
+     * @returns {Promise<void>}
+     */
+    whenClosed() {
+      if (!open) {
+        return Promise.resolve();
+      }
+
+      promise ??= new Promise((resolve) => {
+        release = resolve;
+      });
+
+      return promise;
+    },
+
+    /**
+     * Tells whether a card is open or opening.
+     * @returns {boolean}
+     */
+    isOpen() {
+      return open;
+    },
+  };
+}

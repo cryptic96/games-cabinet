@@ -297,8 +297,32 @@ function abandonRedraw() {
   return false;
 }
 
+let redrawWaitingForCard = null;
+
+/**
+ * Redraws the cabinet quietly once no card is open. While a card is open nothing under it is redrawn, refetched or replaced; the
+ * redraw waits until the card has closed and its box is back in its slot. Changes that arrive during that wait share the one
+ * pending redraw, which fetches the newest layout when the wait is over.
+ * @returns {Promise<boolean>} What the redraw reports: true when the new cabinet is on screen.
+ */
+function redrawWhenCardIsClosed() {
+  if (redrawWaitingForCard !== null) {
+    return redrawWaitingForCard;
+  }
+
+  const closed = cardControls === null ? Promise.resolve() : cardControls.whenClosed();
+
+  redrawWaitingForCard = closed.then(() => {
+    redrawWaitingForCard = null;
+
+    return redraw();
+  });
+
+  return redrawWaitingForCard;
+}
+
 if (syncRoot !== null) {
-  const sync = initSyncStatus(syncRoot, { onCollectionChanged: redraw });
+  const sync = initSyncStatus(syncRoot, { onCollectionChanged: redrawWhenCardIsClosed });
 
   startLive({ applyStatus: sync.applyStatus, fetchStatus });
 }
