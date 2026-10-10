@@ -1,6 +1,7 @@
 @page
 @model Cabinet.Service.Pages.IndexModel
 @inject Microsoft.AspNetCore.Mvc.ViewFeatures.IFileVersionProvider FileVersions
+<a class="skip-link" href="#games-list-start">@Model.Language.Text.SkipLink</a>
 <header>
     <h1>@Model.Language.Text.SiteName</h1>
     <nav class="lang-toggle" aria-label="@Model.Language.Text.LanguageLabel">
@@ -54,6 +55,10 @@
     }
 </header>
 <main>
+    <section class="games-list" aria-labelledby="games-list-title">
+        <h2 id="games-list-title" class="games-list-heading" tabindex="-1">@Model.Language.Text.GamesListHeading</h2>
+        <ul class="games-list-items" role="list"></ul>
+    </section>
     @if (!Model.ShowingSample && !Model.HasSynced)
     {
         <div class="cabinet-message cabinet-filling">

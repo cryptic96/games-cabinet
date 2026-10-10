@@ -1313,6 +1313,10 @@ class FakeElement {
       return attributes.every(([, name, value]) => this.dataset[name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] === value);
     }
 
+    if (/^[a-z]+$/.test(selector)) {
+      return this.tagName === selector.toUpperCase();
+    }
+
     return selector.startsWith('.') && this.className.split(' ').includes(selector.slice(1));
   }
 
@@ -1799,7 +1803,7 @@ let cabinetPageCount = 0;
  * @param {{ firstLayout: object, status: () => object }} setup The first layout drawn and the status the server reports.
  * @returns {Promise<object>} The page, its parts and the levers the tests pull.
  */
-async function startCabinetPage({ firstLayout, status }) {
+async function startCabinetPage({ firstLayout, status, cards = [], withList = false }) {
   const clock = createClock(true);
   const page = createFakeDocument();
   const mount = page.createElement('main');
@@ -1820,6 +1824,21 @@ async function startCabinetPage({ firstLayout, status }) {
 
   filling.className = 'cabinet-message cabinet-filling';
   page.body.append(filling, mount);
+
+  const skipLink = page.createElement('a');
+  const listSection = page.createElement('section');
+  const listHeading = page.createElement('h2');
+  const listItems = page.createElement('ul');
+
+  skipLink.className = 'skip-link';
+  listSection.className = 'games-list';
+  listHeading.className = 'games-list-heading';
+  listItems.className = 'games-list-items';
+  listSection.append(listHeading, listItems);
+
+  if (withList) {
+    page.body.append(skipLink, listSection);
+  }
 
   const replaceChildren = mount.replaceChildren.bind(mount);
 
@@ -1847,7 +1866,7 @@ async function startCabinetPage({ firstLayout, status }) {
     if (url.startsWith('/cabinet/cards?')) {
       cardRequests.push({ url, init });
 
-      return Promise.resolve(answer(200, { layout: '', cards: [] }));
+      return Promise.resolve(answer(200, { layout: '', cards }));
     }
 
     assert.equal(url, CABINET_LAYOUT_ROUTE);
@@ -1877,6 +1896,9 @@ async function startCabinetPage({ firstLayout, status }) {
     replaced,
     layoutRequests,
     cardRequests,
+    skipLink,
+    listHeading,
+    listButtons: () => listItems.querySelectorAll('button'),
     settle,
     boxes: () => mount.descendants().filter((node) => node.tagName === 'BUTTON'),
     box: (entryId) => mount.querySelector('[data-entry-id="' + entryId + '"]'),
@@ -2294,6 +2316,47 @@ test('the card data is fetched once right after the cabinet draws, at low priori
     await cabinet.settle();
 
     assert.equal(cabinet.cardRequests.length, 2);
+  } finally {
+    leaveCabinetPage();
+  }
+});
+
+test('the games list shows every drawn game by title, then the facts when the card data arrives, and the skip link leads into it', async () => {
+  try {
+    const cards = [
+      { entryId: 1, title: 'Invented Lighthouse', year: 2019, minPlayers: 2, maxPlayers: 4, expansions: [], bases: [] },
+      { entryId: 2, title: 'Invented Orchard', expansions: [], bases: [] },
+      { entryId: 3, title: 'Invented Harbour', playTime: 45, expansions: [], bases: [] },
+    ];
+    const cabinet = await startCabinetPage({ firstLayout: layoutOfEntries([1, 2, 3]), status: () => ({ running: false, snapshotVersion: 'v1' }), cards, withList: true });
+
+    assert.deepEqual(cabinet.listButtons().map((button) => button.textContent), [
+      'Invented Harbour, 45 minutes',
+      'Invented Lighthouse (2019), 2–4 players',
+      'Invented Orchard',
+    ]);
+    assert.equal(cabinet.listButtons()[0].getAttribute('id'), 'games-list-start');
+
+    let prevented = false;
+
+    cabinet.skipLink.listeners.find((listener) => listener.type === 'click').handler({ preventDefault: () => { prevented = true; } });
+
+    assert.equal(prevented, true);
+    assert.equal(cabinet.page.activeElement, cabinet.listButtons()[0]);
+  } finally {
+    leaveCabinetPage();
+  }
+});
+
+test('with nothing drawn the games list has no entries and the skip link lands on its heading', async () => {
+  try {
+    const cabinet = await startCabinetPage({ firstLayout: layoutWith([]), status: () => ({ running: false, snapshotVersion: 'v1' }), withList: true });
+
+    assert.equal(cabinet.listButtons().length, 0);
+
+    cabinet.skipLink.listeners.find((listener) => listener.type === 'click').handler({ preventDefault: () => undefined });
+
+    assert.equal(cabinet.page.activeElement, cabinet.listHeading);
   } finally {
     leaveCabinetPage();
   }
