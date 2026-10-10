@@ -171,6 +171,14 @@
   }
 }
 
+/**
+ * A box that is out of the shelf while its card is open. It is hidden with visibility, never opacity or display, so its slot keeps
+ * its size and the empty cubby shows behind the dim.
+ */
+.placement[data-out] {
+  visibility: hidden;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .placement {
     transition: none;

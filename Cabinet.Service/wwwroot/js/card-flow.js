@@ -18,6 +18,26 @@ export function sourceEntry(kind, entryId) {
   return { entryId, atExpansions: kind === 'moreMarker' };
 }
 
+/** The box kinds that stand upright with the spine facing out and so turn about the vertical axis. */
+const UPRIGHT_KINDS = ['spine', 'expansionSpine'];
+
+/** The box kinds that lie flat with the spine facing out and so tip about the horizontal axis. */
+const LYING_KINDS = ['flatBox', 'expansionLayer', 'orphanExpansion'];
+
+/**
+ * Says how a box moves when it is pulled out: an upright spine turns about the vertical axis, a lying box tips about the horizontal
+ * axis, and a box that already shows its cover only lifts.
+ * @param {string} kind The kind of the box.
+ * @returns {'turn-y' | 'turn-x' | 'lift'}
+ */
+export function pullKind(kind) {
+  if (UPRIGHT_KINDS.includes(kind)) {
+    return 'turn-y';
+  }
+
+  return LYING_KINDS.includes(kind) ? 'turn-x' : 'lift';
+}
+
 /**
  * Builds the least a card can show from one drawn box: identity, title, kind, colours and picture. It is what the card shows when
  * the card data did not arrive or failed, so the card still opens with its cover, title and link.

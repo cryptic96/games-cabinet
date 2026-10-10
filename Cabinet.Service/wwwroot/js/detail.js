@@ -3,7 +3,7 @@
  * on the box that opened it. The card is built from data already in memory, so opening it never waits for the network.
  */
 import { buildCard } from './card-view.js';
-import { createHistoryStep, sourceEntry } from './card-flow.js';
+import { createHistoryStep, pullKind, sourceEntry } from './card-flow.js';
 
 /**
  * Wires the dialog to the cabinet.
@@ -27,6 +27,8 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
   let shownEntryId = null;
   let swapping = false;
   let opening = false;
+  let moving = false;
+  let closeWhenSettled = false;
   let pressedOnFrame = false;
   let closedPromise = null;
   let resolveClosed = null;
@@ -132,6 +134,86 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
   }
 
   /**
+   * Puts the card on screen as it stands: shows the dialog, takes the history step and moves focus to the title.
+   * @param {HTMLElement} card The card in the dialog.
+   */
+  function showCard(card) {
+    if (!dialog.open) {
+      dialog.showModal();
+    }
+
+    steps.opened();
+    card.querySelector('.card-title').focus({ preventScroll: true });
+  }
+
+  /**
+   * Removes the marks a transition leaves on the page.
+   * @param {HTMLElement | null} box The box that was pulled.
+   * @param {HTMLElement | null} art The cover spot of the card.
+   */
+  function clearPullMarks(box, art) {
+    const root = document.documentElement;
+
+    box?.removeAttribute('data-pulling');
+    art?.removeAttribute('data-pulling');
+    delete root.dataset.pullKind;
+    delete root.dataset.pullDir;
+  }
+
+  /**
+   * Runs one view transition and waits until it has settled, whatever way it ends. The update step always runs, so a skipped or
+   * failed transition still leaves the page in its final state; every promise the transition makes is observed so none of them
+   * can report an unhandled rejection.
+   * @param {() => void} update Puts the page into its new state.
+   * @returns {Promise<void>}
+   */
+  async function runTransition(update) {
+    let transition;
+
+    try {
+      transition = document.startViewTransition(update);
+    } catch {
+      update();
+
+      return;
+    }
+
+    transition.ready.catch(() => {});
+    transition.updateCallbackDone.catch(() => {});
+    await transition.finished.catch(() => {});
+  }
+
+  /**
+   * Opens the card as a pull-out: the box lifts, turns to its cover and becomes the card's cover spot, while the box itself stays
+   * hidden so its empty slot shows behind the dim.
+   * @param {HTMLElement} box The box that was tapped.
+   * @param {HTMLElement} card The card, already in the closed dialog.
+   * @returns {Promise<void>}
+   */
+  async function openWithPull(box, card) {
+    const art = card.querySelector('.card-art');
+    const root = document.documentElement;
+
+    root.dataset.pullKind = pullKind(box.dataset.kind);
+    root.dataset.pullDir = 'open';
+    box.dataset.pulling = 'source';
+
+    await runTransition(() => {
+      box.removeAttribute('data-pulling');
+      box.dataset.out = '';
+      art?.setAttribute('data-pulling', 'target');
+      showCard(card);
+    });
+
+    if (!dialog.open) {
+      box.dataset.out = '';
+      showCard(card);
+    }
+
+    clearPullMarks(box, art);
+  }
+
+  /**
    * Opens the card of an entry over the cabinet, takes the one history step and moves focus to its title, or to the heading of the
    * owned expansions when the card is opened at them. A card that is open or opening is left alone. A close that just happened is
    * given a moment to finish removing its own step first.
@@ -141,7 +223,7 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
    * @returns {Promise<void>}
    */
   async function openCard(entryId, { opener: element, atExpansions = false } = {}) {
-    if (dialog.open || opening) {
+    if (dialog.open || opening || moving) {
       return;
     }
 
@@ -159,32 +241,114 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
       opener = { element, entryId: String(entryId), kind: element?.dataset.kind ?? '' };
 
       const card = buildCard(record, getCopy(), cardOptions());
+      const box = element?.classList.contains('placement') ? element : null;
 
       shownEntryId = String(entryId);
       dialog.replaceChildren(card);
-      dialog.showModal();
-      steps.opened();
+      moving = true;
+
+      try {
+        if (box !== null && typeof document.startViewTransition === 'function') {
+          await openWithPull(box, card);
+        } else {
+          showCard(card);
+        }
+      } finally {
+        moving = false;
+      }
 
       const heading = atExpansions ? card.querySelector('.card-expansions-title') : null;
 
-      if (heading === null) {
-        card.querySelector('.card-title').focus({ preventScroll: true });
-      } else {
+      if (heading !== null) {
         heading.scrollIntoView({ block: 'start', behavior: 'instant' });
         heading.focus({ preventScroll: true });
       }
     } finally {
       opening = false;
     }
+
+    if (closeWhenSettled) {
+      closeWhenSettled = false;
+      closeCard();
+    }
   }
 
   /**
-   * Closes the card.
+   * Ends a close once the box is back in its slot and the dialog is gone: gives focus back to the box that opened the card and
+   * lets anyone waiting for the card to be gone go on.
+   * @param {HTMLElement | null} returnTo The element that gets focus back.
    */
-  function closeCard() {
+  function finishClose(returnTo) {
+    returnTo?.focus({ preventScroll: true });
+    opener = null;
+    shownEntryId = null;
+    moving = false;
+    closeWhenSettled = false;
+
+    if (resolveClosed !== null) {
+      resolveClosed();
+      closedPromise = null;
+      resolveClosed = null;
+    }
+  }
+
+  /**
+   * Closes the card the way it came out: the cover turns away and the box slides back into its slot. Without a box or without the
+   * transition API the card simply closes.
+   * @returns {Promise<void>}
+   */
+  async function closeWithPull() {
+    const returnTo = findOpener();
+    const box = returnTo !== null && returnTo.classList.contains('placement') ? returnTo : null;
+    const art = dialog.querySelector('.card-art');
+    const root = document.documentElement;
+
+    moving = true;
+
+    if (box === null || art === null || typeof document.startViewTransition !== 'function') {
+      dialog.close();
+      box?.removeAttribute('data-out');
+      finishClose(returnTo);
+
+      return;
+    }
+
+    root.dataset.pullKind = pullKind(box.dataset.kind);
+    root.dataset.pullDir = 'close';
+    art.dataset.pulling = 'target';
+
+    await runTransition(() => {
+      art.removeAttribute('data-pulling');
+      dialog.close();
+      box.removeAttribute('data-out');
+      box.dataset.pulling = 'source';
+      returnTo.focus({ preventScroll: true });
+    });
+
     if (dialog.open) {
       dialog.close();
+      box.removeAttribute('data-out');
     }
+
+    clearPullMarks(box, art);
+    finishClose(returnTo);
+  }
+
+  /**
+   * Closes the card. A close asked for while the card is still opening waits until it has finished opening.
+   */
+  function closeCard() {
+    if (!dialog.open) {
+      return;
+    }
+
+    if (moving || opening) {
+      closeWhenSettled = true;
+
+      return;
+    }
+
+    closeWithPull();
   }
 
   /**
@@ -196,11 +360,12 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
   }
 
   /**
-   * Gives a promise that is settled when no card is open: at once when none is, otherwise when the open one has closed.
+   * Gives a promise that is settled when no card is open and no pull-out is running: at once when none is, otherwise when the one
+   * that is has finished and the box is back in its slot.
    * @returns {Promise<void>}
    */
   function whenClosed() {
-    if (!dialog.open) {
+    if (!dialog.open && !moving && !opening) {
       return Promise.resolve();
     }
 
@@ -213,21 +378,11 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
 
   dialog.addEventListener('close', () => {
     steps.closedHere();
+  });
 
-    const box = findOpener();
-
-    if (box !== null) {
-      box.focus({ preventScroll: true });
-    }
-
-    opener = null;
-    shownEntryId = null;
-
-    if (resolveClosed !== null) {
-      resolveClosed();
-      closedPromise = null;
-      resolveClosed = null;
-    }
+  dialog.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    closeCard();
   });
 
   window.addEventListener('popstate', () => {

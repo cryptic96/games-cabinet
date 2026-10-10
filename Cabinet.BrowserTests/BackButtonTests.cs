@@ -156,6 +156,7 @@ public sealed class BackButtonTests : CabinetPageTest
 
         await Page.Locator(CoverWithoutSecondLine).First.ClickAsync();
         await Expect(Page.Locator(OpenCard)).ToBeVisibleAsync();
+        await Expect(Page.Locator("html[data-pull-kind]")).ToHaveCountAsync(0);
         Page.Url.Should().Be(address);
 
         return address;

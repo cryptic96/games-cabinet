@@ -638,3 +638,102 @@ html:has(dialog[open]) {
     border: 1px solid CanvasText;
   }
 }
+
+/**
+ * The pull-out. The script only sets attributes; every view-transition name comes from the rule below, so no style is ever written
+ * by script. The box and the cover spot are the one named snapshot, `pull`: the box is the old state and the cover spot the new
+ * one on opening, and the other way round on closing. Everything else is the page itself, cross-faded by the root group.
+ */
+[data-pulling] {
+  view-transition-name: pull;
+}
+
+html[data-pull-dir="close"] {
+  --pull-dur: var(--pull-close);
+}
+
+::view-transition-group(root),
+::view-transition-group(pull),
+::view-transition-group(card) {
+  animation-duration: var(--pull-dur);
+}
+
+::view-transition-group(pull) {
+  animation-timing-function: var(--pull-ease-out);
+}
+
+::view-transition-image-pair(pull) {
+  animation: pull-lift var(--pull-dur) var(--pull-ease-out) both;
+}
+
+::view-transition-old(pull),
+::view-transition-new(pull) {
+  height: 100%;
+  object-fit: contain;
+  mix-blend-mode: normal;
+}
+
+html[data-pull-kind="lift"]::view-transition-old(pull),
+html[data-pull-kind="lift"]::view-transition-new(pull) {
+  animation-duration: var(--pull-dur);
+}
+
+html[data-pull-kind="turn-y"]::view-transition-old(pull) {
+  animation: pull-away-y calc(var(--pull-dur) * var(--pull-flip-share)) var(--pull-ease-in) both;
+}
+
+html[data-pull-kind="turn-y"]::view-transition-new(pull) {
+  animation: pull-in-y calc(var(--pull-dur) * (1 - var(--pull-flip-share))) var(--pull-ease-out)
+    calc(var(--pull-dur) * var(--pull-flip-share)) both;
+}
+
+html[data-pull-kind="turn-x"]::view-transition-old(pull) {
+  animation: pull-away-x calc(var(--pull-dur) * var(--pull-flip-share)) var(--pull-ease-in) both;
+}
+
+html[data-pull-kind="turn-x"]::view-transition-new(pull) {
+  animation: pull-in-x calc(var(--pull-dur) * (1 - var(--pull-flip-share))) var(--pull-ease-out)
+    calc(var(--pull-dur) * var(--pull-flip-share)) both;
+}
+
+@keyframes pull-lift {
+  0% {
+    scale: 1;
+  }
+
+  40% {
+    scale: var(--pull-lift);
+  }
+
+  100% {
+    scale: 1;
+  }
+}
+
+@keyframes pull-away-y {
+  to {
+    transform: perspective(var(--pull-perspective)) rotateY(-90deg);
+    opacity: 0;
+  }
+}
+
+@keyframes pull-in-y {
+  from {
+    transform: perspective(var(--pull-perspective)) rotateY(90deg);
+    opacity: 0;
+  }
+}
+
+@keyframes pull-away-x {
+  to {
+    transform: perspective(var(--pull-perspective)) rotateX(90deg);
+    opacity: 0;
+  }
+}
+
+@keyframes pull-in-x {
+  from {
+    transform: perspective(var(--pull-perspective)) rotateX(-90deg);
+    opacity: 0;
+  }
+}
