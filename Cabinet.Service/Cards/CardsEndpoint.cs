@@ -48,10 +48,7 @@ public static class CardsEndpoint
 
     private static CachedCards SyncedCards(IServiceProvider services, SectionDesign design)
     {
-        var current = services.GetRequiredService<CollectionStore>().Current;
-        var layout = current.LayoutFor(design, services.GetRequiredService<LayoutOptions>());
-
-        return CachedCards.From(new CardsDocument(layout.ETag, []));
+        return services.GetRequiredService<CollectionStore>().Current.CardsFor(design, services.GetRequiredService<LayoutOptions>());
     }
 
     private static bool MatchesIfNoneMatch(HttpRequest request, string eTag)

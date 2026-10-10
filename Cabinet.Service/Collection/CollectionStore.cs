@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
+using Cabinet.Domain.Cards;
 using Cabinet.Domain.Collection;
 using Cabinet.Domain.Layout;
+using Cabinet.Service.Cards;
 using Cabinet.Service.Layout;
 
 namespace Cabinet.Service.Collection;
@@ -8,11 +10,12 @@ namespace Cabinet.Service.Collection;
 /// <summary>
 /// One immutable view of the owned collection: the items to draw, which collection version they came from, and when they
 /// were captured. A new view replaces the old one as a whole, so a reader that holds one never sees a half-updated
-/// collection. The layouts built from it are kept with it and disappear with it.
+/// collection. The layouts and card records built from it are kept with it and disappear with it.
 /// </summary>
 public sealed class CollectionState
 {
     private readonly ConcurrentDictionary<string, Lazy<CachedLayout>> _layouts = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, Lazy<CachedCards>> _cards = new(StringComparer.Ordinal);
 
     /// <summary>Creates a view of a collection that has been synced.</summary>
     /// <param name="items">The items to draw.</param>
@@ -84,6 +87,28 @@ public sealed class CollectionState
         ArgumentNullException.ThrowIfNull(options);
 
         return _layouts.GetOrAdd(design.Name, _ => new Lazy<CachedLayout>(() => Build(design, options))).Value;
+    }
+
+    /// <summary>
+    /// The serialised card records of this collection for one section design, built on first use and kept with the view, so
+    /// each design's cards are built at most once per collection version however many visitors ask. The document names the
+    /// entity tag of the layout of the same collection and design.
+    /// </summary>
+    /// <param name="design">The section design for the requested profile.</param>
+    /// <param name="options">The layout settings the cabinet is built with.</param>
+    public CachedCards CardsFor(SectionDesign design, LayoutOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(design);
+        ArgumentNullException.ThrowIfNull(options);
+
+        return _cards.GetOrAdd(design.Name, _ => new Lazy<CachedCards>(() => BuildCards(design, options))).Value;
+    }
+
+    private CachedCards BuildCards(SectionDesign design, LayoutOptions options)
+    {
+        var cards = CardRecords.Build(Items, Snapshot, design);
+
+        return CachedCards.From(new CardsDocument(LayoutFor(design, options).ETag, cards));
     }
 
     private CachedLayout Build(SectionDesign design, LayoutOptions options)
