@@ -3,6 +3,8 @@
  * through text content or an attribute the script checks first, so nothing a source writes can become markup.
  */
 
+import { factsFor, hasAnyDetail, ratingText } from './format.js';
+
 /** The only address shape a card picture may have: a stored file on the site's own origin. */
 const ART_PATH = /^\/art\/[0-9a-f]{16}-[0-9]{1,4}\.webp$/;
 
@@ -276,8 +278,192 @@ function buildLink(record, copy, iconsUrl) {
 }
 
 /**
+ * Builds one entry of the game-night strip: a decorative icon, the bold value and the quiet label that screen readers read.
+ * @param {{ icon: string, value: string, label: string }} fact The entry from the format functions.
+ * @param {string} iconsUrl The address of the icon sprite.
+ * @returns {HTMLLIElement}
+ */
+function buildFact(fact, iconsUrl) {
+  const icon = buildIcon(iconsUrl, fact.icon);
+  icon.classList.add('fact-icon');
+
+  const value = document.createElement('span');
+  value.className = 'v';
+  value.textContent = fact.value;
+
+  const label = document.createElement('span');
+  label.className = 'l';
+  label.textContent = fact.label;
+
+  const item = document.createElement('li');
+  item.className = 'fact';
+  item.append(icon, value, document.createTextNode(' '), label);
+
+  return item;
+}
+
+/**
+ * Builds the quiet note that stands in the strip's place when no detail is known.
+ * @param {object} copy The visitor-facing strings.
+ * @returns {HTMLParagraphElement}
+ */
+function buildNote(copy) {
+  const note = document.createElement('p');
+  note.className = 'card-note';
+  note.textContent = copy.noDetails;
+
+  return note;
+}
+
+/**
+ * Builds the game-night strip, the quiet note when no detail is known or the card data did not arrive, or nothing when details
+ * are known but none of them belongs in the strip.
+ * @param {object} record The card record.
+ * @param {object} copy The visitor-facing strings.
+ * @param {string} iconsUrl The address of the icon sprite.
+ * @returns {HTMLElement | null}
+ */
+function buildStripOrNote(record, copy, iconsUrl) {
+  if (record.incomplete === true || !hasAnyDetail(record)) {
+    return buildNote(copy);
+  }
+
+  const facts = factsFor(record, copy);
+
+  if (facts.length === 0) {
+    return null;
+  }
+
+  const list = document.createElement('ul');
+  list.className = 'facts';
+  list.append(...facts.map((fact) => buildFact(fact, iconsUrl)));
+
+  return list;
+}
+
+/**
+ * Tells whether a value is a string with something other than white space in it.
+ * @param {unknown} value The value from the data.
+ * @returns {boolean}
+ */
+function isFilledText(value) {
+  return typeof value === 'string' && value.trim() !== '';
+}
+
+/**
+ * Keeps the filled strings of a list from the data.
+ * @param {unknown} list The list from the record.
+ * @returns {string[]}
+ */
+function filledTexts(list) {
+  return Array.isArray(list) ? list.filter(isFilledText) : [];
+}
+
+/**
+ * Builds one row of a label-and-value list: the label in the first column, the value beside it.
+ * @param {string} label The quiet label.
+ * @param {HTMLElement} value The value element, a dd.
+ * @param {HTMLElement} list The list the row is added to.
+ */
+function appendRow(label, value, list) {
+  const term = document.createElement('dt');
+  term.textContent = label;
+  list.append(term, value);
+}
+
+/**
+ * Builds the stored-in group, or returns null when the record has no usable location. The location is shown exactly as it was
+ * given, with its own text direction and no language mark.
+ * @param {object} record The card record.
+ * @param {object} copy The visitor-facing strings.
+ * @returns {HTMLDListElement | null}
+ */
+function buildWhere(record, copy) {
+  if (!isFilledText(record.location)) {
+    return null;
+  }
+
+  const value = document.createElement('dd');
+  value.setAttribute('dir', 'auto');
+  value.textContent = record.location;
+
+  const list = document.createElement('dl');
+  list.className = 'card-where';
+  appendRow(copy.storedIn, value, list);
+
+  return list;
+}
+
+/**
+ * Builds the mechanics list: every mechanic in full, marked as English because BoardGameGeek names them in English, with the
+ * separator drawn by the style sheet.
+ * @param {string[]} mechanics The mechanic names.
+ * @returns {HTMLUListElement}
+ */
+function buildMechanics(mechanics) {
+  const list = document.createElement('ul');
+  list.className = 'mech';
+  list.setAttribute('role', 'list');
+  list.setAttribute('lang', 'en');
+
+  for (const name of mechanics) {
+    const item = document.createElement('li');
+    item.setAttribute('role', 'listitem');
+    item.textContent = name;
+
+    if (list.childElementCount > 0) {
+      list.append(document.createTextNode(' '));
+    }
+
+    list.append(item);
+  }
+
+  return list;
+}
+
+/**
+ * Builds the quiet rows below the strip: the rating, the designers and the mechanics, each only when it has data. Returns null
+ * when none has.
+ * @param {object} record The card record.
+ * @param {object} copy The visitor-facing strings.
+ * @returns {HTMLDListElement | null}
+ */
+function buildMeta(record, copy) {
+  const list = document.createElement('dl');
+  list.className = 'card-meta';
+
+  const rating = ratingText(record.rating, copy);
+
+  if (rating !== null) {
+    const value = document.createElement('dd');
+    value.textContent = rating;
+    appendRow(copy.ratingLabel, value, list);
+  }
+
+  const designers = filledTexts(record.designers);
+
+  if (designers.length > 0) {
+    const value = document.createElement('dd');
+    value.setAttribute('dir', 'auto');
+    value.textContent = designers.join(', ');
+    appendRow(copy.designersLabel(designers.length), value, list);
+  }
+
+  const mechanics = filledTexts(record.mechanics);
+
+  if (mechanics.length > 0) {
+    const value = document.createElement('dd');
+    value.append(buildMechanics(mechanics));
+    appendRow(copy.mechanicsLabel(mechanics.length), value, list);
+  }
+
+  return list.childElementCount === 0 ? null : list;
+}
+
+/**
  * Builds the card of one game: the grip strip of the phone sheet, the close button, the header with cover, title and year, and the
- * ruled area with the quiet note when details are missing and the link to BoardGameGeek last.
+ * ruled area with the game-night strip or the quiet note, the location, the rating, designers and mechanics, and the link to
+ * BoardGameGeek last. Whatever is missing is left out.
  * @param {object} record The card record, or the least a card can show when the data did not arrive.
  * @param {object} copy The visitor-facing strings.
  * @param {{ iconsUrl?: string, palette?: object[] }} [options] The sprite address and the colour table of the layout on screen.
@@ -331,11 +517,10 @@ export function buildCard(record, copy, options = {}) {
   const ruled = document.createElement('div');
   ruled.className = 'card-ruled';
 
-  if (record.incomplete === true) {
-    const note = document.createElement('p');
-    note.className = 'card-note';
-    note.textContent = copy.noDetails;
-    ruled.append(note);
+  for (const part of [buildStripOrNote(record, copy, iconsUrl), buildWhere(record, copy), buildMeta(record, copy)]) {
+    if (part !== null) {
+      ruled.append(part);
+    }
   }
 
   const link = buildLink(record, copy, iconsUrl);
