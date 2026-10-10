@@ -154,6 +154,13 @@ Things worth knowing:
 - Pictures are downloaded once and stored. To start again, stop the cabinet and delete the `art` folder inside the local state directory (`.cabinet-state` next to the service project, unless `Storage__Directory` says otherwise), then run a sync.
 - The fake's failure scenarios apply to the picture route as well, so `throttle` and `unavailable` also exercise how pictures cope with trouble.
 
+### Checking both languages, reduced motion and storage locations locally
+
+- **Dutch:** open the site with the browser's language set to Dutch, or press `NL` in the header. The choice is stored in the `lang` cookie for a year; delete the cookie to go back to following the browser. Titles, designers, mechanics and storage locations stay as the data has them in both languages.
+- **Reduced motion:** turn on the operating system's reduced-motion setting, or use the browser developer tools' emulation of `prefers-reduced-motion: reduce`. Opening a card then fades instead of pulling the box out, no view transition runs, and the box stays outlined in its slot.
+- **Invented storage locations:** the card shows a "Stored in" row only when the collection carries a location. The fake BGG invents them, but the cabinet only asks for them when started with `Bgg__IncludePrivateInfo=true`, so add that to the Development start described above. Use it only on a development machine against the fake; the committed configuration keeps it off, and the invented collections (`?sample=65`, `?sample=400`, `?sample=edge`) already carry invented locations, including ones in several scripts.
+- **A walk through the whole thing:** start the fake with 65 games, start the cabinet in Development against it, press sync once, then open a few boxes with the mouse, with Tab and the arrow keys and Enter, and with the skip link, in both languages.
+
 ## Using a BGG token locally
 
 The BGG username and API token are configuration only. They never go in the repository, in `appsettings.json`, or in a test. For local development keep them in user secrets, which live in your home directory outside the repository and are loaded only when the app runs in the Development environment:
@@ -197,7 +204,7 @@ Run them:
 dotnet test --project Cabinet.BrowserTests
 ```
 
-Set `CABINET_SCREENSHOT_DIR` to a directory to keep the full-page screenshots the tests take; without it they are not written.
+Set `CABINET_SCREENSHOT_DIR` to a directory to keep the screenshots the tests take; without it they are not written. A screenshot covers the whole page, except while a card is open, when only the visible window is saved, because a full-page capture resizes the window and would disturb the open card.
 
 The test host serves module scripts without a content type when the browser accepts compressed responses, so the shared base class asks for the identity encoding. A new browser test should derive from `CabinetPageTest` to inherit that, the recording of console errors and request hosts, and the screenshot helper.
 

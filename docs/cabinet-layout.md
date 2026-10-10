@@ -430,6 +430,52 @@ layout address answers normally with that empty cabinet. When a sync finishes
 with no games at all, the bare cabinet stays and the message goes, because the
 collection really is empty.
 
+### The card
+
+Tapping or clicking a box, or pressing Enter on it, opens a card for that game. The
+box, the `+N more` marker and every entry of the games list open the same card.
+A box that is mostly on screen slides out of its slot, turns and becomes the card's
+cover, and slides back into the same slot when the card closes; a box that is off
+screen, a browser without view transitions and a visitor who asked for reduced
+motion get a short fade instead, and with reduced motion the box is only outlined
+in place. The `+N more` marker opens the card of its base game scrolled to the
+expansions. An expansion's card names its base game or games and swaps to a base
+game's card in place.
+
+The facts on a card (players, play time, weight, minimum age, rating, designers,
+mechanics, stored location, and for a family its expansions and bases) are served
+with the layout from the same address family, under the same entity tag rules, and
+revalidated the same way. A game whose details have not arrived yet still opens and
+says more details follow after the next sync. A value BoardGameGeek reports as zero
+or leaves out is left out of the card, never shown as unknown. Neither the layout
+nor the card data carries any language-dependent text: the page script writes the
+words in the visitor's language, and game titles, designers, mechanics and storage
+locations are never translated.
+
+Escape, a tap outside the card, the close button and, on a phone, dragging the
+sheet down all close the card. The browser's Back button closes it too and leaves
+no dead history step; the address never changes. A sync that finishes while a card
+is open waits: the cabinet is redrawn only once the card is closed.
+
+### Keyboard and screen readers
+
+The cabinet is one tab stop. Inside it the arrow keys move to the nearest box in
+that direction by position on screen, Home and End go to the first and last box,
+and Enter opens the card. A skip link at the top of the page leads to the games
+list: every game from A to Z with its expansions nested under it and the facts a
+card shows, so a screen reader user can read the whole collection without walking
+the shelves. The list is visually hidden except while focus is inside it. The
+cabinet is announced as a group with a hint about the arrow keys, and there is no
+live region beyond the existing sync status.
+
+### Languages
+
+The page is rendered in English or Dutch from the first byte. The language comes
+from a one-year functional cookie, which the toggle in the header sets, and
+otherwise from the browser's language preference; the page language attribute follows
+it and the language is never part of the address. Switching reloads the page and
+keeps the scroll position where the browser allows it.
+
 ## Invented collections
 
 The invented collections exist only for judging the cabinet at every size while
