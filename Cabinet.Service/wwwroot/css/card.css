@@ -463,31 +463,6 @@ html:has(dialog[open]) {
 }
 
 /**
- * The punched hole at the foot of the card: a trailing block two rulings tall holding one small circle that reads as a hole in the
- * paper, lit from the upper left like everything else. It is decoration only and takes no press.
- */
-.card-ruled > .card-hole {
-  display: grid;
-  place-items: center;
-  height: calc(2 * var(--ruling));
-  margin-block-start: 0;
-  pointer-events: none;
-}
-
-.card-hole::before {
-  content: "";
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 70% 75%, #3a2415 0, var(--paper-hole) 60%, #160a04 100%);
-  box-shadow:
-    inset 1px 2px 2px rgb(0 0 0 / 0.55),
-    inset -1px -1px 0 rgb(255 235 205 / 0.22),
-    0 0 0 1px rgb(120 90 60 / 0.28),
-    0 1px 0 rgb(255 255 255 / 0.9);
-}
-
-/**
  * Pressable rows that swap the card to another owned game: the owned expansions of a base game and the owned base games of an
  * expansion. A row is one button, text on the first ruled line; its colour chip and chevron sit inside its line and never change
  * the line box. A long title wraps over whole rulings and the whole row stays one tap area.

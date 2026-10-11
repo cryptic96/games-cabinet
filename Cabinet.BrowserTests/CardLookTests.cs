@@ -9,7 +9,7 @@ namespace Cabinet.BrowserTests;
 /// <summary>
 /// The scenarios that prove the card looks like a ruled index card in a real browser: every block of the ruled area is a whole
 /// number of rulings tall whatever script the text is in, pressable rows are one or two rulings tall and never overlap, the focus
-/// ring on paper is ink, and the punched hole is decoration only. A concrete class below runs them at one viewport.
+/// ring on paper is ink, and the card has no punched hole. A concrete class below runs them at one viewport.
 /// </summary>
 [Trait("Category", "Browser")]
 public abstract class CardLookScenarios(int width, int height, bool touch) : CabinetPageTest
@@ -122,7 +122,7 @@ public abstract class CardLookScenarios(int width, int height, bool touch) : Cab
     }
 
     [Fact]
-    public async Task A_row_reached_with_the_keyboard_shows_a_two_pixel_ink_ring_and_the_hole_is_hidden_decoration()
+    public async Task A_row_reached_with_the_keyboard_shows_a_two_pixel_ink_ring_and_the_card_has_no_punched_hole()
     {
         await StartAsync(PrototypeOn);
         var cards = await LoadCardsAsync("/?sample=65", "review");
@@ -137,11 +137,7 @@ public abstract class CardLookScenarios(int width, int height, bool touch) : Cab
         var ring = await row.EvaluateAsync<string[]>("row => { const style = getComputedStyle(row); return [style.outlineColor, style.outlineStyle, style.outlineWidth, style.outlineOffset]; }");
         ring.Should().Equal("rgb(42, 26, 16)", "solid", "2px", "2px");
 
-        var hole = Page.Locator(".card-hole");
-        await Expect(hole).ToHaveCountAsync(1);
-        await Expect(hole).ToHaveAttributeAsync("aria-hidden", "true");
-        (await hole.EvaluateAsync<int>("hole => hole.querySelectorAll('a, button, [tabindex]').length")).Should().Be(0);
-        (await Page.Locator(".card-ruled").EvaluateAsync<string>("ruled => ruled.lastElementChild.className")).Should().Be("card-hole");
+        await Expect(Page.Locator(".card-hole")).ToHaveCountAsync(0);
     }
 
     /// <summary>Sets the language cookie to Dutch for the pages opened afterwards.</summary>

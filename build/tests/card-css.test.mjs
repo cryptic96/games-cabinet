@@ -101,9 +101,8 @@ test('the swap fades the header and the ruled area over the swap token', () => {
   assert.ok(declares('.card-head', 'transition: opacity var(--swap-fade)'));
 });
 
-test('the punched hole takes no press and is two rulings tall', () => {
-  assert.ok(declares('.card-ruled > .card-hole', 'pointer-events: none'));
-  assert.ok(declares('.card-ruled > .card-hole', 'height: calc(2 * var(--ruling))'));
+test('the card has no punched hole', () => {
+  assert.doesNotMatch(stripped, /card-hole/);
 });
 
 test('the chip takes its colour from the row, and the text and paper never take an art colour', () => {
