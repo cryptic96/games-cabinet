@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 05
 current_phase_name: game-detail-accessibility-language
 status: executing
-stopped_at: Phase 5 UI-SPEC approved
-last_updated: "2026-10-10T11:06:51.300Z"
-last_activity: 2026-10-10
-last_activity_desc: Phase 05 execution started
+stopped_at: Completed 05-15-PLAN.md
+last_updated: "2026-10-11T18:26:07.721Z"
+last_activity: 2026-10-11
+last_activity_desc: Plan 05-15 complete (review round answered and applied)
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 78
-  completed_plans: 62
+  completed_plans: 77
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-10-06)
 ## Current Position
 
 Phase: 05 (game-detail-accessibility-language) — EXECUTING
-Plan: 1 of 16
+Plan: 15 of 16 complete (next: 05-16)
 Status: Executing Phase 05
-Last activity: 2026-10-10 — Phase 05 execution started
+Last activity: 2026-10-11 — Plan 05-15 complete (review round answered and applied)
 
-Progress: [██████████] 100%
+Progress: [██████████] 99%
 
 ## Performance Metrics
 
@@ -62,6 +62,7 @@ Progress: [██████████] 100%
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 01 P01 | 25min | 3 tasks | 1 files |
+| Phase 05 P05-15 | two sessions | 4 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,10 @@ Recent decisions affecting current work:
 - [Phase 2]: Layout is a pure versioned function guarded by golden files; later visual changes are a version bump plus a release, with no stored state to migrate.
 - [Phase 2]: Remaining taste calls deferred as todos to Phases 4, 5 and 7; selectable finishes stay an unscheduled todo.
 - [Phase 2]: Front-end work in GSD agents uses the owner's personal senior-frontend skill via agent_skills (planner, executor, UI agents).
+- [Phase 05]: [05-15] Dutch site name stays Spellenkast (owner review round 1)
+- [Phase 05]: [05-15] Card has no punched hole (owner review round 1)
+- [Phase 05]: [05-15] Swap rows are grids packed to the start so one-line titles sit on their first ruling on a phone
+- [Phase 05]: [05-15] Uneven desktop sections accepted for now; todo recorded for a later layout pass
 
 ### Pending Todos
 
@@ -116,6 +121,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-09T21:34:45.483Z
-Stopped at: Phase 5 UI-SPEC approved
-Resume file: .planning/phases/05-game-detail-accessibility-language/05-UI-SPEC.md
+Last session: 2026-10-11T18:26:07.704Z
+Stopped at: Completed 05-15-PLAN.md
+Resume file: None

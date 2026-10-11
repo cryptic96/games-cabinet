@@ -41,14 +41,14 @@ Requirements for the initial release. Each maps to a roadmap phase.
 
 ### Game Detail
 
-- [ ] **DET-01**: Tapping or clicking a game pulls its box out of the shelf with an animation, then opens a detail card.
-- [ ] **DET-02**: The detail card shows:
+- [x] **DET-01**: Tapping or clicking a game pulls its box out of the shelf with an animation, then opens a detail card.
+- [x] **DET-02**: The detail card shows:
   - cover, title and year
   - player count, play time and weight
   - storage location and owned expansions
   - BGG rating, designers, minimum age and mechanics
   - a link to the game on BGG
-- [ ] **DET-03**: Visitors who prefer reduced motion get the detail card without the pull-out animation.
+- [x] **DET-03**: Visitors who prefer reduced motion get the detail card without the pull-out animation.
 
 ### Filters
 
@@ -89,12 +89,12 @@ Requirements for the initial release. Each maps to a roadmap phase.
 
 ### Language
 
-- [ ] **I18N-01**: The site's own labels are available in English and Dutch. The default follows the browser language, a visitor can switch, and the choice is remembered. Game titles stay as BGG provides them.
+- [x] **I18N-01**: The site's own labels are available in English and Dutch. The default follows the browser language, a visitor can switch, and the choice is remembered. Game titles stay as BGG provides them.
 
 ### Accessibility
 
-- [ ] **A11Y-01**: Keyboard users can move through the games in the cabinet and open any game's detail card.
-- [ ] **A11Y-02**: Screen-reader users get an accessible list of all games behind the visual cabinet.
+- [x] **A11Y-01**: Keyboard users can move through the games in the cabinet and open any game's detail card.
+- [x] **A11Y-02**: Screen-reader users get an accessible list of all games behind the visual cabinet.
 
 ### Repository & Release
 
@@ -191,9 +191,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EXP-02 | Phase 2 | Complete |
 | EXP-03 | Phase 2 | Complete |
 | EXP-04 | Phase 7 | Pending |
-| DET-01 | Phase 5 | Pending |
-| DET-02 | Phase 5 | Pending |
-| DET-03 | Phase 5 | Pending |
+| DET-01 | Phase 5 | Complete |
+| DET-02 | Phase 5 | Complete |
+| DET-03 | Phase 5 | Complete |
 | FILT-01 | Phase 7 | Pending |
 | FILT-02 | Phase 7 | Pending |
 | FILT-03 | Phase 7 | Pending |
@@ -209,9 +209,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | IMG-03 | Phase 4 | Complete |
 | OWN-01 | Phase 6 | Pending |
 | OWN-02 | Phase 6 | Pending |
-| I18N-01 | Phase 5 | Pending |
-| A11Y-01 | Phase 5 | Pending |
-| A11Y-02 | Phase 5 | Pending |
+| I18N-01 | Phase 5 | Complete |
+| A11Y-01 | Phase 5 | Complete |
+| A11Y-02 | Phase 5 | Complete |
 | OPS-01 | Phase 1 | Complete |
 | OPS-02 | Phase 1 | Complete |
 | OPS-03 | Phase 1 | Complete |
