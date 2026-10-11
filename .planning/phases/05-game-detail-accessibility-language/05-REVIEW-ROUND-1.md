@@ -85,4 +85,31 @@ These could not be done on a workstation and stay open for the release round:
 
 ## Your answer
 
-(recorded verbatim after the owner replies)
+> approve, L3 yes
+
+Read as: every proposed answer is approved, and L3 is a yes using the corrected finding. D1 `Spellenkast`, D2 drop the hole, D3 as now, D4 accept and log a todo, D5 approve the Dutch strings, L1, L2, L4, L5 (leave the outline), L6, L7, L8 and T1 to T6 as proposed.
+
+## After your answer
+
+Changed items were shot again at 390 px with synthetic data only (the 400-item invented sample); the first-round files are kept next to them for comparison. New files are in `ui-refs/round-1/` and start with `after-`.
+
+| Label | State | Commit |
+| --- | --- | --- |
+| D1 | unchanged: `Spellenkast` is already the Dutch title and heading, and the integration and browser tests pin both | none needed |
+| D2 | done: the hole is gone from the card script and the stylesheet, its unused colour variable is removed, and the stylesheet and browser tests now pin that the card has none. The card now ends on its last row and the ruling below it (`after-card-foot-en-390.png`, `after-card-foot-nl-390.png`) | `dbc812f` |
+| D3 | unchanged: only the owned base is listed | none needed |
+| D4 | done: todo recorded in `.planning/todos/pending/2026-10-11-uneven-desktop-sections-layout-pass.md` | see the review docs commit |
+| D5 | unchanged: Dutch strings approved as in `05-LANGUAGE-TABLE.md` | none needed |
+| L1, L2, L4, L5, L6, L7, L8 | unchanged, approved as proposed (L5 keeps the outline under the dim, L6 is left and watched) | none needed |
+| L3 | done: the swap row is now a grid that packs its text to its first ruling, so one-line titles sit on a ruling (chip and chevron already did) while the 56 px tap area, desktop rows and wrapped titles are unchanged. The base rows on an expansion card use the same class and get the same fix. New browser tests check every text line of every swap row against the 28 px grid at 390 px and at 1440 px, in English and Dutch, over the 400-item sample (a base game with many expansions, its first and its longest-titled expansion card, so one-line and wrapped titles and the base row are all covered). They failed on the phone before the change (every one-line title started 21 px below a ruling, 22 px tall, so it crossed the next one) and pass after | `067fe16` |
+| T1 to T6 | unchanged, approved as proposed | none needed |
+
+Shots after the change:
+
+- `after-04-more-nl-390.png` and `after-04-more-en-390.png`: the card opened from the `+N more` marker, expansion list with one-line and wrapped titles, now on the rulings. `after-04-expansion-rows-crop-nl-390.png` and `after-04-expansion-rows-crop-en-390.png` show the list alone.
+- `after-expansion-card-en-390.png` and `after-expansion-card-nl-390.png`: an expansion card with its base row; `after-expansion-card-base-row-crop-en-390.png` and `after-expansion-card-base-row-crop-nl-390.png` show the row alone.
+- `after-card-foot-en-390.png` and `after-card-foot-nl-390.png`: the foot of the card without the hole.
+
+I looked at the new phone shots myself: every one-line title now sits above its ruling next to the chip, wrapped titles still fill both rulings, and nothing moved on the rest of the card.
+
+Still open for the release round: C1 to C5.
