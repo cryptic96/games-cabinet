@@ -465,11 +465,14 @@ html:has(dialog[open]) {
 /**
  * Pressable rows that swap the card to another owned game: the owned expansions of a base game and the owned base games of an
  * expansion. A row is one button, text on the first ruled line; its colour chip and chevron sit inside its line and never change
- * the line box. A long title wraps over whole rulings and the whole row stays one tap area.
+ * the line box. A long title wraps over whole rulings and the whole row stays one tap area. The row is a grid that packs its text
+ * to the start: a button centres its content vertically, which would push a one-line title half a ruling down on a phone, where
+ * the row is two rulings tall.
  */
 .exp-row {
   position: relative;
-  display: block;
+  display: grid;
+  align-content: start;
   width: 100%;
   margin: 0;
   padding-block: 0;

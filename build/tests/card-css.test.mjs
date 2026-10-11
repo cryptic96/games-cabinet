@@ -101,6 +101,11 @@ test('the swap fades the header and the ruled area over the swap token', () => {
   assert.ok(declares('.card-head', 'transition: opacity var(--swap-fade)'));
 });
 
+test('a swap row packs its text to its first ruling instead of centring it in the button', () => {
+  assert.ok(declares('.exp-row', 'display: grid'));
+  assert.ok(declares('.exp-row', 'align-content: start'));
+});
+
 test('the card has no punched hole', () => {
   assert.doesNotMatch(stripped, /card-hole/);
 });

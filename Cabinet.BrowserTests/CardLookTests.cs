@@ -140,6 +140,21 @@ public abstract class CardLookScenarios(int width, int height, bool touch) : Cab
         await Expect(Page.Locator(".card-hole")).ToHaveCountAsync(0);
     }
 
+    [Fact]
+    public async Task Every_text_line_of_every_swap_row_sits_on_a_ruling_in_English()
+    {
+        await StartAsync(PrototypeOn);
+        await AssertSwapRowTextSitsOnTheRulingsAsync();
+    }
+
+    [Fact]
+    public async Task Every_text_line_of_every_swap_row_sits_on_a_ruling_in_Dutch()
+    {
+        await StartAsync(PrototypeOn);
+        await UseDutchAsync();
+        await AssertSwapRowTextSitsOnTheRulingsAsync();
+    }
+
     /// <summary>Sets the language cookie to Dutch for the pages opened afterwards.</summary>
     protected async Task UseDutchAsync()
     {
@@ -191,6 +206,74 @@ public abstract class CardLookScenarios(int width, int height, bool touch) : Cab
         await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(0);
     }
 
+    private async Task AssertSwapRowTextSitsOnTheRulingsAsync()
+    {
+        var cards = await LoadCardsAsync("/?sample=400", "many expansions");
+        var family = cards.Where(card => !card.IsExpansion).MaxBy(card => card.Expansions.Count)!;
+        var lineCounts = new List<int>();
+
+        await OpenCardAsync(family);
+        lineCounts.AddRange(await AssertRowLinesOnTheRulingsAsync(family.Title));
+        await CloseCardAsync();
+
+        var firstExpansion = family.Expansions.First(link => link.EntryId is not null);
+        var longestExpansion = family.Expansions.Where(link => link.EntryId is not null).MaxBy(link => link.Title.Length)!;
+
+        foreach (var expansion in new[] { firstExpansion, longestExpansion })
+        {
+            await OpenCardAsync(family);
+            await Page.Locator($".card-expansions .exp-row[data-entry-id=\"{expansion.EntryId}\"]").ClickAsync();
+            await Expect(Page.Locator("#card-title")).ToHaveTextAsync(expansion.Title);
+            lineCounts.AddRange(await AssertRowLinesOnTheRulingsAsync(expansion.Title));
+            await CloseCardAsync();
+        }
+
+        lineCounts.Should().Contain(1, "a one-line title is among the rows checked");
+
+        if (width <= 640)
+        {
+            lineCounts.Should().Contain(count => count > 1, "a wrapped title is among the rows checked on a phone");
+        }
+
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    private async Task<int[]> AssertRowLinesOnTheRulingsAsync(string label)
+    {
+        var raw = await Page.EvaluateAsync<JsonElement>(
+            """
+            () => {
+              const ruling = 28;
+              const drop = 4;
+              const ruled = document.querySelector('.card-ruled');
+              const top = ruled.getBoundingClientRect().top;
+              const counts = [];
+              const offenders = [];
+              for (const row of document.querySelectorAll('.card .exp-row')) {
+                const title = row.querySelector('.exp-title');
+                const range = document.createRange();
+                range.selectNodeContents(title);
+                const lines = Array.from(range.getClientRects()).filter(rect => rect.width > 0);
+                counts.push(lines.length);
+                for (const rect of lines) {
+                  const offset = ((rect.top - top + drop) % ruling + ruling) % ruling;
+                  if (offset + rect.height > ruling + 2) {
+                    offenders.push(title.textContent + ': a line starts ' + offset.toFixed(1) + 'px below a ruling and is ' + rect.height.toFixed(1) + 'px tall');
+                  }
+                }
+              }
+              return { counts, offenders };
+            }
+            """);
+
+        var result = JsonSerializer.Deserialize<RowLines>(raw.GetRawText(), WebOptions)!;
+
+        result.Counts.Should().NotBeEmpty($"the card of '{label}' has swap rows");
+        result.Offenders.Should().BeEmpty($"every text line of a swap row on the card of '{label}' sits between two rulings, not across one");
+
+        return result.Counts;
+    }
+
     private static bool IsWholeRulings(double height)
     {
         var rulings = height / Ruling;
@@ -228,6 +311,9 @@ public abstract class CardLookScenarios(int width, int height, bool touch) : Cab
 
         offenders.Should().BeEmpty($"every block of the card of '{label}' sits on the ruling");
     }
+
+    /// <summary>The number of text lines of each swap row, and the lines that cross a ruling.</summary>
+    private sealed record RowLines(int[] Counts, string[] Offenders);
 
     /// <summary>One link of a card list.</summary>
     protected sealed record CardLink(long? EntryId, int GameId, string Title, string? Chip);
