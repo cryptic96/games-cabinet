@@ -108,7 +108,8 @@ public sealed partial class OwnerSession : IDisposable
     /// <param name="content">The bytes of the file; null sends the form with no file part at all, as a browser does when none was chosen.</param>
     /// <param name="asScript">Whether to post as a script does: token in the header and a JSON answer asked for.</param>
     /// <param name="withToken">Whether to send the token.</param>
-    public async Task<OwnerReply> PostFileAsync(string path, string fieldName, byte[]? content, bool asScript = false, bool withToken = true)
+    /// <param name="expectContinue">Whether to ask the server to agree before the body is sent, so a refusal of a huge body is read as the answer it is.</param>
+    public async Task<OwnerReply> PostFileAsync(string path, string fieldName, byte[]? content, bool asScript = false, bool withToken = true, bool expectContinue = false)
     {
         var token = withToken ? await TokenAsync() : null;
         using var form = new MultipartFormDataContent();
@@ -126,6 +127,7 @@ public sealed partial class OwnerSession : IDisposable
         }
 
         using var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = form };
+        request.Headers.ExpectContinue = expectContinue;
 
         if (asScript)
         {

@@ -1829,7 +1829,8 @@ header > .owner-plate {
   }
 }
 
-.backup-notice {
+.backup-notice,
+.restore-notice {
   margin: 0 0 16px;
   padding: 8px 16px;
   border-radius: 4px;

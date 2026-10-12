@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Cabinet.Domain.Owner;
+using Cabinet.Repository.Images;
 
 namespace Cabinet.Repository.Storage;
 
@@ -79,6 +80,8 @@ public static class OwnerDataExport
     /// <summary>The deepest nesting of JSON a restored file may have.</summary>
     public const int MaxDepth = 16;
 
+    private const int MaxFinishLength = 32;
+    private const int MaxChangeTextLength = 1000;
     private const string FileNamePrefix = "cabinet-owner-data-";
     private const string FileNameSuffix = ".json";
     private const string FileNameDateFormat = "yyyy-MM-dd";
@@ -104,38 +107,46 @@ public static class OwnerDataExport
 
     /// <summary>
     /// Checks the bytes of a file chosen for a restore. The file is accepted only whole: it has to be an owner-data file in the
-    /// strict shape the site writes, and its fetched records are left out so every linked picture is fetched again.
+    /// strict shape the site writes, within the size, count, name and link rules, with every reference pointing at something in
+    /// it. Its fetched records are left out so every linked picture is fetched again, and its games are put in order of
+    /// identifier. A file from an older format would be upgraded here; no older format exists yet.
     /// </summary>
     /// <param name="bytes">The content of the file, or null when none was chosen.</param>
-    public static RestoreCheck Check(byte[]? bytes)
+    /// <param name="policy">Says which addresses a linked picture may be fetched from; every link of the file must meet it.</param>
+    public static RestoreCheck Check(byte[]? bytes, ArtSourcePolicy policy)
     {
+        ArgumentNullException.ThrowIfNull(policy);
+
         if (bytes is null || bytes.Length == 0)
         {
             return RestoreCheck.Problem(RestoreProblem.NoFile);
         }
 
-        if (ReadHeader(bytes) is not { } header)
+        if (bytes.Length > MaxRestoreBytes)
+        {
+            return RestoreCheck.Problem(RestoreProblem.TooLarge, sizeBytes: bytes.Length);
+        }
+
+        var header = ReadHeader(bytes);
+
+        if (header.Refusal is { } headerProblem)
+        {
+            return RestoreCheck.Problem(headerProblem);
+        }
+
+        if (header.SchemaVersion > OwnerData.CurrentSchemaVersion)
+        {
+            return RestoreCheck.Problem(RestoreProblem.Newer, formatVersion: header.SchemaVersion);
+        }
+
+        if (header.SchemaVersion < 1 || Deserialize(bytes) is not { } data)
         {
             return RestoreCheck.Problem(RestoreProblem.Damaged);
         }
 
-        OwnerData? data;
-
-        try
-        {
-            data = JsonSerializer.Deserialize<OwnerData>(bytes, OwnerDataStore.StoredOptions);
-        }
-        catch (JsonException)
-        {
-            return RestoreCheck.Problem(RestoreProblem.Damaged);
-        }
-
-        if (data is null || data.Locations.Any(location => location is null) || data.Games.Any(game => game is null) || data.Changes.Any(change => change is null))
-        {
-            return RestoreCheck.Problem(RestoreProblem.Damaged);
-        }
-
-        return RestoreCheck.Ok(Accepted(data), header.SchemaVersion);
+        return WithinLimits(data, policy)
+            ? RestoreCheck.Ok(Accepted(data), header.SchemaVersion)
+            : RestoreCheck.Problem(RestoreProblem.OverLimits);
     }
 
     /// <summary>The name the downloaded file is saved under: <c>cabinet-owner-data-</c> and the date of the download in UTC.</summary>
@@ -143,7 +154,7 @@ public static class OwnerDataExport
     public static string FileName(DateTimeOffset downloadedAt) =>
         FileNamePrefix + downloadedAt.UtcDateTime.ToString(FileNameDateFormat, CultureInfo.InvariantCulture) + FileNameSuffix;
 
-    private static (string? Kind, int SchemaVersion)? ReadHeader(byte[] bytes)
+    private static (RestoreProblem? Refusal, int SchemaVersion) ReadHeader(byte[] bytes)
     {
         try
         {
@@ -153,18 +164,131 @@ public static class OwnerDataExport
             if (root.ValueKind != JsonValueKind.Object
                 || !root.TryGetProperty("kind", out var kind)
                 || kind.ValueKind != JsonValueKind.String
-                || !root.TryGetProperty("schemaVersion", out var version)
-                || !version.TryGetInt32(out var schemaVersion))
+                || kind.GetString() != OwnerData.KindMarker)
             {
-                return null;
+                return (RestoreProblem.NotOwnerData, 0);
             }
 
-            return (kind.GetString(), schemaVersion);
+            return root.TryGetProperty("schemaVersion", out var version) && version.TryGetInt32(out var schemaVersion)
+                ? (null, schemaVersion)
+                : (RestoreProblem.Damaged, 0);
+        }
+        catch (JsonException)
+        {
+            return (IsJsonOfAnyDepth(bytes) || ClaimsToBeOwnerData(bytes) ? RestoreProblem.Damaged : RestoreProblem.NotOwnerData, 0);
+        }
+    }
+
+    private static bool IsJsonOfAnyDepth(byte[] bytes)
+    {
+        try
+        {
+            var reader = new Utf8JsonReader(bytes, new JsonReaderOptions { MaxDepth = int.MaxValue });
+
+            while (reader.Read())
+            {
+            }
+
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool ClaimsToBeOwnerData(byte[] bytes) =>
+        bytes.AsSpan().IndexOf(System.Text.Encoding.UTF8.GetBytes($"\"{OwnerData.KindMarker}\"")) >= 0;
+
+    private static OwnerData? Deserialize(byte[] bytes)
+    {
+        try
+        {
+            var data = JsonSerializer.Deserialize<OwnerData>(bytes, OwnerDataStore.StoredOptions);
+
+            return data is null || data.Locations.Any(location => location is null) || data.Games.Any(game => game is null) || data.Changes.Any(change => change is null)
+                ? null
+                : data;
         }
         catch (JsonException)
         {
             return null;
         }
+    }
+
+    private static bool WithinLimits(OwnerData data, ArtSourcePolicy policy)
+    {
+        if (data.Revision < 0
+            || data.ChangesSinceDownload < 0
+            || data.Finish.Length > MaxFinishLength
+            || data.Changes.Count > OwnerData.MaxStoredChanges
+            || data.Changes.Any(change => change.Text.Length > MaxChangeTextLength)
+            || data.Games.Count > MaxGames)
+        {
+            return false;
+        }
+
+        return LocationsAreAcceptable(data.Locations) && GamesAreAcceptable(data, policy);
+    }
+
+    private static bool LocationsAreAcceptable(IReadOnlyList<OwnerLocation> locations)
+    {
+        var accepted = new List<OwnerLocation>(locations.Count);
+
+        foreach (var location in locations)
+        {
+            var check = LocationNames.Validate(accepted, location.Name);
+
+            if (!OwnerLocation.IsWellFormedId(location.Id)
+                || accepted.Any(other => other.Id == location.Id)
+                || check.Problem != LocationNameProblem.None
+                || check.Name != location.Name)
+            {
+                return false;
+            }
+
+            accepted.Add(location);
+        }
+
+        return true;
+    }
+
+    private static bool GamesAreAcceptable(OwnerData data, ArtSourcePolicy policy)
+    {
+        var locationIds = data.Locations.Select(location => location.Id).ToHashSet(StringComparer.Ordinal);
+        var seen = new HashSet<int>();
+
+        foreach (var game in data.Games)
+        {
+            if (game.GameId <= 0
+                || !seen.Add(game.GameId)
+                || (game.LocationId is not null && !locationIds.Contains(game.LocationId))
+                || !PictureIsAcceptable(game.Picture, policy))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool PictureIsAcceptable(PictureSetting? picture, ArtSourcePolicy policy)
+    {
+        if (picture is null)
+        {
+            return true;
+        }
+
+        if (picture.SeenOwnedUrl?.Length > ArtUrl.MaxLength || picture.SeenMainUrl?.Length > ArtUrl.MaxLength)
+        {
+            return false;
+        }
+
+        return picture.Link is not { } link
+            || (link.FailedChecks >= 0
+                && ArtUrl.Canonical(link.Url) == link.Url
+                && Uri.TryCreate(link.Url, UriKind.Absolute, out var uri)
+                && policy.Allows(uri));
     }
 
     private static OwnerData Accepted(OwnerData data) =>

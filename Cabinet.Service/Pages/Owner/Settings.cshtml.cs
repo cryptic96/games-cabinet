@@ -1,4 +1,5 @@
 using Cabinet.Domain.Owner;
+using Cabinet.Repository.Images;
 using Cabinet.Repository.Storage;
 using Cabinet.Service.Collection;
 using Cabinet.Service.Owner;
@@ -46,20 +47,24 @@ public class SettingsModel : OwnerPage
     private readonly OwnerDataService _owner;
     private readonly CollectionStore _collection;
     private readonly StagedItems<RestoreCandidate> _staged;
+    private readonly ArtSourcePolicy _policy;
 
     /// <summary>Creates the page.</summary>
     /// <param name="owner">The single writer of the owner data, which also makes the download and the restore.</param>
     /// <param name="collection">The collection visitors see, which says which games are owned now.</param>
     /// <param name="staged">Holds the checked files that wait for the owner's confirmation.</param>
-    public SettingsModel(OwnerDataService owner, CollectionStore collection, StagedItems<RestoreCandidate> staged)
+    /// <param name="policy">Says which addresses a linked picture may be fetched from, which every link of a restored file must meet.</param>
+    public SettingsModel(OwnerDataService owner, CollectionStore collection, StagedItems<RestoreCandidate> staged, ArtSourcePolicy policy)
     {
         ArgumentNullException.ThrowIfNull(owner);
         ArgumentNullException.ThrowIfNull(collection);
         ArgumentNullException.ThrowIfNull(staged);
+        ArgumentNullException.ThrowIfNull(policy);
 
         _owner = owner;
         _collection = collection;
         _staged = staged;
+        _policy = policy;
     }
 
     /// <inheritdoc />
@@ -293,7 +298,7 @@ public class SettingsModel : OwnerPage
             filled += read;
         }
 
-        return OwnerDataExport.Check(buffer[..filled]);
+        return OwnerDataExport.Check(buffer[..filled], _policy);
     }
 
     private RestorePreview? PreviewOf(string? token)

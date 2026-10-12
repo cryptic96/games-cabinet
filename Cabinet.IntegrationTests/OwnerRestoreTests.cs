@@ -159,6 +159,132 @@ public sealed class OwnerRestoreTests
         second.Data.Locations.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Every_file_the_check_cannot_fully_accept_changes_nothing_and_the_page_says_why()
+    {
+        await using var host = await RestoreHost.StartAsync(seed: _ => Existing());
+        var path = Path.Combine(host.StoragePath, OwnerDataStore.FileName);
+        var before = await File.ReadAllBytesAsync(path, TestContext.Current.CancellationToken);
+        var revision = host.Service.Revision;
+        var cases = new (string Name, byte[]? File, string Message)[]
+        {
+            ("no file", null, "Choose a file first."),
+            ("not an owner-data file", "just a note"u8.ToArray(), "That isn't an owner-data file. Choose a file you downloaded here."),
+            ("truncated", Truncated(), "That file is damaged or incomplete, so nothing was changed."),
+            ("newer", Encoding.UTF8.GetBytes($"{{\"kind\":\"{OwnerData.KindMarker}\",\"schemaVersion\":2}}"), "That file was made by a newer version of the site (file format 2; this site reads up to 1). Update the site first, or use an older download."),
+            ("too large", Oversized(), "That file is too large (2.1 MB; the limit is 2 MB). Owner-data files are small, so this is probably the wrong file."),
+            ("over the limits", TooManyLocations(), "That file holds more than this site accepts, so nothing was changed."),
+        };
+
+        foreach (var (name, file, message) in cases)
+        {
+            var reply = await host.Session.PostFileAsync(CheckPath, FileField, file);
+            var page = WebUtility.HtmlDecode(reply.Body);
+
+            reply.Status.Should().Be(HttpStatusCode.UnprocessableEntity, name);
+            page.Should().Contain(message, name);
+            page.Should().NotContain(PreviewHeading, name);
+            (await File.ReadAllBytesAsync(path, TestContext.Current.CancellationToken)).Should().Equal(before, name);
+            host.Service.Revision.Should().Be(revision, name);
+        }
+
+        new OwnerDataStore(host.StoragePath, NullLogger<OwnerDataStore>.Instance).EarlierVersions().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_script_is_told_a_refusal_as_json_with_the_same_words_and_the_data_stays()
+    {
+        await using var host = await RestoreHost.StartAsync(seed: _ => Existing());
+
+        var refused = await host.Session.PostFileAsync(CheckPath, FileField, "just a note"u8.ToArray(), asScript: true);
+
+        refused.Status.Should().Be(HttpStatusCode.UnprocessableEntity);
+        refused.JsonText("outcome").Should().Be("refused");
+        refused.JsonText("message").Should().Be("That isn't an owner-data file. Choose a file you downloaded here.");
+        host.Data.Locations.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task A_link_on_another_host_in_an_uploaded_file_is_refused_and_never_fetched()
+    {
+        await using var host = await RestoreHost.StartAsync(seed: _ => Existing(), background: true);
+        var foreign = OwnerData.Empty with
+        {
+            Locations = [new OwnerLocation(CabinetAId, CabinetA)],
+            Games = [new OwnerGame(host.GameIds[0], CabinetAId, null, new PictureSetting(PictureChoice.Link, true, null, null, new PictureLink("https://evil.example.com/steal.png", null, 0, null)))],
+        };
+
+        var reply = await host.Session.PostFileAsync(CheckPath, FileField, OwnerDataExport.Write(foreign, SyncHarness.StartTime));
+
+        reply.Status.Should().Be(HttpStatusCode.UnprocessableEntity);
+        host.Data.Locations.Select(location => location.Name).Should().Equal("Crate C");
+        host.Images.Requests.Should().NotContain(request => request.Uri.Host == "evil.example.com");
+    }
+
+    [Fact]
+    public async Task A_fifty_megabyte_upload_is_answered_413_and_changes_nothing()
+    {
+        await using var host = await RestoreHost.StartAsync(seed: _ => Existing());
+        var path = Path.Combine(host.StoragePath, OwnerDataStore.FileName);
+        var before = await File.ReadAllBytesAsync(path, TestContext.Current.CancellationToken);
+
+        var reply = await host.Session.PostFileAsync(CheckPath, FileField, new byte[50 * 1024 * 1024], expectContinue: true);
+
+        reply.Status.Should().Be(HttpStatusCode.RequestEntityTooLarge);
+        (await File.ReadAllBytesAsync(path, TestContext.Current.CancellationToken)).Should().Equal(before);
+    }
+
+    [Fact]
+    public async Task A_check_without_the_antiforgery_token_is_refused_with_400_and_stages_nothing()
+    {
+        await using var host = await RestoreHost.StartAsync(seed: _ => Existing());
+
+        var forged = await host.Session.PostFileAsync(CheckPath, FileField, Encoding.UTF8.GetBytes("{}"), withToken: false);
+
+        forged.Status.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Nothing_of_the_restore_exists_on_the_public_port()
+    {
+        await using var host = await RestoreHost.StartAsync(seed: _ => Existing());
+
+        using var check = await host.Client.PostAsync(CheckPath, new MultipartFormDataContent(), TestContext.Current.CancellationToken);
+        using var restore = await host.Client.PostAsync(RestorePath, new FormUrlEncodedContent([]), TestContext.Current.CancellationToken);
+
+        check.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        restore.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    private static OwnerData Existing() => OwnerData.Empty with
+    {
+        Revision = 2,
+        Locations = [new OwnerLocation("0f0f0f0f", "Crate C")],
+    };
+
+    private static byte[] Truncated()
+    {
+        var whole = OwnerDataExport.Write(Existing(), SyncHarness.StartTime);
+
+        return whole[..(whole.Length / 2)];
+    }
+
+    private static byte[] Oversized()
+    {
+        var file = new byte[OwnerDataExport.MaxRestoreBytes + 1];
+        Array.Fill(file, (byte)' ');
+        OwnerDataExport.Write(Existing(), SyncHarness.StartTime).CopyTo(file, 0);
+
+        return file;
+    }
+
+    private static byte[] TooManyLocations() => OwnerDataExport.Write(
+        OwnerData.Empty with
+        {
+            Locations = [.. Enumerable.Range(0, OwnerData.MaxLocations + 1).Select(index => new OwnerLocation($"{index:x8}", $"Place {index}"))],
+        },
+        SyncHarness.StartTime);
+
     private static async Task RestoreAsync(RestoreHost host, string downloadedFile)
     {
         var check = await host.Session.PostFileAsync(CheckPath, FileField, Encoding.UTF8.GetBytes(downloadedFile));
@@ -190,15 +316,18 @@ public sealed class OwnerRestoreTests
         private readonly TemporaryDirectory _storage;
         private readonly CabinetWebApplicationFactory _factory;
 
-        private RestoreHost(TemporaryDirectory storage, CabinetWebApplicationFactory factory, FakeTimeProvider clock, IReadOnlyList<int> gameIds)
+        private RestoreHost(TemporaryDirectory storage, CabinetWebApplicationFactory factory, FakeTimeProvider clock, IReadOnlyList<int> gameIds, ScriptedImageHandler images)
         {
             _storage = storage;
             _factory = factory;
+            Images = images;
             Clock = clock;
             GameIds = gameIds;
             Session = new OwnerSession(factory);
             Client = factory.CreatePublicClient();
         }
+
+        public ScriptedImageHandler Images { get; }
 
         public FakeTimeProvider Clock { get; }
 
@@ -247,7 +376,7 @@ public sealed class OwnerRestoreTests
             var clock = SyncHarness.NewClock();
             var factory = SyncHarness.CreateFactory(ScriptedBggHandler.ForCollection(items), clock, settings, images);
 
-            return Task.FromResult(new RestoreHost(storage, factory, clock, gameIds));
+            return Task.FromResult(new RestoreHost(storage, factory, clock, gameIds, images));
         }
 
         public bool StartedEmpty() => !File.Exists(Path.Combine(StoragePath, OwnerDataStore.FileName));

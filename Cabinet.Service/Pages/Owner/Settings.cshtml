@@ -81,7 +81,7 @@
             }
         </div>
     }
-    <p class="backup-notice" id="restore-problem" role="alert" hidden="@(Model.RestoreNotice is null)">@Model.RestoreNotice</p>
+    <p class="restore-notice" id="restore-problem" role="alert" hidden="@(Model.RestoreNotice is null)">@Model.RestoreNotice</p>
     @if (Model.Preview is { } preview)
     {
         <div class="restore-preview" id="restore-preview">

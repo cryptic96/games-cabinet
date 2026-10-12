@@ -295,7 +295,7 @@ public class OwnerWallTests
         await using var factory = new CabinetWebApplicationFactory();
         using var owner = factory.CreateOwnerClient();
         var (cookie, token) = IssueAntiforgery(factory.ServingServices);
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/owner/settings")
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/owner/locations")
         {
             Content = new StringContent("filler=" + new string('a', 70 * 1024), Encoding.UTF8, new MediaTypeHeaderValue("application/x-www-form-urlencoded")),
         };
