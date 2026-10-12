@@ -1,0 +1,23 @@
+@using Cabinet.Service.Owner
+@{
+    var page = ViewData["Title"] as string;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>@(page is null ? OwnerStrings.Plate : OwnerStrings.PageTitle(page))</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <header>
+        <h1>@SiteLanguage.English.Text.SiteName</h1>
+        <span class="owner-plate">@OwnerStrings.Plate</span>
+    </header>
+    <main id="owner-main" class="owner-main">
+        @RenderBody()
+    </main>
+</body>
+</html>
