@@ -1,4 +1,3 @@
-@inject BuildInfo Build
 @{
     var language = SiteLanguage.Resolve(Context);
 }
@@ -15,10 +14,7 @@
 </head>
 <body>
     @RenderBody()
-    <footer>
-        <p class="version">@language.Text.Version(Build.Version, Build.ShortCommit)</p>
-        <a class="bgg-credit" href="https://boardgamegeek.com" rel="noopener"><img src="~/img/powered-by-bgg.svg" alt="@language.Text.LogoAlt" width="342" height="76" asp-append-version="true" /></a>
-    </footer>
+    <partial name="_Footer" model="language" />
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
