@@ -48,6 +48,30 @@ public sealed class OwnerLinkTests
     }
 
     [Fact]
+    public async Task A_stored_copy_keeps_being_served_and_shown_while_its_link_answers_not_found()
+    {
+        await using var host = await LinkHost.StartAsync(serveLink: true, background: true);
+        var record = await host.WaitForRecordAsync();
+        await SyncRounds.PressAndWait(host.Client, host.Clock, advance: false);
+        var before = await host.CoverAsync();
+        host.Images.Withdraw(LinkUrl);
+
+        host.Clock.Advance(OwnerLinkWorker.RecheckEvery + TimeSpan.FromHours(1));
+        host.Service.RequestLinkWork();
+        await SyncHarness.WaitUntil(() => Task.FromResult(host.LinkFailedChecks == 1));
+        var after = await host.CoverAsync();
+
+        host.Images.Requests.Count(request => request.Uri.AbsoluteUri == LinkUrl).Should().BeGreaterThan(1);
+        host.LinkRecord.Should().BeSameAs(record);
+        record.Files!.Should().OnlyContain(file => File.Exists(host.ArtFile(file.Name)));
+        after.Url.Should().Be(before.Url);
+        record.Files.Select(file => file.Name).Should().Contain(Path.GetFileName(after.Url));
+        using var served = await host.Client.GetAsync(after.Url, TestContext.Current.CancellationToken);
+        served.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+        (await served.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken)).Should().NotBeEmpty();
+    }
+
+    [Fact]
     public async Task A_link_that_could_not_be_fetched_is_fetched_when_asked_for_again_and_the_card_changes_to_show_it()
     {
         await using var host = await LinkHost.StartAsync(serveLink: false, background: true);
@@ -138,6 +162,10 @@ public sealed class OwnerLinkTests
 
         public ImageRecord? LinkRecord => Service.State is OwnerDataState.Ready ready
             ? ready.Data.Games.FirstOrDefault(game => game.GameId == _gameId)?.Picture?.Link?.Record
+            : null;
+
+        public int? LinkFailedChecks => Service.State is OwnerDataState.Ready ready
+            ? ready.Data.Games.FirstOrDefault(game => game.GameId == _gameId)?.Picture?.Link?.FailedChecks
             : null;
 
         public static async Task<LinkHost> StartAsync(bool serveLink, bool background, bool unreadable = false)
