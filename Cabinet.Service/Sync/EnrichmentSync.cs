@@ -38,8 +38,9 @@ public sealed class EnrichmentSync(
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(commit);
 
-        var batches = EnrichmentPlanner.Plan(snapshot.Items, snapshot.Games, time.GetUtcNow(), options);
+        var batches = EnrichmentPlanner.Plan(snapshot.Items, snapshot.Games, snapshot.DetailAttempts, time.GetUtcNow(), options);
         var games = new Dictionary<int, GameDetails>(snapshot.Games ?? new Dictionary<int, GameDetails>());
+        var attempts = new Dictionary<int, DateTimeOffset>(snapshot.DetailAttempts ?? new Dictionary<int, DateTimeOffset>());
         var requests = 0;
         var enriched = 0;
         SyncFailure? failure = null;
@@ -78,9 +79,15 @@ public sealed class EnrichmentSync(
                 enriched++;
             }
 
-            if (fetched.Games.Count > 0)
+            var attemptsChanged = RecordAttempts(attempts, batch, games, fetched);
+
+            if (fetched.Games.Count > 0 || attemptsChanged)
             {
-                snapshot = snapshot with { Games = new Dictionary<int, GameDetails>(games) };
+                snapshot = snapshot with
+                {
+                    Games = games.Count == 0 ? snapshot.Games : new Dictionary<int, GameDetails>(games),
+                    DetailAttempts = attempts.Count == 0 ? null : new Dictionary<int, DateTimeOffset>(attempts),
+                };
                 await commit(snapshot);
             }
         }
@@ -88,5 +95,30 @@ public sealed class EnrichmentSync(
         logger.LogInformation("Game details: {Requests} calls, {Enriched} games described.", requests, enriched);
 
         return new EnrichmentSyncResult(requests, enriched, failure);
+    }
+
+    private bool RecordAttempts(
+        Dictionary<int, DateTimeOffset> attempts,
+        IReadOnlyList<int> batch,
+        IReadOnlyDictionary<int, GameDetails> games,
+        EnrichmentFetchResult.Fetched fetched)
+    {
+        var now = time.GetUtcNow();
+        var changed = false;
+
+        foreach (var id in batch)
+        {
+            if (fetched.Games.ContainsKey(id))
+            {
+                changed |= attempts.Remove(id);
+            }
+            else if (!games.ContainsKey(id))
+            {
+                attempts[id] = now;
+                changed = true;
+            }
+        }
+
+        return changed;
     }
 }
