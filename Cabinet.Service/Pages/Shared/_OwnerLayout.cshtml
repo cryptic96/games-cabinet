@@ -1,6 +1,11 @@
 @using Cabinet.Service.Owner
+@using Cabinet.Service.Pages.Owner
+@using Microsoft.AspNetCore.Antiforgery
+@inject IAntiforgery Antiforgery
+@inject Microsoft.AspNetCore.Mvc.ViewFeatures.IFileVersionProvider FileVersions
 @{
     var page = ViewData["Title"] as string;
+    var requestToken = Antiforgery.GetAndStoreTokens(Context).RequestToken;
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -8,16 +13,30 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
+    <meta name="request-verification-token" content="@requestToken" />
     <title>@(page is null ? OwnerStrings.Plate : OwnerStrings.PageTitle(page))</title>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/owner.css" asp-append-version="true" />
+    @await RenderSectionAsync("Head", required: false)
 </head>
 <body>
+    <a class="skip-link" href="#owner-main">@OwnerStrings.SkipLink</a>
     <header>
         <h1>@SiteLanguage.English.Text.SiteName</h1>
         <span class="owner-plate">@OwnerStrings.Plate</span>
     </header>
-    <main id="owner-main" class="owner-main">
+    <nav class="owner-bar" aria-label="@OwnerStrings.BarLabel">
+        @foreach (var item in OwnerPage.BarItems)
+        {
+            <a href="@Url.Content("~" + item.Href)" aria-current="@(item.Name == page ? "page" : null)">@item.Name</a>
+        }
+        <a class="owner-bar-end" href="@Url.Content("~/")">@OwnerStrings.Cabinet</a>
+    </nav>
+    <main id="owner-main" class="owner-main" data-icons="@FileVersions.AddFileVersionToPath(Context.Request.PathBase, "/img/icons.svg")">
+        <p id="owner-status" class="visually-hidden" role="status" aria-atomic="true"></p>
         @RenderBody()
     </main>
+    <partial name="_Footer" model="SiteLanguage.English" />
+    @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
