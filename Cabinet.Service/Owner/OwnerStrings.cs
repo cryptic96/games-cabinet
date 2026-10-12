@@ -144,6 +144,25 @@ public static class OwnerStrings
     /// <param name="baseTitle">The base game's title.</param>
     public static string SameAs(string baseTitle) => $"Same as {baseTitle}";
 
+    /// <summary>The accessible name of the checkbox that ticks one game.</summary>
+    /// <param name="title">The game's title.</param>
+    public static string SelectLabel(string title) => $"Select {title}";
+
+    /// <summary>The tag on an expansion's row.</summary>
+    public const string ExpansionTag = "Expansion";
+
+    /// <summary>The tag on the row of an expansion whose base game is not owned.</summary>
+    public const string OrphanExpansionTag = "Expansion (base not owned)";
+
+    /// <summary>The accessible name of the dock that appears while games are ticked.</summary>
+    public const string SelectionLabel = "Selection";
+
+    /// <summary>The dock button that opens the list of places to move the ticked games to.</summary>
+    public const string MoveToButton = "Move to...";
+
+    /// <summary>The dock button that unticks every game.</summary>
+    public const string ClearButton = "Clear";
+
     /// <summary>The words for a status key, or null when the key is not one the owner tools use.</summary>
     /// <param name="statusKey">The key an owner result carries.</param>
     public static string? Message(string? statusKey) => statusKey switch
@@ -165,6 +184,7 @@ public static class OwnerStrings
         "name-characters" => "Use letters, numbers and ordinary punctuation only.",
         "unknown-location" => "That location isn't in your list.",
         "unknown-game" => "That game isn't in your collection any more.",
+        "nothing-selected" => "Tick at least one game first.",
         "id-clash" or "save-failed" => "Couldn't save that. Try again.",
         _ => null,
     };

@@ -18,7 +18,22 @@ async function loadPageScript(name) {
   return import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 }
 
-const { OWNER_TEXT, fill, gameCount, movedText, deleteDialogParts, deleteDialogBody, deletedText, refusalText, headingText } =
+const {
+  OWNER_TEXT,
+  fill,
+  gameCount,
+  movedText,
+  deleteDialogParts,
+  deleteDialogBody,
+  deletedText,
+  refusalText,
+  headingText,
+  selectedText,
+  moveTitleText,
+  movedGamesText,
+  clearedGamesText,
+  effectiveLocationIds,
+} =
   await loadPageScript('owner-format.js');
 
 test('the table of strings is frozen', () => {
@@ -95,4 +110,49 @@ test('filling a template keeps a marker whose value is missing', () => {
 
 test('a name that looks like a marker is written as it is and not filled again', () => {
   assert.equal(fill('Added "{name}"', { name: '{n}' }), 'Added "{n}"');
+});
+
+test('the dock counts the ticked games in the singular and the plural', () => {
+  assert.equal(selectedText(1), '1 selected');
+  assert.equal(selectedText(3), '3 selected');
+  assert.equal(moveTitleText(1), 'Move 1 game to');
+  assert.equal(moveTitleText(4), 'Move 4 games to');
+});
+
+test('the status after a move into a location names the count and the place', () => {
+  assert.equal(movedGamesText(1, 'Shelf B'), 'Moved 1 game to Shelf B');
+  assert.equal(movedGamesText(2, 'Shelf B'), 'Moved 2 games to Shelf B');
+});
+
+test('the status after games were taken out of their location says which are not placed and which follow a base game', () => {
+  assert.equal(clearedGamesText(1, 0), '1 game is now not placed');
+  assert.equal(clearedGamesText(3, 0), '3 games are now not placed');
+  assert.equal(clearedGamesText(0, 1), '1 expansion now follows its base game');
+  assert.equal(clearedGamesText(0, 2), '2 expansions now follow their base game');
+  assert.equal(clearedGamesText(1, 2), '1 game is now not placed and 2 expansions now follow their base game');
+});
+
+test('a game without a location of its own is shown where its base game is shown', () => {
+  const rows = [
+    { id: '1', own: 'a', baseId: null },
+    { id: '2', own: '', baseId: '1' },
+    { id: '3', own: 'b', baseId: '1' },
+    { id: '4', own: '', baseId: null },
+  ];
+
+  const shown = effectiveLocationIds(rows);
+
+  assert.deepEqual([...shown], [['1', 'a'], ['2', 'a'], ['3', 'b'], ['4', '']]);
+});
+
+test('leaving a location out shows its games, and the expansions that followed them, nowhere', () => {
+  const rows = [
+    { id: '1', own: 'a', baseId: null },
+    { id: '2', own: '', baseId: '1' },
+    { id: '3', own: 'a', baseId: '1' },
+  ];
+
+  const shown = effectiveLocationIds(rows, 'a');
+
+  assert.deepEqual([...shown], [['1', ''], ['2', ''], ['3', '']]);
 });

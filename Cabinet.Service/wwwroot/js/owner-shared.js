@@ -66,7 +66,7 @@ export function initRevision(doc = globalThis.document) {
  * other answer or a network error gives `failed`. A saved, unchanged or refused answer updates the page's revision; an out-of-date
  * answer does not, so the page keeps saying it is out of date until it is reloaded.
  * @param {string} url The handler's address.
- * @param {Record<string, string | number>} [fields] The form fields to send.
+ * @param {Record<string, string | number | Array<string | number>>} [fields] The form fields to send; a list is sent as one field per item.
  * @param {{ fetch?: Function, token?: string, revision?: number | null }} [options] The browser's fetch, the token and the revision, replaceable in tests.
  * @returns {Promise<{ outcome: string, status?: string, message?: string, revision?: number, canUndo?: boolean }>}
  */
@@ -77,7 +77,9 @@ export async function postOwner(url, fields = {}, options = {}) {
   const body = new URLSearchParams();
 
   for (const [name, value] of Object.entries(fields)) {
-    body.append(name, String(value));
+    for (const each of Array.isArray(value) ? value : [value]) {
+      body.append(name, String(each));
+    }
   }
 
   if (revision !== null && revision !== undefined) {

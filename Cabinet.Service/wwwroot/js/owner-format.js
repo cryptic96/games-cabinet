@@ -43,6 +43,22 @@ export const OWNER_TEXT = Object.freeze({
   failed: "Couldn't save that. Nothing changed. Try again.",
   cantUndo: "Can't undo because something changed after this.",
   unreadable: "Your owner data couldn't be read, so nothing can be saved until it is restored.",
+  selected: '{n} selected',
+  selectedOne: '1 selected',
+  dismiss: 'Dismiss',
+  moveTitle: 'Move {n} games to',
+  moveTitleOne: 'Move 1 game to',
+  notPlaced: 'Not placed',
+  sameAsBase: 'Same as base game',
+  keepSelection: 'Keep selection',
+  movedGames: 'Moved {n} games to {name}',
+  movedOneGame: 'Moved 1 game to {name}',
+  gamesNotPlaced: '{n} games are now not placed',
+  oneGameNotPlaced: '1 game is now not placed',
+  expansionsFollow: '{n} expansions now follow their base game',
+  oneExpansionFollows: '1 expansion now follows its base game',
+  and: 'and',
+  nothingToChange: 'Nothing to change.',
 });
 
 /**
@@ -150,4 +166,75 @@ export function refusalText(status, name) {
  */
 export function headingText(count) {
   return count === 0 ? OWNER_TEXT.headingEmpty : fill(OWNER_TEXT.heading, { n: count });
+}
+
+/**
+ * The count line of the selection dock.
+ * @param {number} count How many games are ticked.
+ * @returns {string} `1 selected` or `{n} selected`.
+ */
+export function selectedText(count) {
+  return count === 1 ? OWNER_TEXT.selectedOne : fill(OWNER_TEXT.selected, { n: count });
+}
+
+/**
+ * The heading of the dialog that asks where the ticked games go.
+ * @param {number} count How many games are ticked.
+ * @returns {string} `Move 1 game to` or `Move {n} games to`.
+ */
+export function moveTitleText(count) {
+  return count === 1 ? OWNER_TEXT.moveTitleOne : fill(OWNER_TEXT.moveTitle, { n: count });
+}
+
+/**
+ * The status after games were moved into a location.
+ * @param {number} count How many games were moved.
+ * @param {string} name The location's name.
+ * @returns {string}
+ */
+export function movedGamesText(count, name) {
+  return count === 1
+    ? fill(OWNER_TEXT.movedOneGame, { name })
+    : fill(OWNER_TEXT.movedGames, { n: count, name });
+}
+
+/**
+ * The status after games were taken out of their location: the games that are not placed now, and the expansions that follow
+ * their base game again. A part that has no games is left out.
+ * @param {number} notPlaced How many games are not placed now.
+ * @param {number} following How many expansions follow their base game again.
+ * @returns {string}
+ */
+export function clearedGamesText(notPlaced, following) {
+  const parts = [];
+
+  if (notPlaced > 0) {
+    parts.push(notPlaced === 1 ? OWNER_TEXT.oneGameNotPlaced : fill(OWNER_TEXT.gamesNotPlaced, { n: notPlaced }));
+  }
+
+  if (following > 0) {
+    parts.push(following === 1 ? OWNER_TEXT.oneExpansionFollows : fill(OWNER_TEXT.expansionsFollow, { n: following }));
+  }
+
+  return parts.join(` ${OWNER_TEXT.and} `);
+}
+
+/**
+ * Works out where every game is shown from the location each one was given and the base game each expansion follows. A game
+ * that has no location of its own is shown where its base game is shown. A base game has to come before its expansions in the list.
+ * @param {Array<{ id: string, own: string, baseId: string | null }>} rows The games in list order.
+ * @param {string} [removedId] A location to leave out, as if it were deleted; none by default.
+ * @returns {Map<string, string>} The location each game is shown in by game id; an empty string means not placed.
+ */
+export function effectiveLocationIds(rows, removedId = '') {
+  const shown = new Map();
+
+  for (const row of rows) {
+    const own = removedId !== '' && row.own === removedId ? '' : row.own;
+    const inherited = own === '' && row.baseId !== null ? (shown.get(row.baseId) ?? '') : '';
+
+    shown.set(row.id, own === '' ? inherited : own);
+  }
+
+  return shown;
 }

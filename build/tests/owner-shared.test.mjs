@@ -115,6 +115,15 @@ test('a post carries the fields, the revision, the token header and a request fo
   assert.equal(calls[0].init.body.get('revision'), '3');
 });
 
+test('a list field is sent as one field per item', async () => {
+  const { fetch, calls } = answering(200, '{"outcome":"saved","revision":0}');
+
+  await postOwner('?handler=BulkMove', { gameIds: [4, 7, 9], target: 'not-placed' }, { fetch, token: 't', revision: 2 });
+
+  assert.deepEqual(calls[0].init.body.getAll('gameIds'), ['4', '7', '9']);
+  assert.equal(calls[0].init.body.get('target'), 'not-placed');
+});
+
 test('a post without a known revision sends none', async () => {
   const { fetch, calls } = answering(200, '{"outcome":"saved","revision":0}');
   setRevision(null);

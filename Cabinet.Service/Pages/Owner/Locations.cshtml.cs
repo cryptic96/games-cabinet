@@ -16,13 +16,29 @@ namespace Cabinet.Service.Pages.Owner;
 /// <param name="OwnLocationId">The location the owner gave the game itself, or null.</param>
 /// <param name="BaseTitle">The title of the owned base game an expansion stands beside, or null for any other game.</param>
 /// <param name="EffectiveLocation">The name of the location the game is shown in, or null when it is not placed.</param>
+/// <param name="BaseGameId">The owned base game an expansion stands beside, or null for any other game.</param>
+/// <param name="EffectiveLocationId">The identifier of the location the game is shown in, or null when it is not placed.</param>
+/// <param name="CoverUrl">The path of the small stored picture of the game's box, or null when it has none.</param>
+/// <param name="SwatchColour">The colour of the game's spine as a hexadecimal colour, or null when it has none.</param>
+/// <param name="CoverWidth">The width of the stored picture in pixels, or zero without a picture.</param>
+/// <param name="CoverHeight">The height of the stored picture in pixels, or zero without a picture.</param>
 public sealed record LocationGameRow(
     int GameId,
     string Title,
     bool IsExpansion,
     string? OwnLocationId,
     string? BaseTitle,
-    string? EffectiveLocation);
+    string? EffectiveLocation,
+    int? BaseGameId = null,
+    string? EffectiveLocationId = null,
+    string? CoverUrl = null,
+    string? SwatchColour = null,
+    int CoverWidth = 0,
+    int CoverHeight = 0)
+{
+    /// <summary>Whether the game is an expansion that stands beside an owned base game, so that no location of its own means it follows the base.</summary>
+    public bool FollowsBase => BaseGameId is not null;
+}
 
 /// <summary>
 /// The owner's locations page: the list of locations with a form to add one, and every game with a picker that says where it
@@ -36,6 +52,11 @@ public class LocationsModel : OwnerPage
     private const string NoticeAnchor = "owner-notice";
     private const string RefusedPrefix = "refused-";
     private const string JsonMediaType = "application/json";
+    private const string GamesAnchor = "games-heading";
+    private const string LocationTargetPrefix = "location:";
+    private const string NotPlacedTarget = "not-placed";
+    private const string SameAsBaseTarget = "same-as-base";
+    private const int CoverWidthPx = 240;
 
     private readonly OwnerDataService _owner;
     private readonly CollectionStore _collection;
@@ -234,6 +255,28 @@ public class LocationsModel : OwnerPage
         return OwnerResponses.For(this, result, PagePath, RowAnchor(gameId));
     }
 
+    /// <summary>
+    /// Moves the ticked games in one change: into one location, to no location of their own, or back to following their base game.
+    /// Every game must be in the collection and the target must be one of the owner's locations or one of the two fixed words;
+    /// otherwise nothing moves.
+    /// </summary>
+    /// <param name="revision">The revision the page was built from.</param>
+    /// <param name="gameIds">The ticked games.</param>
+    /// <param name="target">Where they go: <c>location:{id}</c>, <c>not-placed</c> or <c>same-as-base</c>.</param>
+    /// <param name="cancellationToken">Cancels the wait for the writer.</param>
+    public async Task<IActionResult> OnPostBulkMoveAsync(long revision, int[]? gameIds, string? target, CancellationToken cancellationToken)
+    {
+        var snapshot = _collection.Current.Snapshot;
+        var ids = gameIds ?? [];
+
+        var result = await _owner.MutateAsync(
+            revision,
+            data => BulkMoveInSnapshot(data, snapshot, ids, target),
+            cancellationToken);
+
+        return OwnerResponses.For(this, result, PagePath, GamesAnchor);
+    }
+
     /// <summary>Takes back the latest change, when nothing was written after it.</summary>
     /// <param name="revision">The revision the change produced, which the Undo form carries.</param>
     /// <param name="cancellationToken">Cancels the wait for the writer.</param>
@@ -265,6 +308,46 @@ public class LocationsModel : OwnerPage
 
         return LocationEdits.Assign(data, gameId, locationId, TitleOf(item), followsBase);
     }
+
+    private static OwnerChange BulkMoveInSnapshot(OwnerData data, CollectionSnapshot? snapshot, int[] gameIds, string? target)
+    {
+        var moveTarget = ParseTarget(target);
+
+        if (moveTarget is null)
+        {
+            return OwnerChange.Refused(data, "unknown-location");
+        }
+
+        if (snapshot is null)
+        {
+            return OwnerChange.Refused(data, "unknown-game");
+        }
+
+        var titles = new Dictionary<int, string>();
+
+        foreach (var item in snapshot.Items)
+        {
+            titles.TryAdd(item.GameId, TitleOf(item));
+        }
+
+        var overlay = OwnerOverlay.From(snapshot, data);
+
+        return LocationEdits.MoveMany(
+            data,
+            gameIds,
+            moveTarget,
+            gameId => titles.GetValueOrDefault(gameId),
+            gameId => overlay.OwnedBaseGameId(gameId) is not null);
+    }
+
+    private static MoveTarget? ParseTarget(string? target) => target switch
+    {
+        NotPlacedTarget => MoveTarget.NotPlaced,
+        SameAsBaseTarget => MoveTarget.SameAsBase,
+        not null when target.StartsWith(LocationTargetPrefix, StringComparison.Ordinal) && target.Length > LocationTargetPrefix.Length
+            => MoveTarget.Location(target[LocationTargetPrefix.Length..]),
+        _ => null,
+    };
 
     private static string RowAnchor(int gameId) => $"game-{gameId}";
 
@@ -375,20 +458,79 @@ public class LocationsModel : OwnerPage
             titles.TryAdd(item.GameId, TitleOf(item));
         }
 
-        Games =
-        [
-            .. snapshot.Items
-                .GroupBy(item => item.GameId)
-                .Select(group => group.First())
-                .Select(item => new LocationGameRow(
-                    item.GameId,
-                    titles[item.GameId],
-                    item.Kind == ItemKind.Expansion,
-                    overlay.OwnLocationId(item.GameId),
-                    overlay.OwnedBaseGameId(item.GameId) is { } baseId ? titles[baseId] : null,
-                    overlay.EffectiveLocationName(item.GameId)))
-                .OrderBy(row => row.Title, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(row => row.GameId),
-        ];
+        var covers = new Dictionary<int, CabinetItem>();
+
+        foreach (var cabinetItem in _collection.Current.Items)
+        {
+            covers.TryAdd(cabinetItem.BggId, cabinetItem);
+        }
+
+        var rows = snapshot.Items
+            .GroupBy(item => item.GameId)
+            .Select(group => group.First())
+            .Select(item => RowOf(item, overlay, titles, covers))
+            .ToList();
+
+        Games = Nested(rows);
+    }
+
+    private static LocationGameRow RowOf(
+        SnapshotItem item,
+        OwnerOverlay overlay,
+        IReadOnlyDictionary<int, string> titles,
+        IReadOnlyDictionary<int, CabinetItem> covers)
+    {
+        var baseId = overlay.OwnedBaseGameId(item.GameId);
+        var shown = covers.GetValueOrDefault(item.GameId);
+        var variant = CoverOf(shown);
+        var swatch = shown?.Colour?.Background;
+
+        return new LocationGameRow(
+            item.GameId,
+            titles[item.GameId],
+            item.Kind == ItemKind.Expansion,
+            overlay.OwnLocationId(item.GameId),
+            baseId is { } id && titles.TryGetValue(id, out var baseTitle) ? baseTitle : null,
+            overlay.EffectiveLocationName(item.GameId),
+            baseId,
+            overlay.EffectiveLocationId(item.GameId),
+            variant?.Url,
+            RgbColour.TryParseHex(swatch, out _) ? swatch : null,
+            variant?.Width ?? 0,
+            variant?.Height ?? 0);
+    }
+
+    private static ArtVariant? CoverOf(CabinetItem? item)
+    {
+        var variants = item?.Art?.Variants;
+
+        if (variants is null || variants.Count == 0)
+        {
+            return null;
+        }
+
+        return variants.Where(variant => variant.Width >= CoverWidthPx).OrderBy(variant => variant.Width).FirstOrDefault()
+            ?? variants.OrderByDescending(variant => variant.Width).First();
+    }
+
+    private static List<LocationGameRow> Nested(List<LocationGameRow> rows)
+    {
+        var present = rows.Select(row => row.GameId).ToHashSet();
+        var under = rows
+            .Where(row => row.BaseGameId is { } baseId && present.Contains(baseId))
+            .ToLookup(row => row.BaseGameId!.Value);
+        var top = rows
+            .Where(row => row.BaseGameId is not { } baseId || !present.Contains(baseId))
+            .OrderBy(row => row.Title, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(row => row.GameId);
+        var ordered = new List<LocationGameRow>(rows.Count);
+
+        foreach (var row in top)
+        {
+            ordered.Add(row);
+            ordered.AddRange(under[row.GameId].OrderBy(child => child.Title, StringComparer.OrdinalIgnoreCase).ThenBy(child => child.GameId));
+        }
+
+        return ordered;
     }
 }

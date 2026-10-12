@@ -112,6 +112,50 @@ public static class LocationNames
         || character is >= '⁦' and <= '⁩';
 }
 
+/// <summary>Where a move of several games at once puts them.</summary>
+public enum MoveTargetKind
+{
+    /// <summary>Into one of the owner's locations.</summary>
+    Location,
+
+    /// <summary>Into no location of their own.</summary>
+    NotPlaced,
+
+    /// <summary>Back to following the base game, for the expansions that have an owned base game.</summary>
+    SameAsBase,
+}
+
+/// <summary>Where a move of several games at once puts them: one location, no location, or back with their base game.</summary>
+public sealed record MoveTarget
+{
+    private MoveTarget(MoveTargetKind kind, string? locationId)
+    {
+        Kind = kind;
+        LocationId = locationId;
+    }
+
+    /// <summary>What kind of place this is.</summary>
+    public MoveTargetKind Kind { get; }
+
+    /// <summary>The location the games go to, or null unless <see cref="Kind"/> is <see cref="MoveTargetKind.Location"/>.</summary>
+    public string? LocationId { get; }
+
+    /// <summary>Not placed: the games keep no location of their own.</summary>
+    public static MoveTarget NotPlaced { get; } = new(MoveTargetKind.NotPlaced, null);
+
+    /// <summary>Same as the base game: the expansions that have an owned base game follow it again, and no other game is touched.</summary>
+    public static MoveTarget SameAsBase { get; } = new(MoveTargetKind.SameAsBase, null);
+
+    /// <summary>One of the owner's locations.</summary>
+    /// <param name="id">The location's identifier.</param>
+    public static MoveTarget Location(string id)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+
+        return new MoveTarget(MoveTargetKind.Location, id);
+    }
+}
+
 /// <summary>The edits of the location list and of where each game is kept. Every edit is pure: it gives back new data and leaves the old untouched.</summary>
 public static class LocationEdits
 {
@@ -186,6 +230,68 @@ public static class LocationEdits
             data with { Games = [.. games.OrderBy(game => game.GameId)] },
             LogLine(title, target, followsBase),
             target is null ? "game-unplaced" : "game-moved");
+    }
+
+    /// <summary>
+    /// Moves several games at once: into one location, to no location of their own, or, for the expansions that have an owned base
+    /// game, back to following it. The whole move is one change with one log line, so one Undo takes all of it back.
+    /// </summary>
+    /// <param name="data">The data to change.</param>
+    /// <param name="gameIds">The games to move; a game listed twice counts once.</param>
+    /// <param name="target">Where they go.</param>
+    /// <param name="titleOf">Gives the title of an owned game, or null when the game is not in the collection; any such game refuses the whole move.</param>
+    /// <param name="followsBase">Whether a game is an expansion with an owned base game, so that no location of its own means it follows the base.</param>
+    public static OwnerChange MoveMany(
+        OwnerData data,
+        IReadOnlyList<int> gameIds,
+        MoveTarget target,
+        Func<int, string?> titleOf,
+        Func<int, bool> followsBase)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(gameIds);
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(titleOf);
+        ArgumentNullException.ThrowIfNull(followsBase);
+
+        var ids = gameIds.Distinct().ToList();
+
+        if (ids.Count == 0)
+        {
+            return OwnerChange.Refused(data, "nothing-selected");
+        }
+
+        if (ids.Any(id => titleOf(id) is null))
+        {
+            return OwnerChange.Refused(data, "unknown-game");
+        }
+
+        var destination = target.Kind == MoveTargetKind.Location
+            ? data.Locations.FirstOrDefault(location => string.Equals(location.Id, target.LocationId, StringComparison.Ordinal))
+            : null;
+
+        if (target.Kind == MoveTargetKind.Location && destination is null)
+        {
+            return OwnerChange.Refused(data, "unknown-location");
+        }
+
+        var affected = target.Kind == MoveTargetKind.SameAsBase ? ids.Where(followsBase).ToList() : ids;
+        var changing = affected.Where(id => !string.Equals(OwnLocationOf(data, id), destination?.Id, StringComparison.Ordinal)).ToHashSet();
+
+        if (changing.Count == 0)
+        {
+            return OwnerChange.None;
+        }
+
+        var kept = data.Games.Where(game => !changing.Contains(game.GameId));
+        var changed = changing.Select(id =>
+            (data.Games.FirstOrDefault(game => game.GameId == id) ?? new OwnerGame(id, null, null, null)) with { LocationId = destination?.Id });
+        var games = kept.Concat(changed.Where(game => !IsEmpty(game))).OrderBy(game => game.GameId);
+
+        return new OwnerChange(
+            data with { Games = [.. games] },
+            MoveManyLog(destination, affected, followsBase),
+            destination is null ? "game-unplaced" : "game-moved");
     }
 
     /// <summary>Renames a location in place. Its identifier and its place in the list stay, so every game kept there follows the new name.</summary>
@@ -309,6 +415,37 @@ public static class LocationEdits
             .Select(item => item.GameId)
             .Distinct()
             .Count(gameId => string.Equals(before.EffectiveLocationId(gameId), id, StringComparison.Ordinal) && after.EffectiveLocationId(gameId) is null);
+    }
+
+    private static string? OwnLocationOf(OwnerData data, int gameId)
+    {
+        var held = data.Games.FirstOrDefault(game => game.GameId == gameId)?.LocationId;
+
+        return held is not null && data.Locations.Any(location => string.Equals(location.Id, held, StringComparison.Ordinal)) ? held : null;
+    }
+
+    private static string MoveManyLog(OwnerLocation? destination, IReadOnlyList<int> affected, Func<int, bool> followsBase)
+    {
+        if (destination is not null)
+        {
+            return $"Moved {affected.Count} {(affected.Count == 1 ? "game" : "games")} to {destination.Name}";
+        }
+
+        var following = affected.Count(followsBase);
+        var notPlaced = affected.Count - following;
+        var parts = new List<string>();
+
+        if (notPlaced > 0)
+        {
+            parts.Add(notPlaced == 1 ? "1 game is now not placed" : $"{notPlaced} games are now not placed");
+        }
+
+        if (following > 0)
+        {
+            parts.Add(following == 1 ? "1 expansion now follows its base game" : $"{following} expansions now follow their base game");
+        }
+
+        return string.Join(" and ", parts);
     }
 
     private static int IndexOf(OwnerData data, string id)
