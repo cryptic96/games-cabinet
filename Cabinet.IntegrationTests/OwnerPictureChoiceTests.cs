@@ -135,6 +135,33 @@ public sealed partial class OwnerPictureChoiceTests
         page.Body.Should().Contain($"id=\"game-{host.GameId}\"");
     }
 
+    [Fact]
+    public void The_synthetic_collection_holds_every_picture_case_the_choices_are_checked_against()
+    {
+        var items = SyntheticBggCollection.Create(65).Where(item => item.Owned).ToList();
+        var ownedBases = items.Where(item => !item.IsExpansion).Select(item => item.ObjectId).ToHashSet();
+        var threeDShots = new[] { SyntheticArtKind.BoxOnWhite, SyntheticArtKind.BoxOnGreyGradient, SyntheticArtKind.BoxOnBlack, SyntheticArtKind.BoxTransparent };
+        var expansions = items.Where(item => item.IsExpansion).ToList();
+        var ownedBasesOf = (FakeBggItem expansion) => (expansion.AlsoExpands ?? []).Append(expansion.BaseObjectId ?? 0).Count(ownedBases.Contains);
+
+        items.Any(item => item.Version is not null
+            && SyntheticBggCollection.ArtFor(item, true) is { } owned
+            && SyntheticBggCollection.ArtFor(item, false) is { } main
+            && owned != main).Should().BeTrue("a game whose owned edition and main picture differ");
+        items.Any(item => item.Version is not null
+            && SyntheticBggCollection.ArtFor(item, true) is { } owned
+            && threeDShots.Contains(owned)).Should().BeTrue("a game whose owned edition reads as a 3D shot");
+        items.Any(item => item.Version is null
+            && SyntheticBggCollection.ArtFor(item, false) is not null).Should().BeTrue("a game with no owned-edition picture");
+        items.Any(item => IsUnusable(SyntheticBggCollection.ArtFor(item, true))
+            && IsUnusable(SyntheticBggCollection.ArtFor(item, false))).Should().BeTrue("a game with no usable picture at all");
+        expansions.Any(expansion => ownedBasesOf(expansion) == 1).Should().BeTrue("an expansion with one owned base");
+        expansions.Any(expansion => ownedBasesOf(expansion) > 1).Should().BeTrue("an expansion with several owned bases");
+        expansions.Any(expansion => ownedBasesOf(expansion) == 0).Should().BeTrue("an expansion with no owned base");
+    }
+
+    private static bool IsUnusable(SyntheticArtKind? kind) => kind is null or SyntheticArtKind.Undecodable;
+
     private static KeyValuePair<string, string> Field(string name, string value) => new(name, value);
 
     private static string VersionUrl(FakeBggItem item) => $"{ImageHost}version-{BggXml.VersionId(item)}.jpg";
