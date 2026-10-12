@@ -48,6 +48,8 @@ public sealed record LocationGameRow(
 public class LocationsModel : OwnerPage
 {
     private const string PagePath = "/Owner/Locations";
+    private const string PicturesPagePath = "/Owner/Pictures";
+    private const string PicturesReturn = LocationPickerModel.ReturnToPictures;
     private const string AddAnchor = "new-location";
     private const string NoticeAnchor = "owner-notice";
     private const string RefusedPrefix = "refused-";
@@ -251,8 +253,9 @@ public class LocationsModel : OwnerPage
     /// <param name="revision">The revision the form was built from.</param>
     /// <param name="gameId">The game to move.</param>
     /// <param name="locationId">The location to put it in; empty for none of its own.</param>
+    /// <param name="returnTo">The page a form posted without script goes back to: <c>pictures</c> for the single-game view, and the locations page for anything else.</param>
     /// <param name="cancellationToken">Cancels the wait for the writer.</param>
-    public async Task<IActionResult> OnPostAssignAsync(long revision, int gameId, string? locationId, CancellationToken cancellationToken)
+    public async Task<IActionResult> OnPostAssignAsync(long revision, int gameId, string? locationId, string? returnTo, CancellationToken cancellationToken)
     {
         var snapshot = _collection.Current.Snapshot;
 
@@ -261,7 +264,14 @@ public class LocationsModel : OwnerPage
             data => AssignInSnapshot(data, snapshot, gameId, locationId),
             cancellationToken);
 
-        return OwnerResponses.For(this, result, PagePath, RowAnchor(gameId));
+        if (!string.Equals(returnTo, PicturesReturn, StringComparison.Ordinal))
+        {
+            return OwnerResponses.For(this, result, PagePath, RowAnchor(gameId));
+        }
+
+        var known = snapshot?.Items.Any(item => item.GameId == gameId) == true;
+
+        return OwnerResponses.For(this, result, PicturesPagePath, RowAnchor(gameId), game: known ? gameId : null);
     }
 
     /// <summary>
@@ -459,7 +469,23 @@ public class LocationsModel : OwnerPage
             return;
         }
 
-        var overlay = OwnerOverlay.From(snapshot, ready.Data);
+        Games = Nested(RowsOf(snapshot, ready.Data, _collection.Current.Items));
+    }
+
+    /// <summary>
+    /// Builds the location row of one game, with the choices its picker needs, or null when the collection does not hold it. The
+    /// pictures page uses it to show the same picker the games list uses.
+    /// </summary>
+    /// <param name="snapshot">The synced collection.</param>
+    /// <param name="data">The owner data.</param>
+    /// <param name="shown">The items the cabinet draws, which give each game's small picture.</param>
+    /// <param name="gameId">The game.</param>
+    internal static LocationGameRow? RowFor(CollectionSnapshot snapshot, OwnerData data, IEnumerable<CabinetItem> shown, int gameId) =>
+        RowsOf(snapshot, data, shown).FirstOrDefault(row => row.GameId == gameId);
+
+    private static List<LocationGameRow> RowsOf(CollectionSnapshot snapshot, OwnerData data, IEnumerable<CabinetItem> shown)
+    {
+        var overlay = OwnerOverlay.From(snapshot, data);
         var titles = new Dictionary<int, string>();
 
         foreach (var item in snapshot.Items)
@@ -469,18 +495,16 @@ public class LocationsModel : OwnerPage
 
         var covers = new Dictionary<int, CabinetItem>();
 
-        foreach (var cabinetItem in _collection.Current.Items)
+        foreach (var cabinetItem in shown)
         {
             covers.TryAdd(cabinetItem.BggId, cabinetItem);
         }
 
-        var rows = snapshot.Items
+        return snapshot.Items
             .GroupBy(item => item.GameId)
             .Select(group => group.First())
             .Select(item => RowOf(item, overlay, titles, covers))
             .ToList();
-
-        Games = Nested(rows);
     }
 
     private static LocationGameRow RowOf(

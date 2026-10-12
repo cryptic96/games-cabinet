@@ -156,6 +156,21 @@ public static class OwnerStrings
     public static string NoteChanged(ChangedPicture picture) =>
         $"BGG replaced the {(picture == ChangedPicture.OwnedEdition ? "owned edition" : "main")} picture. Check that it still looks right.";
 
+    /// <summary>The line above the one game the single-game view shows.</summary>
+    public const string ShowingOneGame = "Showing one game.";
+
+    /// <summary>The link from the single-game view back to the list of every game.</summary>
+    public const string ShowAllGames = "Show all games";
+
+    /// <summary>The visible label of the location picker in the single-game view.</summary>
+    public const string LocationLabel = "Location";
+
+    /// <summary>The note in the single-game view while there is no location to choose.</summary>
+    public const string AddLocationOnLocationsPage = "Add a location on the Locations page first.";
+
+    /// <summary>The link that goes with <see cref="AddLocationOnLocationsPage"/>.</summary>
+    public const string LocationsLink = "Locations";
+
     /// <summary>The link that switches the pictures page to the games worth a look.</summary>
     /// <param name="count">How many games are left to check.</param>
     public static string WorthALookLink(int count) => $"Worth a look ({count})";
