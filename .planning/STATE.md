@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 6
-current_phase_name: Owner Tools & Persistence
+current_phase: 06
+current_phase_name: owner-tools-persistence
 status: executing
 stopped_at: Phase 6 UI-SPEC approved
-last_updated: "2026-10-12T14:26:51.610Z"
+last_updated: "2026-10-12T14:28:31.859Z"
 last_activity: 2026-10-12
 last_activity_desc: Plan 05-16 complete (v0.6.0 released and deployed; device check partly open)
 progress:
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-06)
 
 **Core value:** Anyone with the link sees an up-to-date, good-looking cabinet of exactly the games the owner owns on BGG, with no manual data entry in the app.
-**Current focus:** Phase 05 — game-detail-accessibility-language
+**Current focus:** Phase 06 — owner-tools-persistence
 
 ## Current Position
 
-Phase: 6 — Owner Tools & Persistence
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-10-12 — Phase 05 complete, transitioned to Phase 6
+Phase: 06 (owner-tools-persistence) — EXECUTING
+Plan: 1 of 30
+Status: Executing Phase 06
+Last activity: 2026-10-12 — Phase 06 execution started
 
 Progress: [██████████] 100%
 
