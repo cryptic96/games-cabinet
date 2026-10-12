@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Cabinet.Domain.Owner;
+using Cabinet.Repository.Storage;
 
 namespace Cabinet.Service.Owner;
 
@@ -28,6 +29,22 @@ public enum OwnerOutcome
 /// <param name="StatusKey">A short key the page turns into the words it shows the owner.</param>
 /// <param name="CanUndo">Whether the latest change can still be undone: nothing was written after it.</param>
 public sealed record OwnerResult(OwnerOutcome Outcome, OwnerData? Data, string StatusKey, bool CanUndo = false);
+
+/// <summary>The file of a backup the owner downloads.</summary>
+/// <param name="FileName">The name the file is saved under.</param>
+/// <param name="Content">The readable JSON document.</param>
+public sealed record OwnerDownload(string FileName, byte[] Content);
+
+/// <summary>What the owner pages need to know about the backup: how stale it is, and whether there is anything to back up.</summary>
+/// <param name="Readable">Whether the stored owner data can be read; nothing is offered while it cannot.</param>
+/// <param name="HasData">Whether the owner has entered anything yet.</param>
+/// <param name="ChangesSinceDownload">How many changes were saved since the last download, counted in full.</param>
+/// <param name="LastDownloadAtUtc">When the owner last downloaded a backup, or null when never.</param>
+public sealed record BackupState(bool Readable, bool HasData, int ChangesSinceDownload, DateTimeOffset? LastDownloadAtUtc)
+{
+    /// <summary>Whether the reminder shows: there is something that exists only on the server and was not downloaded.</summary>
+    public bool ShowsBanner => Readable && ChangesSinceDownload > 0;
+}
 
 /// <summary>Tells the art clean-up which stored pictures the owner's data still needs.</summary>
 public interface IOwnerArtReferences
@@ -93,6 +110,15 @@ public sealed class OwnerDataService : IOwnerArtReferences
     public long? UndoableRevision => _undo is { } slot && State is OwnerDataState.Ready ready && ready.Data.Revision == slot.Revision
         ? slot.Revision
         : null;
+
+    /// <summary>What the owner pages show about the backup right now.</summary>
+    public BackupState Backup => State is OwnerDataState.Ready ready
+        ? new BackupState(
+            Readable: true,
+            HasData: ready.Data.Revision > 0 || ready.Data.Locations.Count > 0 || ready.Data.Games.Count > 0 || ready.Data.Changes.Count > 0,
+            ready.Data.ChangesSinceDownload,
+            ready.Data.LastDownloadAtUtc)
+        : new BackupState(Readable: false, HasData: false, 0, null);
 
     /// <summary>Asks the background work to look for linked pictures that have no usable stored copy now instead of at its next turn.</summary>
     public void RequestLinkWork() => LinkWorkRequested?.Invoke();
@@ -248,6 +274,53 @@ public sealed class OwnerDataService : IOwnerArtReferences
             {
                 Changed?.Invoke();
             }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Makes the backup the owner downloads and records that it was made: the last download becomes now and no change is left
+    /// since it. It is a system write, so it adds no log line and does not move the revision, and it ends the chance to undo.
+    /// The file carries those values as they are after the download. Nothing is recorded when the file cannot be stored, so
+    /// the owner is not told a backup exists that the server does not know about.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the wait for a turn.</param>
+    /// <returns>The file, or null while the stored owner data cannot be read or the record of the download could not be stored.</returns>
+    public async Task<OwnerDownload?> RecordDownloadAsync(CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+
+        try
+        {
+            if (State is not OwnerDataState.Ready ready)
+            {
+                return null;
+            }
+
+            var now = _time.GetUtcNow();
+            var next = ready.Data with { LastDownloadAtUtc = now, ChangesSinceDownload = 0 };
+            var content = OwnerDataExport.Write(next, now);
+
+            try
+            {
+                KeepEarlierVersionWhenDue(now);
+                _store.Save(next);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                _logger.LogWarning("The owner data could not be saved: {ExceptionType}", exception.GetType().Name);
+
+                return null;
+            }
+
+            _undo = null;
+            Volatile.Write(ref _state, new OwnerDataState.Ready(next));
+            _logger.LogInformation("Owner data downloaded: revision {Revision}, {Changes} log lines.", next.Revision, next.Changes.Count);
+
+            return new OwnerDownload(OwnerDataExport.FileName(now), content);
         }
         finally
         {

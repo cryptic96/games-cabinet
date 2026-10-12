@@ -45,6 +45,9 @@ public sealed class OwnerDataStore : IOwnerDataStore
         AtomicJsonFile.RemoveStrayTemporaryFiles(_versionsDirectory);
     }
 
+    /// <summary>The strict serializer settings of the stored file, which a readable copy of the same document is written with as well.</summary>
+    internal static JsonSerializerOptions StoredOptions => JsonOptions;
+
     /// <inheritdoc />
     public OwnerDataState Load()
     {

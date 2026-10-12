@@ -1,5 +1,7 @@
+using System.Globalization;
 using Cabinet.Domain.Collection;
 using Cabinet.Domain.Owner;
+using Cabinet.Service.Pages;
 
 namespace Cabinet.Service.Owner;
 
@@ -497,6 +499,74 @@ public static class OwnerStrings
         (null, { } limit) => $" (the limit is {Megabytes(limit)} MB)",
         _ => string.Empty,
     };
+
+    /// <summary>The heading of the backup panel.</summary>
+    public const string BackupHeading = "Backup";
+
+    /// <summary>The line under the backup panel's heading.</summary>
+    public const string BackupHelper =
+        "Your pictures and locations live on this server only. Download them now and then, so you can restore them if the server is lost.";
+
+    /// <summary>The button that downloads the owner data; it is also the accessible name of the compact button on a phone.</summary>
+    public const string DownloadButton = "Download owner data";
+
+    /// <summary>The visible text of the compact download button below the phone breakpoint.</summary>
+    public const string DownloadButtonShort = "Download data";
+
+    /// <summary>The text of the download button while the file is being prepared.</summary>
+    public const string Preparing = "Preparing...";
+
+    /// <summary>The line of the backup panel while the owner has entered nothing yet.</summary>
+    public const string NothingToBackUp = "Nothing to back up yet.";
+
+    /// <summary>The words shown when the download could not be prepared.</summary>
+    public const string DownloadFailed = "Couldn't prepare the download. Try again.";
+
+    /// <summary>The start of the quiet line that names when the last download was made; the time follows it.</summary>
+    public const string DownloadedPrefix = "Downloaded";
+
+    /// <summary>The heading of the change log panel.</summary>
+    public const string RecentChangesHeading = "Recent changes";
+
+    /// <summary>The line under the change log's heading.</summary>
+    public const string RecentChangesHelper = "The last 20 changes.";
+
+    /// <summary>The line of the change log while it has no entry.</summary>
+    public const string NoChangesYet = "No changes yet. Edits you make show up here.";
+
+    /// <summary>The reminder when changes were made since the last download.</summary>
+    /// <param name="count">How many changes, at least one.</param>
+    public static string ChangesSinceDownload(int count) =>
+        count == 1 ? "1 change since your last download" : $"{count.ToString(CultureInfo.InvariantCulture)} changes since your last download";
+
+    /// <summary>The one-line reminder shown on a phone.</summary>
+    /// <param name="count">How many changes, at least one.</param>
+    public static string ChangesNotDownloaded(int count) =>
+        count == 1 ? "1 change not downloaded" : $"{count.ToString(CultureInfo.InvariantCulture)} changes not downloaded";
+
+    /// <summary>The reminder when the owner has never downloaded anything and has changes.</summary>
+    /// <param name="count">How many changes, at least one.</param>
+    public static string NeverDownloaded(int count) =>
+        "You haven't downloaded your owner data yet. " + (count == 1
+            ? "1 change is only on this server."
+            : $"{count.ToString(CultureInfo.InvariantCulture)} changes are only on this server.");
+
+    /// <summary>The note under the backup panel about the earlier versions the server keeps.</summary>
+    /// <param name="kept">How many versions the server keeps.</param>
+    public static string BackupFootnote(int kept) =>
+        $"The site keeps the last {kept.ToString(CultureInfo.InvariantCulture)} versions of your owner data on the server.";
+
+    /// <summary>The value of a <c>time</c> element's <c>datetime</c> attribute for a moment: UTC to the second.</summary>
+    /// <param name="at">The moment.</param>
+    public static string TimeAttribute(DateTimeOffset at) =>
+        at.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// The readable text a <c>time</c> element holds until a script rewrites it in the viewer's own clock: the moment in UTC,
+    /// the way the status line of the cabinet writes it.
+    /// </summary>
+    /// <param name="at">The moment.</param>
+    public static string TimeUtcText(DateTimeOffset at) => SyncStatusText.ExactUtc(at);
 
     /// <summary>The words for a status key, or null when the key is not one the owner tools use.</summary>
     /// <param name="statusKey">The key an owner result carries.</param>

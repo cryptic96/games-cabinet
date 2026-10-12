@@ -3,8 +3,10 @@
 @using Microsoft.AspNetCore.Antiforgery
 @inject IAntiforgery Antiforgery
 @inject Microsoft.AspNetCore.Mvc.ViewFeatures.IFileVersionProvider FileVersions
+@inject OwnerDataService OwnerData
 @{
     var page = ViewData["Title"] as string;
+    var backup = OwnerData.Backup;
     var requestToken = Antiforgery.GetAndStoreTokens(Context).RequestToken;
 }
 <!DOCTYPE html>
@@ -32,11 +34,14 @@
         }
         <a class="owner-bar-end" href="@Url.Content("~/")">@OwnerStrings.Cabinet</a>
     </nav>
-    <main id="owner-main" class="owner-main" data-icons="@FileVersions.AddFileVersionToPath(Context.Request.PathBase, "/img/icons.svg")">
+    @if (backup.Readable && backup.HasData && ViewData["BannerInPanel"] is not true)
+    {
+        <partial name="_OwnerBanner" model="backup" />
+    }
+    <main id="owner-main" class="owner-main" data-icons="@FileVersions.AddFileVersionToPath(Context.Request.PathBase, "/img/icons.svg")" data-backup-state="@Url.Page("/Owner/Settings", "BackupState")">
         <p id="owner-status" class="visually-hidden" role="status" aria-atomic="true"></p>
         @RenderBody()
     </main>
     <partial name="_Footer" model="SiteLanguage.English" />
-    @await RenderSectionAsync("Scripts", required: false)
-</body>
+    @await RenderSectionAsync("Scripts", required: false)</body>
 </html>
