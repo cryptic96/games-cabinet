@@ -349,29 +349,4 @@ public sealed class OwnerBackupTests
             ],
         };
     }
-
-    private sealed class SometimesFailingStore(IOwnerDataStore inner) : IOwnerDataStore
-    {
-        public bool FailSaves { get; set; }
-
-        public OwnerDataState Load() => inner.Load();
-
-        public void Save(OwnerData data)
-        {
-            if (FailSaves)
-            {
-                throw new IOException("The disk is full.");
-            }
-
-            inner.Save(data);
-        }
-
-        public void KeepEarlierVersion(DateTimeOffset now) => inner.KeepEarlierVersion(now);
-
-        public IReadOnlyList<EarlierVersion> EarlierVersions() => inner.EarlierVersions();
-
-        public byte[]? ReadEarlierVersion(int index) => inner.ReadEarlierVersion(index);
-
-        public DateTimeOffset? NewestEarlierVersionAt() => inner.NewestEarlierVersionAt();
-    }
 }

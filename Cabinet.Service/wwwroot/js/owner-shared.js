@@ -103,7 +103,25 @@ export async function postOwner(url, fields = {}, options = {}) {
     return { outcome: 'failed' };
   }
 
-  return mapAnswer(response.status, text);
+  const result = mapAnswer(response.status, text);
+
+  if (result.outcome === 'saved') {
+    announceSaved();
+  }
+
+  return result;
+}
+
+/**
+ * Tells the page that a change was saved, so what depends on the owner data, such as the backup reminder, can bring itself up to
+ * date. It does nothing outside a page.
+ */
+function announceSaved() {
+  const doc = globalThis.document;
+
+  if (doc && typeof CustomEvent === 'function') {
+    doc.dispatchEvent(new CustomEvent('owner-saved'));
+  }
 }
 
 /**

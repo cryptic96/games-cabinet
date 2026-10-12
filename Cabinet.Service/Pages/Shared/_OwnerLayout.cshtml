@@ -43,5 +43,6 @@
         @RenderBody()
     </main>
     <partial name="_Footer" model="SiteLanguage.English" />
-    @await RenderSectionAsync("Scripts", required: false)</body>
+    @await RenderSectionAsync("Scripts", required: false)
+    <script type="module" src="~/js/owner-settings.js" asp-append-version="true"></script></body>
 </html>
