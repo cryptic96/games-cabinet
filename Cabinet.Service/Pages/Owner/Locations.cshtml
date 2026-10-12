@@ -1,6 +1,10 @@
 @page
 @using Cabinet.Service.Owner
+@using Cabinet.Service.Pages.Owner
 @model Cabinet.Service.Pages.Owner.LocationsModel
+@{
+    var addDescribedBy = Model.AddError is null ? "new-location-hint" : "new-location-hint new-location-error";
+}
 <h2>@OwnerStrings.Locations</h2>
 <p class="owner-intro">@OwnerStrings.LocationsIntro</p>
 @if (Model.Notice is not null)
@@ -24,29 +28,31 @@
 }
 else
 {
-    <section class="owner-panel" aria-labelledby="locations-heading">
-        <h3 id="locations-heading">@OwnerStrings.LocationsHeading(Model.Locations.Count)</h3>
-        @if (Model.Locations.Count == 0)
-        {
-            <p>@OwnerStrings.NoLocationsYet</p>
-        }
-        else
-        {
-            <ol class="loc-list">
-                @foreach (var location in Model.Locations)
-                {
-                    <li dir="auto">@location.Name</li>
-                }
-            </ol>
-        }
-        <form method="post" asp-page-handler="AddLocation">
-            <input type="hidden" name="revision" value="@Model.Revision" />
+    <details class="owner-panel loc-panel" id="your-locations" open="@Model.PanelOpen">
+        <summary class="loc-summary"><h3 id="locations-heading" data-count="@Model.Locations.Count">@OwnerStrings.LocationsHeading(Model.Locations.Count)</h3></summary>
+        <p class="owner-hint loc-helper">@OwnerStrings.LocationsHelper</p>
+        <p class="loc-empty" id="loc-empty" hidden="@(Model.Locations.Count > 0)">@OwnerStrings.NoLocationsYet</p>
+        <ol class="loc-list" id="loc-list" hidden="@(Model.Locations.Count == 0)">
+            @foreach (var item in Model.Items)
+            {
+                <partial name="_LocationItem" model="item" />
+            }
+        </ol>
+        <template id="loc-item-template">
+            <partial name="_LocationItem" model="LocationItemModel.Template(Model.Revision)" />
+        </template>
+        <form method="post" id="add-location-form" asp-page-handler="AddLocation">
+            <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
             <label for="new-location">@OwnerStrings.NewLocationLabel</label>
-            <input id="new-location" name="name" type="text" maxlength="60" required dir="auto" autocomplete="off" aria-describedby="new-location-hint" />
+            <input id="new-location" name="name" type="text" maxlength="60" required dir="auto" autocomplete="off"
+                   aria-describedby="@addDescribedBy"
+                   aria-invalid="@(Model.AddError is null ? null : "true")" />
             <p id="new-location-hint" class="owner-hint">@OwnerStrings.NewLocationHint</p>
+            <p class="field-error" id="new-location-error" role="alert">@Model.AddError</p>
             <button type="submit" class="owner-btn-primary">@OwnerStrings.AddLocationButton</button>
         </form>
-    </section>
+        <div class="row-status" id="new-location-status" role="status"></div>
+    </details>
     <section class="owner-panel" aria-labelledby="games-heading">
         <h3 id="games-heading">@OwnerStrings.GamesHeading</h3>
         @if (Model.Games.Count == 0)
@@ -64,7 +70,7 @@ else
                 {
                     <li class="game-row" id="game-@game.GameId">
                         <form method="post" asp-page-handler="Assign">
-                            <input type="hidden" name="revision" value="@Model.Revision" />
+                            <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
                             <input type="hidden" name="gameId" value="@game.GameId" />
                             <span class="game-title" dir="auto">@game.Title</span>
                             <select name="locationId" aria-label="@OwnerStrings.PickerLabel(game.Title)">
@@ -81,4 +87,15 @@ else
             </ul>
         }
     </section>
+    <dialog class="owner-dialog" id="loc-delete-dialog" aria-labelledby="loc-delete-title" aria-describedby="loc-delete-body">
+        <h3 id="loc-delete-title" dir="auto"></h3>
+        <p class="warning-line" id="loc-delete-body" dir="auto"><strong></strong> <span></span></p>
+        <div class="dialog-actions">
+            <button type="button" class="owner-btn-danger" id="loc-delete-confirm">@OwnerStrings.DeleteLocationButton</button>
+            <button type="button" class="owner-btn" id="loc-delete-keep" autofocus>@OwnerStrings.KeepItButton</button>
+        </div>
+    </dialog>
+}
+@section Scripts {
+    <script type="module" src="~/js/owner-locations.js" asp-append-version="true"></script>
 }

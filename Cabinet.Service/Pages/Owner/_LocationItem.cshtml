@@ -1,0 +1,55 @@
+@using Cabinet.Service.Owner
+@model Cabinet.Service.Pages.Owner.LocationItemModel
+@inject Microsoft.AspNetCore.Mvc.ViewFeatures.IFileVersionProvider FileVersions
+@{
+    var location = Model.Location;
+    var icons = FileVersions.AddFileVersionToPath(Context.Request.PathBase, "/img/icons.svg");
+    var template = Model.IsTemplate;
+    var firstOrOnly = Model.Position <= 1;
+    var lastOrOnly = Model.Position == Model.Total;
+    var invalid = Model.ErrorText is not null;
+}
+<li class="loc-item" id="@(template ? null : Model.AnchorId)" data-location-id="@(template ? null : location.Id)" data-games="@Model.Games" data-not-placed="@Model.NotPlacedOnDelete">
+    <form method="post" class="loc-form" asp-page-handler="Rename">
+        <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
+        <input type="hidden" name="id" value="@location.Id" />
+        <input type="text" class="loc-name" name="name" value="@location.Name" maxlength="60" dir="auto" autocomplete="off"
+               aria-label="@OwnerStrings.NameOfLocation(Model.Position)"
+               aria-invalid="@(invalid ? "true" : null)" aria-describedby="@(invalid ? Model.ErrorId : null)" />
+        <button type="submit" class="owner-btn loc-save">@OwnerStrings.SaveButton</button>
+        <span class="loc-count">@OwnerStrings.GameCount(Model.Games)</span>
+        <button type="submit" class="owner-btn loc-step" asp-page-handler="MoveUp" data-step="up"
+                aria-label="@OwnerStrings.MoveUpLabel(location.Name)" aria-disabled="@(firstOrOnly && !template ? "true" : null)">
+            <svg class="loc-chev" aria-hidden="true" focusable="false"><use href="@icons#i-chev"></use></svg><span>@OwnerStrings.UpButton</span>
+        </button>
+        <button type="submit" class="owner-btn loc-step" asp-page-handler="MoveDown" data-step="down"
+                aria-label="@OwnerStrings.MoveDownLabel(location.Name)" aria-disabled="@(lastOrOnly && !template ? "true" : null)">
+            <svg class="loc-chev" aria-hidden="true" focusable="false"><use href="@icons#i-chev"></use></svg><span>@OwnerStrings.DownButton</span>
+        </button>
+        <button type="submit" class="owner-btn loc-delete" asp-page-handler="Delete" aria-label="@OwnerStrings.DeleteLabel(location.Name)">@OwnerStrings.DeleteButton</button>
+    </form>
+    <p class="field-error" id="@(template ? null : Model.ErrorId)" role="alert">@Model.ErrorText</p>
+    <div class="row-status" role="status" data-problem="@(Model.StatusIsProblem ? "true" : null)">
+        @if (Model.StatusText is not null)
+        {
+            <span>@Model.StatusText</span>
+            @if (Model.UndoRevision is { } undoRevision)
+            {
+                <form method="post" asp-page-handler="Undo">
+                    <input type="hidden" name="revision" value="@undoRevision" />
+                    <button type="submit" class="owner-btn">@OwnerStrings.UndoButton</button>
+                </form>
+            }
+        }
+    </div>
+    @if (Model.ConfirmingDelete)
+    {
+        <form method="post" class="loc-confirm" asp-page-handler="DeleteConfirmed" id="loc-confirm-@location.Id">
+            <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
+            <input type="hidden" name="id" value="@location.Id" />
+            <p class="warning-line" dir="auto"><strong>@OwnerStrings.DeleteTitle(location.Name)</strong> <strong>@OwnerStrings.DeleteLead(Model.NotPlacedOnDelete)</strong> @OwnerStrings.DeleteRest(Model.NotPlacedOnDelete)</p>
+            <button type="submit" class="owner-btn-danger">@OwnerStrings.DeleteLocationButton</button>
+            <a class="owner-btn" href="@Url.Page("/Owner/Locations")#@Model.AnchorId">@OwnerStrings.KeepItButton</a>
+        </form>
+    }
+</li>

@@ -118,8 +118,11 @@ header > .owner-plate {
 .owner-panel button:focus-visible,
 .owner-panel input:focus-visible,
 .owner-panel select:focus-visible,
+.owner-panel summary:focus-visible,
 .owner-panel textarea:focus-visible,
-.owner-panel [tabindex]:focus-visible {
+.owner-panel [tabindex]:focus-visible,
+.owner-dialog a:focus-visible,
+.owner-dialog button:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
@@ -302,7 +305,7 @@ header > .owner-plate {
   list-style: none;
 }
 
-.loc-list li,
+.loc-item,
 .game-row {
   padding-block: 8px;
   border-bottom: 1px solid var(--paper-rule);
@@ -319,4 +322,214 @@ header > .owner-plate {
 .game-title {
   flex: 1 1 14rem;
   font-weight: 600;
+}
+
+.owner-panel [hidden],
+.owner-dialog [hidden] {
+  display: none;
+}
+
+.owner-panel .loc-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.loc-summary::-webkit-details-marker {
+  display: none;
+}
+
+.loc-summary::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-inline-start: 4px;
+  border-inline-end: 2px solid currentColor;
+  border-block-end: 2px solid currentColor;
+  rotate: -45deg;
+}
+
+.loc-panel[open] > .loc-summary::before {
+  rotate: 45deg;
+}
+
+.owner-panel .loc-summary h3 {
+  margin: 0;
+}
+
+.loc-helper {
+  margin-top: 8px;
+}
+
+.loc-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.owner-panel .loc-name {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.loc-count {
+  min-width: 6ch;
+  color: var(--paper-label);
+  font-size: 14px;
+}
+
+.loc-step {
+  gap: 4px;
+}
+
+.loc-chev {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.loc-step[data-step="up"] .loc-chev {
+  rotate: -90deg;
+}
+
+.loc-step[data-step="down"] .loc-chev {
+  rotate: 90deg;
+}
+
+@media (max-width: 40rem) {
+  .owner-panel .loc-name {
+    flex-basis: 100%;
+  }
+
+  .loc-form {
+    gap: 8px;
+  }
+
+  .loc-form .owner-btn {
+    padding-inline: 8px;
+  }
+
+  .loc-count {
+    min-width: 0;
+    margin-inline-end: auto;
+  }
+}
+
+@media (max-width: 22.5rem) {
+  .owner-panel {
+    padding-inline: 12px;
+  }
+
+  .loc-form {
+    gap: 8px 6px;
+  }
+
+  .loc-form .owner-btn {
+    padding-inline: 6px;
+  }
+}
+
+.owner-panel #add-location-form input[type="text"] {
+  width: min(100%, 24rem);
+}
+
+.loc-item .row-status {
+  margin-top: 4px;
+}
+
+.row-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  color: var(--paper-label);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.row-status:empty {
+  display: none;
+}
+
+.row-status form {
+  margin: 0;
+}
+
+.row-status[data-problem="true"] {
+  padding-inline-start: 12px;
+  border-inline-start: 4px solid var(--paper-label);
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.field-error {
+  margin: 8px 0 0;
+  padding-inline-start: 12px;
+  border-inline-start: 4px solid var(--paper-label);
+  color: var(--ink);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.field-error:empty {
+  display: none;
+}
+
+.warning-line {
+  margin: 8px 0 16px;
+  padding-inline-start: 12px;
+  border-inline-start: 4px solid var(--danger);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.warning-line strong {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.loc-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-top: 8px;
+}
+
+.loc-confirm .warning-line {
+  flex: 1 1 100%;
+  margin: 0;
+}
+
+.owner-dialog {
+  width: min(28rem, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 24px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.owner-dialog::backdrop {
+  background: var(--dim);
+}
+
+.owner-dialog h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
 }
