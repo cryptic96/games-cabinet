@@ -221,4 +221,59 @@ public sealed class OwnerDataServiceTests
         failed.StatusKey.Should().Be("save-failed");
         harness.Data.Should().BeSameAs(before);
     }
+
+    [Fact]
+    public async Task The_first_write_keeps_an_earlier_version_and_a_write_half_an_hour_later_does_not()
+    {
+        var store = new InMemoryOwnerDataStore { FileExists = true };
+        var harness = OwnerTestKit.Harness(store);
+
+        await harness.AddAsync(CabinetA);
+        harness.Clock.Advance(TimeSpan.FromMinutes(30));
+        await harness.AddAsync(ShelfB);
+
+        store.KeptAt.Should().Equal(OwnerTestKit.Start);
+    }
+
+    [Fact]
+    public async Task A_write_more_than_an_hour_after_the_last_copy_keeps_another_version()
+    {
+        var store = new InMemoryOwnerDataStore { FileExists = true };
+        var harness = OwnerTestKit.Harness(store);
+        await harness.AddAsync(CabinetA);
+        harness.Clock.Advance(TimeSpan.FromMinutes(30));
+        await harness.AddAsync(ShelfB);
+
+        harness.Clock.Advance(TimeSpan.FromMinutes(31));
+        await harness.AddAsync("Shelf C");
+
+        store.KeptAt.Should().Equal(OwnerTestKit.Start, OwnerTestKit.Start.AddMinutes(61));
+    }
+
+    [Fact]
+    public async Task A_write_that_changed_nothing_and_a_refused_write_keep_no_version()
+    {
+        var store = new InMemoryOwnerDataStore { FileExists = true };
+        var harness = OwnerTestKit.Harness(store);
+        await harness.AddAsync(CabinetA);
+        harness.Clock.Advance(TimeSpan.FromHours(3));
+
+        await harness.AddAsync(CabinetA);
+        await harness.Service.MutateAsync(0, data => LocationEdits.Add(data, ShelfB, OwnerDataService.NewId), CancellationToken.None);
+
+        store.KeptAt.Should().Equal(OwnerTestKit.Start);
+    }
+
+    [Fact]
+    public async Task An_undo_also_keeps_an_earlier_version_when_one_is_due()
+    {
+        var store = new InMemoryOwnerDataStore { FileExists = true };
+        var harness = OwnerTestKit.Harness(store);
+        var added = await harness.AddAsync(CabinetA);
+        harness.Clock.Advance(TimeSpan.FromHours(2));
+
+        await harness.Service.UndoAsync(added.Data!.Revision, CancellationToken.None);
+
+        store.KeptAt.Should().Equal(OwnerTestKit.Start, OwnerTestKit.Start.AddHours(2));
+    }
 }

@@ -32,10 +32,18 @@ public sealed record OwnerResult(OwnerOutcome Outcome, OwnerData? Data, string S
 /// <summary>
 /// The only code that changes the owner data. Writes are one at a time, each one is checked against the revision the writer
 /// worked from, and each saved change is logged for the owner, stored atomically and announced so the collection shown to
-/// visitors is rebuilt. It writes nothing to the application log but counts and categories.
+/// visitors is rebuilt. Before a write an earlier copy of the file is kept when the newest one is more than an hour old.
+/// The housekeeping the sync triggers, stamping and forgetting games that left the collection, goes through the same lock
+/// but is not an owner change. It writes nothing to the application log but counts and categories.
 /// </summary>
 public sealed class OwnerDataService
 {
+    /// <summary>How old the newest earlier copy of the file must be before a write keeps another one.</summary>
+    public static readonly TimeSpan VersionInterval = TimeSpan.FromHours(1);
+
+    /// <summary>How long a game may be missing from accepted collections before its owner data is removed.</summary>
+    public static readonly TimeSpan AbsentAfter = OwnerExpiry.AbsentAfter;
+
     private readonly IOwnerDataStore _store;
     private readonly TimeProvider _time;
     private readonly ILogger<OwnerDataService> _logger;
@@ -148,6 +156,7 @@ public sealed class OwnerDataService
 
             try
             {
+                KeepEarlierVersionWhenDue(now);
                 _store.Save(restored);
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
@@ -170,6 +179,78 @@ public sealed class OwnerDataService
         }
     }
 
+    /// <summary>
+    /// Applies a change the system makes on its own, alone and in turn with the owner's changes. It adds no log line, does not
+    /// count as a change since the last download, does not move the revision and does not announce itself, because it never
+    /// changes what visitors see; it does end the chance to undo, so an undo can never bring back what it removed. It does
+    /// nothing while the stored file cannot be read, and a failed save only leaves the data as it was.
+    /// </summary>
+    /// <param name="change">Works out the new data from the stored data, or returns null when there is nothing to change.</param>
+    /// <param name="cancellationToken">Cancels the wait for a turn.</param>
+    public async Task MutateSystemAsync(Func<OwnerData, OwnerData?> change, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+
+        await _gate.WaitAsync(cancellationToken);
+
+        try
+        {
+            if (State is not OwnerDataState.Ready ready || change(ready.Data) is not { } next)
+            {
+                return;
+            }
+
+            try
+            {
+                KeepEarlierVersionWhenDue(_time.GetUtcNow());
+                _store.Save(next);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                _logger.LogWarning("The owner data could not be saved: {ExceptionType}", exception.GetType().Name);
+
+                return;
+            }
+
+            _undo = null;
+            Volatile.Write(ref _state, new OwnerDataState.Ready(next));
+            _logger.LogInformation("Owner data tidied: revision {Revision}, {Games} games with decisions.", next.Revision, next.Games.Count);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Applies the thirty-day rule after an accepted collection: a game the collection no longer lists is stamped with the
+    /// time of that first collection, a game that is listed again loses its stamp and keeps its decisions, and a game whose
+    /// stamp is thirty days old is forgotten.
+    /// </summary>
+    /// <param name="listedGameIds">Every game the accepted collection lists, base games and expansions.</param>
+    /// <param name="cancellationToken">Cancels the wait for a turn.</param>
+    public Task ReconcileAsync(IReadOnlySet<int> listedGameIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(listedGameIds);
+
+        return MutateSystemAsync(data => OwnerExpiry.Reconcile(data, listedGameIds, _time.GetUtcNow()), cancellationToken);
+    }
+
+    private void KeepEarlierVersionWhenDue(DateTimeOffset now)
+    {
+        try
+        {
+            if (_store.NewestEarlierVersionAt() is not { } newest || now - newest > VersionInterval)
+            {
+                _store.KeepEarlierVersion(now);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning("An earlier version of the owner data could not be kept: {ExceptionType}", exception.GetType().Name);
+        }
+    }
+
     private OwnerResult Save(OwnerData current, OwnerChange edit)
     {
         var now = _time.GetUtcNow();
@@ -186,6 +267,7 @@ public sealed class OwnerDataService
 
         try
         {
+            KeepEarlierVersionWhenDue(now);
             _store.Save(next);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)

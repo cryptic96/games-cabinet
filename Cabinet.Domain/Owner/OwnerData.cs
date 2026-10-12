@@ -118,6 +118,11 @@ public abstract record OwnerDataState
     public sealed record Unreadable(string Reason) : OwnerDataState;
 }
 
+/// <summary>One earlier copy of the owner-data file, kept so a wrong edit can be undone by hand.</summary>
+/// <param name="Index">The place of the copy in the listing, newest first and counting from zero; it is how a copy is read back.</param>
+/// <param name="SavedAtUtc">When the copy was taken.</param>
+public sealed record EarlierVersion(int Index, DateTimeOffset SavedAtUtc);
+
 /// <summary>Keeps the owner data in a file that this build never renames, moves or overwrites unless it wrote it.</summary>
 public interface IOwnerDataStore
 {
@@ -127,4 +132,70 @@ public interface IOwnerDataStore
     /// <summary>Stores the data so that a reader sees either the previous copy or this one, never a mixture.</summary>
     /// <param name="data">The data to store.</param>
     void Save(OwnerData data);
+
+    /// <summary>Copies the stored file, as it is and readable or not, to the earlier versions and drops the oldest copies beyond the number kept. It does nothing when there is no file yet.</summary>
+    /// <param name="now">The moment the copy is stamped with.</param>
+    void KeepEarlierVersion(DateTimeOffset now);
+
+    /// <summary>The kept copies, newest first.</summary>
+    IReadOnlyList<EarlierVersion> EarlierVersions();
+
+    /// <summary>Reads a kept copy by its place in <see cref="EarlierVersions"/>; null when there is no copy at that place.</summary>
+    /// <param name="index">The place in the listing.</param>
+    byte[]? ReadEarlierVersion(int index);
+
+    /// <summary>When the newest kept copy was taken, or null when there is none.</summary>
+    DateTimeOffset? NewestEarlierVersionAt();
+}
+
+/// <summary>
+/// The thirty-day rule: what the owner decided for a game is kept for a while after the game leaves the collection, in case
+/// it was only a hiccup or the owner takes it back, and forgotten once the game stayed away for thirty days of accepted collections.
+/// </summary>
+public static class OwnerExpiry
+{
+    /// <summary>How long a game may be missing from accepted collections before its owner data is removed.</summary>
+    public static readonly TimeSpan AbsentAfter = TimeSpan.FromDays(30);
+
+    /// <summary>Works out the owner data after an accepted collection that lists these games.</summary>
+    /// <param name="data">The owner data as it is.</param>
+    /// <param name="listedGameIds">Every game the accepted collection lists, base games and expansions.</param>
+    /// <param name="now">The moment the collection was accepted.</param>
+    /// <returns>The new owner data, or null when nothing needs to change.</returns>
+    public static OwnerData? Reconcile(OwnerData data, IReadOnlySet<int> listedGameIds, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(listedGameIds);
+
+        var changed = false;
+        var games = new List<OwnerGame>(data.Games.Count);
+
+        foreach (var game in data.Games)
+        {
+            var next = Next(game, listedGameIds.Contains(game.GameId), now);
+            changed |= !ReferenceEquals(next, game);
+
+            if (next is not null)
+            {
+                games.Add(next);
+            }
+        }
+
+        return changed ? data with { Games = games } : null;
+    }
+
+    private static OwnerGame? Next(OwnerGame game, bool listed, DateTimeOffset now)
+    {
+        if (listed)
+        {
+            return game.AbsentSinceUtc is null ? game : game with { AbsentSinceUtc = null };
+        }
+
+        if (game.AbsentSinceUtc is not { } since)
+        {
+            return game with { AbsentSinceUtc = now };
+        }
+
+        return now - since >= AbsentAfter ? null : game;
+    }
 }
