@@ -26,7 +26,8 @@ public enum OwnerOutcome
 /// <param name="Outcome">How the attempt ended.</param>
 /// <param name="Data">The owner data after the attempt; null when the stored file is unreadable.</param>
 /// <param name="StatusKey">A short key the page turns into the words it shows the owner.</param>
-public sealed record OwnerResult(OwnerOutcome Outcome, OwnerData? Data, string StatusKey);
+/// <param name="CanUndo">Whether the latest change can still be undone: nothing was written after it.</param>
+public sealed record OwnerResult(OwnerOutcome Outcome, OwnerData? Data, string StatusKey, bool CanUndo = false);
 
 /// <summary>
 /// The only code that changes the owner data. Writes are one at a time, each one is checked against the revision the writer
@@ -40,6 +41,7 @@ public sealed class OwnerDataService
     private readonly ILogger<OwnerDataService> _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private OwnerDataState _state;
+    private UndoSlot? _undo;
 
     /// <summary>Creates the service and reads the stored owner data once.</summary>
     /// <param name="store">Keeps the owner data.</param>
@@ -66,6 +68,11 @@ public sealed class OwnerDataService
     /// <summary>The revision of the data now, or zero while it cannot be read.</summary>
     public long Revision => State is OwnerDataState.Ready ready ? ready.Data.Revision : 0;
 
+    /// <summary>The revision of the change that <see cref="UndoAsync"/> would revert, or null when there is nothing to undo.</summary>
+    public long? UndoableRevision => _undo is { } slot && State is OwnerDataState.Ready ready && ready.Data.Revision == slot.Revision
+        ? slot.Revision
+        : null;
+
     /// <summary>Makes a fresh identifier for a location.</summary>
     public static string NewId() => RandomNumberGenerator.GetHexString(8, lowercase: true);
 
@@ -91,19 +98,19 @@ public sealed class OwnerDataService
 
             if (ready.Data.Revision != expectedRevision)
             {
-                return new OwnerResult(OwnerOutcome.OutOfDate, ready.Data, "out-of-date");
+                return new OwnerResult(OwnerOutcome.OutOfDate, ready.Data, "out-of-date", UndoableRevision is not null);
             }
 
             var edit = change(ready.Data);
 
             if (edit.IsNone)
             {
-                return new OwnerResult(OwnerOutcome.NoChange, ready.Data, edit.StatusKey);
+                return new OwnerResult(OwnerOutcome.NoChange, ready.Data, edit.StatusKey, UndoableRevision is not null);
             }
 
             if (!edit.Changed)
             {
-                return new OwnerResult(OwnerOutcome.Refused, ready.Data, edit.StatusKey);
+                return new OwnerResult(OwnerOutcome.Refused, ready.Data, edit.StatusKey, UndoableRevision is not null);
             }
 
             return Save(ready.Data, edit);
@@ -136,13 +143,16 @@ public sealed class OwnerDataService
         {
             _logger.LogWarning("The owner data could not be saved: {ExceptionType}", exception.GetType().Name);
 
-            return new OwnerResult(OwnerOutcome.Refused, current, "save-failed");
+            return new OwnerResult(OwnerOutcome.Refused, current, "save-failed", UndoableRevision is not null);
         }
 
+        _undo = new UndoSlot(next.Revision, current);
         Volatile.Write(ref _state, new OwnerDataState.Ready(next));
         _logger.LogInformation("Owner data saved: revision {Revision}, {Locations} locations, {Games} games with decisions.", next.Revision, next.Locations.Count, next.Games.Count);
         Changed?.Invoke();
 
-        return new OwnerResult(OwnerOutcome.Saved, next, edit.StatusKey);
+        return new OwnerResult(OwnerOutcome.Saved, next, edit.StatusKey, CanUndo: true);
     }
+
+    private sealed record UndoSlot(long Revision, OwnerData Previous);
 }
