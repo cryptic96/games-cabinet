@@ -169,11 +169,9 @@ public static class CardRecords
 
         public BuildContext(IReadOnlyList<CabinetItem> items, CollectionSnapshot? snapshot)
         {
-            var stored = new Dictionary<long, SnapshotItem>();
-            foreach (var snapshotItem in snapshot?.Items ?? [])
-            {
-                stored.TryAdd(snapshotItem.CollectionId, snapshotItem);
-            }
+            var stored = (snapshot?.Items ?? [])
+                .GroupBy(snapshotItem => snapshotItem.CollectionId)
+                .ToDictionary(entry => entry.Key, entry => SnapshotMapper.InEntryOrder(entry).First());
 
             var byEntry = new Dictionary<long, CabinetItem>();
             foreach (var item in items)

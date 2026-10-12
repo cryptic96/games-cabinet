@@ -1,3 +1,4 @@
+using Cabinet.Domain.Cards;
 using Cabinet.Domain.Collection;
 using Cabinet.Domain.Layout;
 using FluentAssertions;
@@ -252,6 +253,43 @@ public class SnapshotMapperTests
     public void An_empty_collection_has_a_version_too()
     {
         SnapshotMapper.Version(SnapshotMapper.ToCabinetItems(Snapshot([]))).Should().MatchRegex("^[0-9a-f]{16}$");
+    }
+
+    [Fact]
+    public void Entries_sharing_a_collection_id_are_resolved_the_same_way_for_any_stored_order()
+    {
+        SnapshotItem[] items =
+        [
+            new(10, 7, "Zeta Expansion", ItemKind.Expansion, 2010, null, "Cabinet A"),
+            new(10, 2, "Alpha Base", ItemKind.Base, 2001, null, "Cabinet B"),
+            new(20, 5, "Beta", ItemKind.Base, 2005, null, "Shelf B"),
+            new(20, 4, "Beta", ItemKind.Base, 1999, null, "Shelf A"),
+            new(20, 4, "Alpha", ItemKind.Base, 1998, null, "Shelf C"),
+            new(30, 3, "Third", ItemKind.Base, 2001, null, null),
+        ];
+        var games = new Dictionary<int, GameDetails> { [7] = Details([new BaseGameRef(2, "Alpha Base")]), [4] = Details([]), [5] = Details([]) };
+        var baseline = Fingerprint(Snapshot(items) with { Games = games });
+        var random = new Random(20301);
+
+        for (var round = 0; round < 60; round++)
+        {
+            var shuffled = items.OrderBy(_ => random.Next()).ToArray();
+
+            Fingerprint(Snapshot(shuffled) with { Games = games }).Should().Be(baseline, $"round {round} shuffled the stored items");
+        }
+
+        var chosen = SnapshotMapper.Explain(Snapshot(items.Reverse()) with { Games = games }, ArtRules.Default).Select(trace => trace.Item).ToList();
+        chosen.Select(item => (item.CollectionId, item.GameId, item.Title)).Should().Equal((10, 7, "Zeta Expansion"), (20, 4, "Alpha"), (30, 3, "Third"));
+    }
+
+    private static string Fingerprint(CollectionSnapshot snapshot)
+    {
+        var traces = SnapshotMapper.Explain(snapshot, ArtRules.Default);
+        var items = SnapshotMapper.ToCabinetItems(snapshot);
+        var cards = CardRecords.Serialize(new CardsDocument("layout", CardRecords.Build(items, snapshot, SectionDesigns.Desktop)));
+        var explained = string.Join(';', traces.Select(trace => $"{trace.Item}|{trace.Shape}|{trace.Pick}|{string.Join(',', trace.Mapped.ExpansionOf)}"));
+
+        return $"{explained}\n{SnapshotMapper.Version(items, ArtRules.Default, snapshot)}\n{cards}";
     }
 
     private static string CardVersion(CollectionSnapshot snapshot) =>
