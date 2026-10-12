@@ -1822,7 +1822,7 @@ let cabinetPageCount = 0;
  * @param {{ firstLayout: object, status: () => object }} setup The first layout drawn and the status the server reports.
  * @returns {Promise<object>} The page, its parts and the levers the tests pull.
  */
-async function startCabinetPage({ firstLayout, status, cards = [], withList = false }) {
+async function startCabinetPage({ firstLayout, status, cards = [], withList = false, cardsAnswer = undefined }) {
   const clock = createClock(true);
   const page = createFakeDocument();
   const mount = page.createElement('main');
@@ -1885,7 +1885,7 @@ async function startCabinetPage({ firstLayout, status, cards = [], withList = fa
     if (url.startsWith('/cabinet/cards?')) {
       cardRequests.push({ url, init });
 
-      return Promise.resolve(answer(200, { layout: '', cards }));
+      return cardsAnswer === undefined ? Promise.resolve(answer(200, { layout: '', cards })) : cardsAnswer(cardRequests.length);
     }
 
     assert.equal(url, CABINET_LAYOUT_ROUTE);
@@ -1909,6 +1909,7 @@ async function startCabinetPage({ firstLayout, status, cards = [], withList = fa
 
   return {
     page,
+    clock,
     mount,
     filling,
     note,
@@ -2376,6 +2377,114 @@ test('with nothing drawn the games list has no entries and the skip link lands o
     cabinet.skipLink.listeners.find((listener) => listener.type === 'click').handler({ preventDefault: () => undefined });
 
     assert.equal(cabinet.page.activeElement, cabinet.listHeading);
+  } finally {
+    leaveCabinetPage();
+  }
+});
+
+/**
+ * Builds a card data answer from a list of outcomes, one per request in order; the last outcome repeats.
+ * @param {Array<'ok' | 'refused' | 'offline'>} outcomes What each request meets.
+ * @param {object[]} cards The cards an ok answer carries.
+ * @returns {(requestNumber: number) => Promise<object>}
+ */
+function cardsAnswerFrom(outcomes, cards) {
+  return (requestNumber) => {
+    const outcome = outcomes[Math.min(requestNumber, outcomes.length) - 1];
+
+    if (outcome === 'offline') {
+      return Promise.reject(new TypeError('network error'));
+    }
+
+    return Promise.resolve(outcome === 'refused' ? answer(503, {}) : answer(200, { layout: '', cards }));
+  };
+}
+
+const RETRY_CARDS = [{ entryId: 1, title: 'Invented Lighthouse', year: 2019, minPlayers: 2, maxPlayers: 4, expansions: [], bases: [] }];
+
+test('a card data request that fails on the network is repeated after a short wait and the data then arrives', async () => {
+  try {
+    const cabinet = await startCabinetPage({
+      firstLayout: layoutOfEntries([1]),
+      status: () => ({ running: false, snapshotVersion: 'v1' }),
+      cards: RETRY_CARDS,
+      cardsAnswer: cardsAnswerFrom(['offline', 'ok'], RETRY_CARDS),
+      withList: true,
+    });
+
+    assert.equal(cabinet.cardRequests.length, 1);
+    assert.deepEqual(cabinet.listButtons().map((button) => button.textContent), ['Invented Lighthouse']);
+
+    await cabinet.clock.advance(1000);
+    assert.equal(cabinet.cardRequests.length, 1);
+
+    await cabinet.clock.advance(1000);
+    assert.equal(cabinet.cardRequests.length, 2);
+    assert.deepEqual(cabinet.listButtons().map((button) => button.textContent), ['Invented Lighthouse (2019), 2–4 players']);
+  } finally {
+    leaveCabinetPage();
+  }
+});
+
+test('a card data request the server refuses is repeated too', async () => {
+  try {
+    const cabinet = await startCabinetPage({
+      firstLayout: layoutOfEntries([1]),
+      status: () => ({ running: false, snapshotVersion: 'v1' }),
+      cards: RETRY_CARDS,
+      cardsAnswer: cardsAnswerFrom(['refused', 'refused', 'ok'], RETRY_CARDS),
+      withList: true,
+    });
+
+    await cabinet.clock.advance(2000);
+    assert.equal(cabinet.cardRequests.length, 2);
+
+    await cabinet.clock.advance(5000);
+    assert.equal(cabinet.cardRequests.length, 3);
+    assert.deepEqual(cabinet.listButtons().map((button) => button.textContent), ['Invented Lighthouse (2019), 2–4 players']);
+  } finally {
+    leaveCabinetPage();
+  }
+});
+
+test('the card data request gives up after three attempts and then stops asking', async () => {
+  try {
+    const cabinet = await startCabinetPage({
+      firstLayout: layoutOfEntries([1]),
+      status: () => ({ running: false, snapshotVersion: 'v1' }),
+      cardsAnswer: cardsAnswerFrom(['offline'], []),
+      withList: true,
+    });
+
+    await cabinet.clock.advance(60000);
+
+    assert.equal(cabinet.cardRequests.length, 3);
+    assert.deepEqual(cabinet.listButtons().map((button) => button.textContent), ['Invented Lighthouse']);
+  } finally {
+    leaveCabinetPage();
+  }
+});
+
+test('a repeat of the card data request that waits for a layout which is since replaced never fires', async () => {
+  let version = 'v1';
+
+  try {
+    const cabinet = await startCabinetPage({
+      firstLayout: layoutOfEntries([1]),
+      status: () => ({ running: false, snapshotVersion: version }),
+      cardsAnswer: cardsAnswerFrom(['offline', 'ok'], RETRY_CARDS),
+    });
+
+    version = 'v2';
+    await cabinet.comeOnline();
+    cabinet.layoutRequests.shift().resolve(answer(200, layoutOfEntries([2])));
+    await cabinet.settle();
+
+    assert.equal(cabinet.cardRequests.length, 2);
+
+    await cabinet.clock.advance(60000);
+
+    assert.equal(cabinet.cardRequests.length, 2);
   } finally {
     leaveCabinetPage();
   }

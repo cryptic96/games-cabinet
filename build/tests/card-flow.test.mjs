@@ -197,6 +197,7 @@ test('a drawn box is enough to build an incomplete record with a link and a titl
   const record = recordFromPlacement({ entryId: 3, gameId: 30, title: 'Invented Harbour', kind: 'cover', toneIndex: 1, patternIndex: 2, art });
 
   assert.equal(record.incomplete, true);
+  assert.equal(record.detailsFailed, false);
   assert.equal(record.title, 'Invented Harbour');
   assert.equal(record.gameId, 30);
   assert.equal(record.isExpansion, false);
@@ -204,6 +205,15 @@ test('a drawn box is enough to build an incomplete record with a link and a titl
   assert.equal(record.cover, art);
   assert.deepEqual(record.expansions, []);
   assert.equal(recordFromPlacement({ entryId: 4, gameId: 40, title: 'Invented Orchard', kind: 'expansionLayer', toneIndex: 0, patternIndex: 0 }).isExpansion, true);
+});
+
+test('a record built after a failed request for the card data says so, and one built without that says nothing', () => {
+  const placement = { entryId: 3, gameId: 30, title: 'Invented Harbour', kind: 'cover', toneIndex: 1, patternIndex: 2 };
+
+  assert.equal(recordFromPlacement(placement, true).detailsFailed, true);
+  assert.equal(recordFromPlacement(placement, true).incomplete, true);
+  assert.equal(recordFromPlacement(placement, false).detailsFailed, false);
+  assert.equal(recordFromPlacement(placement).detailsFailed, false);
 });
 
 test('the placement index skips the marker, keeps the first box of an entry and keys by text', () => {

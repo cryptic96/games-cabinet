@@ -84,9 +84,11 @@ export function choosePath({ reducedMotion, hasViewTransition, boxOnScreen, swap
  * Builds the least a card can show from one drawn box: identity, title, kind, colours and picture. It is what the card shows when
  * the card data did not arrive or failed, so the card still opens with its cover, title and link.
  * @param {object} placement One placement from the layout.
+ * @param {boolean} [detailsFailed] True when the request for the card data failed, so the card can say the details could not be
+ * loaded instead of saying they are still to come.
  * @returns {object} A card record marked incomplete.
  */
-export function recordFromPlacement(placement) {
+export function recordFromPlacement(placement, detailsFailed = false) {
   const art = placement.art !== null && typeof placement.art === 'object' ? placement.art : undefined;
   const ratio = art !== undefined && art.height > 0 ? art.width / art.height : 1;
 
@@ -101,6 +103,7 @@ export function recordFromPlacement(placement) {
     toneIndex: placement.toneIndex,
     patternIndex: placement.patternIndex,
     incomplete: true,
+    detailsFailed: detailsFailed === true,
     designers: [],
     mechanics: [],
     expansions: [],

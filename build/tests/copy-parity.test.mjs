@@ -103,6 +103,10 @@ test('the Dutch sentences with arguments equal the copy contract', () => {
 test('the card strings equal the copy contract in both languages', () => {
   assert.deepEqual([en.close, en.bggLink, en.newTabHint, en.noDetails], ['Close', 'View on BoardGameGeek', '(opens in a new tab)', 'More details arrive after the next sync.']);
   assert.deepEqual([nl.close, nl.bggLink, nl.newTabHint, nl.noDetails], ['Sluiten', 'Bekijk op BoardGameGeek', '(opent in een nieuw tabblad)', 'Meer details volgen na de volgende synchronisatie.']);
+  assert.equal(en.detailsFailed, "Couldn't load the details. Reload the page to try again.");
+  assert.equal(nl.detailsFailed, 'De details konden niet worden geladen. Laad de pagina opnieuw om het nog eens te proberen.');
+  assert.notEqual(en.detailsFailed, en.noDetails);
+  assert.notEqual(nl.detailsFailed, nl.noDetails);
   assert.deepEqual([...en.weightWords], ['Light', 'Medium-light', 'Medium', 'Medium-heavy', 'Heavy']);
   assert.deepEqual([...nl.weightWords], ['Licht', 'Vrij licht', 'Gemiddeld', 'Vrij zwaar', 'Zwaar']);
   assert.deepEqual([...nl.weightWordsLower], ['licht', 'vrij licht', 'gemiddeld', 'vrij zwaar', 'zwaar']);

@@ -303,14 +303,16 @@ function buildFact(fact, iconsUrl) {
 }
 
 /**
- * Builds the quiet note that stands in the strip's place when no detail is known.
+ * Builds the quiet note that stands in the strip's place when no detail is known: that the details could not be loaded when the
+ * request for them failed, otherwise that they arrive after the next sync.
+ * @param {object} record The card record.
  * @param {object} copy The visitor-facing strings.
  * @returns {HTMLParagraphElement}
  */
-function buildNote(copy) {
+function buildNote(record, copy) {
   const note = document.createElement('p');
   note.className = 'card-note';
-  note.textContent = copy.noDetails;
+  note.textContent = record.detailsFailed === true ? copy.detailsFailed : copy.noDetails;
 
   return note;
 }
@@ -325,7 +327,7 @@ function buildNote(copy) {
  */
 function buildStripOrNote(record, copy, iconsUrl) {
   if (record.incomplete === true || !hasAnyDetail(record)) {
-    return buildNote(copy);
+    return buildNote(record, copy);
   }
 
   const facts = factsFor(record, copy);

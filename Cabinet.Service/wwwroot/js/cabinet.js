@@ -35,6 +35,11 @@ let latestLoad = 0;
 let cardRecords = new Map();
 let drawnPlacements = new Map();
 let drawnPalette = [];
+let cardsFailed = false;
+
+/** The waits before the second and third request for the card data after a failed one, in milliseconds. */
+const CARD_RETRY_DELAYS_MS = [1500, 4000];
+const CARD_ATTEMPTS = CARD_RETRY_DELAYS_MS.length + 1;
 
 /**
  * Returns the profile name the layout endpoint expects for the current viewport.
@@ -66,7 +71,7 @@ function cardsUrl() {
 
 /**
  * Gives the card record of an entry: the record the card data holds, or the least the drawn box knows when the data did not
- * arrive or does not hold that entry.
+ * arrive or does not hold that entry. The least record says so when every request for the data failed.
  * @param {string} entryId The collection entry id as text.
  * @returns {object | null} The record, or null when the entry is not on screen either.
  */
@@ -79,46 +84,90 @@ function recordFor(entryId) {
 
   const placement = drawnPlacements.get(entryId);
 
-  return placement === undefined ? null : recordFromPlacement(placement);
+  return placement === undefined ? null : recordFromPlacement(placement, cardsFailed);
 }
 
 /**
- * Fetches the card data of the layout just drawn, once more when it belongs to a different layout than the one on screen, and
- * keeps it in memory so a tap finds it ready. It never shows anything and ignores every failure: a card without its data still
- * opens with what the drawn box knows. A newer load or redraw supersedes it.
+ * Waits the given time without blocking anything.
+ * @param {number} milliseconds How long to wait.
+ * @returns {Promise<void>}
+ */
+function pause(milliseconds) {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+/**
+ * Asks for the card data once and keeps it when it belongs to the layout on screen.
+ * @param {number} epoch The load counter when the layout was drawn.
+ * @param {string | null} etag The entity tag of the layout on screen, when the response carried one.
+ * @returns {Promise<'loaded' | 'superseded' | 'stale' | 'failed'>} Loaded when the data is kept, superseded when a newer load took
+ * over, stale when the data belongs to a different layout, failed when the request or its answer was not usable.
+ */
+async function requestCards(epoch, etag) {
+  try {
+    const response = await fetch(cardsUrl(), { priority: 'low' });
+
+    if (epoch !== latestLoad) {
+      return 'superseded';
+    }
+
+    if (!response.ok) {
+      return 'failed';
+    }
+
+    const body = await response.json();
+
+    if (epoch !== latestLoad) {
+      return 'superseded';
+    }
+
+    if (etag !== null && body.layout !== etag) {
+      return 'stale';
+    }
+
+    cardRecords = new Map(body.cards.map((record) => [String(record.entryId), record]));
+    gamesList?.showCards(body.cards);
+
+    return 'loaded';
+  } catch {
+    return epoch === latestLoad ? 'failed' : 'superseded';
+  }
+}
+
+/**
+ * Fetches the card data of the layout just drawn and keeps it in memory so a tap finds it ready. It tries again when the
+ * data belongs to a different layout than the one on screen, and again after a short wait when the request failed. It never
+ * shows anything: a card without its data still opens with what the drawn box knows, and says that the details could not be
+ * loaded once every attempt has failed. A newer load or redraw supersedes it.
  * @param {number} epoch The load counter when the layout was drawn.
  * @param {string | null} etag The entity tag of the layout on screen, when the response carried one.
  * @returns {Promise<void>}
  */
 async function fetchCards(epoch, etag) {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      const response = await fetch(cardsUrl(), { priority: 'low' });
+  let failures = 0;
 
-      if (epoch !== latestLoad) {
-        return;
-      }
+  for (let attempt = 0; attempt < CARD_ATTEMPTS; attempt += 1) {
+    const outcome = await requestCards(epoch, etag);
 
-      if (!response.ok) {
-        return;
-      }
-
-      const body = await response.json();
-
-      if (epoch !== latestLoad) {
-        return;
-      }
-
-      if (etag === null || body.layout === etag) {
-        cardRecords = new Map(body.cards.map((record) => [String(record.entryId), record]));
-        gamesList?.showCards(body.cards);
-
-        return;
-      }
-    } catch {
+    if (outcome === 'superseded') {
       return;
     }
+
+    if (outcome === 'loaded') {
+      return;
+    }
+
+    if (outcome === 'failed' && attempt < CARD_ATTEMPTS - 1) {
+      await pause(CARD_RETRY_DELAYS_MS[failures]);
+      failures += 1;
+
+      if (epoch !== latestLoad) {
+        return;
+      }
+    }
   }
+
+  cardsFailed = true;
 }
 
 /**
@@ -129,6 +178,7 @@ async function fetchCards(epoch, etag) {
 function afterDraw(layout, etag) {
   drawnPlacements = indexPlacements(layout);
   drawnPalette = layout.palette ?? [];
+  cardsFailed = false;
   gamesList?.showTitles(drawnPlacements);
   fetchCards(latestLoad, etag);
 }
@@ -175,6 +225,7 @@ async function load() {
   latestLoad += 1;
   const thisLoad = latestLoad;
   cardRecords = new Map();
+  cardsFailed = false;
   showLoading();
 
   try {

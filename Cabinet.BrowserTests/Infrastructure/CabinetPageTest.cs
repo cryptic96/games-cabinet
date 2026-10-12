@@ -98,6 +98,56 @@ public abstract class CabinetPageTest : PageTest
     }
 
     /// <summary>
+    /// Makes the page's requests for the card data fail with a network error, the given number of times, and lets every later one
+    /// through to the host. Call it before opening the cabinet page.
+    /// </summary>
+    /// <param name="failures">How many requests fail before the rest succeed; the default fails them all.</param>
+    /// <returns>A function that tells how many card data requests the page has made so far.</returns>
+    protected async Task<Func<int>> FailCardDataRequestsAsync(int failures = int.MaxValue)
+    {
+        var seen = 0;
+
+        await Page.RouteAsync("**/cabinet/cards**", async route =>
+        {
+            if (Interlocked.Increment(ref seen) <= failures)
+            {
+                await route.AbortAsync();
+            }
+            else
+            {
+                await route.ContinueAsync();
+            }
+        });
+
+        return () => Volatile.Read(ref seen);
+    }
+
+    /// <summary>
+    /// Waits until the page has made the given number of card data requests and has had a moment to take in the answer to the last
+    /// one, so what the page knows about the card data no longer changes.
+    /// </summary>
+    /// <param name="requestCount">Tells how many card data requests the page has made so far.</param>
+    /// <param name="expected">How many requests the page makes in all.</param>
+    protected async Task WaitForCardDataRequestsAsync(Func<int> requestCount, int expected)
+    {
+        ArgumentNullException.ThrowIfNull(requestCount);
+
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+
+        while (requestCount() < expected)
+        {
+            if (DateTime.UtcNow > deadline)
+            {
+                throw new TimeoutException($"The page made {requestCount()} of {expected} card data requests.");
+            }
+
+            await Task.Delay(50, TestContext.Current.CancellationToken);
+        }
+
+        await Task.Delay(300, TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
     /// Opens a page of the running host and waits until the cabinet has drawn its first box or shown its own message.
     /// </summary>
     /// <param name="pathAndQuery">The path and query to open, such as <c>/?sample=65</c>.</param>
