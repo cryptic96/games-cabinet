@@ -1,3 +1,5 @@
+using Cabinet.Domain.Collection;
+
 namespace Cabinet.Domain.Owner;
 
 /// <summary>What one edit of the owner data came to.</summary>
@@ -19,6 +21,9 @@ public sealed record OwnerChange(OwnerData Data, string? LogText, string StatusK
     /// <param name="data">The data as it was.</param>
     /// <param name="statusKey">Why the edit was refused.</param>
     public static OwnerChange Refused(OwnerData data, string statusKey) => new(data, null, statusKey, false);
+
+    /// <summary>How many games an edit left not placed, such as the games that were kept in a location that was deleted.</summary>
+    public int GamesNotPlaced { get; init; }
 }
 
 /// <summary>Why a location name was refused.</summary>
@@ -182,6 +187,154 @@ public static class LocationEdits
             LogLine(title, target, followsBase),
             target is null ? "game-unplaced" : "game-moved");
     }
+
+    /// <summary>Renames a location in place. Its identifier and its place in the list stay, so every game kept there follows the new name.</summary>
+    /// <param name="data">The data to change.</param>
+    /// <param name="id">The location to rename.</param>
+    /// <param name="name">The new name, held to the same rules as the name of a new location.</param>
+    public static OwnerChange Rename(OwnerData data, string id, string name)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(id);
+        ArgumentNullException.ThrowIfNull(name);
+
+        var index = IndexOf(data, id);
+
+        if (index < 0)
+        {
+            return OwnerChange.Refused(data, "unknown-location");
+        }
+
+        var check = LocationNames.Validate(data.Locations, name, id);
+
+        if (check.Problem != LocationNameProblem.None)
+        {
+            return OwnerChange.Refused(data, check.StatusKey);
+        }
+
+        var current = data.Locations[index];
+
+        if (string.Equals(current.Name, check.Name, StringComparison.Ordinal))
+        {
+            return OwnerChange.None;
+        }
+
+        var locations = data.Locations.ToList();
+        locations[index] = current with { Name = check.Name };
+
+        return new OwnerChange(
+            data with { Locations = locations },
+            $"Renamed \"{current.Name}\" to \"{check.Name}\"",
+            "location-renamed");
+    }
+
+    /// <summary>Moves a location one place up or down the list by swapping it with its neighbour.</summary>
+    /// <param name="data">The data to change.</param>
+    /// <param name="id">The location to move.</param>
+    /// <param name="step">Minus one to move it up, plus one to move it down.</param>
+    public static OwnerChange Move(OwnerData data, string id, int step)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(id);
+
+        var index = IndexOf(data, id);
+
+        if (index < 0 || step is not (-1 or 1))
+        {
+            return OwnerChange.Refused(data, "unknown-location");
+        }
+
+        var target = index + step;
+
+        if (target < 0 || target >= data.Locations.Count)
+        {
+            return OwnerChange.None;
+        }
+
+        var locations = data.Locations.ToList();
+        (locations[index], locations[target]) = (locations[target], locations[index]);
+
+        return new OwnerChange(
+            data with { Locations = locations },
+            $"Moved \"{data.Locations[index].Name}\" {(step < 0 ? "up" : "down")}",
+            "location-moved");
+    }
+
+    /// <summary>
+    /// Deletes a location. Every game kept there is not placed afterwards, and an expansion that has an owned base game goes back
+    /// to following its base game; nothing is moved to another location. The change says how many games ended up not placed.
+    /// </summary>
+    /// <param name="data">The data to change.</param>
+    /// <param name="snapshot">The collection the games are in, or null when there is none yet, which counts no games.</param>
+    /// <param name="id">The location to delete.</param>
+    public static OwnerChange Delete(OwnerData data, CollectionSnapshot? snapshot, string id)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(id);
+
+        var index = IndexOf(data, id);
+
+        if (index < 0)
+        {
+            return OwnerChange.Refused(data, "unknown-location");
+        }
+
+        var name = data.Locations[index].Name;
+        var notPlaced = CountLeftNotPlaced(data, snapshot, id);
+        var log = notPlaced == 0
+            ? $"Deleted location \"{name}\""
+            : $"Deleted location \"{name}\" ({notPlaced} {(notPlaced == 1 ? "game" : "games")} now not placed)";
+
+        return new OwnerChange(Without(data, id), log, "location-deleted") { GamesNotPlaced = notPlaced };
+    }
+
+    /// <summary>Counts the games that would be not placed if a location were deleted: those shown there now that would be shown nowhere afterwards.</summary>
+    /// <param name="data">The data as it is now.</param>
+    /// <param name="snapshot">The collection the games are in, or null when there is none yet.</param>
+    /// <param name="id">The location that would be deleted.</param>
+    public static int CountLeftNotPlaced(OwnerData data, CollectionSnapshot? snapshot, string id)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(id);
+
+        if (snapshot is null || IndexOf(data, id) < 0)
+        {
+            return 0;
+        }
+
+        var before = OwnerOverlay.From(snapshot, data);
+        var after = OwnerOverlay.From(snapshot, Without(data, id));
+
+        return snapshot.Items
+            .Select(item => item.GameId)
+            .Distinct()
+            .Count(gameId => string.Equals(before.EffectiveLocationId(gameId), id, StringComparison.Ordinal) && after.EffectiveLocationId(gameId) is null);
+    }
+
+    private static int IndexOf(OwnerData data, string id)
+    {
+        for (var index = 0; index < data.Locations.Count; index++)
+        {
+            if (string.Equals(data.Locations[index].Id, id, StringComparison.Ordinal))
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    private static OwnerData Without(OwnerData data, string id) =>
+        data with
+        {
+            Locations = [.. data.Locations.Where(location => !string.Equals(location.Id, id, StringComparison.Ordinal))],
+            Games =
+            [
+                .. data.Games
+                    .Select(game => string.Equals(game.LocationId, id, StringComparison.Ordinal) ? game with { LocationId = null } : game)
+                    .Where(game => !IsEmpty(game)),
+            ],
+        };
 
     private static string? FreshId(OwnerData data, Func<string> newId)
     {
