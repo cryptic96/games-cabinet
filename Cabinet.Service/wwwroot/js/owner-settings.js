@@ -6,7 +6,7 @@
  * time, and every text is written with `textContent`.
  */
 import { OWNER_TEXT, bannerTexts, fill, whenText } from './owner-format.js';
-import { announce } from './owner-shared.js';
+import { announce, readToken } from './owner-shared.js';
 
 /** How long after a download starts the page asks the server how the backup stands. */
 const REFRESH_DELAY_MS = 1500;
@@ -150,11 +150,11 @@ export function applyBackupState(doc, state, now = new Date()) {
  * what a screen reader reads.
  * @param {HTMLButtonElement} button The download button.
  */
-function setBusy(button) {
+function setBusy(button, text = OWNER_TEXT.preparing) {
   busyButtons.set(button, { children: [...button.childNodes].map((node) => node.cloneNode(true)), label: button.getAttribute('aria-label') });
   button.setAttribute('aria-disabled', 'true');
   button.removeAttribute('aria-label');
-  button.replaceChildren(button.ownerDocument.createTextNode(OWNER_TEXT.preparing));
+  button.replaceChildren(button.ownerDocument.createTextNode(text));
 }
 
 /**
@@ -188,6 +188,107 @@ function dropUndoButtons(doc) {
   }
 }
 
+/** The shape of the token a checked file is held under: 32 lowercase hexadecimal characters. */
+const RESTORE_TOKEN = /^[0-9a-f]{32}$/;
+
+/**
+ * Shows a problem with the file the owner chose in the alert line of the restore panel, or hides the line when there is none.
+ * @param {Document} doc The page.
+ * @param {string | null} text The words, written with `textContent`.
+ */
+function showRestoreProblem(doc, text) {
+  const line = doc.getElementById('restore-problem');
+
+  if (!line) {
+    return;
+  }
+
+  line.textContent = text ?? '';
+  line.hidden = text === null;
+}
+
+/**
+ * Sends the chosen file to the server to be checked, with the antiforgery token in the header and a JSON answer asked for. A file
+ * that passes brings the page to its preview, which the server renders from the token it made; a file that does not shows its
+ * words in the alert line and changes nothing.
+ * @param {HTMLFormElement} form The check form.
+ * @param {Document} doc The page.
+ * @param {{ send?: Function, go?: (address: string) => void, body?: BodyInit }} [options] The browser's fetch, how the browser is taken
+ * to the preview, and the body to send, each replaceable in tests.
+ * @returns {Promise<boolean>} Whether the page is being taken to the preview.
+ */
+export async function submitRestoreCheck(form, doc, options = {}) {
+  const send = options.send ?? ((address, init) => globalThis.fetch(address, init));
+  const go = options.go ?? ((address) => globalThis.location.assign(address));
+
+  showRestoreProblem(doc, null);
+
+  try {
+    const response = await send(form.action, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json', RequestVerificationToken: readToken(doc) },
+      body: options.body ?? new globalThis.FormData(form),
+    });
+
+    if (response.status === 413) {
+      showRestoreProblem(doc, OWNER_TEXT.fileTooLarge);
+
+      return false;
+    }
+
+    const answer = await response.json();
+
+    if (response.ok && typeof answer?.token === 'string' && RESTORE_TOKEN.test(answer.token)) {
+      const page = new URL(form.action, doc.baseURI).pathname;
+
+      go(`${page}?restore=${answer.token}#restore-preview-heading`);
+
+      return true;
+    }
+
+    showRestoreProblem(doc, typeof answer?.message === 'string' && answer.message !== '' ? answer.message : OWNER_TEXT.checkFailed);
+  } catch {
+    showRestoreProblem(doc, OWNER_TEXT.checkFailed);
+  }
+
+  return false;
+}
+
+/**
+ * Takes over the check form of the restore panel: the check is made without leaving the page, the button shows `Checking...`
+ * while it runs, and focus moves to the preview or to the restored line when the page shows one. Without the script the form is
+ * a plain post and the page answers it.
+ * @param {Document} doc The page.
+ */
+function initRestore(doc) {
+  doc.getElementById('restore-preview-heading')?.focus();
+  doc.getElementById('restore-done-heading')?.focus();
+
+  const form = doc.querySelector('form[data-restore-form]');
+  const button = form?.querySelector('button[data-check-button]');
+
+  if (!form || !button) {
+    return;
+  }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    if (button.getAttribute('aria-disabled') === 'true') {
+      return;
+    }
+
+    setBusy(button, OWNER_TEXT.checking);
+    await submitRestoreCheck(form, doc);
+    clearBusy(button);
+  });
+
+  doc.querySelector('button[data-keep-current]')?.addEventListener('click', () => {
+    doc.getElementById('restore-file')?.focus();
+  });
+}
+
 /**
  * Starts the script on a page: localises its times, takes over the download forms' busy state and keeps the banner current.
  * @param {Document} [doc] The page; the browser's own by default.
@@ -198,6 +299,7 @@ export function initBackup(doc = globalThis.document) {
   }
 
   localiseTimes(doc);
+  initRestore(doc);
 
   const url = doc.getElementById('owner-main')?.dataset.backupState ?? '';
   let timer = null;

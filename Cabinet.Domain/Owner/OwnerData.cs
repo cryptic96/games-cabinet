@@ -5,7 +5,16 @@ namespace Cabinet.Domain.Owner;
 /// <summary>One place the owner keeps games, such as a cabinet or a shelf. Games refer to it by its identifier, so a rename moves nothing.</summary>
 /// <param name="Id">The stable identifier the server generated when the location was added.</param>
 /// <param name="Name">The name every visitor sees on a card.</param>
-public sealed record OwnerLocation(string Id, string Name);
+public sealed record OwnerLocation(string Id, string Name)
+{
+    /// <summary>How many characters an identifier has.</summary>
+    public const int IdLength = 8;
+
+    /// <summary>Tells whether a text has the shape of an identifier the server generates: <see cref="IdLength"/> lowercase hexadecimal digits.</summary>
+    /// <param name="text">The text, or null.</param>
+    public static bool IsWellFormedId(string? text) =>
+        text is { Length: IdLength } && text.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
+}
 
 /// <summary>Which of the available pictures the owner wants a game drawn from.</summary>
 public enum PictureChoice
@@ -49,6 +58,25 @@ public sealed record PictureSetting(
 /// <param name="AbsentSinceUtc">When the game stopped being owned, or null while it is owned; its decisions are kept for a while.</param>
 /// <param name="Picture">The picture decision, or null when the owner made none.</param>
 public sealed record OwnerGame(int GameId, string? LocationId, DateTimeOffset? AbsentSinceUtc, PictureSetting? Picture);
+
+/// <summary>The three counts that say what a copy of the owner data holds, which the owner compares before a copy replaces another.</summary>
+/// <param name="Locations">How many locations there are.</param>
+/// <param name="PlacedGames">How many games are kept in a location.</param>
+/// <param name="PictureChoices">How many games have a picture other than the automatic one.</param>
+public readonly record struct OwnerDataFigures(int Locations, int PlacedGames, int PictureChoices)
+{
+    /// <summary>Counts what a copy of the owner data holds.</summary>
+    /// <param name="data">The owner data.</param>
+    public static OwnerDataFigures From(OwnerData data)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+
+        return new OwnerDataFigures(
+            data.Locations.Count,
+            data.Games.Count(game => game.LocationId is not null),
+            data.Games.Count(game => game.Picture is { } picture && picture.Choice != PictureChoice.Automatic));
+    }
+}
 
 /// <summary>One line of the owner's change log.</summary>
 /// <param name="AtUtc">When the change was made.</param>

@@ -68,6 +68,98 @@
         <p class="owner-hint backup-footnote">@OwnerStrings.BackupFootnote(OwnerDataStore.KeptVersions)</p>
     }
 </section>
+<section class="owner-panel" id="restore" aria-labelledby="restore-heading">
+    <h3 id="restore-heading">@OwnerStrings.RestoreHeading</h3>
+    <p class="owner-hint">@OwnerStrings.RestoreHelper</p>
+    @if (Model.RestoredText is not null)
+    {
+        <div class="restore-done" id="restore-done" role="status">
+            <h4 id="restore-done-heading" tabindex="-1">@Model.RestoredText</h4>
+            @if (Model.RestoredFetchingText is not null)
+            {
+                <p>@Model.RestoredFetchingText</p>
+            }
+        </div>
+    }
+    <p class="backup-notice" id="restore-problem" role="alert" hidden="@(Model.RestoreNotice is null)">@Model.RestoreNotice</p>
+    @if (Model.Preview is { } preview)
+    {
+        <div class="restore-preview" id="restore-preview">
+            <h4 id="restore-preview-heading" tabindex="-1">@OwnerStrings.RestorePreviewHeading</h4>
+            <p>@preview.Summary.</p>
+            @if (preview.OlderFormat is { } older)
+            {
+                <p class="owner-hint">@OwnerStrings.OlderFormat(older)</p>
+            }
+            <table class="restore-table">
+                <caption class="visually-hidden">@OwnerStrings.RestoreTableCaption</caption>
+                <thead>
+                    <tr>
+                        <td></td>
+                        <th scope="col">@OwnerStrings.RestoreColumnFile</th>
+                        <th scope="col">@OwnerStrings.RestoreColumnServer</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <th scope="row">@OwnerStrings.RestoreRowSavedOn</th>
+                        @foreach (var side in new[] { preview.InFile, preview.OnServer })
+                        {
+                            <td>
+                                @if (side.SavedAtUtc is { } savedAt)
+                                {
+                                    <time datetime="@OwnerStrings.TimeAttribute(savedAt)" data-owner-when>@OwnerStrings.TimeUtcText(savedAt)</time>
+                                }
+                                else
+                                {
+                                    @OwnerStrings.RestoreNotSaved
+                                }
+                            </td>
+                        }
+                    </tr>
+                    <tr>
+                        <th scope="row">@OwnerStrings.RestoreRowLocations</th>
+                        <td>@preview.InFile.Figures.Locations</td>
+                        <td>@preview.OnServer.Figures.Locations</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">@OwnerStrings.RestoreRowPlacedGames</th>
+                        <td>@preview.InFile.Figures.PlacedGames</td>
+                        <td>@preview.OnServer.Figures.PlacedGames</td>
+                    </tr>
+                    <tr>
+                        <th scope="row">@OwnerStrings.RestoreRowPictureChoices</th>
+                        <td>@preview.InFile.Figures.PictureChoices</td>
+                        <td>@preview.OnServer.Figures.PictureChoices</td>
+                    </tr>
+                    @if (preview.InFile.NotInCollection > 0 || preview.OnServer.NotInCollection > 0)
+                    {
+                        <tr>
+                            <th scope="row">
+                                @OwnerStrings.RestoreRowNotInCollection
+                                <span class="restore-note">@OwnerStrings.RestoreNotInCollectionNote</span>
+                            </th>
+                            <td>@preview.InFile.NotInCollection</td>
+                            <td>@preview.OnServer.NotInCollection</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <p class="warning-line"><strong>@OwnerStrings.RestoreWarningLead</strong> @OwnerStrings.RestoreWarningRest</p>
+            <p class="owner-hint">@OwnerStrings.RestoreRefetchNote</p>
+            <form method="post" class="restore-actions" asp-page="/Owner/Settings" data-restore-actions>
+                <input type="hidden" name="token" value="@preview.Token" />
+                <button type="submit" class="owner-btn-danger" asp-page-handler="Restore">@OwnerStrings.RestoreButton</button>
+                <button type="submit" class="owner-btn" asp-page-handler="Discard" data-keep-current>@OwnerStrings.KeepCurrentButton</button>
+            </form>
+        </div>
+    }
+    <form method="post" enctype="multipart/form-data" class="restore-form" asp-page="/Owner/Settings" asp-page-handler="CheckFile" data-restore-form>
+        <label for="restore-file">@OwnerStrings.RestoreFileLabel</label>
+        <input type="file" id="restore-file" name="ownerDataFile" accept="application/json,.json" />
+        <button type="submit" class="owner-btn-primary" data-check-button>@OwnerStrings.CheckFileButton</button>
+    </form>
+</section>
 @if (backup.Readable)
 {
     <section class="owner-panel" id="recent-changes" aria-labelledby="recent-changes-heading">

@@ -1,6 +1,7 @@
 using System.Globalization;
 using Cabinet.Domain.Collection;
 using Cabinet.Domain.Owner;
+using Cabinet.Repository.Storage;
 using Cabinet.Service.Pages;
 
 namespace Cabinet.Service.Owner;
@@ -586,6 +587,130 @@ public static class OwnerStrings
     /// <param name="kept">How many versions the server keeps.</param>
     public static string BackupFootnote(int kept) =>
         $"The site keeps the last {kept.ToString(CultureInfo.InvariantCulture)} versions of your owner data on the server.";
+
+    /// <summary>The heading of the restore sub-section of the backup panel.</summary>
+    public const string RestoreHeading = "Restore from a file";
+
+    /// <summary>The line under the restore heading.</summary>
+    public const string RestoreHelper =
+        "Replaces all your owner data with the contents of a file you downloaded earlier. Your current data is kept as an earlier version first.";
+
+    /// <summary>The label of the file field.</summary>
+    public const string RestoreFileLabel = "Owner-data file";
+
+    /// <summary>The button that sends the chosen file to be checked.</summary>
+    public const string CheckFileButton = "Check file";
+
+    /// <summary>The text of the check button while the file is being checked.</summary>
+    public const string Checking = "Checking...";
+
+    /// <summary>The heading of the preview of a checked file.</summary>
+    public const string RestorePreviewHeading = "This file contains";
+
+    /// <summary>The hidden caption of the comparison table.</summary>
+    public const string RestoreTableCaption = "The checked file next to the owner data on this server now";
+
+    /// <summary>The heading of the column that describes the checked file.</summary>
+    public const string RestoreColumnFile = "In the file";
+
+    /// <summary>The heading of the column that describes the owner data on the server now.</summary>
+    public const string RestoreColumnServer = "On this server now";
+
+    /// <summary>The heading of the row that says when the data was last saved.</summary>
+    public const string RestoreRowSavedOn = "Saved on";
+
+    /// <summary>The heading of the row that counts the locations.</summary>
+    public const string RestoreRowLocations = "Locations";
+
+    /// <summary>The heading of the row that counts the placed games.</summary>
+    public const string RestoreRowPlacedGames = "Placed games";
+
+    /// <summary>The heading of the row that counts the picture choices.</summary>
+    public const string RestoreRowPictureChoices = "Picture choices";
+
+    /// <summary>The heading of the row that counts the games the collection does not list now.</summary>
+    public const string RestoreRowNotInCollection = "Not in your collection now";
+
+    /// <summary>The note in the row of games the collection does not list now.</summary>
+    public const string RestoreNotInCollectionNote = "What you decided for them is kept for 30 days.";
+
+    /// <summary>The cell of a moment that was never recorded.</summary>
+    public const string RestoreNotSaved = "Not saved yet";
+
+    /// <summary>The first sentence of the warning above the restore button, which is set in semibold.</summary>
+    public const string RestoreWarningLead = "Restoring replaces what is on this server now.";
+
+    /// <summary>The rest of the warning above the restore button.</summary>
+    public const string RestoreWarningRest = "Your current data is kept as an earlier version first.";
+
+    /// <summary>The note that says the linked pictures are fetched again.</summary>
+    public const string RestoreRefetchNote = "Picture links in the file are fetched again in the background. Pictures show again once they arrive.";
+
+    /// <summary>The destructive button that replaces the owner data with the checked file.</summary>
+    public const string RestoreButton = "Restore file";
+
+    /// <summary>The button that throws the check away and leaves everything as it is.</summary>
+    public const string KeepCurrentButton = "Keep current data";
+
+    /// <summary>The words shown when the check a restore refers to has run out or was never made.</summary>
+    public const string RestoreExpired = "That check has run out. Choose the file again.";
+
+    /// <summary>The words shown when a restore could not be stored.</summary>
+    public const string RestoreFailed = "Couldn't restore the file. Nothing was changed. Try again.";
+
+    /// <summary>The words shown when the owner pressed the check button without choosing a file.</summary>
+    public const string RestoreNoFile = "Choose a file first.";
+
+    /// <summary>What a count of items reads like, singular for one.</summary>
+    /// <param name="count">How many.</param>
+    /// <param name="singular">The word for one.</param>
+    /// <param name="plural">The word for any other number.</param>
+    private static string Counted(int count, string singular, string plural) =>
+        count == 1 ? $"1 {singular}" : $"{count.ToString(CultureInfo.InvariantCulture)} {plural}";
+
+    /// <summary>The short sentence that says what an owner-data file holds.</summary>
+    /// <param name="locations">How many locations.</param>
+    /// <param name="placedGames">How many placed games.</param>
+    /// <param name="pictureChoices">How many picture choices.</param>
+    public static string RestoreSummary(int locations, int placedGames, int pictureChoices) =>
+        $"{Counted(locations, "location", "locations")}, {Counted(placedGames, "placed game", "placed games")}, {Counted(pictureChoices, "picture choice", "picture choices")}";
+
+    /// <summary>The line shown after a restore, in front of which the summary of what came back is put.</summary>
+    /// <param name="summary">The summary of what was restored.</param>
+    public static string RestoreDone(string summary) => $"Restored. {summary}. Your previous data is kept as an earlier version.";
+
+    /// <summary>The line that says how many linked pictures are being fetched again.</summary>
+    /// <param name="count">How many pictures, at least one.</param>
+    public static string FetchingPictures(int count) => $"Fetching {Counted(count, "picture", "pictures")} in the background.";
+
+    /// <summary>The line that says a file uses an older format than the site writes now.</summary>
+    /// <param name="version">The file's format.</param>
+    public static string OlderFormat(int version) =>
+        $"This file uses an older format ({version.ToString(CultureInfo.InvariantCulture)}). It is upgraded when restored.";
+
+    /// <summary>The words for a file the check refused.</summary>
+    /// <param name="check">The refusal.</param>
+    public static string RestoreProblemText(RestoreCheck check)
+    {
+        ArgumentNullException.ThrowIfNull(check);
+
+        return check.Refusal switch
+        {
+            RestoreProblem.NoFile => RestoreNoFile,
+            RestoreProblem.TooLarge =>
+                $"That file is too large ({RestoreMegabytes(check.SizeBytes)} MB; the limit is {RestoreMegabytes(OwnerDataExport.MaxRestoreBytes)} MB). Owner-data files are small, so this is probably the wrong file.",
+            RestoreProblem.Damaged => "That file is damaged or incomplete, so nothing was changed.",
+            RestoreProblem.Newer =>
+                $"That file was made by a newer version of the site (file format {check.FormatVersion.ToString(CultureInfo.InvariantCulture)}; this site reads up to {OwnerData.CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture)}). Update the site first, or use an older download.",
+            RestoreProblem.OverLimits => "That file holds more than this site accepts, so nothing was changed.",
+            _ => "That isn't an owner-data file. Choose a file you downloaded here.",
+        };
+    }
+
+    /// <summary>Megabytes of 1,048,576 bytes, rounded up to one decimal and without a trailing zero, so a file over the limit never reads as the limit.</summary>
+    /// <param name="bytes">The size in bytes.</param>
+    public static string RestoreMegabytes(long bytes) =>
+        (Math.Ceiling(bytes / 1_048_576d * 10) / 10).ToString("0.#", CultureInfo.InvariantCulture);
 
     /// <summary>The value of a <c>time</c> element's <c>datetime</c> attribute for a moment: UTC to the second.</summary>
     /// <param name="at">The moment.</param>

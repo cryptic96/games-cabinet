@@ -30,6 +30,22 @@ public enum OwnerOutcome
 /// <param name="CanUndo">Whether the latest change can still be undone: nothing was written after it.</param>
 public sealed record OwnerResult(OwnerOutcome Outcome, OwnerData? Data, string StatusKey, bool CanUndo = false);
 
+/// <summary>Where a document that replaces the owner data came from.</summary>
+public enum RestoreSource
+{
+    /// <summary>A file the owner downloaded earlier and chose.</summary>
+    File,
+
+    /// <summary>One of the earlier versions the server keeps.</summary>
+    EarlierVersion,
+}
+
+/// <summary>A checked document that waits for the owner to confirm the restore.</summary>
+/// <param name="Data">The document that passed the check.</param>
+/// <param name="FormatVersion">The stored format the file was written in.</param>
+/// <param name="Source">Where the document came from.</param>
+public sealed record RestoreCandidate(OwnerData Data, int FormatVersion, RestoreSource Source);
+
 /// <summary>The file of a backup the owner downloads.</summary>
 /// <param name="FileName">The name the file is saved under.</param>
 /// <param name="Content">The readable JSON document.</param>
@@ -70,6 +86,9 @@ public sealed class OwnerDataService : IOwnerArtReferences
 
     /// <summary>How long a game may be missing from accepted collections before its owner data is removed.</summary>
     public static readonly TimeSpan AbsentAfter = OwnerExpiry.AbsentAfter;
+
+    private const string RestoredFromFileLog = "Restored from file";
+    private const string RestoredEarlierVersionLog = "Restored an earlier version";
 
     private readonly IOwnerDataStore _store;
     private readonly TimeProvider _time;
@@ -133,7 +152,7 @@ public sealed class OwnerDataService : IOwnerArtReferences
             : null;
 
     /// <summary>Makes a fresh identifier for a location.</summary>
-    public static string NewId() => RandomNumberGenerator.GetHexString(8, lowercase: true);
+    public static string NewId() => RandomNumberGenerator.GetHexString(OwnerLocation.IdLength, lowercase: true);
 
     /// <summary>Applies one change to the stored data, alone and in turn with every other change.</summary>
     /// <param name="expectedRevision">The revision the writer worked from; a stored revision that differs answers out of date.</param>
@@ -329,6 +348,60 @@ public sealed class OwnerDataService : IOwnerArtReferences
     }
 
     /// <summary>
+    /// Replaces all the owner data with a document that passed the restore check. There is no merging. The data that is stored
+    /// now, readable or not, is kept as an earlier version first, and when that cannot be done nothing is replaced. The
+    /// document is stored under a revision higher than both its own and the one it replaces, with one log line that does not
+    /// count toward the download reminder; the reminder's own state comes from the document. A game in the document that the
+    /// collection does not list gets its thirty days from now, and one it does list loses any stamp. The chance to undo ends, the
+    /// link pictures are asked for again and the change is announced.
+    /// </summary>
+    /// <param name="document">The checked document, whose links carry no fetched record.</param>
+    /// <param name="source">Where the document came from, for the log line.</param>
+    /// <param name="ownedGameIds">Every game the collection lists now, or null while there is no collection yet, which stamps no game.</param>
+    /// <param name="cancellationToken">Cancels the wait for a turn.</param>
+    public async Task<OwnerResult> RestoreAsync(
+        OwnerData document,
+        RestoreSource source,
+        IReadOnlySet<int>? ownedGameIds,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+
+        await _gate.WaitAsync(cancellationToken);
+
+        try
+        {
+            var current = State as OwnerDataState.Ready;
+            var now = _time.GetUtcNow();
+            var next = Restored(document, current?.Data.Revision ?? 0, source, ownedGameIds, now);
+
+            try
+            {
+                _store.KeepEarlierVersion(now);
+                _store.Save(next);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                _logger.LogWarning("The owner data could not be restored: {ExceptionType}", exception.GetType().Name);
+
+                return new OwnerResult(OwnerOutcome.Refused, current?.Data, "save-failed", UndoableRevision is not null);
+            }
+
+            _undo = null;
+            Volatile.Write(ref _state, new OwnerDataState.Ready(next));
+            _logger.LogInformation("Owner data restored: revision {Revision}, {Locations} locations, {Games} games with decisions.", next.Revision, next.Locations.Count, next.Games.Count);
+            Changed?.Invoke();
+            RequestLinkWork();
+
+            return new OwnerResult(OwnerOutcome.Saved, next, "restored");
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
     /// Applies the thirty-day rule after an accepted collection: a game the collection no longer lists is stamped with the
     /// time of that first collection, a game that is listed again loses its stamp and keeps its decisions, and a game whose
     /// stamp is thirty days old is forgotten.
@@ -355,6 +428,27 @@ public sealed class OwnerDataService : IOwnerArtReferences
         {
             _logger.LogWarning("An earlier version of the owner data could not be kept: {ExceptionType}", exception.GetType().Name);
         }
+    }
+
+    private static OwnerData Restored(
+        OwnerData document,
+        long currentRevision,
+        RestoreSource source,
+        IReadOnlySet<int>? ownedGameIds,
+        DateTimeOffset now)
+    {
+        var line = new ChangeEntry(now, source == RestoreSource.File ? RestoredFromFileLog : RestoredEarlierVersionLog);
+        var games = document.Games
+            .Select(game => ownedGameIds is null ? game : game with { AbsentSinceUtc = ownedGameIds.Contains(game.GameId) ? null : now })
+            .OrderBy(game => game.GameId);
+
+        return document with
+        {
+            Revision = Math.Max(document.Revision, currentRevision) + 1,
+            SavedAtUtc = now,
+            Games = [.. games],
+            Changes = [line, .. document.Changes.Take(OwnerData.MaxStoredChanges - 1)],
+        };
     }
 
     private OwnerResult Save(OwnerData current, OwnerChange edit)
