@@ -68,6 +68,15 @@ regex = '''\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'''
     '''(?i)@cf\.geekdo-images\.com$''',
   ]
 
+  [[rules.allowlists]]
+  description = "Razor views write values into markup as text-@variable.Member, which reads like an address but is a C# expression"
+  condition = "AND"
+  paths = ['''\.cshtml$''']
+  regexTarget = "match"
+  regexes = [
+    '''@[a-z][A-Za-z0-9]*\.[A-Z][A-Za-z0-9]*$''',
+  ]
+
 [[rules]]
 id = "internal-hostname"
 description = "Hostname under a suffix that only resolves on a private network"
