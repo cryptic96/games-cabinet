@@ -75,12 +75,26 @@ public static class SnapshotMapper
         [
             .. snapshot.Items
                 .GroupBy(item => item.CollectionId)
-                .Select(entry => entry.FirstOrDefault(item => item.Kind == ItemKind.Expansion) ?? entry.First())
+                .Select(entry => InEntryOrder(entry).First())
                 .OrderBy(item => item.CollectionId)
                 .ThenBy(item => item.GameId)
                 .Select(item => Trace(item, snapshot, images, pairing, rules)),
         ];
     }
+
+    /// <summary>
+    /// Puts the stored items that share a collection entry in one fixed order: an expansion first, then the lower game
+    /// identifier, then the title compared ordinally, then the year and the location. The first of them is the one the
+    /// cabinet, the version and the cards all use, so the choice never depends on the order the collection was stored in.
+    /// </summary>
+    /// <param name="entry">The stored items of one collection entry.</param>
+    internal static IOrderedEnumerable<SnapshotItem> InEntryOrder(IEnumerable<SnapshotItem> entry) =>
+        entry
+            .OrderBy(item => item.Kind == ItemKind.Expansion ? 0 : 1)
+            .ThenBy(item => item.GameId)
+            .ThenBy(item => item.Title, StringComparer.Ordinal)
+            .ThenBy(item => item.Year)
+            .ThenBy(item => item.Location, StringComparer.Ordinal);
 
     /// <summary>
     /// The address of the picture a game offers besides the one of the owned edition: the main picture its details name,
@@ -140,7 +154,7 @@ public static class SnapshotMapper
 
         var entries = snapshot.Items
             .GroupBy(entry => (entry.CollectionId, entry.GameId))
-            .ToDictionary(group => group.Key, group => group.First());
+            .ToDictionary(group => group.Key, group => InEntryOrder(group).First());
 
         return HashOf(items
             .Select(item => $"{DrawnText(item)}|{CardText(item, entries, snapshot.Games)}")
