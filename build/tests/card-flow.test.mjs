@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const source = readFileSync(new URL('../../Cabinet.Service/wwwroot/js/card-flow.js', import.meta.url), 'utf8');
-const { createHistoryStep, sourceEntry, recordFromPlacement, indexPlacements, pullKind, choosePath, isMostlyOnScreen, createCloseGate, dragOutcome, resist } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+const { createHistoryStep, sourceEntry, recordFromPlacement, indexPlacements, pullKind, choosePath, isMostlyOnScreen, createCloseGate, dragOutcome, resist, releaseSpeed, recentSamples, DRAG_SPEED_WINDOW_MS } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 
 /**
  * A stand-in for the browser history that records every call.
@@ -389,6 +389,52 @@ test('an upward drag never closes the sheet, however fast', () => {
 test('a sheet with no height closes only on speed', () => {
   assert.equal(dragOutcome({ dy: 10, height: 0, velocity: 0 }), 'spring');
   assert.equal(dragOutcome({ dy: 10, height: 0, velocity: 0.7 }), 'close');
+});
+
+test('the speed at release is the distance from the oldest sample inside the 80 ms window to the release, over their time', () => {
+  assert.equal(DRAG_SPEED_WINDOW_MS, 80);
+  assert.equal(releaseSpeed([{ at: 100, y: 10 }, { at: 120, y: 30 }, { at: 140, y: 50 }], { at: 150, y: 90 }), 1.6);
+  assert.equal(releaseSpeed([{ at: 0, y: 0 }, { at: 50, y: 40 }], { at: 100, y: 100 }), 1.2);
+  assert.equal(releaseSpeed([{ at: 100, y: 0 }], { at: 110, y: 8 }), 0.8);
+});
+
+test('a sample exactly 80 ms old still counts and one 81 ms old does not', () => {
+  assert.equal(releaseSpeed([{ at: 20, y: 0 }], { at: 100, y: 80 }), 1);
+  assert.equal(releaseSpeed([{ at: 19, y: 0 }], { at: 100, y: 80 }), 0);
+  assert.deepEqual(recentSamples([{ at: 19, y: 0 }, { at: 20, y: 1 }, { at: 100, y: 2 }], 100), [{ at: 20, y: 1 }, { at: 100, y: 2 }]);
+});
+
+test('a finger that rested for longer than the window before it lifted has no speed, however far it had moved', () => {
+  assert.equal(releaseSpeed([{ at: 0, y: 0 }, { at: 10, y: 60 }, { at: 20, y: 80 }], { at: 300, y: 80 }), 0);
+  assert.equal(releaseSpeed([], { at: 300, y: 80 }), 0);
+});
+
+test('a release at the very time of the oldest sample, or before it, has no speed instead of a division by zero', () => {
+  assert.equal(releaseSpeed([{ at: 100, y: 0 }], { at: 100, y: 50 }), 0);
+  assert.equal(releaseSpeed([{ at: 100, y: 0 }], { at: 90, y: 50 }), 0);
+});
+
+test('an upward movement gives a negative speed that never closes the sheet', () => {
+  const speed = releaseSpeed([{ at: 100, y: 100 }], { at: 110, y: 40 });
+
+  assert.equal(speed < 0, true);
+  assert.equal(dragOutcome({ dy: -15, height: 800, velocity: speed }), 'spring');
+});
+
+test('a short fast flick closes the sheet and the same distance with the last movement older than the window springs back', () => {
+  const flick = [{ at: 0, y: 0 }, { at: 10, y: 20 }, { at: 20, y: 40 }, { at: 30, y: 60 }, { at: 40, y: 80 }];
+  const fast = releaseSpeed(flick, { at: 50, y: 80 });
+  const rested = releaseSpeed(flick, { at: 240, y: 80 });
+
+  assert.equal(fast, 1.6);
+  assert.equal(dragOutcome({ dy: 80, height: 800, velocity: fast }), 'close');
+  assert.equal(rested, 0);
+  assert.equal(dragOutcome({ dy: 80, height: 800, velocity: rested }), 'spring');
+});
+
+test('the speed that closes a sheet is reached by 0.6 pixels per millisecond and not by a hair less', () => {
+  assert.equal(dragOutcome({ dy: 40, height: 800, velocity: releaseSpeed([{ at: 0, y: 0 }], { at: 50, y: 30 }) }), 'close');
+  assert.equal(dragOutcome({ dy: 40, height: 800, velocity: releaseSpeed([{ at: 0, y: 0 }], { at: 50, y: 29 }) }), 'spring');
 });
 
 test('a downward drag is followed one to one and an upward drag a quarter of the way', () => {

@@ -3,16 +3,13 @@
  * on the box that opened it. The card is built from data already in memory, so opening it never waits for the network.
  */
 import { buildCard } from './card-view.js';
-import { choosePath, createCloseGate, createHistoryStep, dragOutcome, isMostlyOnScreen, pullKind, resist, sourceEntry } from './card-flow.js';
+import { choosePath, createCloseGate, createHistoryStep, dragOutcome, isMostlyOnScreen, pullKind, recentSamples, releaseSpeed, resist, sourceEntry } from './card-flow.js';
 
 /** The media query that says the visitor prefers less motion. */
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
 
 /** The media query that makes the card a sheet at the bottom of the screen. */
 const PHONE = '(max-width: 40rem)';
-
-/** How far back, in milliseconds, the speed of a drag is measured. */
-const SPEED_WINDOW_MS = 80;
 
 /** The parts of the sheet a drag may start on. */
 const DRAG_ZONES = '.card-grip, .card-head';
@@ -602,23 +599,7 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
     drag.offset = resist(event.clientY - drag.startY);
     drag.card.style.setProperty('--sheet-dy', drag.offset + 'px');
     drag.samples.push({ at: event.timeStamp, y: event.clientY });
-    drag.samples = drag.samples.filter((sample) => event.timeStamp - sample.at <= SPEED_WINDOW_MS);
-  }
-
-  /**
-   * Gives how fast the finger was moving down over the last moments before it lifted, in pixels per millisecond; zero when it had
-   * rested for longer than the measured window.
-   * @param {PointerEvent} event The release.
-   * @returns {number}
-   */
-  function releaseSpeed(event) {
-    const recent = drag.samples.filter((sample) => event.timeStamp - sample.at <= SPEED_WINDOW_MS);
-
-    if (recent.length === 0 || !(event.timeStamp > recent[0].at)) {
-      return 0;
-    }
-
-    return (event.clientY - recent[0].y) / (event.timeStamp - recent[0].at);
+    drag.samples = recentSamples(drag.samples, event.timeStamp);
   }
 
   /**
@@ -653,7 +634,7 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
 
     const { card, offset } = drag;
     const outcome = event.type === 'pointerup'
-      ? dragOutcome({ dy: offset, height: card.getBoundingClientRect().height, velocity: releaseSpeed(event) })
+      ? dragOutcome({ dy: offset, height: card.getBoundingClientRect().height, velocity: releaseSpeed(drag.samples, { at: event.timeStamp, y: event.clientY }) })
       : 'spring';
 
     drag = null;

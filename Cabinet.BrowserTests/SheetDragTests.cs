@@ -6,8 +6,9 @@ using Microsoft.Playwright;
 namespace Cabinet.BrowserTests;
 
 /// <summary>
-/// Runs its tests one at a time after every parallel test has finished, because a drag's release speed comes from the browser's
-/// own event times, and on a busy machine the gaps between the steps of a scripted drag stretch until a fast flick reads as slow.
+/// Runs its tests one at a time after every parallel test has finished, so the pointer gestures and the viewport changes they script
+/// are not stretched by the load of other browser tests. The speed of a flick does not depend on this: its event times are set by
+/// the test, not read from the clock.
 /// </summary>
 [CollectionDefinition(nameof(GestureSpeedCollection), DisableParallelization = true)]
 public sealed class GestureSpeedCollection;
@@ -97,15 +98,29 @@ public sealed partial class SheetDragTests : CabinetPageTest
     {
         await OpenCardAsync();
         var head = await BoxOfAsync(".card-head");
+        var card = await BoxOfAsync(".card");
+        var x = head.X + 6;
+        var y = head.Y + (head.Height / 2);
+        var flick = new[] { 0f, 20f, 40f, 60f, 80f };
+        flick[^1].Should().BeLessThan(card.Height * 0.25f);
+
+        await DispatchTimedDragAsync(x, y, flick, stepMilliseconds: 10);
+
+        await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(0);
+    }
+
+    [Fact]
+    public async Task A_short_drag_whose_last_movement_was_long_before_the_release_springs_back()
+    {
+        await OpenCardAsync();
+        var head = await BoxOfAsync(".card-head");
         var x = head.X + 6;
         var y = head.Y + (head.Height / 2);
 
-        await Page.Mouse.MoveAsync(x, y);
-        await Page.Mouse.DownAsync();
-        await Page.Mouse.MoveAsync(x, y + 80, new MouseMoveOptions { Steps = 4 });
-        await Page.Mouse.UpAsync();
+        await DispatchTimedDragAsync(x, y, [0f, 20f, 40f, 60f, 80f], stepMilliseconds: 10, restMilliseconds: 200);
 
-        await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(0);
+        await Expect(Page.Locator(".card")).ToHaveCSSAsync("translate", AtRest(), new LocatorAssertionsToHaveCSSOptions { Timeout = SpringWaitMilliseconds });
+        await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(1);
     }
 
     [Fact]
@@ -215,6 +230,43 @@ public sealed partial class SheetDragTests : CabinetPageTest
 
         return address;
     }
+
+    /// <summary>
+    /// Drags the mouse straight down with event times the test chooses, so the release speed the page measures is the same on a busy
+    /// machine as on an idle one. The press lands at the first offset, each later offset is one step later, and the release comes one
+    /// step after the last offset, delayed by the rest.
+    /// </summary>
+    /// <param name="x">The horizontal position of the whole drag, in viewport pixels.</param>
+    /// <param name="y">The vertical position of the press, in viewport pixels.</param>
+    /// <param name="offsets">How far below the press the pointer is at each step; the first is the press itself.</param>
+    /// <param name="stepMilliseconds">The time between two steps.</param>
+    /// <param name="restMilliseconds">How long the pointer rests at the last offset before the release.</param>
+    private async Task DispatchTimedDragAsync(float x, float y, IReadOnlyList<float> offsets, int stepMilliseconds, int restMilliseconds = 0)
+    {
+        var session = await Page.Context.NewCDPSessionAsync(Page);
+        var startMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - 1000;
+
+        for (var index = 0; index < offsets.Count; index++)
+        {
+            var type = index == 0 ? "mousePressed" : "mouseMoved";
+            await SendMouseEventAsync(session, type, x, y + offsets[index], startMilliseconds + (index * stepMilliseconds));
+        }
+
+        var releaseMilliseconds = startMilliseconds + (offsets.Count * stepMilliseconds) + restMilliseconds;
+        await SendMouseEventAsync(session, "mouseReleased", x, y + offsets[^1], releaseMilliseconds);
+    }
+
+    private static Task<System.Text.Json.JsonElement?> SendMouseEventAsync(ICDPSession session, string type, float x, float y, long timestampMilliseconds) =>
+        session.SendAsync("Input.dispatchMouseEvent", new Dictionary<string, object>
+        {
+            ["type"] = type,
+            ["x"] = x,
+            ["y"] = y,
+            ["button"] = "left",
+            ["buttons"] = type == "mouseReleased" ? 0 : 1,
+            ["clickCount"] = type == "mouseMoved" ? 0 : 1,
+            ["timestamp"] = timestampMilliseconds / 1000.0,
+        });
 
     private async Task<LocatorBoundingBoxResult> BoxOfAsync(string selector) =>
         (await Page.Locator(selector).First.BoundingBoxAsync())!;
