@@ -218,7 +218,7 @@ public sealed class OwnerRestoreParserTests
     [InlineData("http://example.org/pictures/linked.png")]
     [InlineData("https://example.org:8443/pictures/linked.png")]
     [InlineData("https://user@example.org/pictures/linked.png")]
-    [InlineData("//example.org/pictures/linked.png")]
+    [InlineData("/" + "/example.org/pictures/linked.png")]
     [InlineData("not an address")]
     public void A_link_on_another_host_over_http_or_in_another_shape_is_over_the_limits(string address)
     {
