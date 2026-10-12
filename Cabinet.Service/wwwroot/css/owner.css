@@ -946,6 +946,10 @@ header > .owner-plate {
   display: none;
 }
 
+.pic-row > * + * {
+  margin-top: 12px;
+}
+
 .pic-row form {
   display: flex;
   flex-direction: column;
@@ -980,6 +984,166 @@ header > .owner-plate {
   color: var(--paper-label);
   font-size: 14px;
   font-variant-numeric: tabular-nums;
+}
+
+.pic-row .pic-looks-form {
+  flex: none;
+  gap: 0;
+  margin-inline-start: auto;
+}
+
+@media (max-width: 40rem) {
+  .pic-row .pic-looks-form {
+    flex-basis: 100%;
+    margin-inline-start: 0;
+  }
+}
+
+.pic-marks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-bottom: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pic-marks:not(:has(> li:not([hidden]))) {
+  display: none;
+}
+
+.pic-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pic-notes:not(:has(> .pic-note:not([hidden]))) {
+  display: none;
+}
+
+.pic-note {
+  margin: 0;
+  padding-inline-start: 12px;
+  border-inline-start: 4px solid var(--paper-label);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.pic-why {
+  margin: 0;
+  color: var(--paper-label);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.pic-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 24px;
+  margin-bottom: 16px;
+}
+
+.pic-views {
+  display: flex;
+  align-items: center;
+  margin-inline-start: -12px;
+}
+
+.pic-views a {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding-inline: 12px;
+  color: var(--chrome-muted);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+}
+
+.pic-views a[aria-current="true"] {
+  color: var(--wall-text);
+  font-weight: 600;
+  text-decoration: underline 2px;
+  text-underline-offset: 4px;
+}
+
+.pic-views a + a::before {
+  content: "·" / "";
+  position: absolute;
+  inset-inline-start: 0;
+  translate: -50% 0;
+  color: var(--chrome-muted);
+  font-weight: 400;
+}
+
+.pic-views a:focus-visible,
+.pic-toolbar input:focus-visible {
+  outline: 2px solid var(--wall-text);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .pic-views a:hover {
+    color: var(--wall-text);
+    text-decoration: underline 2px;
+    text-underline-offset: 4px;
+  }
+}
+
+.pic-counter {
+  margin: 0;
+  color: var(--wall-text);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pic-toolbar .owner-find {
+  flex: 1 1 14rem;
+  max-width: 22rem;
+  margin-inline-start: auto;
+}
+
+.pic-toolbar .owner-find label {
+  color: var(--wall-text);
+}
+
+.pic-toolbar .owner-find input[type="search"] {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid var(--wood-edge);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}
+
+.pic-toolbar .owner-find[hidden] {
+  display: none;
+}
+
+@media (max-width: 40rem) {
+  .pic-toolbar .owner-find {
+    flex-basis: 100%;
+    max-width: none;
+    margin-inline-start: 0;
+  }
+}
+
+.pic-count {
+  margin: 0 0 16px;
+  color: var(--wall-text);
+  font-size: 14px;
+}
+
+.pic-count[hidden] {
+  display: none;
 }
 
 .pic-empty h3 {
@@ -1114,6 +1278,21 @@ header > .owner-plate {
   color: var(--ink);
   font-size: 14px;
   line-height: 1.5;
+}
+
+.pic-tag.pic-tag-strong {
+  border-color: var(--ink);
+  font-weight: 600;
+}
+
+.pic-tag.pic-tag-dashed {
+  border-style: dashed;
+}
+
+.pic-tag.pic-tag-plain {
+  padding-inline: 0;
+  border-color: transparent;
+  color: var(--paper-label);
 }
 
 .pic-tile:has(input:checked) {

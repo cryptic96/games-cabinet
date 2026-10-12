@@ -31,7 +31,7 @@ public sealed class OwnerPicturesPageTests : CabinetPageTest
         await Page.SetViewportSizeAsync(width, height);
         await StartHostAsync();
 
-        await GotoOwnerAsync("/owner/pictures");
+        await GotoOwnerAsync("/owner/pictures?view=all");
 
         await Expect(Page.Locator("h2")).ToHaveTextAsync("Pictures");
         await Expect(Page.Locator("nav.owner-bar a[aria-current=\"page\"]")).ToHaveTextAsync("Pictures");

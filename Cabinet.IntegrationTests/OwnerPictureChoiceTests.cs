@@ -122,7 +122,7 @@ public sealed partial class OwnerPictureChoiceTests
         using var publicClient = host.Factory.CreatePublicClient();
 
         using var onPublic = await publicClient.GetAsync("/owner/pictures", TestContext.Current.CancellationToken);
-        var page = await host.Session.GetAsync("/owner/pictures");
+        var page = await host.Session.GetAsync("/owner/pictures?view=all");
         var rows = GameRows().Matches(page.Body).Count;
 
         onPublic.StatusCode.Should().Be(HttpStatusCode.NotFound);

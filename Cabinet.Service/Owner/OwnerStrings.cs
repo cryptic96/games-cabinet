@@ -102,6 +102,106 @@ public static class OwnerStrings
         _ => "Uses a generated cover",
     };
 
+    /// <summary>The accessible name of the two links that switch which games the pictures page shows.</summary>
+    public const string GamesShownLabel = "Games shown";
+
+    /// <summary>The button that records that a game's pictures look right.</summary>
+    public const string LooksRightButton = "Looks right";
+
+    /// <summary>The mark of a game whose choice is the owner's own link.</summary>
+    public const string MarkYours = "Yours";
+
+    /// <summary>The mark, and the button text, of a game the owner dealt with.</summary>
+    public const string MarkChecked = "Checked";
+
+    /// <summary>The mark of a game whose linked picture no longer works.</summary>
+    public const string MarkLinkDead = "Link no longer works";
+
+    /// <summary>The mark of a game whose picture BGG replaced since the owner looked.</summary>
+    public const string MarkChanged = "Picture changed on BGG";
+
+    /// <summary>The mark of a game that has no picture at all.</summary>
+    public const string MarkNoPicture = "No picture";
+
+    /// <summary>The mark of a game whose stored picture cannot be shown.</summary>
+    public const string MarkWontLoad = "Picture won't load";
+
+    /// <summary>The mark of a game whose owned edition has a picture that Automatic does not draw.</summary>
+    public const string MarkSkipsOwned = "Automatic skips the owned edition";
+
+    /// <summary>The mark of a game whose linked picture has not been fetched yet.</summary>
+    public const string MarkFetching = "Fetching your link...";
+
+    /// <summary>The note under the marks of a game whose linked picture no longer works.</summary>
+    public const string NoteLinkDead =
+        "Your link no longer works. The cabinet keeps showing the copy it saved. Choose another picture, paste a new link, remove the link, or press \"Looks right\" to keep this copy.";
+
+    /// <summary>The note under the marks of a game that has no usable picture.</summary>
+    public const string NoteMissing = "BGG has no usable picture for this game, so the cabinet shows a generated cover.";
+
+    /// <summary>The note under the marks of a game whose picture cannot be loaded.</summary>
+    public const string NoteWontLoad = "The picture can't be loaded right now. The cabinet shows a generated cover until it can.";
+
+    /// <summary>The heading shown in place of the worklist when nothing is left to check.</summary>
+    public const string NothingToCheckHeading = "Nothing to check.";
+
+    /// <summary>The line under <see cref="NothingToCheckHeading"/>.</summary>
+    public const string NothingToCheckBody = "You've checked every game that needed a look. Use \"All games\" to change any picture.";
+
+    /// <summary>The counter's words when no game is worth a look.</summary>
+    public const string NothingNeedsLook = "Nothing needs a look right now.";
+
+    /// <summary>The note under the marks of a game whose picture BGG replaced.</summary>
+    /// <param name="picture">Which picture BGG replaced.</param>
+    public static string NoteChanged(ChangedPicture picture) =>
+        $"BGG replaced the {(picture == ChangedPicture.OwnedEdition ? "owned edition" : "main")} picture. Check that it still looks right.";
+
+    /// <summary>The link that switches the pictures page to the games worth a look.</summary>
+    /// <param name="count">How many games are left to check.</param>
+    public static string WorthALookLink(int count) => $"Worth a look ({count})";
+
+    /// <summary>The link that switches the pictures page to every game.</summary>
+    /// <param name="count">How many games there are.</param>
+    public static string AllGamesLink(int count) => $"All games ({count})";
+
+    /// <summary>The counter above the games: how many are left to check, or why there is nothing to count.</summary>
+    /// <param name="counts">What the worklist holds.</param>
+    public static string CounterText(PictureCounts counts)
+    {
+        ArgumentNullException.ThrowIfNull(counts);
+
+        if (counts.Candidates == 0)
+        {
+            return NothingNeedsLook;
+        }
+
+        if (counts.ToCheck > 0)
+        {
+            return $"{counts.ToCheck} of {counts.Candidates} to check";
+        }
+
+        return counts.Candidates == 1 ? "You've checked 1 game." : $"You've checked all {counts.Candidates} games.";
+    }
+
+    /// <summary>The sentence under a game's choices that says why Automatic drew what it did.</summary>
+    /// <param name="why">The reason.</param>
+    /// <param name="ownedReadsAs">What the owned edition's picture looks like, when that is the reason.</param>
+    public static string WhyLine(AutomaticWhy why, ArtVerdictKind? ownedReadsAs) => why switch
+    {
+        AutomaticWhy.OwnedEdition => "Automatic picks the owned edition.",
+        AutomaticWhy.MainBecauseOwnedReads => $"Automatic picks the main picture because the owned edition reads as {ReadsAs(ownedReadsAs)}.",
+        AutomaticWhy.MainBecauseNoOwned => "Automatic picks the main picture because BGG has no owned edition picture.",
+        _ => "Automatic has no picture to use, so the cabinet shows a generated cover.",
+    };
+
+    private static string ReadsAs(ArtVerdictKind? kind) => kind switch
+    {
+        ArtVerdictKind.ThreeD => "a 3D shot",
+        ArtVerdictKind.CutOut => "a cut-out",
+        ArtVerdictKind.TightCrop => "a tight crop",
+        _ => "an unsure shape",
+    };
+
     /// <summary>The heading of the games panel on the locations page.</summary>
     public const string GamesHeading = "Games";
 
@@ -258,6 +358,7 @@ public static class OwnerStrings
         "location-moved" => "Location moved.",
         "location-deleted" => "Location deleted.",
         "game-moved" or "game-unplaced" or "picture-chosen" => "Saved.",
+        "picture-checked" => "Marked as checked.",
         "unchanged" => "Nothing to change.",
         "undone" => "Undone.",
         "out-of-date" => "This page was out of date, so nothing was saved. It has been reloaded; try again.",
