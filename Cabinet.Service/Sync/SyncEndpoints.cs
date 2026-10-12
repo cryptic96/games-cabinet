@@ -5,6 +5,7 @@ using Cabinet.Repository.Bgg;
 using Cabinet.Repository.Images;
 using Cabinet.Repository.Storage;
 using Cabinet.Service.Collection;
+using Cabinet.Service.Owner;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Cabinet.Service.Sync;
@@ -129,7 +130,8 @@ public static class SyncEndpoints
             provider.GetRequiredService<ArtCache>(),
             provider.GetRequiredService<ImageOptions>(),
             provider.GetRequiredService<EnrichmentSync>(),
-            provider.GetRequiredService<ArtRules>()));
+            provider.GetRequiredService<ArtRules>(),
+            provider.GetRequiredService<CollectionPublisher>()));
         services.AddSingleton<SyncCoordinator>();
         services.AddSingleton<SyncStatusService>();
         services.AddHostedService<SyncStartup>();

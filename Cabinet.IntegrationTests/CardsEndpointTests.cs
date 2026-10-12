@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using Cabinet.Domain.Collection;
 using Cabinet.Domain.Layout;
+using Cabinet.Domain.Owner;
 using Cabinet.IntegrationTests.Infrastructure;
 using Cabinet.Repository.Storage;
 using Cabinet.Service.Collection;
@@ -123,6 +124,11 @@ public sealed class CardsEndpointTests
     {
         using var storage = new TemporaryDirectory();
         new SnapshotStore(storage.FullPath, NullLogger<SnapshotStore>.Instance).Save(InventedSnapshot());
+        new OwnerDataStore(storage.FullPath, NullLogger<OwnerDataStore>.Instance).Save(OwnerData.Empty with
+        {
+            Locations = [new OwnerLocation("a1b2c3d4", "Crate 7")],
+            Games = [new OwnerGame(BaseGameId, "a1b2c3d4", null, null)],
+        });
         await using var factory = new CabinetWebApplicationFactory(new Dictionary<string, string?> { ["Storage:Directory"] = storage.FullPath });
         using var client = factory.CreatePublicClient();
 
