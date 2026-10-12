@@ -234,7 +234,7 @@ public sealed class PictureRowsTests
     }
 
     private static IReadOnlyList<PictureRow> Build(CollectionSnapshot snapshot, OwnerData data) =>
-        PictureRows.Build(snapshot, ArtRules.Default, data);
+        PictureRows.Build(snapshot, ArtRules.Default, data, Moment);
 
     private static OwnerData OwnerWith(PictureChoice choice, PictureLink? link) =>
         OwnerData.Empty with { Games = [new OwnerGame(GameId, null, null, new PictureSetting(choice, false, null, null, link))] };

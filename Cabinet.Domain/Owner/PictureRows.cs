@@ -16,6 +16,28 @@ public enum AutomaticSource
     GeneratedCover,
 }
 
+/// <summary>Why the automatic pick drew what it did; one of the four reasons the pictures page words for every row.</summary>
+public enum AutomaticWhy
+{
+    /// <summary>The owned edition's picture is drawn.</summary>
+    OwnedEdition,
+
+    /// <summary>The main picture is drawn because the owned edition's picture reads as something other than a flat cover.</summary>
+    MainBecauseOwnedReads,
+
+    /// <summary>The main picture is drawn because the owned edition has no usable picture.</summary>
+    MainBecauseNoOwned,
+
+    /// <summary>No picture is usable, so the generated cover is drawn.</summary>
+    GeneratedCover,
+}
+
+/// <summary>How many games the owner's worklist holds.</summary>
+/// <param name="ToCheck">The candidates the owner has not dealt with yet.</param>
+/// <param name="Candidates">Every game worth a look, including those the owner dealt with while that still holds.</param>
+/// <param name="Total">Every game.</param>
+public sealed record PictureCounts(int ToCheck, int Candidates, int Total);
+
 /// <summary>One of the four tiles of a game on the pictures page.</summary>
 /// <param name="Kind">Which choice the tile stands for.</param>
 /// <param name="Available">Whether the choice has something behind it; a tile that is not available shows no picture and its radio cannot be picked.</param>
@@ -50,6 +72,9 @@ public sealed record PictureTile(
 /// <param name="CoverText">The text colour of the generated cover.</param>
 /// <param name="CoverPattern">The index of the generated cover's pattern.</param>
 /// <param name="Tiles">The four tiles in the order Automatic, Owned edition, Main picture, Your link.</param>
+/// <param name="Look">What the worklist knows about the game: its reasons to be looked at, its marks and whether it is resolved.</param>
+/// <param name="Why">Why Automatic drew what it did.</param>
+/// <param name="OwnedReadsAs">What the owned edition's picture looks like to the detector, or null when it has no usable picture.</param>
 public sealed record PictureRow(
     int GameId,
     string Title,
@@ -60,7 +85,10 @@ public sealed record PictureRow(
     string CoverBackground,
     string CoverText,
     int CoverPattern,
-    IReadOnlyList<PictureTile> Tiles)
+    IReadOnlyList<PictureTile> Tiles,
+    WorthALookResult Look,
+    AutomaticWhy Why,
+    ArtVerdictKind? OwnedReadsAs)
 {
     /// <summary>The tile of one choice.</summary>
     /// <param name="kind">The choice.</param>
@@ -81,7 +109,8 @@ public static class PictureRows
     /// <param name="snapshot">The stored collection as the sync wrote it.</param>
     /// <param name="rules">The rules that decide what Automatic picks.</param>
     /// <param name="data">What the owner entered.</param>
-    public static IReadOnlyList<PictureRow> Build(CollectionSnapshot snapshot, ArtRules rules, OwnerData data)
+    /// <param name="now">The moment the rows are built for, which decides whether a link counts as dead.</param>
+    public static IReadOnlyList<PictureRow> Build(CollectionSnapshot snapshot, ArtRules rules, OwnerData data, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(rules);
@@ -92,10 +121,39 @@ public static class PictureRows
             .. SnapshotMapper.Explain(snapshot, rules)
                 .GroupBy(trace => trace.Item.GameId)
                 .Select(group => group.First())
-                .Select(trace => RowOf(trace, snapshot, rules, data))
+                .Select(trace => RowOf(trace, snapshot, rules, data, now))
                 .OrderBy(row => row.Title, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(row => row.GameId),
         ];
+    }
+
+    /// <summary>
+    /// The games the owner's worklist opens on: the candidates that are not resolved. Games with a mark that asks for attention
+    /// come first, a missing or broken picture before a link that no longer works before a picture BGG changed, and the rest
+    /// follow; inside each group the games are by title with case ignored and then by game.
+    /// </summary>
+    /// <param name="rows">The rows of every game.</param>
+    public static IReadOnlyList<PictureRow> WorthALookList(IReadOnlyList<PictureRow> rows)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+
+        return
+        [
+            .. rows
+                .Where(row => row.Look.ToCheck)
+                .OrderBy(row => row.Look.AttentionRank)
+                .ThenBy(row => row.Title, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(row => row.GameId),
+        ];
+    }
+
+    /// <summary>Counts what the worklist holds.</summary>
+    /// <param name="rows">The rows of every game.</param>
+    public static PictureCounts CountsOf(IReadOnlyList<PictureRow> rows)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+
+        return new PictureCounts(rows.Count(row => row.Look.ToCheck), rows.Count(row => row.Look.Candidate), rows.Count);
     }
 
     /// <summary>The title to show for an item: the title trimmed, or a name made from the game's number when it is blank.</summary>
@@ -107,7 +165,7 @@ public static class PictureRows
         return string.IsNullOrWhiteSpace(item.Title) ? $"Game {item.GameId}" : item.Title.Trim();
     }
 
-    private static PictureRow RowOf(MappedItemTrace trace, CollectionSnapshot snapshot, ArtRules rules, OwnerData data)
+    private static PictureRow RowOf(MappedItemTrace trace, CollectionSnapshot snapshot, ArtRules rules, OwnerData data, DateTimeOffset now)
     {
         var item = trace.Item;
         var setting = data.Games.FirstOrDefault(game => game.GameId == item.GameId)?.Picture;
@@ -117,10 +175,11 @@ public static class PictureRows
             ArtPick.MainImage => AutomaticSource.MainPicture,
             _ => AutomaticSource.GeneratedCover,
         };
+        var mainUrl = SnapshotMapper.MainPictureUrl(item, snapshot);
         var owned = PictureTileOf(PictureChoice.OwnedEdition, item.VersionImageUrl is not null, trace.VersionImage, rules, source == AutomaticSource.OwnedEdition);
         var main = PictureTileOf(
             PictureChoice.MainPicture,
-            SnapshotMapper.MainPictureUrl(item, snapshot) is not null,
+            mainUrl is not null,
             trace.MainImage,
             rules,
             source == AutomaticSource.MainPicture);
@@ -137,8 +196,18 @@ public static class PictureRows
             tone.Background,
             tone.Text,
             SpinePalette.PatternFor(item.GameId),
-            [automatic, owned, main, LinkTileOf(setting?.Link, rules)]);
+            [automatic, owned, main, LinkTileOf(setting?.Link, rules)],
+            WorthALook.Evaluate(trace, mainUrl, setting, snapshot.Images ?? new Dictionary<string, ImageRecord>(StringComparer.Ordinal), now),
+            WhyOf(source, trace.VersionImage),
+            owned.Verdict);
     }
+
+    private static AutomaticWhy WhyOf(AutomaticSource source, ImageRecord? ownedUsable) => source switch
+    {
+        AutomaticSource.OwnedEdition => AutomaticWhy.OwnedEdition,
+        AutomaticSource.MainPicture => ownedUsable is null ? AutomaticWhy.MainBecauseNoOwned : AutomaticWhy.MainBecauseOwnedReads,
+        _ => AutomaticWhy.GeneratedCover,
+    };
 
     private static PictureTile AutomaticTile(AutomaticSource source, PictureTile owned, PictureTile main)
     {

@@ -40,7 +40,16 @@ public static class OwnerResponses
     /// <param name="pagePath">The page to send a form back to, as the page's own path, written in code.</param>
     /// <param name="anchor">The row to land on, built by the server.</param>
     /// <param name="createdId">The identifier of what the change created, which a script needs to build its row; null when nothing was created.</param>
-    public static IActionResult For(PageModel page, OwnerResult result, string pagePath, string anchor, string? createdId = null)
+    /// <param name="extra">More facts a script needs from the answer, such as the counts a page shows; they are only part of the JSON answer.</param>
+    /// <param name="view">The view of the page to send a form back to, one of a fixed set the page maps in code; null for the page's default view.</param>
+    public static IActionResult For(
+        PageModel page,
+        OwnerResult result,
+        string pagePath,
+        string anchor,
+        string? createdId = null,
+        IReadOnlyDictionary<string, object?>? extra = null,
+        string? view = null)
     {
         ArgumentNullException.ThrowIfNull(page);
         ArgumentNullException.ThrowIfNull(result);
@@ -63,13 +72,18 @@ public static class OwnerResponses
                 body["id"] = createdId;
             }
 
+            foreach (var (name, value) in extra ?? new Dictionary<string, object?>())
+            {
+                body[name] = value;
+            }
+
             return new JsonResult(body)
             {
                 StatusCode = (int)StatusOf(result.Outcome),
             };
         }
 
-        return page.RedirectToPage(pagePath, pageHandler: null, routeValues: new { done = DoneCode(result) }, fragment: anchor);
+        return page.RedirectToPage(pagePath, pageHandler: null, routeValues: new { done = DoneCode(result), view }, fragment: anchor);
     }
 
     /// <summary>The code a redirect carries for a result; always one of a fixed set.</summary>
