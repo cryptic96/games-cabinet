@@ -7,6 +7,7 @@ using Cabinet.Service.Hosting;
 using Cabinet.Service.Language;
 using Cabinet.Service.Layout;
 using Cabinet.Service.Live;
+using Cabinet.Service.Owner;
 using Cabinet.Service.Review;
 using Cabinet.Service.Sync;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -49,6 +50,7 @@ builder.Services.AddRazorPages();
 builder.Services.AddCabinetLayout(builder.Configuration, builder.Environment);
 builder.Services.AddCabinetSync(builder.Configuration, builder.Environment);
 builder.Services.AddCabinetLive(builder.Configuration);
+builder.Services.AddCabinetOwner(builder.Configuration, builder.Environment);
 builder.Services.AddSingleton<ArtFileAudit>();
 
 var buildInfo = BuildInfo.Parse(
@@ -81,6 +83,7 @@ var opsPort = OpsEndpoint.FromConfiguration(app.Configuration);
 
 app.UseContentSecurityPolicy();
 app.UseForwardedHeaders();
+app.UseOwnerClientRange();
 
 app.UseHealthChecks("/health", opsPort, new HealthCheckOptions
 {
@@ -100,9 +103,12 @@ app.UseHealthChecks("/health", opsPort, new HealthCheckOptions
     }
 });
 
+app.UseOwnerPathGuard();
+
 app.UseCabinetArt();
 
 app.UseRouting();
+app.UseOwnerOnlyRoutes();
 
 app.MapStaticAssets();
 app.MapRazorPages().WithStaticAssets();

@@ -13,7 +13,7 @@ using Microsoft.Extensions.Hosting;
 
 namespace Cabinet.IntegrationTests.Infrastructure;
 
-/// <summary>Boots the cabinet host on real Kestrel sockets so the public and ops listeners are genuinely separate.</summary>
+/// <summary>Boots the cabinet host on real Kestrel sockets so the public, ops and owner listeners are genuinely separate.</summary>
 public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
 {
     private const int MaxBindAttempts = 5;
@@ -24,16 +24,18 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
 
     private const string BackgroundSyncKey = "Sync:BackgroundEnabled";
 
+    private const string OwnerUrlKey = "Kestrel:Endpoints:Owner:Url";
+
     private readonly IReadOnlyDictionary<string, string?> _settings;
     private readonly Action<IServiceCollection>? _configureServices;
-    private readonly Func<(int Public, int Ops)> _pickPorts;
+    private readonly Func<(int Public, int Ops, int Owner)> _pickPorts;
     private readonly string? _ownedStorageDirectory;
     private readonly bool _backgroundSyncOnServingHost;
     private readonly RealNetworkGuard _networkGuard = new();
     private readonly HashSet<IFileProvider> _environmentFileProviders = new(ReferenceEqualityComparer.Instance);
     private IHost? _realHost;
 
-    /// <summary>Creates the factory and picks two free loopback ports so clients can be built before the host starts.</summary>
+    /// <summary>Creates the factory and picks three free loopback ports so clients can be built before the host starts.</summary>
     public CabinetWebApplicationFactory()
         : this(new Dictionary<string, string?>())
     {
@@ -67,8 +69,8 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
 
     /// <summary>Creates the factory with its own port picker, so a test can hand it a port that is already taken.</summary>
     /// <param name="settings">Configuration keys and values added on top of the committed settings.</param>
-    /// <param name="pickPorts">Returns the public and ops ports to try; called again whenever a chosen port turns out to be taken.</param>
-    internal CabinetWebApplicationFactory(IReadOnlyDictionary<string, string?> settings, Func<(int Public, int Ops)> pickPorts)
+    /// <param name="pickPorts">Returns the public, ops and owner ports to try; called again whenever a chosen port turns out to be taken.</param>
+    internal CabinetWebApplicationFactory(IReadOnlyDictionary<string, string?> settings, Func<(int Public, int Ops, int Owner)> pickPorts)
         : this(settings, null, pickPorts)
     {
     }
@@ -76,7 +78,7 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
     private CabinetWebApplicationFactory(
         IReadOnlyDictionary<string, string?> settings,
         Action<IServiceCollection>? configureServices,
-        Func<(int Public, int Ops)> pickPorts)
+        Func<(int Public, int Ops, int Owner)> pickPorts)
     {
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(pickPorts);
@@ -93,7 +95,7 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
         _settings = effective;
         _configureServices = configureServices;
         _pickPorts = pickPorts;
-        (PublicPort, OpsPort) = pickPorts();
+        (PublicPort, OpsPort, OwnerPort) = pickPorts();
 
         try
         {
@@ -111,6 +113,9 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
 
     /// <summary>The loopback port the ops listener uses for this instance.</summary>
     public int OpsPort { get; private set; }
+
+    /// <summary>The loopback port the owner listener uses for this instance; no listener is bound to it when the owner endpoint was left out.</summary>
+    public int OwnerPort { get; private set; }
 
     /// <summary>The services of the host that listens on the real sockets, which is where background syncs run when a test asks for them.</summary>
     internal IServiceProvider ServingServices
@@ -135,6 +140,9 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
     /// <summary>An HttpClient bound to the ops listener.</summary>
     public HttpClient CreateOpsClient() => new() { BaseAddress = new Uri($"http://127.0.0.1:{OpsPort}") };
 
+    /// <summary>An HttpClient bound to the owner listener.</summary>
+    public HttpClient CreateOwnerClient() => new() { BaseAddress = new Uri($"http://127.0.0.1:{OwnerPort}") };
+
     /// <inheritdoc />
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -153,8 +161,23 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
 
         builder.ConfigureTestServices(services => services.AddSingleton(_networkGuard.Filter()));
 
+        var ownerEndpointLeftOut = _settings.TryGetValue(OwnerUrlKey, out var ownerUrl) && ownerUrl is null;
+        if (!_settings.ContainsKey(OwnerUrlKey))
+        {
+            builder.UseSetting(OwnerUrlKey, $"http://127.0.0.1:{OwnerPort}");
+            builder.UseSetting("Owner:AllowedRanges:0", "127.0.0.0/8");
+            builder.UseSetting("Owner:AllowedRanges:1", "::1/128");
+            builder.UseSetting("Owner:AllowedRanges:2", "192.0.2.0/24");
+            builder.UseSetting("ReverseProxy:KnownProxies:0", "127.0.0.1");
+        }
+
         foreach (var (key, value) in _settings)
         {
+            if (ownerEndpointLeftOut && key == OwnerUrlKey)
+            {
+                continue;
+            }
+
             builder.UseSetting(key, value);
         }
 
@@ -321,7 +344,7 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
     }
 
     /// <summary>
-    /// Builds and starts the hosts, moving both listeners to fresh ports when one of the chosen ports was taken between
+    /// Builds and starts the hosts, moving the listeners to fresh ports when one of the chosen ports was taken between
     /// being picked and being bound, which parallel tests and outgoing connections can both do. Each attempt goes back
     /// through Server: a failed start leaves that attempt's host builder unable to start again, while Server builds a
     /// new one as long as no host has started.
@@ -337,7 +360,7 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
             }
             catch (Exception exception) when (IsPortClash(exception) && attempt < MaxBindAttempts)
             {
-                (PublicPort, OpsPort) = _pickPorts();
+                (PublicPort, OpsPort, OwnerPort) = _pickPorts();
             }
         }
     }
@@ -353,13 +376,18 @@ public class CabinetWebApplicationFactory : WebApplicationFactory<Program>
         exception is IOException { InnerException: AddressInUseException }
             or SocketException { SocketErrorCode: SocketError.AddressAlreadyInUse };
 
-    /// <summary>Asks the system for two free loopback ports, holding the first while taking the second so they differ.</summary>
-    internal static (int Public, int Ops) PickFreeLoopbackPorts()
+    /// <summary>Asks the system for three free loopback ports, holding the earlier ones while taking the later so they differ.</summary>
+    internal static (int Public, int Ops, int Owner) PickFreeLoopbackPorts()
     {
         using var publicListener = new TcpListener(IPAddress.Loopback, 0);
         using var opsListener = new TcpListener(IPAddress.Loopback, 0);
+        using var ownerListener = new TcpListener(IPAddress.Loopback, 0);
         publicListener.Start();
         opsListener.Start();
-        return (((IPEndPoint)publicListener.LocalEndpoint).Port, ((IPEndPoint)opsListener.LocalEndpoint).Port);
+        ownerListener.Start();
+        return (
+            ((IPEndPoint)publicListener.LocalEndpoint).Port,
+            ((IPEndPoint)opsListener.LocalEndpoint).Port,
+            ((IPEndPoint)ownerListener.LocalEndpoint).Port);
     }
 }
