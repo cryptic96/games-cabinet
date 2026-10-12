@@ -5,6 +5,7 @@
 @model Cabinet.Service.Pages.Owner.PicturesModel
 @section Head {
     <link rel="stylesheet" href="~/css/card.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/cabinet.css" asp-append-version="true" />
 }
 <h2>@OwnerStrings.Pictures</h2>
 <p class="owner-intro">@OwnerStrings.PicturesIntro</p>
@@ -246,6 +247,30 @@ else
                             <p class="owner-hint" id="no-locations-note">@OwnerStrings.AddLocationOnLocationsPage <a class="pic-link" href="~/owner/locations">@OwnerStrings.LocationsLink</a></p>
                         }
                     }
+                    @{
+                    var preview = Model.Preview is not null && Model.PreviewToken is not null && game.GameId == Model.SingleGameId
+                        ? new LinkPreviewModel(game.GameId, Model.PreviewToken, Model.Preview, Model.Revision)
+                        : null;
+                    var linkFieldId = $"pic-link-{game.GameId}";
+                    var linkHintId = $"pic-link-hint-{game.GameId}";
+                    var linkErrorId = $"pic-link-error-{game.GameId}";
+                    }
+                    <details class="pic-linkbox" open="@(preview is not null)">
+                        <summary>@OwnerStrings.LinkSummary</summary>
+                        <form method="post" class="pic-link-form" asp-page-handler="CheckLink">
+                            <input type="hidden" name="gameId" value="@game.GameId" />
+                            <label for="@linkFieldId">@OwnerStrings.LinkLabel</label>
+                            <input id="@linkFieldId" name="link" type="url" inputmode="url" autocomplete="off" spellcheck="false" autocapitalize="none" dir="ltr"
+                                   aria-describedby="@linkHintId" />
+                            <p class="owner-hint" id="@linkHintId">@OwnerStrings.LinkHint</p>
+                            <p class="pic-link-error" id="@linkErrorId" role="alert" hidden></p>
+                            <button type="submit" class="owner-btn-primary" data-check-link>@OwnerStrings.CheckLinkButton</button>
+                        </form>
+                        @if (preview is not null)
+                        {
+                            <partial name="_LinkPreview" model="preview" />
+                        }
+                    </details>
                 </li>
             }
         </ul>

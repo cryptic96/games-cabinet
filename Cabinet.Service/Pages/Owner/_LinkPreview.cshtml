@@ -1,0 +1,62 @@
+@using Cabinet.Domain.Owner
+@using Cabinet.Service.Owner
+@using Cabinet.Service.Pages.Owner
+@model Cabinet.Service.Pages.Owner.LinkPreviewModel
+@{
+    var preview = Model.Preview;
+    var gameId = Model.GameId;
+    var previewId = $"pic-preview-{gameId}";
+    var headingId = $"pic-preview-heading-{gameId}";
+    var previewUrl = $"{OwnerEndpoints.PreviewPath}/{Model.Token}";
+    var boxWidth = LinkPreviewModel.Pixels(preview.BoxWidthMm);
+    var boxHeight = LinkPreviewModel.Pixels(preview.BoxHeightMm);
+    var spineWidth = LinkPreviewModel.Pixels(preview.SpineWidthMm);
+    var spineHeight = LinkPreviewModel.Pixels(preview.SpineHeightMm);
+    var edge = preview.Edges?.Top ?? preview.Spine.Background;
+    var note = OwnerStrings.PreviewNote(preview.Verdict);
+}
+<section class="pic-preview" id="@previewId" aria-labelledby="@headingId" data-token="@Model.Token" data-game-id="@gameId">
+    <h4 id="@headingId" tabindex="-1">@OwnerStrings.PreviewHeading</h4>
+    <p class="pic-preview-sub">@OwnerStrings.PreviewSub</p>
+    <div class="preview-shelf" data-static>
+        <span class="preview-back" aria-hidden="true"></span>
+        <span class="preview-board" aria-hidden="true"></span>
+        <div class="preview-slot" data-slot="box">
+            <svg class="preview-fallback" width="@boxWidth" height="@boxHeight" viewBox="0 0 @boxWidth @boxHeight" role="img" aria-label="@OwnerStrings.PreviewBoxLabel(preview.Title)">
+                <rect width="@boxWidth" height="@boxHeight" fill="@edge" />
+                <image href="@previewUrl" width="@boxWidth" height="@boxHeight" preserveAspectRatio="xMidYMid meet" />
+            </svg>
+        </div>
+        <div class="preview-slot" data-slot="spine">
+            <svg class="preview-fallback" width="@spineWidth" height="@spineHeight" viewBox="0 0 @spineWidth @spineHeight" role="img" aria-label="@OwnerStrings.PreviewSpineLabel(preview.Title)">
+                <rect width="@spineWidth" height="@spineHeight" fill="@preview.Spine.Background" />
+                <text x="@(spineWidth / 2)" y="@(spineHeight / 2)" fill="@preview.Spine.Text" font-size="12" font-weight="600" text-anchor="middle" dominant-baseline="central" writing-mode="vertical-rl">@preview.SpineLabel</text>
+            </svg>
+        </div>
+        <span class="preview-caption" data-slot="box">@OwnerStrings.BoxFrontCaption</span>
+        <span class="preview-caption" data-slot="spine">@OwnerStrings.SpineCaption</span>
+    </div>
+    <p class="pic-preview-facts">
+        <span class="pic-tag" data-preview-verdict>@OwnerStrings.VerdictTag(preview.Verdict)</span>
+        <span class="pic-preview-shape" data-preview-shape>@OwnerStrings.ShapeText(preview.ShapeSource)</span>
+    </p>
+    @if (note is not null)
+    {
+        <p class="pic-note" data-preview-note>@note</p>
+    }
+    <p class="pic-why" data-preview-disclaimer>@OwnerStrings.PreviewDisclaimer</p>
+    <div class="pic-preview-actions">
+        <form method="post" asp-page-handler="UseLink">
+            <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
+            <input type="hidden" name="gameId" value="@gameId" />
+            <input type="hidden" name="token" value="@Model.Token" />
+            <input type="hidden" name="game" value="@gameId" />
+            <button type="submit" class="owner-btn-primary" data-use-preview>@OwnerStrings.UseThisButton</button>
+        </form>
+        <form method="post" asp-page-handler="DiscardPreview">
+            <input type="hidden" name="gameId" value="@gameId" />
+            <input type="hidden" name="token" value="@Model.Token" />
+            <button type="submit" class="owner-btn" data-discard-preview>@OwnerStrings.DiscardPreviewButton</button>
+        </form>
+    </div>
+</section>
