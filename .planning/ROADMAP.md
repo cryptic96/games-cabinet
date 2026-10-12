@@ -363,16 +363,16 @@ Plans:
   3. Overrides (and locations, if edited in the app) survive syncs, restarts and new releases, and a backup exists from which a fresh container can be restored without losing them.
   4. Conditional on the Phase 3 spike outcome: if BGG cannot supply locations, the owner can define their own list of storage locations (rooms, cabinets, "Lent out") and assign one to each game; if BGG does supply them, this criterion is closed by recording that no location editor is needed.
 
-**Plans:** 30 plans
+**Plans:** 5/30 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 06-01-PLAN.md — Tracer - the owner port answers only at home
-- [ ] 06-02-PLAN.md — The owner host's road through the firewall and the reverse proxy
-- [ ] 06-03-PLAN.md — Verdict kinds and the review sheet's fixes
-- [ ] 06-04-PLAN.md — Details backoff - a game BGG never describes is not asked for every hour
-- [ ] 06-05-PLAN.md — Plausible cover shapes and an order-independent mapping
+- [x] 06-01-PLAN.md — Tracer - the owner port answers only at home
+- [x] 06-02-PLAN.md — The owner host's road through the firewall and the reverse proxy
+- [x] 06-03-PLAN.md — Verdict kinds and the review sheet's fixes
+- [x] 06-04-PLAN.md — Details backoff - a game BGG never describes is not asked for every hour
+- [x] 06-05-PLAN.md — Plausible cover shapes and an order-independent mapping
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -524,7 +524,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 3. BGG Access Spike, Real Sync & Snapshot | 15/15 | Complete    | 2026-10-07 |
 | 4. Enrichment, Box Images & Shape | 23/23 | Complete    | 2026-10-09 |
 | 5. Game Detail, Accessibility & Language | 16/16 | Complete    | 2026-10-12 |
-| 6. Owner Tools & Persistence | 0/0 | Not started | - |
+| 6. Owner Tools & Persistence | 5/30 | In Progress|  |
 | 6.1. Selectable Cabinet Finishes & Lighting (INSERTED) | 0/0 | Not started | - |
 | 7. Game-Night Filters & Location Cabinets | 0/0 | Not started | - |
 | 8. Public Hardening & Go-Public | 0/0 | Not started | - |
