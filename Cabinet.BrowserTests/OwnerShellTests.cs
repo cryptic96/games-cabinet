@@ -97,4 +97,23 @@ public sealed class OwnerShellTests : CabinetPageTest
         await Expect(Page.Locator("footer .bgg-credit")).ToHaveAttributeAsync("href", "https://boardgamegeek.com");
         await Expect(Page.Locator(".owner-plate")).ToHaveCountAsync(0);
     }
+
+    [Fact]
+    public async Task Every_bar_item_is_a_phone_sized_target_and_the_bar_wraps_at_320_pixels_without_sideways_scrolling()
+    {
+        await Page.SetViewportSizeAsync(320, 640);
+        await StartAsync(NoSettings);
+        await GotoOwnerAsync("/owner/settings");
+
+        var boxes = await Page.Locator("nav.owner-bar a").EvaluateAllAsync<double[][]>(
+            "links => links.map(link => { const box = link.getBoundingClientRect(); return [box.width, box.height, box.top]; })");
+        var overflow = await Page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth > document.documentElement.clientWidth");
+        var plateTop = await Page.Locator(".owner-plate").EvaluateAsync<double>("element => element.getBoundingClientRect().top");
+        var titleBottom = await Page.Locator("header h1").EvaluateAsync<double>("element => element.getBoundingClientRect().bottom");
+
+        boxes.Should().OnlyContain(box => box[0] >= 44 && box[1] >= 44);
+        boxes.Select(box => box[2]).Distinct().Count().Should().BeGreaterThan(1, "four items cannot share one line at 320 pixels");
+        overflow.Should().BeFalse();
+        plateTop.Should().BeLessThan(titleBottom, "the plate stays on the title's row");
+    }
 }
