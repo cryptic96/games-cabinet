@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using Cabinet.IntegrationTests.Infrastructure;
 using FluentAssertions;
 
@@ -117,5 +118,83 @@ public class OwnerWallTests
         var cookies = response.Headers.TryGetValues("Set-Cookie", out var values) ? values : [];
 
         cookies.Should().OnlyContain(cookie => cookie.StartsWith("cabinet-owner-af", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_forwarded_address_from_the_known_proxy_inside_a_range_gets_through()
+    {
+        await using var host = await UntrustedPeerHost.StartAsync("198.51.100.1", "192.0.2.0/24");
+
+        var (status, _) = await host.GetProbeAsync("198.51.100.1", UntrustedPeerHost.OwnerPort, "192.0.2.10");
+
+        status.Should().Be(200);
+    }
+
+    [Fact]
+    public async Task A_forwarded_address_from_the_known_proxy_outside_every_range_is_refused()
+    {
+        await using var host = await UntrustedPeerHost.StartAsync("198.51.100.1", "192.0.2.0/24");
+
+        var (status, _) = await host.GetProbeAsync("198.51.100.1", UntrustedPeerHost.OwnerPort, "203.0.113.9");
+
+        status.Should().Be(403);
+    }
+
+    [Fact]
+    public async Task A_forged_forwarded_address_from_an_untrusted_peer_is_ignored_and_the_peer_is_refused()
+    {
+        await using var host = await UntrustedPeerHost.StartAsync("198.51.100.1", "192.0.2.0/24");
+
+        var (ownerStatus, _) = await host.GetProbeAsync("198.51.100.7", UntrustedPeerHost.OwnerPort, "192.0.2.10");
+        var (publicStatus, publicBody) = await host.GetProbeAsync("198.51.100.7", UntrustedPeerHost.PublicPort, "192.0.2.10");
+
+        ownerStatus.Should().Be(403);
+        publicStatus.Should().Be(200);
+        publicBody.Should().Be("198.51.100.7");
+    }
+
+    [Fact]
+    public async Task Every_request_on_one_kept_alive_owner_connection_is_range_checked_on_its_own()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        var connections = 0;
+        using var handler = new SocketsHttpHandler
+        {
+            MaxConnectionsPerServer = 1,
+            ConnectCallback = async (context, cancellationToken) =>
+            {
+                Interlocked.Increment(ref connections);
+                var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+                try
+                {
+                    await socket.ConnectAsync(context.DnsEndPoint, cancellationToken);
+
+                    return new NetworkStream(socket, ownsSocket: true);
+                }
+                catch
+                {
+                    socket.Dispose();
+                    throw;
+                }
+            },
+        };
+        using var owner = new HttpClient(handler) { BaseAddress = new Uri($"http://127.0.0.1:{factory.OwnerPort}") };
+
+        var statuses = new List<HttpStatusCode>();
+        foreach (var forwardedFor in new string?[] { "192.0.2.10", "203.0.113.9", null })
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/owner/settings");
+            if (forwardedFor is not null)
+            {
+                request.Headers.Add("X-Forwarded-For", forwardedFor);
+            }
+
+            using var response = await owner.SendAsync(request, TestContext.Current.CancellationToken);
+            await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+            statuses.Add(response.StatusCode);
+        }
+
+        statuses.Should().Equal(HttpStatusCode.OK, HttpStatusCode.Forbidden, HttpStatusCode.OK);
+        connections.Should().Be(1);
     }
 }
