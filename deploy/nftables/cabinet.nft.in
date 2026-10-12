@@ -4,8 +4,8 @@
 ### installed as /etc/nftables.conf. Default-drop input and forward:
 ### nothing reaches this host except loopback traffic, already-established
 ### connections, rate-limited ICMP/ICMPv6, SSH from the admin subnets, and
-### the app port from the reverse proxy. Every other inbound connection is
-### dropped before it reaches any service. The operations listener binds to
+### the app port and the owner port from the reverse proxy only. Every other
+### inbound connection is dropped before it reaches any service. The operations listener binds to
 ### loopback only and has no rule here.
 ###
 flush ruleset
@@ -23,6 +23,7 @@ table inet cabinet_filter {
 
     tcp dport 22 ip saddr { @CABINET_ADMIN_SSH_SOURCES@ } accept
     tcp dport 5080 ip saddr @CABINET_TRAEFIK_IP@ accept
+    tcp dport 5082 ip saddr @CABINET_TRAEFIK_IP@ accept
   }
 
   chain forward {

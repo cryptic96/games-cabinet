@@ -16,6 +16,7 @@ directory it owns.
 | What | Where it listens | Who can reach it |
 | --- | --- | --- |
 | Web application | port 5080 | the reverse proxy only (the firewall drops everyone else) |
+| Owner tools | port 5082 | the reverse proxy only, and only when the owner tools are switched on |
 | Operations and health endpoint | port 5081, loopback only | processes on the container itself; no route through the reverse proxy |
 | SSH | port 22 | the admin address ranges only, with keys only |
 
@@ -178,6 +179,51 @@ container.
 In your DNS, point the site's hostname (for example `cabinet.example.com`) at
 the Traefik container's address.
 
+## 7a. The owner host
+
+The owner tools (correcting box images and managing storage locations) are
+served on a port and a hostname of their own and are off by default: a release
+installs with the owner port closed until you switch it on. Switching them on
+takes four steps, all on your side:
+
+1. Add the owner router. `deploy/traefik/cabinet.yml.example` carries a second
+   router, `cabinet-owner`, on its own hostname (the example uses
+   `owner.example.com`) and a service pointing at this container's address on
+   port 5082. Copy both into the real file next to the public router. The
+   owner router uses the same LAN and VPN allow-list and security headers, and
+   it keeps that allow-list permanently: when you later remove the allow-list
+   from the public router to open the site to everyone, leave it on the owner
+   router. The entry point must append the client address to `X-Forwarded-For`
+   (Traefik's default); do not enable `notAppendXForwardedFor` and do not list
+   client networks under `trustedIPs` in the entry point's `forwardedHeaders`.
+2. Add the DNS record. Point the owner hostname at the Traefik container, the
+   same way as the public hostname.
+3. Switch the endpoint on. Add these lines to `/etc/cabinet/cabinet.env`
+   (`deploy/cabinet.env.example` shows them commented out, with placeholder
+   ranges), using your own LAN and VPN ranges:
+
+   ```text
+   Kestrel__Endpoints__Owner__Url=http://0.0.0.0:5082
+   Owner__AllowedRanges__0={your-lan-range}
+   Owner__AllowedRanges__1={your-vpn-range}
+   ```
+
+   `ReverseProxy__KnownProxies__0` must be the Traefik container's address,
+   because the owner tools trust the forwarded client address only from it.
+   Then restart the application with `sudo systemctl restart cabinet`.
+4. Check it. Run `cabinet-selfcheck` on the container, then
+   `build/check-owner-routes.sh` from a machine on your home network or VPN
+   (see [the deploy guide](deploy.md)).
+
+The firewall already admits port 5082 from the Traefik container only, the
+same as port 5080, so nothing else on the network can reach it. There are two
+more walls behind the proxy's allow-list. The firewall is the second: it drops
+every other source. The application is the third: it checks the client address
+itself against `Owner__AllowedRanges__*` and answers `403` to any address
+outside the ranges, and the public port answers `404` for every owner path.
+All walls must agree; the selfcheck and the route check each prove part of
+that.
+
 ## 8. Apply the GitHub repository settings
 
 Follow [the repository settings guide](github-repository-settings.md) once,
@@ -215,6 +261,10 @@ This proves the host end to end and prints PASS or FAIL for each check:
 - ownership and modes of the configuration, state and release directories;
 - the application answers on port 5080 and the operations port 5081 is
   bound to loopback only;
+- the owner port 5082 is listening or, when the owner tools are off, nothing
+  listens on it; the public port answers `404` for the owner pages, and when
+  the owner port listens a request through loopback that claims an address
+  outside the allowed ranges is refused with `403`;
 - the firewall's input chain drops by default;
 - the health endpoint reports `Healthy` at exactly the version the `current`
   link points at;

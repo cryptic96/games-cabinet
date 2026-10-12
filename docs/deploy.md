@@ -161,6 +161,35 @@ version and commit, and finally shows that a copy of the archive with one
 byte changed is refused. It prints one PASS or FAIL line per check and exits 1
 on the first failure.
 
+## Switching the owner tools on after a release
+
+A release never switches the owner tools on by itself: the owner endpoint and
+the allowed ranges live in the server's environment file, and the commented
+placeholders in `deploy/cabinet.env.example` are only a reminder of the keys.
+The steps to switch them on (the second router, the DNS name and the env
+lines) are in [the container guide](lxc-setup.md#7a-the-owner-host).
+
+After switching them on, or after any release that changes the proxy or
+firewall setup, prove the owner host two ways:
+
+- On the server, `cabinet-selfcheck` reports whether the owner port is
+  listening, that the public port hides the owner pages with a `404`, and that
+  the owner port refuses a forged out-of-range client address with a `403`.
+- From a machine on the home network or VPN, run
+  `build/check-owner-routes.sh` with the two hostnames in the environment:
+
+  ```bash
+  CABINET_OWNER_HOST={owner-hostname} CABINET_PUBLIC_HOST={public-hostname} \
+    build/check-owner-routes.sh
+  ```
+
+  It passes only when the owner host serves its home page (showing the
+  "Owner tools" plate), the pictures page and the settings page, and the public
+  host answers `404` for the owner pictures page and for an owner preview
+  address, and serves its home page without any `/owner` reference. It prints
+  one PASS or FAIL line per check with status codes only; the hostnames are
+  never printed and never written into the repository.
+
 ## Where outcomes appear
 
 - The journal of the poll unit, `journalctl -u cabinet-deploy-poll`, shows

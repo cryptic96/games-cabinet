@@ -246,7 +246,7 @@ STUB_BIN="${WORK_DIR}/stub-bin"
 mkdir -p "$STUB_BIN"
 export STUB_ARGS_LOG="${WORK_DIR}/stub-args.log"
 
-for stub in systemd-run ss nft sshd; do
+for stub in systemd-run ss nft sshd curl; do
   cat > "${STUB_BIN}/${stub}" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "${STUB_ARGS_LOG}"
@@ -255,6 +255,13 @@ case "$(basename "$0")" in
   ss) printf '%s\n' "${STUB_SS_OUTPUT:-}" ;;
   nft) printf '%s\n' "${STUB_NFT_OUTPUT:-}" ;;
   sshd) printf '%s\n' "${STUB_SSHD_OUTPUT:-}" ;;
+  curl)
+    case "$*" in
+      *:5082*) printf '%s' "${STUB_CURL_STATUS_OWNER:-000}" ;;
+      *:5080*) printf '%s' "${STUB_CURL_STATUS_APP:-000}" ;;
+      *) printf '000' ;;
+    esac
+    ;;
 esac
 STUB
   chmod +x "${STUB_BIN}/${stub}"
@@ -309,15 +316,75 @@ check "image smoke fails when the binary prints nothing" "0 1" "${RUN_PASSED} ${
 STUB_SS_OUTPUT=$'LISTEN 0 512 0.0.0.0:5080 0.0.0.0:*\nLISTEN 0 512 127.0.0.1:5081 0.0.0.0:*'
 export STUB_SS_OUTPUT
 run_selfcheck_function check_listeners
-check "listeners pass with 5080 public and 5081 on loopback" "2 0" "${RUN_PASSED} ${RUN_FAILED}"
+check "listeners pass with 5080 public, 5081 on loopback and the owner tools off" "3 0" "${RUN_PASSED} ${RUN_FAILED}"
+check "listeners say the owner tools are off when nothing listens on 5082" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "the owner tools are off (nothing listens on port 5082)")"
+
+STUB_SS_OUTPUT=$'LISTEN 0 512 0.0.0.0:5080 0.0.0.0:*\nLISTEN 0 512 127.0.0.1:5081 0.0.0.0:*\nLISTEN 0 512 0.0.0.0:5082 0.0.0.0:*'
+run_selfcheck_function check_listeners
+check "listeners pass three checks with the owner port listening" "3 0" "${RUN_PASSED} ${RUN_FAILED}"
+check "listeners report the owner port when it listens" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "the owner port 5082 is listening")"
 
 STUB_SS_OUTPUT=$'LISTEN 0 512 0.0.0.0:5080 0.0.0.0:*\nLISTEN 0 512 0.0.0.0:5081 0.0.0.0:*'
 run_selfcheck_function check_listeners
-check "listeners fail when the ops port is bound beyond loopback" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "listeners fail when the ops port is bound beyond loopback" "2 1" "${RUN_PASSED} ${RUN_FAILED}"
 
 STUB_SS_OUTPUT=$'LISTEN 0 512 127.0.0.1:5081 0.0.0.0:*'
 run_selfcheck_function check_listeners
-check "listeners fail when nothing serves the public port" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "listeners fail when nothing serves the public port" "2 1" "${RUN_PASSED} ${RUN_FAILED}"
+
+OWNER_LISTENING_SS=$'LISTEN 0 512 0.0.0.0:5080 0.0.0.0:*\nLISTEN 0 512 127.0.0.1:5081 0.0.0.0:*\nLISTEN 0 512 0.0.0.0:5082 0.0.0.0:*'
+OWNER_OFF_SS=$'LISTEN 0 512 0.0.0.0:5080 0.0.0.0:*\nLISTEN 0 512 127.0.0.1:5081 0.0.0.0:*'
+
+STUB_SS_OUTPUT="$OWNER_LISTENING_SS"
+STUB_CURL_STATUS_APP=404
+STUB_CURL_STATUS_OWNER=403
+export STUB_CURL_STATUS_APP STUB_CURL_STATUS_OWNER
+run_selfcheck_function check_owner_wall
+check "owner wall passes when the public port hides the owner pages and the owner port refuses a forged address" \
+  "2 0" "${RUN_PASSED} ${RUN_FAILED}"
+check "owner wall sends the forged forwarded address to the owner port" "1" \
+  "$(file_has_text "$STUB_ARGS_LOG" "X-Forwarded-For: 203.0.113.7")"
+check "owner wall never prints the forged address" "0" \
+  "$(file_has_text "${WORK_DIR}/run.out" "203.0.113.7")"
+
+STUB_CURL_STATUS_OWNER=200
+run_selfcheck_function check_owner_wall
+check "owner wall fails when the owner port serves a forged out-of-range address" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "owner wall reports the status code of the failed probe" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "status 200")"
+
+STUB_CURL_STATUS_OWNER=000
+run_selfcheck_function check_owner_wall
+check "owner wall fails when the owner port gives no answer" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+
+STUB_CURL_STATUS_APP=200
+STUB_CURL_STATUS_OWNER=403
+run_selfcheck_function check_owner_wall
+check "owner wall fails when the public port serves an owner page" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+
+STUB_CURL_STATUS_APP=403
+run_selfcheck_function check_owner_wall
+check "owner wall fails when the public port answers 403 instead of 404" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+
+STUB_SS_OUTPUT="$OWNER_OFF_SS"
+STUB_CURL_STATUS_APP=404
+STUB_CURL_STATUS_OWNER=200
+run_selfcheck_function check_owner_wall
+check "owner wall skips the forged probe when the owner port is off" "2 0" "${RUN_PASSED} ${RUN_FAILED}"
+check "owner wall says the owner tools are off when nothing listens" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "owner tools are off")"
+check "owner wall does not call the owner port when it is off" "0" \
+  "$(file_has_text "$STUB_ARGS_LOG" ":5082")"
+
+STUB_CURL_STATUS_APP=200
+run_selfcheck_function check_owner_wall
+check "owner wall still fails an owner page on the public port when the owner port is off" "1 1" \
+  "${RUN_PASSED} ${RUN_FAILED}"
+
+check "selfcheck runs the owner wall check" "1" \
+  "$(file_has_line "$SELFCHECK" "  check_owner_wall")"
 
 STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain input {\n\t\ttype filter hook input priority filter; policy drop;\n\t}\n}'
 export STUB_NFT_OUTPUT
