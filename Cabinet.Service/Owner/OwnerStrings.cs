@@ -1,3 +1,6 @@
+using Cabinet.Domain.Collection;
+using Cabinet.Domain.Owner;
+
 namespace Cabinet.Service.Owner;
 
 /// <summary>The English text of the owner pages' shell. The owner tools are written in English only.</summary>
@@ -47,6 +50,57 @@ public static class OwnerStrings
 
     /// <summary>The picture choice that draws the picture at the owner's own link.</summary>
     public const string ChoiceYourLink = "Your link";
+
+    /// <summary>The heading shown in place of the pictures list while no game has been synced.</summary>
+    public const string PicturesNoGamesHeading = "No games yet.";
+
+    /// <summary>The line under <see cref="PicturesNoGamesHeading"/>.</summary>
+    public const string PicturesNoGamesBody = "Your games show up here after the first sync.";
+
+    /// <summary>The line on a tile whose candidate picture BGG does not have.</summary>
+    public const string TileBggHasNone = "BGG has none";
+
+    /// <summary>The line on the Your link tile while the owner has stored no link.</summary>
+    public const string TileNoLinkYet = "None yet";
+
+    /// <summary>The text on the Your link tile while the stored link's picture has not arrived.</summary>
+    public const string TileFetching = "Fetching...";
+
+    /// <summary>The tag on the tile whose picture the Automatic tile shows.</summary>
+    public const string AutomaticsPick = "Automatic's pick";
+
+    /// <summary>The tag a picture gets when the detector cannot tell what shape it has, and the one an unknown kind falls back to.</summary>
+    public const string VerdictUnsure = "Shape unsure";
+
+    /// <summary>The label of the tile of one picture choice.</summary>
+    /// <param name="choice">The choice the tile stands for.</param>
+    public static string TileLabel(PictureChoice choice) => choice switch
+    {
+        PictureChoice.OwnedEdition => ChoiceOwnedEdition,
+        PictureChoice.MainPicture => ChoiceMainPicture,
+        PictureChoice.Link => ChoiceYourLink,
+        _ => ChoiceAutomatic,
+    };
+
+    /// <summary>The words that tell the owner what a picture looks like to the detector.</summary>
+    /// <param name="kind">The kind of verdict.</param>
+    public static string VerdictTag(ArtVerdictKind kind) => kind switch
+    {
+        ArtVerdictKind.Flat => "Reads as a flat cover",
+        ArtVerdictKind.ThreeD => "Reads as a 3D shot",
+        ArtVerdictKind.CutOut => "Reads as a cut-out",
+        ArtVerdictKind.TightCrop => "Reads as a tight crop",
+        _ => VerdictUnsure,
+    };
+
+    /// <summary>The line on the Automatic tile that names the tile it duplicates.</summary>
+    /// <param name="source">Which picture Automatic draws.</param>
+    public static string AutomaticSubLine(AutomaticSource source) => source switch
+    {
+        AutomaticSource.OwnedEdition => $"Same as {ChoiceOwnedEdition}",
+        AutomaticSource.MainPicture => $"Same as {ChoiceMainPicture}",
+        _ => "Uses a generated cover",
+    };
 
     /// <summary>The heading of the games panel on the locations page.</summary>
     public const string GamesHeading = "Games";
