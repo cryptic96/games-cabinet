@@ -52,12 +52,9 @@ public sealed class OwnerLocationListTests : CabinetPageTest
         await Expect(Page.Locator("#your-locations[open]")).ToHaveCountAsync(1);
 
         await Page.Locator($"#game-{game.GameId} select").SelectOptionAsync(new SelectOptionValue { Label = "Cabinet A" });
-        await Page.Locator($"#game-{game.GameId} button").ClickAsync();
-        await Page.WaitForURLAsync("**/owner/locations?done=saved**");
-        await WaitEnhancedAsync();
+        await Expect(Page.Locator($"#game-{game.GameId} .row-status")).ToContainTextAsync("Saved");
         (await ReadCardsAsync()).Single(card => card.EntryId == game.EntryId).Location.Should().Be("Cabinet A");
 
-        await Page.Locator("#your-locations summary").ClickAsync();
         var changesBefore = ChangeCount(host);
         var field = Page.Locator(".loc-item .loc-name");
         await field.FillAsync("Shelf B");

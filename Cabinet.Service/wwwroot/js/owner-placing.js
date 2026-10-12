@@ -12,7 +12,7 @@ import {
   moveTitleText,
   selectedText,
 } from './owner-format.js';
-import { announce, postOwner, showRowProblem, showRowStatus } from './owner-shared.js';
+import { announce, postOwner, setPickerValue, showRowProblem, showRowStatus } from './owner-shared.js';
 
 /** The handler addresses, relative to the page the script runs on. */
 const HANDLERS = Object.freeze({
@@ -79,8 +79,9 @@ function buildMoveDialog(doc) {
  *   locations: () => Array<{ id: string, name: string }>,
  *   showProblem: (region: HTMLElement, result: object) => void,
  *   gamesChanged: () => void,
- * }} hooks What the list of locations offers: one request at a time, the locations in order, the way a failure is worded, and
- * the call that brings the counts of every location in line after games moved.
+ *   selectionChanged?: () => void,
+ * }} hooks What the list of locations offers: one request at a time, the locations in order, the way a failure is worded, the
+ * call that brings the counts of every location in line after games moved, and the call that tells the toolbar the ticks changed.
  * @returns {{ refreshMeta: () => void } | null} The part other code needs, or null when the page has no games list.
  */
 export function initPlacing(doc, hooks) {
@@ -208,6 +209,7 @@ export function initPlacing(doc, hooks) {
 
     globalThis.clearTimeout(announceTimer);
     resetStatus();
+    hooks.selectionChanged?.();
 
     if (count === 0) {
       hide();
@@ -227,6 +229,8 @@ export function initPlacing(doc, hooks) {
     for (const row of tickedRows()) {
       row.querySelector('.game-check').checked = false;
     }
+
+    hooks.selectionChanged?.();
   }
 
   /**
@@ -306,7 +310,7 @@ export function initPlacing(doc, hooks) {
         }
 
         for (const { row, own } of previous) {
-          pickerOf(row).value = own;
+          setPickerValue(pickerOf(row), own);
         }
 
         hooks.gamesChanged();
@@ -341,7 +345,7 @@ export function initPlacing(doc, hooks) {
       const own = target.startsWith(LOCATION_TARGET) ? target.slice(LOCATION_TARGET.length) : '';
 
       for (const row of eligible) {
-        pickerOf(row).value = own;
+        setPickerValue(pickerOf(row), own);
       }
 
       hooks.gamesChanged();

@@ -33,6 +33,10 @@ const {
   movedGamesText,
   clearedGamesText,
   effectiveLocationIds,
+  showingText,
+  noMatchText,
+  resultText,
+  unplacedLabel,
 } =
   await loadPageScript('owner-format.js');
 
@@ -155,4 +159,33 @@ test('leaving a location out shows its games, and the expansions that followed t
   const shown = effectiveLocationIds(rows, 'a');
 
   assert.deepEqual([...shown], [['1', ''], ['2', ''], ['3', '']]);
+});
+
+test('the count line says how many games are shown', () => {
+  assert.equal(showingText(2, 65), 'Showing 2 of 65 games');
+  assert.equal(showingText(1, 1), 'Showing 1 of 1 games');
+});
+
+test('the no-match line names the query and keeps it as plain text', () => {
+  assert.equal(noMatchText('zzz'), 'No games match "zzz".');
+  assert.equal(noMatchText('<b>"x"</b>'), 'No games match "<b>"x"</b>".');
+});
+
+test('the result words follow the query and the not-placed switch', () => {
+  assert.equal(resultText({ shown: 2, total: 65, query: 'cafe', unplacedOnly: false }), 'Showing 2 of 65 games');
+  assert.equal(resultText({ shown: 0, total: 65, query: 'zzz', unplacedOnly: false }), 'No games match "zzz".');
+  assert.equal(resultText({ shown: 0, total: 65, query: 'zzz', unplacedOnly: true }), 'No games match "zzz".');
+  assert.equal(resultText({ shown: 0, total: 65, query: '', unplacedOnly: true }), 'Every game is placed.');
+  assert.equal(resultText({ shown: 3, total: 65, query: '', unplacedOnly: true }), 'Showing 3 of 65 games');
+});
+
+test('the not-placed switch carries its count', () => {
+  assert.equal(unplacedLabel(0), 'Not placed yet (0)');
+  assert.equal(unplacedLabel(12), 'Not placed yet (12)');
+});
+
+test('the words of the picker and the empty states are in the table', () => {
+  assert.equal(OWNER_TEXT.saved, 'Saved');
+  assert.equal(OWNER_TEXT.noMatch, 'No games match.');
+  assert.equal(OWNER_TEXT.everyPlaced, 'Every game is placed.');
 });

@@ -61,10 +61,23 @@ else
         }
         else
         {
-            @if (Model.Locations.Count == 0)
-            {
-                <p>@OwnerStrings.AddLocationFirst</p>
-            }
+            <p class="owner-hint" id="no-locations-note" hidden="@(Model.Locations.Count > 0)">@OwnerStrings.AddLocationFirst</p>
+            <div class="games-toolbar" id="games-toolbar" hidden>
+                <div class="owner-find">
+                    <label for="game-find">@OwnerStrings.FindLabel</label>
+                    <input id="game-find" type="search" autocomplete="off" dir="auto" />
+                </div>
+                <label class="owner-switch">
+                    <input id="unplaced-switch" type="checkbox" role="switch" checked="@Model.FilterUnplaced" />
+                    <span id="unplaced-label">@OwnerStrings.UnplacedLabel(Model.UnplacedCount)</span>
+                </label>
+                <label class="owner-switch owner-selectall">
+                    <input id="select-all" type="checkbox" />
+                    <span>@OwnerStrings.SelectAllShown</span>
+                </label>
+            </div>
+            <p class="owner-hint games-count" id="games-count" hidden></p>
+            <p class="games-empty" id="games-empty" hidden></p>
             <ul class="game-list" role="list">
                 @foreach (var game in Model.Games)
                 {
@@ -94,18 +107,7 @@ else
                                 }
                             </span>
                         </div>
-                        <form method="post" asp-page-handler="Assign" class="game-form">
-                            <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
-                            <input type="hidden" name="gameId" value="@game.GameId" />
-                            <select name="locationId" aria-label="@OwnerStrings.PickerLabel(game.Title)">
-                                <option value="" selected="@(game.OwnLocationId is null)">@(game.BaseTitle is null ? OwnerStrings.NotPlaced : OwnerStrings.SameAs(game.BaseTitle))</option>
-                                @foreach (var location in Model.Locations)
-                                {
-                                    <option value="@location.Id" selected="@(location.Id == game.OwnLocationId)">@location.Name</option>
-                                }
-                            </select>
-                            <button type="submit" class="owner-btn">@OwnerStrings.SaveButton</button>
-                        </form>
+                        <partial name="_LocationPicker" model="LocationPickerModel.For(game, Model.Locations, Model.Revision)" />
                     </li>
                 }
             </ul>

@@ -1,0 +1,23 @@
+@using Cabinet.Service.Owner
+@model Cabinet.Service.Pages.Owner.LocationPickerModel
+@{
+    var selectId = string.Concat("picker-", Model.GameId);
+}
+<div class="game-picker">
+    @if (Model.VisibleLabel is not null)
+    {
+        <label class="picker-label" for="@selectId">@Model.VisibleLabel</label>
+    }
+    <form method="post" asp-page="/Owner/Locations" asp-page-handler="Assign" class="game-form">
+        <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
+        <input type="hidden" name="gameId" value="@Model.GameId" />
+        <select id="@selectId" name="locationId" aria-label="@OwnerStrings.PickerLabel(Model.Title)" data-picker>
+            @foreach (var option in Model.Options)
+            {
+                <option value="@option.Value" selected="@option.Selected">@option.Text</option>
+            }
+        </select>
+        <button type="submit" class="owner-btn" data-save>@OwnerStrings.SaveButton</button>
+    </form>
+    <div class="row-status" role="status"></div>
+</div>

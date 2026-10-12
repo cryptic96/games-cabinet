@@ -16,6 +16,7 @@ import {
   movedText,
   refusalText,
 } from './owner-format.js';
+import { initGamesToolbar, initPickers } from './owner-games.js';
 import { gameStates, initPlacing } from './owner-placing.js';
 import {
   announce,
@@ -23,6 +24,7 @@ import {
   initRevision,
   postOwner,
   reloadButton,
+  setPickerValue,
   setRevision,
   showRowProblem,
   showRowStatus,
@@ -90,6 +92,7 @@ export function initLocationList(doc = globalThis.document) {
   let confirmed = false;
   let pendingDelete = null;
   let placing = null;
+  let toolbar = null;
 
   initRevision(doc);
 
@@ -192,6 +195,12 @@ export function initLocationList(doc = globalThis.document) {
     if (empty) {
       empty.hidden = all.length > 0;
     }
+
+    const note = doc.getElementById('no-locations-note');
+
+    if (note) {
+      note.hidden = all.length > 0;
+    }
   }
 
   /**
@@ -229,10 +238,17 @@ export function initLocationList(doc = globalThis.document) {
         select.append(option);
       }
 
-      select.value = Array.from(select.options).some((option) => option.value === previous) ? previous : '';
+      const kept = Array.from(select.options).some((option) => option.value === previous);
+
+      select.value = kept ? previous : '';
+
+      if (!kept) {
+        select.dataset.saved = '';
+      }
     }
 
     placing?.refreshMeta();
+    toolbar?.refreshCount();
   }
 
   /**
@@ -254,6 +270,7 @@ export function initLocationList(doc = globalThis.document) {
 
     refresh();
     placing?.refreshMeta();
+    toolbar?.refreshCount();
   }
 
   /**
@@ -467,7 +484,7 @@ export function initLocationList(doc = globalThis.document) {
           syncPickers();
 
           for (const select of placed) {
-            select.value = item.dataset.locationId;
+            setPickerValue(select, item.dataset.locationId);
           }
 
           placing?.refreshMeta();
@@ -624,7 +641,10 @@ export function initLocationList(doc = globalThis.document) {
     locations: () => items().map((item) => ({ id: item.dataset.locationId, name: item.dataset.saved })),
     showProblem,
     gamesChanged: recountGames,
+    selectionChanged: () => toolbar?.syncSelectAll(),
   });
+  toolbar = initGamesToolbar(doc);
+  initPickers(doc, { enqueue, showProblem, undoer, gamesChanged: recountGames });
   panel.dataset.enhanced = '';
 }
 

@@ -18,8 +18,21 @@ async function loadPageScript(name) {
   return import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 }
 
-const { readToken, postOwner, getRevision, setRevision, showRowStatus, showRowProblem, reloadButton, announce } =
-  await loadPageScript('owner-shared.js');
+const {
+  readToken,
+  postOwner,
+  getRevision,
+  setRevision,
+  showRowStatus,
+  showRowProblem,
+  reloadButton,
+  announce,
+  saveSettledValue,
+  foldForSearch,
+  createFinder,
+  sortByCollator,
+  setPickerValue,
+} = await loadPageScript('owner-shared.js');
 
 /**
  * Makes a fetch that remembers what it was asked and answers with a fixed status and body.
@@ -288,4 +301,269 @@ test('the announcer takes the text and does nothing without one', () => {
   announce('Ignored', { getElementById: () => null });
 
   assert.equal(region.textContent, 'Moved "A" up. Now 1 of 2.');
+});
+
+/**
+ * Makes a stand-in for a select with just what the settled-value helper listens to.
+ * @param {object} [doc] The document it belongs to, or none.
+ * @returns {object}
+ */
+function fakeSelect(doc) {
+  const select = {
+    value: 'a',
+    ownerDocument: doc,
+    listeners: {},
+    addEventListener(type, handler) {
+      (select.listeners[type] ??= []).push(handler);
+    },
+    fire(type, event = {}) {
+      for (const handler of select.listeners[type] ?? []) {
+        handler(event);
+      }
+    },
+  };
+
+  return select;
+}
+
+test('three keyboard-originated changes save once, with the last value, after the pause', (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+
+  const select = fakeSelect();
+  const saved = [];
+
+  saveSettledValue(select, (value) => saved.push(value), 600);
+
+  for (const [value, at] of [['b', 1000], ['c', 1200], ['d', 1400]]) {
+    select.fire('keydown', { key: 'ArrowDown', timeStamp: at });
+    select.value = value;
+    select.fire('change', { timeStamp: at + 2 });
+  }
+
+  assert.deepEqual(saved, []);
+  context.mock.timers.tick(599);
+  assert.deepEqual(saved, []);
+  context.mock.timers.tick(1);
+  assert.deepEqual(saved, ['d']);
+  context.mock.timers.tick(5000);
+  assert.equal(saved.length, 1);
+});
+
+test('a pointer or touch choice saves at once', (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+
+  const select = fakeSelect();
+  const saved = [];
+
+  saveSettledValue(select, (value) => saved.push(value), 600);
+  select.fire('keydown', { key: 'ArrowDown', timeStamp: 100 });
+  select.value = 'b';
+  select.fire('change', { timeStamp: 5000 });
+
+  assert.deepEqual(saved, ['b']);
+  context.mock.timers.tick(5000);
+  assert.equal(saved.length, 1);
+});
+
+test('Tab and Enter flush what is waiting, and leaving the control does too, once', (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+
+  const select = fakeSelect();
+  const saved = [];
+
+  saveSettledValue(select, (value) => saved.push(value), 600);
+
+  select.fire('keydown', { key: 'ArrowDown', timeStamp: 100 });
+  select.value = 'b';
+  select.fire('change', { timeStamp: 101 });
+  select.fire('keydown', { key: 'Tab', timeStamp: 300 });
+  select.fire('focusout', {});
+
+  assert.deepEqual(saved, ['b']);
+
+  select.fire('keydown', { key: 'ArrowDown', timeStamp: 1000 });
+  select.value = 'c';
+  select.fire('change', { timeStamp: 1001 });
+  select.fire('keydown', { key: 'Enter', timeStamp: 1200 });
+
+  assert.deepEqual(saved, ['b', 'c']);
+
+  select.fire('keydown', { key: 'ArrowDown', timeStamp: 2000 });
+  select.value = 'd';
+  select.fire('change', { timeStamp: 2001 });
+  select.fire('focusout', {});
+
+  assert.deepEqual(saved, ['b', 'c', 'd']);
+  context.mock.timers.tick(5000);
+  assert.equal(saved.length, 3);
+});
+
+test('a page that goes to the background flushes with the keepalive flag', (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+
+  const doc = { visibilityState: 'visible', listeners: {} };
+
+  doc.addEventListener = (type, handler) => {
+    doc.listeners[type] = handler;
+  };
+
+  const select = fakeSelect(doc);
+  const calls = [];
+
+  saveSettledValue(select, (value, options) => calls.push({ value, options }), 600);
+  select.fire('keydown', { key: 'ArrowDown', timeStamp: 100 });
+  select.value = 'b';
+  select.fire('change', { timeStamp: 101 });
+  doc.visibilityState = 'hidden';
+  doc.listeners.visibilitychange();
+
+  assert.deepEqual(calls, [{ value: 'b', options: { keepalive: true } }]);
+});
+
+test('a control with nothing waiting saves nothing when it loses focus', () => {
+  const select = fakeSelect();
+  const saved = [];
+
+  saveSettledValue(select, (value) => saved.push(value), 600);
+  select.fire('focusout', {});
+
+  assert.deepEqual(saved, []);
+});
+
+test('a post can ask for the keepalive flag and the token still goes in the header', async () => {
+  const { fetch, calls } = answering(200, '{"outcome":"saved","revision":9}');
+
+  await postOwner('?handler=Assign', { gameId: 1, locationId: 'x' }, { fetch, token: 'tok', revision: 8, keepalive: true });
+
+  assert.equal(calls[0].init.keepalive, true);
+  assert.equal(calls[0].init.headers.RequestVerificationToken, 'tok');
+});
+
+test('the shared setter keeps the saved value in step with the select', () => {
+  const select = { value: '', dataset: {} };
+
+  setPickerValue(select, 'x');
+
+  assert.equal(select.value, 'x');
+  assert.equal(select.dataset.saved, 'x');
+});
+
+test('search folding ignores case and accents', () => {
+  assert.equal(foldForSearch('Café'), foldForSearch('cafe'));
+  assert.equal(foldForSearch('CAFÉ Quarter'), 'cafe quarter');
+  assert.equal(foldForSearch(''), '');
+});
+
+/**
+ * Makes a stand-in for a game row with a title, the way the page marks nesting, and the one property the finder sets.
+ * @param {string} id The game id.
+ * @param {string} title The title.
+ * @param {string | null} [baseId] The base game an expansion follows.
+ * @returns {object}
+ */
+function gameRow(id, title, baseId = null) {
+  return {
+    hidden: false,
+    dataset: { gameId: id, baseId: baseId ?? '', nested: baseId === null ? 'false' : 'true' },
+    querySelector: (selector) => (selector === '.game-title' ? { textContent: title } : null),
+  };
+}
+
+/**
+ * Makes a stand-in for the search box.
+ * @param {string} [value] The text in it.
+ * @returns {object}
+ */
+function fakeInput(value = '') {
+  const input = {
+    value,
+    listeners: {},
+    addEventListener(type, handler) {
+      (input.listeners[type] ??= []).push(handler);
+    },
+  };
+
+  return input;
+}
+
+test('typing waits for a pause, then hides the rows that do not match and reports what is shown', (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+
+  const rows = [gameRow('1', 'Café Quarter'), gameRow('2', 'Game 2'), gameRow('3', 'Game 10')];
+  const input = fakeInput();
+  const reports = [];
+  const finder = createFinder(input, () => rows, { debounceMs: 250, onApply: (report) => reports.push(report) });
+
+  finder.apply({ announce: false });
+  input.value = 'cafe';
+  input.listeners.input[0]();
+  context.mock.timers.tick(249);
+
+  assert.equal(reports.length, 1);
+
+  context.mock.timers.tick(1);
+
+  assert.deepEqual(rows.map((row) => row.hidden), [false, true, true]);
+  assert.deepEqual(reports.at(-1), { shown: 1, total: 3, query: 'cafe', announce: true });
+});
+
+test('a base game stays visible as context when only one of its expansions matches', () => {
+  const rows = [gameRow('1', 'Harbour'), gameRow('2', 'Harbour: Lanterns', '1'), gameRow('3', 'Quarry')];
+  const input = fakeInput('lantern');
+  const finder = createFinder(input, () => rows, {});
+  const report = finder.apply({ announce: false });
+
+  assert.deepEqual(rows.map((row) => row.hidden), [false, false, true]);
+  assert.equal(rows[0].dataset.context, 'true');
+  assert.equal(rows[1].dataset.context, undefined);
+  assert.equal(report.shown, 2);
+});
+
+test('an extra rule narrows the rows and a base that matches is not marked as context', () => {
+  const rows = [gameRow('1', 'Harbour'), gameRow('2', 'Harbour: Lanterns', '1'), gameRow('3', 'Quarry')];
+  const input = fakeInput('');
+  const finder = createFinder(input, () => rows, { accepts: (row) => row.dataset.gameId !== '3' });
+  const report = finder.apply({ announce: false });
+
+  assert.deepEqual(rows.map((row) => row.hidden), [false, false, true]);
+  assert.equal(rows[0].dataset.context, undefined);
+  assert.equal(report.shown, 2);
+});
+
+test('clearing the query shows every row again', () => {
+  const rows = [gameRow('1', 'Harbour'), gameRow('2', 'Quarry')];
+  const input = fakeInput('zzz');
+  const finder = createFinder(input, () => rows, {});
+
+  assert.equal(finder.apply({ announce: false }).shown, 0);
+
+  input.value = '  ';
+
+  assert.equal(finder.apply({ announce: false }).shown, 2);
+  assert.deepEqual(rows.map((row) => row.hidden), [false, false]);
+});
+
+test('the rows are put in collator order with each base game followed by its expansions', () => {
+  const rows = [
+    gameRow('1', 'Game 10'),
+    gameRow('2', 'Game 2'),
+    gameRow('3', 'Game 2: Zebra', '2'),
+    gameRow('4', 'Game 2: Apple', '2'),
+    gameRow('5', 'Café Quarter'),
+    gameRow('6', 'Ápple Orchard'),
+    gameRow('7', 'Orphan: Pack'),
+  ];
+  const container = {
+    children: [...rows],
+    append(...nodes) {
+      container.children = nodes;
+    },
+  };
+
+  sortByCollator(container);
+
+  assert.deepEqual(
+    container.children.map((row) => row.querySelector('.game-title').textContent),
+    ['Ápple Orchard', 'Café Quarter', 'Game 2', 'Game 2: Apple', 'Game 2: Zebra', 'Game 10', 'Orphan: Pack'],
+  );
 });

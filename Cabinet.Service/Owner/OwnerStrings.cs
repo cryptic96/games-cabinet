@@ -148,6 +148,16 @@ public static class OwnerStrings
     /// <param name="title">The game's title.</param>
     public static string SelectLabel(string title) => $"Select {title}";
 
+    /// <summary>The label of the search box above the games.</summary>
+    public const string FindLabel = "Find a game";
+
+    /// <summary>The label of the checkbox that ticks every game that is shown.</summary>
+    public const string SelectAllShown = "Select all shown";
+
+    /// <summary>The label of the switch that shows only the games that are not placed, with how many there are.</summary>
+    /// <param name="count">How many games are not placed.</param>
+    public static string UnplacedLabel(int count) => $"Not placed yet ({count})";
+
     /// <summary>The tag on an expansion's row.</summary>
     public const string ExpansionTag = "Expansion";
 
