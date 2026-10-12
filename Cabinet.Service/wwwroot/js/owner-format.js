@@ -65,6 +65,17 @@ export const OWNER_TEXT = Object.freeze({
   noMatch: 'No games match.',
   everyPlaced: 'Every game is placed.',
   unplacedLabel: 'Not placed yet ({n})',
+  markedChecked: 'Marked as checked',
+  looksRight: 'Looks right',
+  checked: 'Checked',
+  toCheck: '{n} of {m} to check',
+  allChecked: "You've checked all {m} games.",
+  oneChecked: "You've checked 1 game.",
+  nothingNeedsLook: 'Nothing needs a look right now.',
+  worthALookLink: 'Worth a look ({n})',
+  allGamesLink: 'All games ({m})',
+  wontLoad: "Picture won't load",
+  wontLoadNote: "The picture can't be loaded right now. The cabinet shows a generated cover until it can.",
 });
 
 /**
@@ -268,6 +279,42 @@ export function resultText({ shown, total, query, unplacedOnly }) {
  */
 export function unplacedLabel(count) {
   return fill(OWNER_TEXT.unplacedLabel, { n: count });
+}
+
+/**
+ * The counter above the pictures worklist: how many games are left to check, or why there is nothing to count.
+ * @param {number} toCheck How many candidates the owner has not dealt with.
+ * @param {number} candidates How many games are worth a look, including those the owner dealt with.
+ * @returns {string} `{n} of {m} to check`, `You've checked all {m} games.` or `Nothing needs a look right now.`
+ */
+export function counterText(toCheck, candidates) {
+  if (candidates === 0) {
+    return OWNER_TEXT.nothingNeedsLook;
+  }
+
+  if (toCheck > 0) {
+    return fill(OWNER_TEXT.toCheck, { n: toCheck, m: candidates });
+  }
+
+  return candidates === 1 ? OWNER_TEXT.oneChecked : fill(OWNER_TEXT.allChecked, { m: candidates });
+}
+
+/**
+ * The text of the link that shows the games worth a look.
+ * @param {number} toCheck How many games are left to check.
+ * @returns {string} `Worth a look ({n})`.
+ */
+export function worthALookLinkText(toCheck) {
+  return fill(OWNER_TEXT.worthALookLink, { n: toCheck });
+}
+
+/**
+ * The text of the link that shows every game.
+ * @param {number} total How many games there are.
+ * @returns {string} `All games ({m})`.
+ */
+export function allGamesLinkText(total) {
+  return fill(OWNER_TEXT.allGamesLink, { m: total });
 }
 
 /**

@@ -34,7 +34,7 @@ public sealed class OwnerPictureTilesTests : CabinetPageTest
         var before = await CoverOfAsync(RowTitle);
         var posts = CountChoosePosts();
 
-        await GotoOwnerAsync("/owner/pictures");
+        await GotoOwnerAsync("/owner/pictures?view=all");
         var row = RowOf(RowTitle);
         await Expect(row.Locator("fieldset.pic-choices label.pic-tile")).ToHaveCountAsync(4);
         (await row.Locator("label.pic-tile .pic-label").AllInnerTextsAsync()).Should().Equal("Automatic", "Owned edition", "Main picture", "Your link");
@@ -67,7 +67,7 @@ public sealed class OwnerPictureTilesTests : CabinetPageTest
         await Page.SetViewportSizeAsync(1440, 900);
         await StartHostAsync();
 
-        await GotoOwnerAsync("/owner/pictures");
+        await GotoOwnerAsync("/owner/pictures?view=all");
         await Expect(Page.Locator(".pic-art > img").First).ToHaveJSPropertyAsync("complete", true);
 
         var heights = await Page.Locator(".pic-row").EvaluateAllAsync<double[][]>(
@@ -81,7 +81,7 @@ public sealed class OwnerPictureTilesTests : CabinetPageTest
         var extras = RowOf("Example Game 1: Lantern Extras");
         await Expect(TileOf(extras, "Automatic").Locator(".pic-art[data-art='cover'] .card-plate-label")).ToHaveTextAsync("Example Game 1: Lantern Extras");
         await Expect(TileOf(extras, "Automatic").Locator(".pic-sub")).ToHaveTextAsync("Uses a generated cover");
-        await Expect(extras.Locator(".pic-tag")).ToHaveCountAsync(0);
+        await Expect(extras.Locator(".pic-tile .pic-tag")).ToHaveCountAsync(0);
 
         var ribbon = RowOf("Ribbon Orchard");
         await Expect(ribbon.Locator("label.pic-tile")).ToHaveCountAsync(4);
@@ -111,7 +111,7 @@ public sealed class OwnerPictureTilesTests : CabinetPageTest
         await StartHostAsync();
         var posts = CountChoosePosts();
 
-        await GotoOwnerAsync("/owner/pictures");
+        await GotoOwnerAsync("/owner/pictures?view=all");
         var row = RowOf(RowTitle);
         await row.Locator("input[value=Automatic]").FocusAsync();
         await Page.Keyboard.PressAsync("ArrowRight");
@@ -121,7 +121,7 @@ public sealed class OwnerPictureTilesTests : CabinetPageTest
 
         posts().Should().Be(1);
         await Expect(row.Locator(".row-status")).ToContainTextAsync("Saved");
-        await GotoOwnerAsync("/owner/pictures");
+        await GotoOwnerAsync("/owner/pictures?view=all");
         await Expect(RowOf(RowTitle).Locator("input[value=MainPicture]")).ToBeCheckedAsync();
     }
 
@@ -130,7 +130,7 @@ public sealed class OwnerPictureTilesTests : CabinetPageTest
     {
         await Page.SetViewportSizeAsync(1440, 900);
         await StartHostAsync();
-        await GotoOwnerAsync("/owner/pictures");
+        await GotoOwnerAsync("/owner/pictures?view=all");
         await Page.RouteAsync("**/owner/pictures?handler=Choose", route => route.FulfillAsync(new RouteFulfillOptions { Status = 500, Body = string.Empty }));
 
         var row = RowOf(RowTitle);
@@ -150,7 +150,7 @@ public sealed class OwnerPictureTilesTests : CabinetPageTest
         await Page.SetViewportSizeAsync(width, 844);
         await StartHostAsync();
 
-        await GotoOwnerAsync("/owner/pictures");
+        await GotoOwnerAsync("/owner/pictures?view=all");
         await Expect(Page.Locator(".pic-art > img").First).ToHaveJSPropertyAsync("complete", true);
 
         var tops = await RowOf(RowTitle).Locator(".pic-tile").EvaluateAllAsync<double[]>("tiles => tiles.map(tile => Math.round(tile.getBoundingClientRect().top))");
@@ -177,14 +177,14 @@ public sealed class OwnerPictureTilesTests : CabinetPageTest
             ExtraHTTPHeaders = new Dictionary<string, string> { ["Accept-Encoding"] = "identity" },
         });
         var page = await plain.NewPageAsync();
-        await page.GotoAsync($"http://127.0.0.1:{OwnerPort}/owner/pictures");
+        await page.GotoAsync($"http://127.0.0.1:{OwnerPort}/owner/pictures?view=all");
 
         var row = page.Locator(".pic-row", new PageLocatorOptions { Has = page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = RowTitle, Exact = true }) });
         await row.Locator("label.pic-tile", new LocatorLocatorOptions { HasText = "Main picture" }).ClickAsync();
         await row.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Save picture" }).ClickAsync();
 
         await Expect(page.Locator("#owner-notice")).ToHaveTextAsync("Saved.");
-        page.Url.Should().MatchRegex(@"/owner/pictures\?done=saved#game-\d+$");
+        page.Url.Should().MatchRegex(@"/owner/pictures\?done=saved&view=all#game-\d+$");
         await Expect(row.Locator("input[value=MainPicture]")).ToBeCheckedAsync();
         (await CoverOfAsync(RowTitle)).Should().NotBe(before);
         await plain.CloseAsync();
@@ -196,7 +196,7 @@ public sealed class OwnerPictureTilesTests : CabinetPageTest
         await Page.SetViewportSizeAsync(390, 844);
         await StartHostAsync(sync: false);
 
-        await GotoOwnerAsync("/owner/pictures");
+        await GotoOwnerAsync("/owner/pictures?view=all");
 
         await Expect(Page.Locator(".pic-empty h3")).ToHaveTextAsync("No games yet.");
         await Expect(Page.Locator(".pic-empty p")).ToHaveTextAsync("Your games show up here after the first sync.");

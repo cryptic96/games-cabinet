@@ -37,6 +37,9 @@ const {
   noMatchText,
   resultText,
   unplacedLabel,
+  counterText,
+  worthALookLinkText,
+  allGamesLinkText,
 } =
   await loadPageScript('owner-format.js');
 
@@ -188,4 +191,25 @@ test('the words of the picker and the empty states are in the table', () => {
   assert.equal(OWNER_TEXT.saved, 'Saved');
   assert.equal(OWNER_TEXT.noMatch, 'No games match.');
   assert.equal(OWNER_TEXT.everyPlaced, 'Every game is placed.');
+});
+
+test('the worklist counter counts down, says when everything is checked and when nothing needs a look', () => {
+  assert.equal(counterText(1, 2), '1 of 2 to check');
+  assert.equal(counterText(23, 23), '23 of 23 to check');
+  assert.equal(counterText(0, 3), "You've checked all 3 games.");
+  assert.equal(counterText(0, 1), "You've checked 1 game.");
+  assert.equal(counterText(0, 0), 'Nothing needs a look right now.');
+});
+
+test('the two view links carry their counts', () => {
+  assert.equal(worthALookLinkText(0), 'Worth a look (0)');
+  assert.equal(worthALookLinkText(14), 'Worth a look (14)');
+  assert.equal(allGamesLinkText(65), 'All games (65)');
+});
+
+test('the words of the looks-right button and its status are in the table', () => {
+  assert.equal(OWNER_TEXT.looksRight, 'Looks right');
+  assert.equal(OWNER_TEXT.checked, 'Checked');
+  assert.equal(OWNER_TEXT.markedChecked, 'Marked as checked');
+  assert.equal(OWNER_TEXT.wontLoad, "Picture won't load");
 });

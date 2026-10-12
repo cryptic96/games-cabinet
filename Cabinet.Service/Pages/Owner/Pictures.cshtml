@@ -27,7 +27,7 @@
         <p>@OwnerStrings.OwnerDataUnreadable</p>
     </section>
 }
-else if (Model.Games.Count == 0)
+else if (Model.Counts.Total == 0)
 {
     <section class="owner-panel pic-empty">
         <h3>@OwnerStrings.PicturesNoGamesHeading</h3>
@@ -36,91 +36,182 @@ else if (Model.Games.Count == 0)
 }
 else
 {
-    <ul class="pic-list" role="list" id="pic-list">
-        @foreach (var game in Model.Games)
-        {
-            var rowId = $"game-{game.GameId}";
-            var group = PicturesModel.GroupName(game.GameId);
+    var showsAll = Model.View == PicturesView.All;
 
-            <li class="pic-row" id="@rowId" data-game-id="@game.GameId">
-                <form method="post" asp-page-handler="Choose">
-                    <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
-                    <input type="hidden" name="gameId" value="@game.GameId" />
+    <div class="pic-toolbar">
+        <nav class="pic-views" aria-label="@OwnerStrings.GamesShownLabel">
+            <a id="pic-view-worth" href="~/owner/pictures" aria-current="@(showsAll ? null : "true")">@OwnerStrings.WorthALookLink(Model.Counts.ToCheck)</a>
+            <a id="pic-view-all" href="~/owner/pictures?view=@PicturesModel.AllViewQuery" aria-current="@(showsAll ? "true" : null)">@OwnerStrings.AllGamesLink(Model.Counts.Total)</a>
+        </nav>
+        <p class="pic-counter" id="pic-counter">@OwnerStrings.CounterText(Model.Counts)</p>
+        <div class="owner-find" id="pic-find-box" hidden>
+            <label for="pic-find">@OwnerStrings.FindLabel</label>
+            <input id="pic-find" type="search" autocomplete="off" dir="auto" />
+        </div>
+    </div>
+    <p class="pic-count" id="pic-count" hidden></p>
+    @if (Model.Games.Count == 0)
+    {
+        <section class="owner-panel pic-empty" id="pic-nothing">
+            <h3>@OwnerStrings.NothingToCheckHeading</h3>
+            <p>@OwnerStrings.NothingToCheckBody</p>
+        </section>
+    }
+    else
+    {
+        <ul class="pic-list" role="list" id="pic-list" data-view="@(showsAll ? "all" : "worth")">
+            @foreach (var game in Model.Games)
+            {
+                var rowId = $"game-{game.GameId}";
+                var group = PicturesModel.GroupName(game.GameId);
+                var look = game.Look;
+
+                <li class="pic-row" id="@rowId" data-game-id="@game.GameId">
                     <div class="pic-head">
                         <h3 class="game-title" dir="auto">@game.Title</h3>
                         @if (game.Year is { } year)
                         {
                             <span class="pic-year">@year</span>
                         }
-                        @if (game.IsExpansion)
+                        @if (look.Candidate && !look.Resolved)
                         {
-                            <span class="game-tag">@OwnerStrings.ExpansionTag</span>
+                            <form method="post" class="pic-looks-form" asp-page-handler="LooksRight">
+                                <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
+                                <input type="hidden" name="gameId" value="@game.GameId" />
+                                @if (showsAll)
+                                {
+                                    <input type="hidden" name="view" value="@PicturesModel.AllViewQuery" />
+                                }
+                                <button type="submit" class="owner-btn" data-looks-right>@OwnerStrings.LooksRightButton</button>
+                            </form>
                         }
                     </div>
-                    <fieldset class="pic-choices">
-                        <legend class="visually-hidden" dir="auto">@OwnerStrings.PictureLegend(game.Title)</legend>
-                        @foreach (var tile in game.Tiles)
+                    <ul class="pic-marks" role="list">
+                            @if (game.Choice == PictureChoice.Link)
+                            {
+                                <li class="pic-tag pic-tag-strong" data-mark="yours">@OwnerStrings.MarkYours</li>
+                            }
+                            <li class="pic-tag" data-mark="checked" hidden="@(!look.Resolved)">@OwnerStrings.MarkChecked</li>
+                            @if (look.LinkDead)
+                            {
+                                <li class="pic-tag pic-tag-strong" data-mark="link-dead" data-clears>@OwnerStrings.MarkLinkDead</li>
+                            }
+                            @if (look.Changed is not null)
+                            {
+                                <li class="pic-tag pic-tag-strong" data-mark="changed" data-clears>@OwnerStrings.MarkChanged</li>
+                            }
+                            @if (look.NoPicture)
+                            {
+                                <li class="pic-tag pic-tag-strong" data-mark="no-picture">@OwnerStrings.MarkNoPicture</li>
+                            }
+                            @if (look.WontLoad)
+                            {
+                                <li class="pic-tag pic-tag-strong" data-mark="wont-load">@OwnerStrings.MarkWontLoad</li>
+                            }
+                            @if (look.AutomaticSkipsOwned)
+                            {
+                                <li class="pic-tag" data-mark="skips-owned">@OwnerStrings.MarkSkipsOwned</li>
+                            }
+                            @if (look.Fetching)
+                            {
+                                <li class="pic-tag pic-tag-dashed" data-mark="fetching">@OwnerStrings.MarkFetching</li>
+                            }
+                            @if (game.IsExpansion)
+                            {
+                                <li class="pic-tag pic-tag-plain" data-mark="expansion">@OwnerStrings.ExpansionTag</li>
+                            }
+                        </ul>
+                        <div class="pic-notes">
+                            @if (look.LinkDead)
+                            {
+                                <p class="pic-note" data-clears>@OwnerStrings.NoteLinkDead</p>
+                            }
+                            @if (look.Changed is { } changed)
+                            {
+                                <p class="pic-note" data-clears>@OwnerStrings.NoteChanged(changed)</p>
+                            }
+                            @if (look.NoPicture)
+                            {
+                                <p class="pic-note">@OwnerStrings.NoteMissing</p>
+                            }
+                            @if (look.WontLoad)
+                            {
+                                <p class="pic-note">@OwnerStrings.NoteWontLoad</p>
+                            }
+                        </div>
+                    <form method="post" class="pic-form" asp-page-handler="Choose">
+                        <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
+                        <input type="hidden" name="gameId" value="@game.GameId" />
+                        @if (showsAll)
                         {
-                            var isLink = tile.Kind == PictureChoice.Link;
-                            var showsCover = tile.Url is null && tile.Available && !tile.Fetching;
-                            var state = tile.Fetching ? "fetching"
-                                : tile.Url is not null ? "picture"
-                                : showsCover ? "cover"
-                                : isLink ? "none" : "missing";
-
-                            <label class="pic-tile" data-kind="@tile.Kind" data-state="@state" data-automatic-pick="@(tile.IsAutomaticPick ? "true" : null)">
-                                <span class="pic-art" data-art="@state" data-bg="@game.CoverBackground" data-fg="@game.CoverText" data-pattern="@game.CoverPattern">
-                                    @if (tile.Url is not null)
-                                    {
-                                        <img src="@tile.Url" width="@tile.Width" height="@tile.Height" alt="" loading="lazy" decoding="async" />
-                                    }
-                                    else if (showsCover)
-                                    {
-                                        <span class="pic-cover-text" dir="auto">@game.Title</span>
-                                    }
-                                </span>
-                                <span class="pic-caption">
-                                    <input type="radio" name="@group" value="@tile.Kind" checked="@(game.Choice == tile.Kind)"
-                                           disabled="@(!tile.Available)" aria-disabled="@(tile.Available ? null : "true")" />
-                                    <span class="pic-label">@OwnerStrings.TileLabel(tile.Kind)</span>
-                                </span>
-                                @if (tile.Verdict is { } verdict)
-                                {
-                                    <span class="pic-verdict">@OwnerStrings.VerdictTag(verdict)</span>
-                                }
-                                @if (tile.Kind == PictureChoice.Automatic)
-                                {
-                                    <span class="pic-sub">@OwnerStrings.AutomaticSubLine(game.AutomaticSource)</span>
-                                }
-                                else if (state == "missing")
-                                {
-                                    <span class="pic-sub">@OwnerStrings.TileBggHasNone</span>
-                                }
-                                else if (state == "none")
-                                {
-                                    <span class="pic-sub">@OwnerStrings.TileNoLinkYet</span>
-                                }
-                                else if (state == "fetching")
-                                {
-                                    <span class="pic-sub">@OwnerStrings.TileFetching</span>
-                                }
-                                @if (tile.LinkAddress is not null)
-                                {
-                                    <span class="pic-address" dir="ltr" title="@tile.LinkFullAddress">@tile.LinkAddress</span>
-                                }
-                                @if (tile.IsAutomaticPick)
-                                {
-                                    <span class="pic-tag">@OwnerStrings.AutomaticsPick</span>
-                                }
-                            </label>
+                            <input type="hidden" name="view" value="@PicturesModel.AllViewQuery" />
                         }
-                    </fieldset>
-                    <button type="submit" class="owner-btn" data-save>@OwnerStrings.SavePictureButton</button>
-                </form>
-                <p class="row-status" role="status"></p>
-            </li>
-        }
-    </ul>
+                        <fieldset class="pic-choices">
+                            <legend class="visually-hidden" dir="auto">@OwnerStrings.PictureLegend(game.Title)</legend>
+                            @foreach (var tile in game.Tiles)
+                            {
+                                var isLink = tile.Kind == PictureChoice.Link;
+                                var showsCover = tile.Url is null && tile.Available && !tile.Fetching;
+                                var state = tile.Fetching ? "fetching"
+                                    : tile.Url is not null ? "picture"
+                                    : showsCover ? "cover"
+                                    : isLink ? "none" : "missing";
+
+                                <label class="pic-tile" data-kind="@tile.Kind" data-state="@state" data-automatic-pick="@(tile.IsAutomaticPick ? "true" : null)">
+                                    <span class="pic-art" data-art="@state" data-bg="@game.CoverBackground" data-fg="@game.CoverText" data-pattern="@game.CoverPattern">
+                                        @if (tile.Url is not null)
+                                        {
+                                            <img src="@tile.Url" width="@tile.Width" height="@tile.Height" alt="" loading="lazy" decoding="async" />
+                                        }
+                                        else if (showsCover)
+                                        {
+                                            <span class="pic-cover-text" dir="auto">@game.Title</span>
+                                        }
+                                    </span>
+                                    <span class="pic-caption">
+                                        <input type="radio" name="@group" value="@tile.Kind" checked="@(game.Choice == tile.Kind)"
+                                               disabled="@(!tile.Available)" aria-disabled="@(tile.Available ? null : "true")" />
+                                        <span class="pic-label">@OwnerStrings.TileLabel(tile.Kind)</span>
+                                    </span>
+                                    @if (tile.Verdict is { } verdict)
+                                    {
+                                        <span class="pic-verdict">@OwnerStrings.VerdictTag(verdict)</span>
+                                    }
+                                    @if (tile.Kind == PictureChoice.Automatic)
+                                    {
+                                        <span class="pic-sub">@OwnerStrings.AutomaticSubLine(game.AutomaticSource)</span>
+                                    }
+                                    else if (state == "missing")
+                                    {
+                                        <span class="pic-sub">@OwnerStrings.TileBggHasNone</span>
+                                    }
+                                    else if (state == "none")
+                                    {
+                                        <span class="pic-sub">@OwnerStrings.TileNoLinkYet</span>
+                                    }
+                                    else if (state == "fetching")
+                                    {
+                                        <span class="pic-sub">@OwnerStrings.TileFetching</span>
+                                    }
+                                    @if (tile.LinkAddress is not null)
+                                    {
+                                        <span class="pic-address" dir="ltr" title="@tile.LinkFullAddress">@tile.LinkAddress</span>
+                                    }
+                                    @if (tile.IsAutomaticPick)
+                                    {
+                                        <span class="pic-tag">@OwnerStrings.AutomaticsPick</span>
+                                    }
+                                </label>
+                            }
+                        </fieldset>
+                        <p class="pic-why">@OwnerStrings.WhyLine(game.Why, game.OwnedReadsAs)</p>
+                        <button type="submit" class="owner-btn" data-save>@OwnerStrings.SavePictureButton</button>
+                    </form>
+                    <p class="row-status" role="status"></p>
+                </li>
+            }
+        </ul>
+    }
 }
 @section Scripts {
     <script type="module" src="~/js/owner-pictures.js" asp-append-version="true"></script>
