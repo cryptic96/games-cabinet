@@ -54,6 +54,7 @@ public static class OwnerEndpoints
             provider.GetRequiredService<StorageDirectory>().Path,
             provider.GetRequiredService<ILogger<OwnerDataStore>>()));
         services.AddSingleton<OwnerDataService>();
+        services.AddSingleton<SiteFinish>();
         services.AddSingleton<IOwnerArtReferences>(provider => provider.GetRequiredService<OwnerDataService>());
         services.AddSingleton<CollectionPublisher>();
         services.AddHostedService<OwnerChangeNotifier>();

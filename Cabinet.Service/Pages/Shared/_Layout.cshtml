@@ -1,3 +1,4 @@
+@inject Cabinet.Service.Owner.SiteFinish Finish
 @{
     var language = SiteLanguage.Resolve(Context);
 }
@@ -12,7 +13,7 @@
     <link rel="stylesheet" href="~/css/cabinet.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/card.css" asp-append-version="true" />
 </head>
-<body>
+<body class="@Finish.BodyClass()">
     @RenderBody()
     <partial name="_Footer" model="language" />
     @await RenderSectionAsync("Scripts", required: false)

@@ -1328,6 +1328,69 @@ header > .owner-plate {
   font-weight: 400;
 }
 
+.finish-tile {
+  align-self: start;
+}
+
+.finish-swatch {
+  position: relative;
+  display: block;
+  flex: none;
+  height: 128px;
+  overflow: hidden;
+  border-radius: 2px;
+  background-color: var(--wood-dark);
+  background-image:
+    linear-gradient(to bottom, rgb(10 5 2 / 0.55), transparent 30%),
+    linear-gradient(to right, rgb(10 5 2 / 0.35), transparent 14%),
+    repeating-linear-gradient(
+      to right,
+      rgb(0 0 0 / 0.45) 0 1px,
+      rgb(255 235 210 / 0.08) 1px 2px,
+      transparent 2px 34px
+    );
+  box-shadow: 0 1px 2px rgb(20 10 4 / 0.35);
+}
+
+.finish-swatch::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 28px;
+  background-color: var(--wood-mid);
+  background-image: linear-gradient(
+    to bottom,
+    var(--wood-edge) 0 1px,
+    rgb(255 245 230 / 0.12) 1px,
+    transparent 45%,
+    rgb(20 10 4 / 0.3) 100%
+  );
+}
+
+.finish-swatch::after {
+  content: "";
+  position: absolute;
+  bottom: 28px;
+  inset-inline-start: 24%;
+  width: 36%;
+  height: 58%;
+  border: 1px solid var(--wood-edge);
+  border-bottom: 0;
+  background-color: var(--wood-light);
+  background-image:
+    linear-gradient(to bottom, transparent 22%, var(--wood-edge) 22% 38%, transparent 38%),
+    linear-gradient(to right, rgb(20 10 4 / 0.22), transparent 18%, transparent 82%, rgb(20 10 4 / 0.22));
+}
+
+.finish-note {
+  margin: 16px 0;
+}
+
+.finish-form + .row-status {
+  margin-top: 12px;
+}
+
 .pic-row .owner-btn {
   align-self: flex-start;
 }
