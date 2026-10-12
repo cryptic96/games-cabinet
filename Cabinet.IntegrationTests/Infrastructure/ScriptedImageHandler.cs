@@ -59,6 +59,18 @@ public sealed class ScriptedImageHandler : HttpMessageHandler
         return this;
     }
 
+    /// <summary>Makes an address that was served answer as not found from now on, as a host does when a picture is taken down.</summary>
+    /// <param name="address">The absolute address.</param>
+    public ScriptedImageHandler Withdraw(string address)
+    {
+        lock (_gate)
+        {
+            _bodies.Remove(address);
+        }
+
+        return this;
+    }
+
     /// <summary>Makes an address answer with picture headers and the first bytes of a body, and then break off as a dropped connection does.</summary>
     /// <param name="address">The absolute address.</param>
     public ScriptedImageHandler ServeBrokenBody(string address)
