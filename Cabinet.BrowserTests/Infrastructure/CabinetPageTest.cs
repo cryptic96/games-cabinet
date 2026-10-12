@@ -46,6 +46,9 @@ public abstract class CabinetPageTest : PageTest
     /// <summary>The loopback port the public listener of the running host uses.</summary>
     protected int PublicPort => (_factory ?? throw new InvalidOperationException("Call StartAsync before using the host.")).PublicPort;
 
+    /// <summary>The loopback port the owner listener of the running host uses.</summary>
+    protected int OwnerPort => (_factory ?? throw new InvalidOperationException("Call StartAsync before using the host.")).OwnerPort;
+
     /// <summary>
     /// Starts the host with the given settings and prepares the page to talk to it. Module scripts are only served with a
     /// JavaScript content type when the browser asks for no content encoding, because the test host does not run against
@@ -158,6 +161,21 @@ public abstract class CabinetPageTest : PageTest
 
         await Page.GotoAsync(address);
         await Page.WaitForSelectorAsync(CabinetReadySelector, new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached });
+
+        return address;
+    }
+
+    /// <summary>
+    /// Opens a page of the running host on the owner port and waits until the owner page's main area exists.
+    /// </summary>
+    /// <param name="pathAndQuery">The path and query to open, such as <c>/owner/settings</c>.</param>
+    /// <returns>The absolute address that was opened.</returns>
+    protected async Task<string> GotoOwnerAsync(string pathAndQuery)
+    {
+        var address = $"http://127.0.0.1:{OwnerPort}{pathAndQuery}";
+
+        await Page.GotoAsync(address);
+        await Page.WaitForSelectorAsync("#owner-main", new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached });
 
         return address;
     }
