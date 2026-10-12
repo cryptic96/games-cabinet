@@ -29,14 +29,16 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 - ✓ Box proportions come from the owned version's real BGG dimensions when available, else from a flat cover's shape, else from an estimate; landscape covers turn their boxes wide — Phase 4
 - ✓ Every owned game carries its BGG details (players, play time, weight, rating, designers, mechanics, minimum age, expansion and family links), refreshed politely within the hourly sync — Phase 4
 - ✓ Series stand together and a base game with two or more owned expansions faces out, its expansions continuing into the next cubby when needed — Phase 4 (owner request during the server review)
+- ✓ Tapping a game pulls the box out of the shelf (view-transition animation, plain fade where unsupported) and opens a detail card: cover, title, year, players, play time, weight, minimum age, owned expansions (tap to swap), BGG rating, designers, mechanics and a link to BGG; the storage-location row is built and shows as soon as locations exist (owner tools) — Phase 5 (v0.6.0, owner-checked on iPhone Safari, desktop and Firefox)
+- ✓ Reduced motion gets the card with a fade and the box outlined in place, no pull-out — Phase 5
+- ✓ Keyboard: the cabinet is one tab stop with arrow, Home and End navigation and Enter to open; screen readers get a skip link and an A to Z list of every game whose entries open the card — Phase 5 (real screen-reader listen and Android Back are open todos)
+- ✓ Site labels in English and Dutch: the page follows the browser language from the first byte, an EN · NL toggle switches in place and is remembered in one cookie, and game titles stay exactly as BGG provides them — Phase 5
 
 ### Active
 
-- [ ] Tapping a game pulls the box out of the shelf (animation) and opens a detail card: player count, play time, weight, storage location, expansions, BGG rating, designers, minimum age, mechanics, link to BGG
 - [ ] Each game shows its storage location to every visitor. The access check proved BGG's private field is not readable with the token, so the owner manages locations in home/VPN-only owner tools
 - [ ] Visitors can toggle between one big cabinet and one cabinet per storage location
 - [ ] The owner can override the box image per game from home/VPN (candidate rows from the Phase 4 server review are listed in a todo)
-- [ ] Site labels in English and Dutch (browser default, switchable)
 - [ ] Game-night filters: player count, play time, storage location, search by name (non-matching games dim on the shelf)
 - [ ] Before the site goes public: revoke or downgrade the development admin account (passwordless sudo) on the server, and drop the LAN/VPN allow-list from the route
 - [ ] Site is public and read-only with no accounts, reachable from the internet through the existing Traefik reverse proxy. Owner tools are reachable only from the home network or VPN
@@ -123,6 +125,10 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 | Real-collection review artefacts (sheets, screenshots, measurements) never enter the repository | The repository is public; only synthetic screenshots are committed | ✓ Good — denylist and history scans clean after three server rounds (Phase 4) |
 | Default cover share 33 percent, series grouped, families with two or more expansions face out | Picked by the owner on the real collection; about a third of games face out | ✓ Good — committed defaults in v0.5.1 (Phase 4) |
 | Phase 4 code-review findings logged as todos rather than fixed, except the picture-pipeline robustness and oversized-picture fixes | Owner's choice; the security audit raised the oversized-picture risk to high | ✓ Fixed in v0.5.2; remaining items tracked as todos |
+| Card data is its own undocumented endpoint with a fixed field set, versioned with the collection | Keeps the layout payload small and BGG relaying minimal; a details-only sync still refreshes every card | ✓ Good (Phase 5 security audit: 56 of 56 threats closed) |
+| Dutch site name "Spellenkast"; the punched hole on the card dropped | Owner's review-round answers | ✓ Approved (Phase 5 review round) |
+| A phone rotating across the phone breakpoint closes an open card | The cabinet is redrawn with a different arrangement, so the card would sit over moved boxes | ✓ Accepted by the owner (Phase 5 device check); revisit if it annoys in daily use |
+| Browser tests run in their own CI job and test hosts dispose their file watchers | A full browser run leaked one inotify instance per host and hit the per-user limit | ✓ Good — 133 browser tests stable locally and in CI (Phase 5) |
 
 ## Evolution
 
@@ -142,4 +148,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-09 after Phase 4 (enrichment, box images and shape; released as v0.5.2)*
+*Last updated: 2026-10-12 after Phase 5 (game detail, accessibility and language; released as v0.6.0)*
