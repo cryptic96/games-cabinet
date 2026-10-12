@@ -39,11 +39,12 @@ jobs:
       - name: Package release
         run: build/package-release.sh --version 0.0.0 --commit "$GITHUB_SHA" --output artifacts/release
 
-      # Browser tests run in their own job, so this run excludes them by trait.
-      # The browser project then runs zero tests, which the test platform
-      # reports as exit code 8; that one code is ignored here.
+      # Each test project that runs here is named, so a project that finds no
+      # tests fails the run. The browser tests run in their own job.
       - name: Run tests
-        run: dotnet test --solution Cabinet.slnx --no-restore --filter-not-trait "Category=Browser" --ignore-exit-code 8
+        run: |
+          dotnet test --project Cabinet.UnitTests --no-restore
+          dotnet test --project Cabinet.IntegrationTests --no-restore
         env:
           CI: true
 

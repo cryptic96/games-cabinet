@@ -211,7 +211,7 @@ The test host serves module scripts without a content type when the browser acce
 ## Running the checks
 
 - Lint and script tests: `build/lint.sh`
-- .NET tests without a browser, exactly as CI runs them: `dotnet test --solution Cabinet.slnx --no-restore --filter-not-trait "Category=Browser" --ignore-exit-code 8` (the browser project then runs zero tests, which the test platform reports as exit code 8)
+- .NET tests without a browser, exactly as CI runs them: `dotnet test --project Cabinet.UnitTests --no-restore` and `dotnet test --project Cabinet.IntegrationTests --no-restore`. Each project is named so that one which finds no tests fails the run; the browser project has its own job.
 - Page script tests: `node --test build/tests/*.test.mjs`
 - Browser tests: `dotnet test --project Cabinet.BrowserTests` (see "Browser tests")
 - Hook tests alone: `bash build/tests/githooks-test.sh`
