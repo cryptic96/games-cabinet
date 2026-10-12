@@ -247,12 +247,14 @@ public static class ReviewSheetCommand
         }
     }
 
-    private static string Counts(IReadOnlyList<ReviewRow> rows, int pages) =>
-        string.Create(
-            CultureInfo.InvariantCulture,
-            $"review sheet: {pages} pages, {rows.Count} games; verdicts flat {Count(rows, "flat")}, 3D shot {Count(rows, "3D shot")}, unsure {Count(rows, "unsure")}, no verdict {Count(rows, "no verdict")}; chosen version image {rows.Count(row => row.Pick == ArtPick.VersionImage)}, main image {rows.Count(row => row.Pick == ArtPick.MainImage)}, generated cover {rows.Count(row => row.Pick == ArtPick.GeneratedCover)}");
+    private static string Counts(IReadOnlyList<ReviewRow> rows, int pages)
+    {
+        var verdicts = ReviewSheetModel.CountVerdicts(rows);
 
-    private static int Count(IReadOnlyList<ReviewRow> rows, string verdict) => rows.Count(row => row.Verdict == verdict);
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"review sheet: {pages} pages, {rows.Count} games; verdicts flat {verdicts.Flat}, 3D shot {verdicts.ThreeD}, 3D shot cut-out {verdicts.CutOut}, 3D shot tight crop {verdicts.TightCrop}, unsure {verdicts.Unsure}, no verdict {verdicts.NoVerdict}; chosen version image {rows.Count(row => row.Pick == ArtPick.VersionImage)}, main image {rows.Count(row => row.Pick == ArtPick.MainImage)}, generated cover {rows.Count(row => row.Pick == ArtPick.GeneratedCover)}");
+    }
 
     private sealed record Options(string State, string Out, string? Font, string? BoldFont);
 }
