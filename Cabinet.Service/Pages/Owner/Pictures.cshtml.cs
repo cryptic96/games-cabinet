@@ -1,5 +1,7 @@
 using Cabinet.Domain.Collection;
+using Cabinet.Domain.Layout;
 using Cabinet.Domain.Owner;
+using Cabinet.Repository.Images;
 using Cabinet.Service.Collection;
 using Cabinet.Service.Owner;
 using Microsoft.AspNetCore.Mvc;
@@ -35,23 +37,42 @@ public class PicturesModel : OwnerPage
     private readonly CollectionStore _collection;
     private readonly ArtRules _rules;
     private readonly TimeProvider _time;
+    private readonly OwnerLinkFetcher _fetcher;
+    private readonly StagedItems<StagedLink> _staged;
+    private readonly ArtCache _cache;
 
     /// <summary>Creates the page.</summary>
     /// <param name="owner">The single writer of the owner data.</param>
     /// <param name="collection">The collection visitors see, which lists the games.</param>
     /// <param name="rules">The rules that decide what the automatic pick draws.</param>
     /// <param name="time">The clock that decides whether a linked picture counts as dead.</param>
-    public PicturesModel(OwnerDataService owner, CollectionStore collection, ArtRules rules, TimeProvider time)
+    /// <param name="fetcher">Fetches and processes the picture at an address the owner pasted.</param>
+    /// <param name="staged">Holds a previewed picture until the owner uses or discards it.</param>
+    /// <param name="cache">The directory of stored pictures, which a used picture is written to.</param>
+    public PicturesModel(
+        OwnerDataService owner,
+        CollectionStore collection,
+        ArtRules rules,
+        TimeProvider time,
+        OwnerLinkFetcher fetcher,
+        StagedItems<StagedLink> staged,
+        ArtCache cache)
     {
         ArgumentNullException.ThrowIfNull(owner);
         ArgumentNullException.ThrowIfNull(collection);
         ArgumentNullException.ThrowIfNull(rules);
         ArgumentNullException.ThrowIfNull(time);
+        ArgumentNullException.ThrowIfNull(fetcher);
+        ArgumentNullException.ThrowIfNull(staged);
+        ArgumentNullException.ThrowIfNull(cache);
 
         _owner = owner;
         _collection = collection;
         _rules = rules;
         _time = time;
+        _fetcher = fetcher;
+        _staged = staged;
+        _cache = cache;
     }
 
     /// <inheritdoc />
@@ -90,6 +111,12 @@ public class PicturesModel : OwnerPage
     /// <summary>The revision of the change the Undo form would take back, or null when there is none to offer.</summary>
     public long? UndoRevision { get; private set; }
 
+    /// <summary>The preview of a linked picture the single-game view shows, or null when there is none.</summary>
+    public LinkPreview? Preview { get; private set; }
+
+    /// <summary>The token of the staged picture <see cref="Preview"/> was made from; it is only set when <see cref="Preview"/> is not null.</summary>
+    public string? PreviewToken { get; private set; }
+
     /// <summary>The value of the <c>view</c> query that selects the view of every game.</summary>
     public static string AllViewQuery => AllViewValue;
 
@@ -101,7 +128,8 @@ public class PicturesModel : OwnerPage
     /// <param name="done">The code of the post that sent the browser here; anything outside the fixed set is ignored.</param>
     /// <param name="view">The view to show; <c>all</c> is the only value that is not the default, and anything else is the default.</param>
     /// <param name="game">The game to show on its own; read as a positive whole number and looked up, so anything else shows that the game is gone.</param>
-    public void OnGet(string? done, string? view, string? game)
+    /// <param name="preview">The token of a previewed linked picture; it is looked up among the staged pictures and never echoed, and a text of any other shape is ignored.</param>
+    public void OnGet(string? done, string? view, string? game, string? preview)
     {
         View = game is null ? ViewOf(view) : PicturesView.Single;
         SingleGameId = game is null ? null : ParseGameId(game);
@@ -109,6 +137,7 @@ public class PicturesModel : OwnerPage
         Notice = OwnerResponses.NoticeFor(done);
         NoticeIsProblem = Notice is not null && OwnerResponses.IsProblem(done);
         UndoRevision = done == "saved" ? _owner.UndoableRevision : null;
+        LoadPreview(preview);
     }
 
     /// <summary>Sets which picture one game is drawn from.</summary>
@@ -163,6 +192,98 @@ public class PicturesModel : OwnerPage
         return OwnerResponses.For(this, result, PagePath, game is null ? NoticeAnchor : RowAnchor(game.Value), extra: StateAfter(result, gameId), game: KnownGame(game));
     }
 
+    /// <summary>
+    /// Fetches the picture at an address the owner pasted, processes it and stages it for a preview. Nothing is stored. A script
+    /// gets the preview as JSON; a form posted without script is sent to the game's own view, which renders the preview from the
+    /// staged picture.
+    /// </summary>
+    /// <param name="gameId">The game the link is for.</param>
+    /// <param name="link">The address as the owner typed it.</param>
+    /// <param name="cancellationToken">Cancels the check.</param>
+    public async Task<IActionResult> OnPostCheckLinkAsync(int gameId, string? link, CancellationToken cancellationToken)
+    {
+        var snapshot = _collection.Current.Snapshot;
+
+        if (snapshot is null || !snapshot.Items.Any(item => item.GameId == gameId))
+        {
+            return Refused("unknown-game", gameId, null, gameId);
+        }
+
+        if (await _fetcher.CheckAsync(link, cancellationToken) is not LinkCheck.Ready ready)
+        {
+            return Refused("link-failed", gameId, null, gameId);
+        }
+
+        var preview = LinkPreview.Build(snapshot, gameId, _rules, ready.Link.Record);
+        var variant = preview is null ? null : ready.Link.Variants.FirstOrDefault(candidate => candidate.Name == preview.ArtFileName);
+
+        if (preview is null || variant is null)
+        {
+            return Refused("link-failed", gameId, null, gameId);
+        }
+
+        var token = _staged.Stage(new StagedLink(gameId, ready.Link, variant));
+
+        return OwnerResponses.AsksForJson(Request)
+            ? new JsonResult(PreviewJson(token, preview))
+            : RedirectToPage(PagePath, pageHandler: null, routeValues: new { game = gameId, preview = token }, fragment: RowAnchor(gameId));
+    }
+
+    /// <summary>
+    /// Uses the previewed picture: its files are written to the art directory first, then the link and its record are stored as
+    /// the game's own picture, replacing any link the game had. The staged picture is forgotten once the change is saved.
+    /// </summary>
+    /// <param name="revision">The revision the form was built from.</param>
+    /// <param name="gameId">The game.</param>
+    /// <param name="token">The token of the staged picture.</param>
+    /// <param name="view">The view the form was on, so a form posted without script returns to it.</param>
+    /// <param name="game">The game of the single-game view the form was on, so a form posted without script returns to it.</param>
+    /// <param name="cancellationToken">Cancels the wait for the writer.</param>
+    public async Task<IActionResult> OnPostUseLinkAsync(long revision, int gameId, string? token, string? view, int? game, CancellationToken cancellationToken)
+    {
+        var snapshot = _collection.Current.Snapshot;
+        var item = snapshot?.Items.FirstOrDefault(candidate => candidate.GameId == gameId);
+
+        if (snapshot is null || item is null)
+        {
+            return Refused("unknown-game", gameId, view, game);
+        }
+
+        if (!_staged.TryGet(token, out var staged) || staged.GameId != gameId)
+        {
+            return Refused("link-expired", gameId, view, game);
+        }
+
+        if (!TryStore(staged.Link))
+        {
+            return Refused("save-failed", gameId, view, game);
+        }
+
+        var result = await _owner.MutateAsync(
+            revision,
+            data => PictureEdits.UseLink(data, gameId, staged.Link.Url, staged.Link.Record, PictureRows.TitleOf(item), item.VersionImageUrl, SnapshotMapper.MainPictureUrl(item, snapshot)),
+            cancellationToken);
+
+        if (result.Outcome == OwnerOutcome.Saved)
+        {
+            _staged.Remove(token);
+        }
+
+        return OwnerResponses.For(this, result, PagePath, RowAnchor(gameId), extra: StateAfter(result, gameId, withLinkTile: true), view: ViewQueryOf(view, game), game: KnownGame(game));
+    }
+
+    /// <summary>Throws a previewed picture away. Nothing was stored, so nothing else changes.</summary>
+    /// <param name="gameId">The game the preview was for, so a form posted without script returns to its view.</param>
+    /// <param name="token">The token of the staged picture; one that is not the shape of a token or is unknown does nothing.</param>
+    public IActionResult OnPostDiscardPreview(int gameId, string? token)
+    {
+        _staged.Remove(token);
+
+        return OwnerResponses.AsksForJson(Request)
+            ? new JsonResult(new Dictionary<string, object?> { ["outcome"] = "discarded" })
+            : RedirectToPage(PagePath, pageHandler: null, routeValues: new { game = KnownGame(gameId) }, fragment: RowAnchor(gameId));
+    }
+
     private static PicturesView ViewOf(string? view) =>
         string.Equals(view, AllViewValue, StringComparison.Ordinal) ? PicturesView.All : PicturesView.WorthALook;
 
@@ -204,9 +325,116 @@ public class PicturesModel : OwnerPage
         return PictureEdits.LooksRight(data, gameId, PictureRows.TitleOf(item), item.VersionImageUrl, SnapshotMapper.MainPictureUrl(item, snapshot), now);
     }
 
+    private IActionResult Refused(string statusKey, int gameId, string? view = null, int? game = null) =>
+        OwnerResponses.For(
+            this,
+            new OwnerResult(OwnerOutcome.Refused, null, statusKey),
+            PagePath,
+            RowAnchor(gameId),
+            view: ViewQueryOf(view, game),
+            game: KnownGame(game));
+
+    private bool TryStore(ProcessedLink link)
+    {
+        try
+        {
+            foreach (var variant in link.Variants)
+            {
+                _cache.Write(variant);
+            }
+
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    private void LoadPreview(string? token)
+    {
+        if (!StagedItems<StagedLink>.IsToken(token))
+        {
+            return;
+        }
+
+        if (!_staged.TryGet(token, out var staged))
+        {
+            if (Notice is null)
+            {
+                Notice = OwnerStrings.Message("link-expired");
+                NoticeIsProblem = true;
+            }
+
+            return;
+        }
+
+        if (View != PicturesView.Single || staged.GameId != SingleGameId || _collection.Current.Snapshot is not { } snapshot)
+        {
+            return;
+        }
+
+        Preview = LinkPreview.Build(snapshot, staged.GameId, _rules, staged.Link.Record);
+        PreviewToken = Preview is null ? null : token;
+    }
+
+    private static Dictionary<string, object?> PreviewJson(string token, LinkPreview preview) =>
+        new()
+        {
+            ["outcome"] = "ready",
+            ["token"] = token,
+            ["previewUrl"] = $"{OwnerEndpoints.PreviewPath}/{token}",
+            ["preview"] = new Dictionary<string, object?>
+            {
+                ["title"] = preview.Title,
+                ["boxWidthMm"] = preview.BoxWidthMm,
+                ["boxHeightMm"] = preview.BoxHeightMm,
+                ["boxDepthMm"] = preview.BoxDepthMm,
+                ["fit"] = CamelName(preview.Fit),
+                ["edges"] = preview.Edges is { } edges
+                    ? new Dictionary<string, string> { ["top"] = edges.Top, ["right"] = edges.Right, ["bottom"] = edges.Bottom, ["left"] = edges.Left }
+                    : null,
+                ["artWidth"] = preview.ArtWidth,
+                ["artHeight"] = preview.ArtHeight,
+                ["shapeSource"] = CamelName(preview.ShapeSource),
+                ["shapeText"] = OwnerStrings.ShapeText(preview.ShapeSource),
+                ["verdict"] = CamelName(preview.Verdict),
+                ["verdictText"] = OwnerStrings.VerdictTag(preview.Verdict),
+                ["note"] = OwnerStrings.PreviewNote(preview.Verdict),
+                ["spineWidthMm"] = preview.SpineWidthMm,
+                ["spineHeightMm"] = preview.SpineHeightMm,
+                ["spineLabel"] = preview.SpineLabel,
+                ["spineBackground"] = preview.Spine.Background,
+                ["spineText"] = preview.Spine.Text,
+            },
+        };
+
+    private static Dictionary<string, object?> LinkTileJson(PictureRow row)
+    {
+        var tile = row.Tile(PictureChoice.Link);
+
+        return new Dictionary<string, object?>
+        {
+            ["url"] = tile.Url,
+            ["width"] = tile.Width,
+            ["height"] = tile.Height,
+            ["verdictText"] = tile.Verdict is { } verdict ? OwnerStrings.VerdictTag(verdict) : null,
+            ["address"] = tile.LinkAddress,
+            ["fullAddress"] = tile.LinkFullAddress,
+        };
+    }
+
+    private static string CamelName<TEnum>(TEnum value)
+        where TEnum : struct, Enum
+    {
+        var name = value.ToString();
+
+        return string.Concat(char.ToLowerInvariant(name[0]), name[1..]);
+    }
+
     private static string RowAnchor(int gameId) => $"game-{gameId}";
 
-    private Dictionary<string, object?> StateAfter(OwnerResult result, int? gameId)
+    private Dictionary<string, object?> StateAfter(OwnerResult result, int? gameId, bool withLinkTile = false)
     {
         var state = new Dictionary<string, object?>();
 
@@ -225,6 +453,11 @@ public class PicturesModel : OwnerPage
         if (gameId is { } id && rows.FirstOrDefault(row => row.GameId == id) is { } row)
         {
             state["resolved"] = row.Look.Resolved;
+
+            if (withLinkTile && result.Outcome == OwnerOutcome.Saved)
+            {
+                state["linkTile"] = LinkTileJson(row);
+            }
         }
 
         return state;
