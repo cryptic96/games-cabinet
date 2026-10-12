@@ -27,6 +27,7 @@ public static class OwnerResponses
         "name-characters",
         "unknown-location",
         "unknown-game",
+        "nothing-selected",
         "id-clash",
         "save-failed",
     };

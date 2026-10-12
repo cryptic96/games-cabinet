@@ -202,6 +202,102 @@ public sealed class LocationEditsTests
         LocationEdits.CountLeftNotPlaced(data, null, ShelfB).Should().Be(0);
     }
 
+    [Fact]
+    public void Moving_many_games_to_a_location_is_one_change_with_one_log_line()
+    {
+        var data = ThreeLocations() with { Games = [new OwnerGame(100, CabinetA, null, null)] };
+
+        var moved = LocationEdits.MoveMany(data, [100, 101], MoveTarget.Location(ShelfB), TitleOfKnown, NeverFollows);
+
+        moved.Changed.Should().BeTrue();
+        moved.StatusKey.Should().Be("game-moved");
+        moved.LogText.Should().Be("Moved 2 games to Shelf B");
+        moved.Data.Games.Should().Equal(new OwnerGame(100, ShelfB, null, null), new OwnerGame(101, ShelfB, null, null));
+    }
+
+    [Fact]
+    public void Moving_one_game_says_one_game_and_listing_a_game_twice_counts_it_once()
+    {
+        var moved = LocationEdits.MoveMany(ThreeLocations(), [101, 101], MoveTarget.Location(ShelfB), TitleOfKnown, NeverFollows);
+
+        moved.LogText.Should().Be("Moved 1 game to Shelf B");
+        moved.Data.Games.Should().Equal(new OwnerGame(101, ShelfB, null, null));
+    }
+
+    [Fact]
+    public void Moving_games_to_not_placed_clears_their_location_and_keeps_their_picture_decision()
+    {
+        var picture = new PictureSetting(PictureChoice.MainPicture, true, null, null, null);
+        var data = ThreeLocations() with
+        {
+            Games = [new OwnerGame(100, ShelfB, null, picture), new OwnerGame(101, ShelfB, null, null)],
+        };
+
+        var moved = LocationEdits.MoveMany(data, [100, 101], MoveTarget.NotPlaced, TitleOfKnown, NeverFollows);
+
+        moved.LogText.Should().Be("2 games are now not placed");
+        moved.StatusKey.Should().Be("game-unplaced");
+        moved.Data.Games.Should().Equal(new OwnerGame(100, null, null, picture));
+    }
+
+    [Fact]
+    public void Same_as_base_game_clears_only_the_expansions_that_have_an_owned_base_and_leaves_the_others()
+    {
+        var data = ThreeLocations() with
+        {
+            Games = [new OwnerGame(100, CabinetA, null, null), new OwnerGame(200, ShelfB, null, null), new OwnerGame(202, ShelfB, null, null)],
+        };
+
+        var moved = LocationEdits.MoveMany(data, [100, 200, 202], MoveTarget.SameAsBase, TitleOfKnown, id => id == 200);
+
+        moved.LogText.Should().Be("1 expansion now follows its base game");
+        moved.Data.Games.Should().Equal(new OwnerGame(100, CabinetA, null, null), new OwnerGame(202, ShelfB, null, null));
+    }
+
+    [Fact]
+    public void A_move_that_changes_nothing_is_the_none_answer()
+    {
+        var data = ThreeLocations() with { Games = [new OwnerGame(100, ShelfB, null, null)] };
+
+        LocationEdits.MoveMany(data, [100], MoveTarget.Location(ShelfB), TitleOfKnown, NeverFollows).IsNone.Should().BeTrue();
+        LocationEdits.MoveMany(data, [101], MoveTarget.NotPlaced, TitleOfKnown, NeverFollows).IsNone.Should().BeTrue();
+        LocationEdits.MoveMany(data, [100], MoveTarget.SameAsBase, TitleOfKnown, NeverFollows).IsNone.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Clearing_expansions_and_other_games_together_says_both_things()
+    {
+        var data = ThreeLocations() with
+        {
+            Games = [new OwnerGame(100, ShelfB, null, null), new OwnerGame(200, ShelfB, null, null), new OwnerGame(201, ShelfB, null, null)],
+        };
+
+        var moved = LocationEdits.MoveMany(data, [100, 200, 201], MoveTarget.NotPlaced, TitleOfKnown, id => id >= 200);
+
+        moved.LogText.Should().Be("1 game is now not placed and 2 expansions now follow their base game");
+        moved.Data.Games.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Unknown_games_an_unknown_location_and_an_empty_selection_are_refused()
+    {
+        var data = ThreeLocations();
+
+        var unknownGame = LocationEdits.MoveMany(data, [100, 999], MoveTarget.Location(ShelfB), TitleOfKnown, NeverFollows);
+        var unknownLocation = LocationEdits.MoveMany(data, [100], MoveTarget.Location("missing"), TitleOfKnown, NeverFollows);
+        var nothing = LocationEdits.MoveMany(data, [], MoveTarget.NotPlaced, TitleOfKnown, NeverFollows);
+
+        unknownGame.Changed.Should().BeFalse();
+        unknownGame.IsNone.Should().BeFalse();
+        unknownGame.StatusKey.Should().Be("unknown-game");
+        unknownLocation.StatusKey.Should().Be("unknown-location");
+        nothing.StatusKey.Should().Be("nothing-selected");
+    }
+
+    private static string? TitleOfKnown(int gameId) => gameId is 100 or 101 or 200 or 201 or 202 ? $"Example Game {gameId}" : null;
+
+    private static bool NeverFollows(int gameId) => false;
+
     private static OwnerData ThreeLocations() =>
         OwnerData.Empty with
         {
