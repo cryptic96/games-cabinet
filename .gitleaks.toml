@@ -69,12 +69,12 @@ regex = '''\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'''
   ]
 
   [[rules.allowlists]]
-  description = "Razor views write values into markup as text-@variable.Member, which reads like an address but is a C# expression"
+  description = "Razor views (and notes quoting them) write values into markup as text-@Variable.Member, which reads like an address but is a C# member access"
   condition = "AND"
-  paths = ['''\.cshtml$''']
+  paths = ['''\.(cshtml|md)$''']
   regexTarget = "match"
   regexes = [
-    '''@[a-z][A-Za-z0-9]*\.[A-Z][A-Za-z0-9]*$''',
+    '''@[A-Za-z][A-Za-z0-9]*\.[A-Z][A-Za-z0-9]*[a-z][A-Za-z0-9]*$''',
   ]
 
 [[rules]]
