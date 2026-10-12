@@ -126,6 +126,84 @@ public sealed class ReviewSheetCommandTests : IDisposable
         result.Error.Should().BeEmpty();
     }
 
+    [Fact]
+    public void A_bold_font_given_without_a_font_is_honoured_and_a_missing_one_exits_with_4()
+    {
+        RequireInstalledFont();
+        AddStoredGames(1);
+        var installedBold = ReviewSheetCommand.FontSearchPaths.First(paths => File.Exists(paths.Regular)).Bold;
+
+        var missing = Run(["--state", _fixture.StatePath, "--out", _out.FullPath, "--bold-font", Path.Combine(_out.FullPath, "absent-bold.ttf")]);
+
+        missing.ExitCode.Should().Be(4);
+        missing.Error.Should().Contain("fonts-dejavu-core");
+
+        if (File.Exists(installedBold))
+        {
+            var present = Run(["--state", _fixture.StatePath, "--out", Path.Combine(_out.FullPath, "pages"), "--bold-font", installedBold]);
+
+            present.ExitCode.Should().Be(0);
+        }
+    }
+
+    [Fact]
+    public void A_font_file_that_is_not_a_font_exits_with_4_and_does_not_throw()
+    {
+        AddStoredGames(1);
+        var notAFont = Path.Combine(_out.FullPath, "notes.ttf");
+        File.WriteAllText(notAFont, "this is not a font");
+
+        var result = Run(["--state", _fixture.StatePath, "--out", _out.FullPath, "--font", notAFont]);
+
+        result.ExitCode.Should().Be(4);
+        result.Error.Should().Contain("fonts-dejavu-core");
+    }
+
+    [Fact]
+    public void A_font_path_naming_a_directory_exits_with_4_and_does_not_throw()
+    {
+        AddStoredGames(1);
+
+        var result = Run(["--state", _fixture.StatePath, "--out", _out.FullPath, "--font", _out.FullPath]);
+
+        result.ExitCode.Should().Be(4);
+    }
+
+    [Fact]
+    public void An_output_path_the_system_rejects_exits_with_5_and_a_one_line_reason()
+    {
+        RequireInstalledFont();
+        AddStoredGames(1);
+
+        var result = Run(["--state", _fixture.StatePath, "--out", "pages\0invalid"]);
+
+        result.ExitCode.Should().Be(5);
+        result.Error.Trim().Split('\n').Should().ContainSingle();
+    }
+
+    [Fact]
+    public void A_missing_state_directory_exits_with_3_and_a_reason()
+    {
+        var result = Run(["--state", Path.Combine(_out.FullPath, "absent"), "--out", Path.Combine(_out.FullPath, "pages")]);
+
+        result.ExitCode.Should().Be(3);
+        result.Error.Should().Contain("no stored collection");
+    }
+
+    [Fact]
+    public void The_printed_counts_put_every_game_under_one_verdict_kind_and_add_up()
+    {
+        RequireInstalledFont();
+        AddStoredGames(3);
+
+        var result = Run(["--state", _fixture.StatePath, "--out", Path.Combine(_out.FullPath, "pages")]);
+
+        result.ExitCode.Should().Be(0);
+        var counts = System.Text.RegularExpressions.Regex.Matches(result.Output.Split(';')[1], @"(\d+)(?:,|$)")
+            .Select(match => int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture));
+        counts.Sum().Should().Be(3);
+    }
+
     private static (int ExitCode, string Output, string Error) Run(string[] args)
     {
         using var output = new StringWriter();

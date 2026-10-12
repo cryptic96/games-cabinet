@@ -12,6 +12,13 @@ public sealed class ReviewSheetTests : IDisposable
 {
     private const float SmallTextSize = 14f;
     private const int ReviewSheetMargin = 22;
+    private const int ReviewSheetCellPadding = 8;
+    private const int ReviewSheetRowHeight = ReviewSheet.ArtHeightPx + 20;
+    private const int PageBottomMargin = 16;
+    private const int PositionColumnWidth = 56;
+    private const int TitleColumnWidth = 300;
+    private const int CandidateColumnWidth = 210;
+    private const int VerdictColumnWidth = 150;
 
     private readonly ReviewFixture _fixture = new();
 
@@ -149,6 +156,94 @@ public sealed class ReviewSheetTests : IDisposable
                 decoded.GetPixel(x, y).Should().Be(pageColour, $"pixel {x},{y} lies in the right margin");
             }
         }
+    }
+
+    [Fact]
+    public void The_longest_verdict_never_draws_past_the_edge_of_its_column()
+    {
+        var (regular, bold) = InstalledFont();
+        var closeCrop = new ArtFeatures(0.06, 0.94, 0.31, 0.26, 4, CutOut: false, TightCrop: true);
+        var version = _fixture.MeasuredPicture("version", SyntheticArtKind.BoxOnWhiteTightCrop, closeCrop);
+        _fixture.Game(1, "Invented Lighthouse", version, null, new VersionDimensions(7.5, 10, 2.5));
+        var rows = ReviewSheetModel.Build(_fixture.Snapshot(), ArtRules.Default, _fixture.ArtPath);
+        rows.Single().Verdict.Should().Be("3D shot, tight crop");
+
+        var page = ReviewSheet.Draw(rows, ArtRules.Default, regular, bold).Single();
+
+        using var decoded = SKBitmap.Decode(page);
+        var rowTop = decoded.Height - PageBottomMargin - ReviewSheetRowHeight;
+        var columnEdge = ReviewSheetMargin + PositionColumnWidth + TitleColumnWidth + (2 * CandidateColumnWidth) + VerdictColumnWidth;
+        var rowColour = decoded.GetPixel(columnEdge, rowTop + 4);
+        for (var y = rowTop + 4; y < rowTop + ReviewSheetRowHeight - 6; y++)
+        {
+            for (var x = columnEdge; x < columnEdge + ReviewSheetCellPadding; x++)
+            {
+                decoded.GetPixel(x, y).Should().Be(rowColour, $"pixel {x},{y} lies right of the verdict column");
+            }
+        }
+    }
+
+    [Fact]
+    public void A_fitted_text_is_never_wider_than_the_width_it_is_fitted_to()
+    {
+        var (regular, bold) = InstalledFont();
+        using var font = new SKFont(bold, 17f);
+
+        foreach (var width in new[] { 40f, 80f, 134f, 300f })
+        {
+            ReviewSheet.Ellipsised("3D shot, tight crop with a long tail", font, width).Should().Match(text => font.MeasureText(text) <= width);
+        }
+
+        regular.Dispose();
+    }
+
+    [Fact]
+    public void A_text_that_already_fits_is_returned_unchanged()
+    {
+        var (regular, bold) = InstalledFont();
+        using var font = new SKFont(regular, 17f);
+
+        ReviewSheet.Ellipsised("flat", font, 300f).Should().Be("flat");
+
+        bold.Dispose();
+    }
+
+    [Fact]
+    public void Fitting_a_title_of_emoji_to_any_width_never_leaves_a_lone_surrogate()
+    {
+        var (regular, bold) = InstalledFont();
+        using var font = new SKFont(regular, 17f);
+        var title = string.Concat(Enumerable.Repeat("\U0001F600", 12)) + "\U0001F3B2 end";
+
+        for (var width = 6; width <= 260; width++)
+        {
+            var fitted = ReviewSheet.Ellipsised(title, font, width);
+
+            LoneSurrogateFree(fitted).Should().BeTrue($"the text fitted to {width} pixels is {fitted.Length} characters long");
+            System.Text.Encoding.UTF8.GetString(System.Text.Encoding.UTF8.GetBytes(fitted)).Should().Be(fitted);
+        }
+
+        bold.Dispose();
+    }
+
+    private static bool LoneSurrogateFree(string text)
+    {
+        for (var index = 0; index < text.Length; index++)
+        {
+            if (char.IsHighSurrogate(text[index]) && index + 1 < text.Length && char.IsLowSurrogate(text[index + 1]))
+            {
+                index++;
+
+                continue;
+            }
+
+            if (char.IsSurrogate(text[index]))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static string Collapsed(string text) => System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ").Trim();

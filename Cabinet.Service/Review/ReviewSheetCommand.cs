@@ -174,48 +174,71 @@ public static class ReviewSheetCommand
 
     private static bool TryLoadFonts(Options options, out SKTypeface? typeface, out SKTypeface? boldTypeface)
     {
-        if (options.Font is not null)
-        {
-            typeface = LoadFont(options.Font);
-            boldTypeface = options.BoldFont is null ? typeface : LoadFont(options.BoldFont);
+        typeface = null;
+        boldTypeface = null;
 
-            return Complete(ref typeface, ref boldTypeface);
+        if (options.Font is null && options.BoldFont is null)
+        {
+            return TryLoadInstalledPair(out typeface, out boldTypeface);
         }
 
-        foreach (var (regular, bold) in FontSearchPaths)
+        var regular = options.Font is null ? LoadInstalledRegular() : LoadFont(options.Font);
+        var bold = options.BoldFont is null ? regular : LoadFont(options.BoldFont);
+
+        return Complete(regular, bold, out typeface, out boldTypeface);
+    }
+
+    private static bool TryLoadInstalledPair(out SKTypeface? typeface, out SKTypeface? boldTypeface)
+    {
+        foreach (var (regularPath, boldPath) in FontSearchPaths)
         {
-            if (!File.Exists(regular))
+            var regular = LoadFont(regularPath);
+
+            if (regular is null)
             {
                 continue;
             }
 
-            typeface = SKTypeface.FromFile(regular);
-            boldTypeface = File.Exists(bold) ? SKTypeface.FromFile(bold) : typeface;
+            var bold = File.Exists(boldPath) ? LoadFont(boldPath) ?? regular : regular;
 
-            if (Complete(ref typeface, ref boldTypeface))
+            return Complete(regular, bold, out typeface, out boldTypeface);
+        }
+
+        typeface = null;
+        boldTypeface = null;
+
+        return false;
+    }
+
+    private static SKTypeface? LoadInstalledRegular()
+    {
+        foreach (var (regularPath, _) in FontSearchPaths)
+        {
+            if (LoadFont(regularPath) is { } regular)
             {
-                return true;
+                return regular;
             }
         }
 
-        typeface = null;
-        boldTypeface = null;
-
-        return false;
+        return null;
     }
 
-    private static bool Complete(ref SKTypeface? typeface, ref SKTypeface? boldTypeface)
+    private static bool Complete(SKTypeface? regular, SKTypeface? bold, out SKTypeface? typeface, out SKTypeface? boldTypeface)
     {
-        if (typeface is not null && boldTypeface is not null)
+        if (regular is not null && bold is not null)
         {
+            typeface = regular;
+            boldTypeface = bold;
+
             return true;
         }
 
-        if (!ReferenceEquals(typeface, boldTypeface))
+        if (!ReferenceEquals(regular, bold))
         {
-            typeface?.Dispose();
-            boldTypeface?.Dispose();
+            bold?.Dispose();
         }
+
+        regular?.Dispose();
 
         typeface = null;
         boldTypeface = null;
@@ -223,7 +246,17 @@ public static class ReviewSheetCommand
         return false;
     }
 
-    private static SKTypeface? LoadFont(string path) => File.Exists(path) ? SKTypeface.FromFile(path) : null;
+    private static SKTypeface? LoadFont(string path)
+    {
+        try
+        {
+            return File.Exists(path) ? SKTypeface.FromFile(path) : null;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return null;
+        }
+    }
 
     private static bool TryWrite(string directory, IReadOnlyList<byte[]> pages)
     {
@@ -240,7 +273,7 @@ public static class ReviewSheetCommand
 
             return true;
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
             return false;
         }
