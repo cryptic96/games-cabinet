@@ -31,6 +31,7 @@ public class LocationsModel : OwnerPage
 {
     private const string PagePath = "/Owner/Locations";
     private const string AddAnchor = "new-location";
+    private const string NoticeAnchor = "owner-notice";
 
     private readonly OwnerDataService _owner;
     private readonly CollectionStore _collection;
@@ -110,6 +111,16 @@ public class LocationsModel : OwnerPage
             cancellationToken);
 
         return OwnerResponses.For(this, result, PagePath, RowAnchor(gameId));
+    }
+
+    /// <summary>Takes back the latest change, when nothing was written after it.</summary>
+    /// <param name="revision">The revision the change produced, which the Undo form carries.</param>
+    /// <param name="cancellationToken">Cancels the wait for the writer.</param>
+    public async Task<IActionResult> OnPostUndoAsync(long revision, CancellationToken cancellationToken)
+    {
+        var result = await _owner.UndoAsync(revision, cancellationToken);
+
+        return OwnerResponses.For(this, result, PagePath, NoticeAnchor);
     }
 
     private static OwnerChange AssignInSnapshot(OwnerData data, CollectionSnapshot? snapshot, int gameId, string? locationId)

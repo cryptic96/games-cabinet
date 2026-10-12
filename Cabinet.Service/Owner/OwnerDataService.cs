@@ -121,6 +121,55 @@ public sealed class OwnerDataService
         }
     }
 
+    /// <summary>
+    /// Takes back the latest change, and only that: it works while nothing was written after the change, once. The previous
+    /// data is stored again as a new revision, which also drops the change's log line and its place in the change count.
+    /// </summary>
+    /// <param name="revisionOfChange">The revision the change produced, which the writer was shown when it made the change.</param>
+    /// <param name="cancellationToken">Cancels the wait for a turn.</param>
+    public async Task<OwnerResult> UndoAsync(long revisionOfChange, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+
+        try
+        {
+            if (State is not OwnerDataState.Ready ready)
+            {
+                return new OwnerResult(OwnerOutcome.Unreadable, null, "unreadable");
+            }
+
+            if (_undo is not { } slot || slot.Revision != revisionOfChange || ready.Data.Revision != revisionOfChange)
+            {
+                return new OwnerResult(OwnerOutcome.OutOfDate, ready.Data, "cant-undo", UndoableRevision is not null);
+            }
+
+            var now = _time.GetUtcNow();
+            var restored = slot.Previous with { Revision = ready.Data.Revision + 1, SavedAtUtc = now };
+
+            try
+            {
+                _store.Save(restored);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                _logger.LogWarning("The owner data could not be saved: {ExceptionType}", exception.GetType().Name);
+
+                return new OwnerResult(OwnerOutcome.Refused, ready.Data, "save-failed", UndoableRevision is not null);
+            }
+
+            _undo = null;
+            Volatile.Write(ref _state, new OwnerDataState.Ready(restored));
+            _logger.LogInformation("Owner data change taken back: revision {Revision}.", restored.Revision);
+            Changed?.Invoke();
+
+            return new OwnerResult(OwnerOutcome.Saved, restored, "undone");
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     private OwnerResult Save(OwnerData current, OwnerChange edit)
     {
         var now = _time.GetUtcNow();
