@@ -1,4 +1,6 @@
 using System.Net;
+using Microsoft.AspNetCore.Http.Metadata;
+using System.Text.RegularExpressions;
 
 namespace Cabinet.Service.Owner;
 
@@ -43,13 +45,17 @@ public sealed record OwnerAccessOptions(int? Port, IReadOnlyList<System.Net.IPNe
 }
 
 /// <summary>Reads the owner access settings and builds the two walls that keep the owner tools off the public port and off foreign addresses.</summary>
-public static class OwnerAccess
+public static partial class OwnerAccess
 {
     private const string UrlKey = "Kestrel:Endpoints:Owner:Url";
 
     private const string RangesKey = "Owner:AllowedRanges";
 
     private const string KnownProxiesKey = "ReverseProxy:KnownProxies";
+
+    private const string WebUrlKey = "Kestrel:Endpoints:Web:Url";
+
+    private const string OpsUrlKey = "Kestrel:Endpoints:Ops:Url";
 
     private const string OwnerSegment = "owner";
 
@@ -75,6 +81,9 @@ public static class OwnerAccess
         {
             throw new InvalidOperationException($"{UrlKey} must be an absolute http URL with an explicit port.");
         }
+
+        RejectSharedPort(configuration, uri.Port, WebUrlKey);
+        RejectSharedPort(configuration, uri.Port, OpsUrlKey);
 
         var ranges = ParseRanges(configuration);
 
@@ -144,8 +153,9 @@ public static class OwnerAccess
     }
 
     /// <summary>
-    /// Wall one: an endpoint marked owner-only answers an empty 404 when it is reached on any port but the owner port. Place it
-    /// straight after routing so the endpoint is known.
+    /// Wall one: an endpoint marked owner-only answers an empty 404 when it is reached on any port but the owner port. On the
+    /// owner port a body that declares itself larger than the endpoint's size limit is refused with 413 before any filter or
+    /// handler runs. Place it straight after routing so the endpoint is known.
     /// </summary>
     /// <param name="app">The pipeline.</param>
     public static IApplicationBuilder UseOwnerOnlyRoutes(this IApplicationBuilder app)
@@ -164,6 +174,14 @@ public static class OwnerAccess
                 return;
             }
 
+            var limit = context.GetEndpoint()?.Metadata.GetMetadata<IRequestSizeLimitMetadata>()?.MaxRequestBodySize;
+            if (ownerOnly && limit is { } maxBytes && context.Request.ContentLength > maxBytes)
+            {
+                context.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
+
+                return;
+            }
+
             await next(context);
         });
     }
@@ -173,6 +191,21 @@ public static class OwnerAccess
         var first = (path.Value ?? string.Empty).Split('/', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
 
         return first is not null && first.Equals(OwnerSegment, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void RejectSharedPort(IConfiguration configuration, int ownerPort, string otherKey)
+    {
+        var other = configuration[otherKey];
+        if (string.IsNullOrWhiteSpace(other))
+        {
+            return;
+        }
+
+        var match = TrailingPort().Match(other.Trim());
+        if (match.Success && int.TryParse(match.Groups[1].Value, out var port) && port == ownerPort)
+        {
+            throw new InvalidOperationException($"{UrlKey} must not use the same port as {otherKey}.");
+        }
     }
 
     private static List<System.Net.IPNetwork> ParseRanges(IConfiguration configuration)
@@ -188,9 +221,7 @@ public static class OwnerAccess
                 continue;
             }
 
-            if (!System.Net.IPNetwork.TryParse(entry.Trim(), out var network)
-                || network.PrefixLength == 0
-                || network.BaseAddress.IsIPv4MappedToIPv6)
+            if (!TryParseRange(entry.Trim(), out var network))
             {
                 throw new InvalidOperationException($"{RangesKey}:{index} is not a usable address range.");
             }
@@ -205,4 +236,62 @@ public static class OwnerAccess
 
         return ranges;
     }
+
+    /// <summary>
+    /// Reads an address with an optional prefix length. A bare address is a single host, host bits are cleared, and the forms
+    /// that would let everyone in or that name the same hosts twice are refused: prefix length 0, any address in the
+    /// IPv4-mapped form, and shortened or numeric IPv4 spellings.
+    /// </summary>
+    private static bool TryParseRange(string entry, out System.Net.IPNetwork network)
+    {
+        network = default;
+
+        var slash = entry.IndexOf('/', StringComparison.Ordinal);
+        var addressText = slash < 0 ? entry : entry[..slash];
+
+        if (!IsPlainAddressSpelling(addressText) || !IPAddress.TryParse(addressText, out var address) || address.IsIPv4MappedToIPv6)
+        {
+            return false;
+        }
+
+        var maxPrefix = address.GetAddressBytes().Length * 8;
+        var prefix = maxPrefix;
+        if (slash >= 0
+            && !(int.TryParse(entry[(slash + 1)..], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out prefix)
+                && prefix > 0
+                && prefix <= maxPrefix))
+        {
+            return false;
+        }
+
+        network = new System.Net.IPNetwork(ClearHostBits(address, prefix), prefix);
+
+        return true;
+    }
+
+    private static bool IsPlainAddressSpelling(string text)
+    {
+        if (text.Contains(':', StringComparison.Ordinal))
+        {
+            return !text.Contains('%', StringComparison.Ordinal);
+        }
+
+        return text.Count(character => character == '.') == 3 && text.All(character => char.IsAsciiDigit(character) || character == '.');
+    }
+
+    private static IPAddress ClearHostBits(IPAddress address, int prefix)
+    {
+        var bytes = address.GetAddressBytes();
+        for (var index = 0; index < bytes.Length; index++)
+        {
+            var kept = Math.Clamp(prefix - (index * 8), 0, 8);
+            var mask = kept == 0 ? 0 : (byte)(0xFF << (8 - kept));
+            bytes[index] &= (byte)mask;
+        }
+
+        return new IPAddress(bytes);
+    }
+
+    [GeneratedRegex(@":(\d+)/?$")]
+    private static partial Regex TrailingPort();
 }

@@ -1,4 +1,3 @@
-using System.Net;
 using System.Reflection;
 using Cabinet.Domain;
 using Cabinet.Repository.Images;
@@ -11,7 +10,6 @@ using Cabinet.Service.Owner;
 using Cabinet.Service.Review;
 using Cabinet.Service.Sync;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 
 if (args.Length > 0 && args[0] == "image-smoke")
@@ -57,23 +55,8 @@ var buildInfo = BuildInfo.Parse(
     typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
 builder.Services.AddSingleton(buildInfo);
 
-builder.Services.Configure<ForwardedHeadersOptions>(options =>
-{
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    options.ForwardLimit = 1;
-
-    var knownProxies = builder.Configuration.GetSection("ReverseProxy:KnownProxies").Get<string[]>() ?? [];
-    foreach (var proxy in knownProxies)
-    {
-        if (!IPAddress.TryParse(proxy, out var address))
-        {
-            throw new InvalidOperationException(
-                "ReverseProxy:KnownProxies contains an entry that is not an IP address.");
-        }
-
-        options.KnownProxies.Add(address);
-    }
-});
+builder.Services.Configure<ForwardedHeadersOptions>(
+    options => ForwardedHeadersSetup.Configure(options, builder.Configuration));
 
 SiteLanguage.EnsureAvailable();
 
