@@ -257,6 +257,174 @@ public sealed class OwnerLocationTests
         (await ReadCards(client)).Cards.Single(card => card.EntryId == game.EntryId).Location.Should().Be(LocationName);
     }
 
+    [Fact]
+    public async Task A_json_post_from_a_stale_page_is_answered_409_out_of_date_and_changes_nothing()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        using var session = new OwnerSession(factory);
+        await session.PostJsonAsync($"{LocationsPath}?handler=AddLocation", [Field("name", LocationName), Field("revision", "0")]);
+
+        var stale = await session.PostJsonAsync($"{LocationsPath}?handler=AddLocation", [Field("name", "Shelf B"), Field("revision", "0")]);
+
+        stale.Status.Should().Be(HttpStatusCode.Conflict);
+        stale.JsonText("outcome").Should().Be("outOfDate");
+        stale.Json.GetProperty("revision").GetInt64().Should().Be(1);
+        (await session.GetAsync(LocationsPath)).Body.Should().Contain(LocationName).And.NotContain("Shelf B");
+    }
+
+    [Fact]
+    public async Task A_form_post_without_a_token_is_answered_400_and_changes_nothing()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        using var session = new OwnerSession(factory);
+        await session.GetAsync(LocationsPath);
+
+        var form = await session.PostFormAsync($"{LocationsPath}?handler=AddLocation", [Field("name", LocationName), Field("revision", "0")], withToken: false);
+        var json = await session.PostJsonAsync($"{LocationsPath}?handler=AddLocation", [Field("name", LocationName), Field("revision", "0")], withToken: false);
+
+        form.Status.Should().Be(HttpStatusCode.BadRequest);
+        form.Body.Should().BeEmpty();
+        json.Status.Should().Be(HttpStatusCode.BadRequest);
+        (await session.GetAsync(LocationsPath)).Body.Should().NotContain(LocationName);
+        factory.ServingServices.GetRequiredService<OwnerDataService>().Revision.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Adding_a_name_that_already_exists_is_answered_422_with_the_duplicate_message()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        using var session = new OwnerSession(factory);
+        await session.PostJsonAsync($"{LocationsPath}?handler=AddLocation", [Field("name", LocationName), Field("revision", "0")]);
+
+        var duplicate = await session.PostJsonAsync($"{LocationsPath}?handler=AddLocation", [Field("name", "  cabinet a "), Field("revision", "1")]);
+        var empty = await session.PostJsonAsync($"{LocationsPath}?handler=AddLocation", [Field("name", "   "), Field("revision", "1")]);
+
+        duplicate.Status.Should().Be(HttpStatusCode.UnprocessableEntity);
+        duplicate.JsonText("outcome").Should().Be("refused");
+        duplicate.JsonText("status").Should().Be("name-taken");
+        duplicate.JsonText("message").Should().Be("You already have a location with that name.");
+        empty.Status.Should().Be(HttpStatusCode.UnprocessableEntity);
+        empty.JsonText("message").Should().Be("Give the location a name.");
+    }
+
+    [Fact]
+    public async Task A_refused_form_post_goes_back_to_the_page_with_a_fixed_code_and_the_page_says_why()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        using var session = new OwnerSession(factory);
+        await session.PostFormAsync($"{LocationsPath}?handler=AddLocation", [Field("name", LocationName), Field("revision", "0")]);
+
+        var duplicate = await session.PostFormAsync($"{LocationsPath}?handler=AddLocation", [Field("name", LocationName), Field("revision", "1")]);
+        var page = await session.GetAsync(duplicate.Location!);
+
+        duplicate.Status.Should().Be(HttpStatusCode.Found);
+        duplicate.Location.Should().Be($"{LocationsPath}?done=refused-name-taken#new-location");
+        page.Body.Should().Contain("You already have a location with that name.").And.Contain("role=\"alert\"");
+    }
+
+    [Fact]
+    public async Task A_code_outside_the_fixed_set_is_ignored_and_never_echoed()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        using var session = new OwnerSession(factory);
+
+        var page = await session.GetAsync($"{LocationsPath}?done=refused-%3Cscript%3Ealert(1)%3C/script%3E");
+        var other = await session.GetAsync($"{LocationsPath}?done=https://example.org/");
+
+        page.Body.Should().NotContain("<script>alert").And.NotContain("owner-notice");
+        other.Body.Should().NotContain("example.org").And.NotContain("owner-notice");
+    }
+
+    [Fact]
+    public async Task Undo_takes_back_the_latest_change_and_a_stale_undo_is_answered_409()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        using var session = new OwnerSession(factory);
+        await session.PostJsonAsync($"{LocationsPath}?handler=AddLocation", [Field("name", LocationName), Field("revision", "0")]);
+        await session.PostJsonAsync($"{LocationsPath}?handler=AddLocation", [Field("name", "Shelf B"), Field("revision", "1")]);
+
+        var stale = await session.PostJsonAsync($"{LocationsPath}?handler=Undo", [Field("revision", "1")]);
+        var undone = await session.PostJsonAsync($"{LocationsPath}?handler=Undo", [Field("revision", "2")]);
+        var again = await session.PostJsonAsync($"{LocationsPath}?handler=Undo", [Field("revision", "3")]);
+        var page = await session.GetAsync(LocationsPath);
+
+        stale.Status.Should().Be(HttpStatusCode.Conflict);
+        stale.JsonText("outcome").Should().Be("outOfDate");
+        stale.JsonText("status").Should().Be("cant-undo");
+        undone.Status.Should().Be(HttpStatusCode.OK);
+        undone.JsonText("outcome").Should().Be("saved");
+        undone.JsonText("status").Should().Be("undone");
+        undone.Json.GetProperty("revision").GetInt64().Should().Be(3);
+        undone.Json.GetProperty("canUndo").GetBoolean().Should().BeFalse();
+        again.Status.Should().Be(HttpStatusCode.Conflict);
+        page.Body.Should().Contain(LocationName).And.NotContain("Shelf B");
+    }
+
+    [Fact]
+    public async Task The_page_offers_undo_right_after_a_saved_change_and_the_form_post_takes_the_change_back()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        using var session = new OwnerSession(factory);
+        var added = await session.PostFormAsync($"{LocationsPath}?handler=AddLocation", [Field("name", LocationName), Field("revision", "0")]);
+
+        var page = await session.GetAsync(added.Location!);
+        var plain = await session.GetAsync(LocationsPath);
+        var undone = await session.PostFormAsync($"{LocationsPath}?handler=Undo", [Field("revision", OwnerSession.FieldValue(page.Body, "revision"))]);
+
+        page.Body.Should().Contain("handler=Undo");
+        plain.Body.Should().NotContain("handler=Undo");
+        undone.Status.Should().Be(HttpStatusCode.Found);
+        undone.Location.Should().StartWith($"{LocationsPath}?done=undone#");
+        (await session.GetAsync(undone.Location!)).Body.Should().NotContain(LocationName).And.Contain("Undone.");
+    }
+
+    [Fact]
+    public async Task While_the_owner_file_is_unreadable_a_post_is_answered_409_and_the_file_is_left_as_it_was()
+    {
+        using var storage = new TemporaryDirectory();
+        var path = Path.Combine(storage.FullPath, "owner-data.json");
+        var content = Encoding.UTF8.GetBytes("{ this is not json");
+        await File.WriteAllBytesAsync(path, content, TestContext.Current.CancellationToken);
+        await using var factory = SyncHarness.CreateFactory(new ScriptedBggHandler(), SyncHarness.NewClock(), StorageSettings(storage));
+        using var session = new OwnerSession(factory);
+
+        var page = await session.GetAsync(LocationsPath);
+        var json = await session.PostJsonAsync($"{LocationsPath}?handler=AddLocation", [Field("name", LocationName), Field("revision", "0")]);
+        var form = await session.PostFormAsync($"{LocationsPath}?handler=AddLocation", [Field("name", LocationName), Field("revision", "0")]);
+
+        page.Body.Should().Contain("couldn&#x27;t be read").And.NotContain("handler=AddLocation");
+        json.Status.Should().Be(HttpStatusCode.Conflict);
+        json.JsonText("outcome").Should().Be("unreadable");
+        form.Location.Should().Be($"{LocationsPath}?done=unreadable#new-location");
+        (await File.ReadAllBytesAsync(path, TestContext.Current.CancellationToken)).Should().Equal(content);
+        Directory.EnumerateFiles(storage.FullPath, "owner-data*").Should().Equal(path);
+    }
+
+    [Fact]
+    public async Task A_game_that_is_not_in_the_collection_or_a_location_that_is_not_in_the_list_is_refused()
+    {
+        using var storage = new TemporaryDirectory();
+        var clock = SyncHarness.NewClock();
+        await using var factory = SyncHarness.CreateFactory(
+            ScriptedBggHandler.ForCollection(SyntheticBggCollection.Create(5)),
+            clock,
+            StorageSettings(storage));
+        using var client = factory.CreatePublicClient();
+        await SyncRounds.PressAndWait(client, clock, advance: false);
+        var game = (await ReadCards(client)).Cards.First(card => !card.IsExpansion);
+        using var session = new OwnerSession(factory);
+
+        var unknownGame = await session.PostJsonAsync($"{LocationsPath}?handler=Assign", [Field("gameId", "987654"), Field("locationId", ""), Field("revision", "0")]);
+        var unknownLocation = await session.PostJsonAsync(
+            $"{LocationsPath}?handler=Assign",
+            [Field("gameId", game.GameId.ToString(CultureInfo.InvariantCulture)), Field("locationId", "nope"), Field("revision", "0")]);
+
+        unknownGame.Status.Should().Be(HttpStatusCode.UnprocessableEntity);
+        unknownGame.JsonText("status").Should().Be("unknown-game");
+        unknownLocation.Status.Should().Be(HttpStatusCode.UnprocessableEntity);
+        unknownLocation.JsonText("status").Should().Be("unknown-location");
+    }
+
     private static Dictionary<string, string?> StorageSettings(TemporaryDirectory storage) =>
         new() { ["Storage:Directory"] = storage.FullPath };
 
