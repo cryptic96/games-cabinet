@@ -67,7 +67,8 @@ export function initRevision(doc = globalThis.document) {
  * answer does not, so the page keeps saying it is out of date until it is reloaded.
  * @param {string} url The handler's address.
  * @param {Record<string, string | number | Array<string | number>>} [fields] The form fields to send; a list is sent as one field per item.
- * @param {{ fetch?: Function, token?: string, revision?: number | null }} [options] The browser's fetch, the token and the revision, replaceable in tests.
+ * @param {{ fetch?: Function, token?: string, revision?: number | null, keepalive?: boolean }} [options] The browser's fetch, the token
+ * and the revision, replaceable in tests, and whether the request has to outlive the page (the antiforgery header still goes along).
  * @returns {Promise<{ outcome: string, status?: string, message?: string, revision?: number, canUndo?: boolean }>}
  */
 export async function postOwner(url, fields = {}, options = {}) {
@@ -95,6 +96,7 @@ export async function postOwner(url, fields = {}, options = {}) {
       credentials: 'same-origin',
       headers: { Accept: 'application/json', [TOKEN_HEADER]: token },
       body,
+      ...(options.keepalive ? { keepalive: true } : {}),
     });
     text = await response.text();
   } catch {
@@ -265,5 +267,202 @@ export function announce(text, doc = globalThis.document) {
 
   if (region) {
     region.textContent = text;
+  }
+}
+
+/** How close after a key press a change has to come to count as made by the keyboard. */
+const KEY_WINDOW_MS = 100;
+
+/**
+ * Sets a picker's value and remembers it as the value that is saved, so a later failed save knows what to go back to.
+ * @param {HTMLSelectElement} select The picker.
+ * @param {string} value The value it now holds and has saved.
+ */
+export function setPickerValue(select, value) {
+  select.value = value;
+  select.dataset.saved = value;
+}
+
+/**
+ * Saves a select's value once it has settled. A closed select fires a change for every arrow key, so stepping through the options
+ * with the keyboard waits for a pause; a choice made with a pointer or a finger fires one change and saves at once. Leaving the
+ * control, Enter and Tab save whatever is waiting, and a page that goes to the background saves it with the keepalive flag so
+ * the request survives.
+ * @param {HTMLSelectElement} select The select.
+ * @param {(value: string, options: { keepalive: boolean }) => void} save Saves the value.
+ * @param {number} [settleMs] How long keyboard stepping must pause before it saves.
+ * @returns {{ flush: () => void }} A way to save what is waiting without delay.
+ */
+export function saveSettledValue(select, save, settleMs = 600) {
+  let lastKeyAt = Number.NEGATIVE_INFINITY;
+  let timer = null;
+  let pending = false;
+
+  /**
+   * Saves the waiting value, if there is one.
+   * @param {boolean} keepalive Whether the request has to outlive the page.
+   */
+  function flushNow(keepalive) {
+    globalThis.clearTimeout(timer);
+    timer = null;
+
+    if (pending) {
+      pending = false;
+      save(select.value, { keepalive });
+    }
+  }
+
+  select.addEventListener('keydown', (event) => {
+    lastKeyAt = event.timeStamp;
+
+    if (event.key === 'Enter' || event.key === 'Tab') {
+      flushNow(false);
+    }
+  });
+  select.addEventListener('change', (event) => {
+    pending = true;
+    globalThis.clearTimeout(timer);
+
+    if (event.timeStamp - lastKeyAt <= KEY_WINDOW_MS) {
+      timer = globalThis.setTimeout(() => flushNow(false), settleMs);
+    } else {
+      flushNow(false);
+    }
+  });
+  select.addEventListener('focusout', () => flushNow(false));
+
+  const doc = select.ownerDocument;
+
+  doc?.addEventListener?.('visibilitychange', () => {
+    if (doc.visibilityState === 'hidden') {
+      flushNow(true);
+    }
+  });
+
+  return { flush: () => flushNow(false) };
+}
+
+/**
+ * Folds a text for searching: accents removed, lower case. `Café` and `cafe` fold to the same text.
+ * @param {string} text The text.
+ * @returns {string}
+ */
+export function foldForSearch(text) {
+  return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
+/**
+ * Reads the title of a game row.
+ * @param {Element} row The row.
+ * @returns {string}
+ */
+function titleOfRow(row) {
+  return row.querySelector('.game-title')?.textContent ?? '';
+}
+
+/**
+ * Wires a search box to a list of rows. After the owner stops typing the rows whose title does not contain the query are hidden;
+ * a base game whose expansion matches stays visible and is marked `data-context`, so the nesting stays readable. An extra rule
+ * can narrow the rows further. Every run reports how many rows are shown out of how many there are.
+ * @param {HTMLInputElement} input The search box.
+ * @param {() => Element[]} rows Gives the rows to filter.
+ * @param {{
+ *   debounceMs?: number,
+ *   accepts?: (row: Element) => boolean,
+ *   titleOf?: (row: Element) => string,
+ *   onApply?: (report: { shown: number, total: number, query: string, announce: boolean }) => void,
+ * }} [options] The pause after the last key, an extra rule, how to read a title, and what to do with each report.
+ * @returns {{ apply: (options?: { announce?: boolean }) => { shown: number, total: number, query: string, announce: boolean } }}
+ */
+export function createFinder(input, rows, options = {}) {
+  const { debounceMs = 250, accepts = () => true, titleOf = titleOfRow, onApply = () => {} } = options;
+  let timer = null;
+
+  /**
+   * Hides the rows that do not match and reports what is shown.
+   * @param {{ announce?: boolean }} [run] Whether the report is meant to be announced.
+   * @returns {{ shown: number, total: number, query: string, announce: boolean }}
+   */
+  function apply(run = {}) {
+    globalThis.clearTimeout(timer);
+    timer = null;
+
+    const all = rows();
+    const query = input.value.trim();
+    const folded = foldForSearch(query);
+    const passes = new Map(all.map((row) => [row, foldForSearch(titleOf(row)).includes(folded) && accepts(row)]));
+    const parents = new Map(all.map((row) => [row.dataset.gameId, row]));
+    const context = new Set();
+
+    for (const row of all) {
+      const parent = row.dataset.nested === 'true' && row.dataset.baseId ? parents.get(row.dataset.baseId) : undefined;
+
+      if (passes.get(row) && parent && !passes.get(parent)) {
+        context.add(parent);
+      }
+    }
+
+    let shown = 0;
+
+    for (const row of all) {
+      const visible = passes.get(row) || context.has(row);
+
+      row.hidden = !visible;
+
+      if (context.has(row)) {
+        row.dataset.context = 'true';
+      } else {
+        delete row.dataset.context;
+      }
+
+      shown += visible ? 1 : 0;
+    }
+
+    const report = { shown, total: all.length, query, announce: run.announce ?? true };
+
+    onApply(report);
+
+    return report;
+  }
+
+  input.addEventListener('input', () => {
+    globalThis.clearTimeout(timer);
+    timer = globalThis.setTimeout(() => apply(), debounceMs);
+  });
+  input.addEventListener('search', () => apply());
+
+  return { apply };
+}
+
+/**
+ * Puts the rows of a games list in the order the English collator gives, with numbers read as numbers, so `Game 2` comes before
+ * `Game 10`: every game by title, each base game followed by its expansions, also by title.
+ * @param {Element} container The list that holds the rows.
+ */
+export function sortByCollator(container) {
+  const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
+  const current = Array.from(container.children);
+  const position = new Map(current.map((row, index) => [row, index]));
+  const present = new Set(current.map((row) => row.dataset.gameId));
+  const byTitle = (first, second) =>
+    collator.compare(titleOfRow(first), titleOfRow(second)) || position.get(first) - position.get(second);
+  const isChild = (row) => row.dataset.nested === 'true' && Boolean(row.dataset.baseId) && present.has(row.dataset.baseId);
+  const children = new Map();
+
+  for (const row of current.filter(isChild)) {
+    const siblings = children.get(row.dataset.baseId) ?? [];
+
+    siblings.push(row);
+    children.set(row.dataset.baseId, siblings);
+  }
+
+  const ordered = [];
+
+  for (const row of current.filter((candidate) => !isChild(candidate)).sort(byTitle)) {
+    ordered.push(row, ...(children.get(row.dataset.gameId) ?? []).sort(byTitle));
+  }
+
+  if (ordered.some((row, index) => row !== current[index])) {
+    container.append(...ordered);
   }
 }
