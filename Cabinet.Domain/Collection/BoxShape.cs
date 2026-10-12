@@ -27,7 +27,8 @@ public sealed record ShapedBox(BoxDimensions Box, int PoseHeightMm, BoxSource So
 /// <summary>
 /// Chooses the size to draw for a box: the real dimensions when they are believable, unless they clearly contradict a flat
 /// cover, in which case the cover gives the shape; without real dimensions a flat cover gives the shape and an estimate the
-/// size; without a cover the estimate or the default is drawn. A flat landscape cover also turns real dimensions that agree
+/// size, unless that shape would make a side of the front unbelievable, in which case the estimate stays; without a cover
+/// the estimate or the default is drawn. A flat landscape cover also turns real dimensions that agree
 /// with it, so the front is drawn landscape at its real area and depth. A picture that is a photographed box or unsure never
 /// shapes anything, so the caller passes a cover only for a flat one. A photographed box never shapes or turns a box, and an
 /// unsure picture only turns one when it is clearly landscape, without changing its proportions. How a box stands never
@@ -69,9 +70,9 @@ public static class BoxShape
                     : new ShapedBox(Turned(real, turning, turnsUnsure, rules), poseHeight, BoxSource.RealSize);
         }
 
-        if (cover is not null)
+        if (cover is not null && FromCover(estimate, cover, rules) is { } fromCover)
         {
-            return new ShapedBox(FromCover(estimate, cover, rules), poseHeight, BoxSource.CoverShape);
+            return new ShapedBox(fromCover, poseHeight, BoxSource.CoverShape);
         }
 
         return new ShapedBox(Turned(estimate, turning, turnsUnsure, rules), poseHeight, details is null ? BoxSource.Default : BoxSource.Estimate);
@@ -122,13 +123,15 @@ public static class BoxShape
             : null;
     }
 
-    private static BoxDimensions FromCover(BoxDimensions estimate, ArtFile cover, ArtRules rules)
+    private static BoxDimensions? FromCover(BoxDimensions estimate, ArtFile cover, ArtRules rules)
     {
         var longer = estimate.HeightMm;
         var shorter = (int)Math.Round(longer * RatioOf(cover), MidpointRounding.AwayFromZero);
         var front = Oriented(shorter, longer, cover, rules);
 
-        return new BoxDimensions(front.WidthMm, front.HeightMm, estimate.DepthMm);
+        return IsPlausible(front.WidthMm) && IsPlausible(front.HeightMm)
+            ? new BoxDimensions(front.WidthMm, front.HeightMm, estimate.DepthMm)
+            : null;
     }
 
     private static (int WidthMm, int HeightMm) Oriented(int shorter, int longer, ArtFile cover, ArtRules rules) =>
