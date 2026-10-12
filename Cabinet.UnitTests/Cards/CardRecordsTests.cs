@@ -247,6 +247,24 @@ public sealed class CardRecordsTests
         card.PatternIndex.Should().Be(SpinePalette.PatternFor(1));
     }
 
+    [Fact]
+    public void The_stored_year_and_location_come_from_the_same_entry_for_any_stored_order()
+    {
+        SnapshotItem[] entries =
+        [
+            new(1, 5, "Invented Title", ItemKind.Base, 2005, null, "Shelf B"),
+            new(1, 4, "Invented Title", ItemKind.Base, 1999, null, "Shelf A"),
+        ];
+        CabinetItem[] items = [Item(4, 1)];
+
+        var forward = CardRecords.Build(items, Snapshot(entries), SectionDesigns.Desktop)[0];
+        var reversed = CardRecords.Build(items, Snapshot([.. entries.Reverse()]), SectionDesigns.Desktop)[0];
+
+        reversed.Should().BeEquivalentTo(forward);
+        forward.Year.Should().Be(1999);
+        forward.Location.Should().Be("Shelf A");
+    }
+
     private static CardRecord BuildOne(CollectionSnapshot snapshot, CabinetItem item) =>
         CardRecords.Build([item], snapshot, SectionDesigns.Desktop)[0];
 
