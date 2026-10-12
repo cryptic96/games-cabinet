@@ -95,7 +95,7 @@ The planned "exactly one router" Traefik assertion was updated to two, as the pl
 
 ## Deferred Issues
 
-- `build/lint/checks/40-secrets.sh` reports one gitleaks finding (an email-address rule hit on a `user@cf.geekdo-images.com` URL-credential example) in another plan's file under `.planning/phases/06-owner-tools-persistence/`. It is outside this plan's files and was not touched.
+- `build/lint/checks/40-secrets.sh` reports one gitleaks finding (an email-address rule hit on a URL-credential example of the image host) in another plan's file under `.planning/phases/06-owner-tools-persistence/`. It is outside this plan's files and was not touched.
 
 ## Known Stubs
 

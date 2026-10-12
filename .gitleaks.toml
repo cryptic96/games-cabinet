@@ -61,6 +61,13 @@ regex = '''\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'''
     '''(?i)@[A-Za-z0-9.-]+\.(service|timer|socket|target|mount|path|slice|scope)$''',
   ]
 
+  [[rules.allowlists]]
+  description = "BGG's image host receives no mail; a user-info link on it is a refused-link example, not an address"
+  regexTarget = "match"
+  regexes = [
+    '''(?i)@cf\.geekdo-images\.com$''',
+  ]
+
 [[rules]]
 id = "internal-hostname"
 description = "Hostname under a suffix that only resolves on a private network"
