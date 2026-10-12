@@ -36,6 +36,7 @@ public sealed class SyncRunner
     private readonly ImageOptions? _images;
     private readonly EnrichmentSync? _enrichment;
     private readonly CollectionPublisher _publisher;
+    private readonly IOwnerArtReferences? _ownerArt;
     private CollectionSnapshot? _stored;
 
     /// <summary>Creates the runner.</summary>
@@ -50,6 +51,7 @@ public sealed class SyncRunner
     /// <param name="enrichment">Fetches the game details; null leaves the run without a details step.</param>
     /// <param name="artRules">The rules that choose each game's picture; the defaults when null. Only used when no publisher is given.</param>
     /// <param name="publisher">Builds the collection visitors see and shows it; a publisher without owner data when null, which only a test without the owner tools relies on.</param>
+    /// <param name="ownerArt">Names the stored pictures the owner's linked pictures need, which the clean-up never removes; null when there are no owner tools, which only a test relies on.</param>
     public SyncRunner(
         Func<ICollectionSource> sourceFactory,
         ISnapshotStore snapshots,
@@ -61,7 +63,8 @@ public sealed class SyncRunner
         ImageOptions? images = null,
         EnrichmentSync? enrichment = null,
         ArtRules? artRules = null,
-        CollectionPublisher? publisher = null)
+        CollectionPublisher? publisher = null,
+        IOwnerArtReferences? ownerArt = null)
     {
         ArgumentNullException.ThrowIfNull(sourceFactory);
         ArgumentNullException.ThrowIfNull(snapshots);
@@ -79,6 +82,7 @@ public sealed class SyncRunner
         _images = images;
         _enrichment = enrichment;
         _publisher = publisher ?? new CollectionPublisher(collection, artRules ?? ArtRules.Default);
+        _ownerArt = ownerArt;
     }
 
     /// <summary>Fetches the collection and applies it when the guard accepts it and it changed, then fetches the box pictures that are due.</summary>
@@ -314,6 +318,20 @@ public sealed class SyncRunner
             .SelectMany(record => record.Files ?? [])
             .Select(file => file.Name)
             .ToHashSet(StringComparer.Ordinal);
+
+        if (_ownerArt is not null)
+        {
+            var kept = _ownerArt.ReferencedArtFiles();
+
+            if (kept is null)
+            {
+                _logger.LogWarning("Box pictures: clean-up skipped, owner data unreadable.");
+
+                return;
+            }
+
+            referenced.UnionWith(kept);
+        }
 
         try
         {
