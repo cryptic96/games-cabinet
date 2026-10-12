@@ -1003,7 +1003,7 @@ header > .owner-plate {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 8px;
-  margin: 0;
+  margin-bottom: 0;
   padding: 0;
   list-style: none;
 }
