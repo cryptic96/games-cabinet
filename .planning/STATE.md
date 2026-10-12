@@ -5,12 +5,12 @@ milestone_name: milestone
 current_phase: 6
 current_phase_name: Owner Tools & Persistence
 status: planning
-stopped_at: Completed 05-16-PLAN.md
-last_updated: "2026-10-12T11:32:13.342Z"
+stopped_at: Phase 6 context gathered
+last_updated: "2026-10-12T12:14:38.987Z"
 last_activity: 2026-10-12
 last_activity_desc: Plan 05-16 complete (v0.6.0 released and deployed; device check partly open)
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 5
   total_plans: 78
   completed_plans: 78
@@ -123,6 +123,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-12T08:52:30.374Z
-Stopped at: Completed 05-16-PLAN.md
-Resume file: None
+Last session: 2026-10-12T12:14:38.970Z
+Stopped at: Phase 6 context gathered
+Resume file: .planning/phases/06-owner-tools-persistence/06-CONTEXT.md
