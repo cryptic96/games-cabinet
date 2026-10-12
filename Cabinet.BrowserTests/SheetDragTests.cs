@@ -220,19 +220,4 @@ public sealed partial class SheetDragTests : CabinetPageTest
         (await Page.Locator(selector).First.BoundingBoxAsync())!;
 
     private Task<int> TransitionCallsAsync() => Page.EvaluateAsync<int>("window.__pullSpy.calls");
-
-    private async Task WaitUntilTheCardStepIsGoneAsync()
-    {
-        for (var attempt = 0; attempt < 100; attempt++)
-        {
-            if (await Page.EvaluateAsync<bool>("window.history.state === null"))
-            {
-                return;
-            }
-
-            await Task.Delay(20, TestContext.Current.CancellationToken);
-        }
-
-        throw new TimeoutException("The card's history step was not removed.");
-    }
 }

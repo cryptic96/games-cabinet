@@ -132,21 +132,6 @@ public sealed class BackButtonTests : CabinetPageTest
         Page.Url.Should().Be(BlankPage);
     }
 
-    private async Task WaitUntilTheCardStepIsGoneAsync()
-    {
-        for (var attempt = 0; attempt < 100; attempt++)
-        {
-            if (await Page.EvaluateAsync<bool>("window.history.state === null"))
-            {
-                return;
-            }
-
-            await Task.Delay(20);
-        }
-
-        throw new TimeoutException("The card's history step was not removed.");
-    }
-
     private async Task<string> OpenCardAfterBlankPageAsync()
     {
         await Page.SetViewportSizeAsync(1440, 900);

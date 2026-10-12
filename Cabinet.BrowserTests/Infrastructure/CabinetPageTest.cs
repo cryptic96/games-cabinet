@@ -78,6 +78,26 @@ public abstract class CabinetPageTest : PageTest
     }
 
     /// <summary>
+    /// Waits until the history step a card adds while it is open is gone again. Closing a card removes that step with a history
+    /// traversal that finishes a moment after the dialog closes, and a navigation or Back started before then races it: the
+    /// browser aborts the new navigation or the Back lands on the card's own step.
+    /// </summary>
+    protected async Task WaitUntilTheCardStepIsGoneAsync()
+    {
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            if (await Page.EvaluateAsync<bool>("window.history.state === null"))
+            {
+                return;
+            }
+
+            await Task.Delay(20, TestContext.Current.CancellationToken);
+        }
+
+        throw new TimeoutException("The card's history step was not removed.");
+    }
+
+    /// <summary>
     /// Opens a page of the running host and waits until the cabinet has drawn its first box or shown its own message.
     /// </summary>
     /// <param name="pathAndQuery">The path and query to open, such as <c>/?sample=65</c>.</param>

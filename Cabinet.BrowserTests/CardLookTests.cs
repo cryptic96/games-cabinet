@@ -204,6 +204,7 @@ public abstract class CardLookScenarios(int width, int height, bool touch) : Cab
     {
         await Page.Keyboard.PressAsync("Escape");
         await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(0);
+        await WaitUntilTheCardStepIsGoneAsync();
     }
 
     private async Task AssertSwapRowTextSitsOnTheRulingsAsync()

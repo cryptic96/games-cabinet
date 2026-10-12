@@ -232,6 +232,7 @@ public sealed class CardContentTests : CabinetPageTest
     {
         await Page.Keyboard.PressAsync("Escape");
         await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(0);
+        await WaitUntilTheCardStepIsGoneAsync();
     }
 
     private sealed record CardData(
