@@ -6,6 +6,7 @@ using Cabinet.FakeBgg.Testing;
 using Cabinet.IntegrationTests.Infrastructure;
 using Cabinet.Service.Owner;
 using FluentAssertions;
+using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Cabinet.IntegrationTests;
@@ -147,6 +148,33 @@ public sealed class OwnerPersistenceTests
         (await File.ReadAllBytesAsync(ownerFile, TestContext.Current.CancellationToken)).Should().Equal(bytesBefore);
         var service = factory.ServingServices.GetRequiredService<OwnerDataService>();
         ((OwnerDataState.Ready)service.State).Data.Games.Should().OnlyContain(game => game.AbsentSinceUtc == null);
+    }
+
+    [Fact]
+    public async Task A_connected_page_hears_once_about_an_owner_save_with_the_new_collection_version_and_no_owner_data()
+    {
+        using var storage = new TemporaryDirectory();
+        var items = SyntheticBggCollection.Create(5);
+        var clock = SyncHarness.NewClock();
+        await using var factory = SyncHarness.CreateFactory(ScriptedBggHandler.ForCollection(items), clock, StorageSettings(storage));
+        using var client = factory.CreatePublicClient();
+        await SyncRounds.PressAndWait(client, clock, advance: false);
+        var placedGame = (await ReadCards(client)).Cards.First(card => !card.IsExpansion);
+        await using var page = await LiveHubTests.LivePage.ConnectAsync(factory, HttpTransportType.WebSockets);
+        var heardBefore = page.Received.Count;
+
+        await PlaceAsync(factory, placedGame.GameId, placedGame.Title);
+        clock.Advance(TimeSpan.FromSeconds(2));
+        page.Received.Count.Should().Be(heardBefore);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await SyncHarness.WaitUntil(() => Task.FromResult(page.Received.Count > heardBefore));
+        clock.Advance(TimeSpan.FromMinutes(1));
+        var status = await SyncHarness.ReadStatus(client);
+
+        page.Received.Should().HaveCount(heardBefore + 1);
+        var heard = page.Received.Last();
+        heard.GetProperty("snapshotVersion").GetString().Should().Be(status.Json.GetProperty("snapshotVersion").GetString());
+        heard.GetRawText().Should().NotContain(LocationName);
     }
 
     private static Dictionary<string, string?> StorageSettings(TemporaryDirectory storage) =>

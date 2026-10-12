@@ -47,6 +47,7 @@ public static class OwnerEndpoints
             provider.GetRequiredService<ILogger<OwnerDataStore>>()));
         services.AddSingleton<OwnerDataService>();
         services.AddSingleton<CollectionPublisher>();
+        services.AddHostedService<OwnerChangeNotifier>();
 
         services.Configure<RouteOptions>(options => options.LowercaseUrls = true);
 
