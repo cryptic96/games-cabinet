@@ -186,7 +186,7 @@ public sealed class OwnerLinkWorker(
             Games =
             [
                 .. data.Games.Select(game => game.GameId == gameId && game.Picture?.Link?.Url == url
-                    ? game with { Picture = game.Picture with { Link = game.Picture.Link with { Record = record, FailedChecks = 0, FailedSinceUtc = null } } }
+                    ? game with { Picture = game.Picture with { Link = LinkHealth.AfterSuccess(game.Picture.Link, record) } }
                     : game),
             ],
         };
