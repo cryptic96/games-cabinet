@@ -95,7 +95,29 @@ export const OWNER_TEXT = Object.freeze({
   previewDisclaimer: "The site can't check that this picture belongs to this game.",
   useThis: 'Use this',
   discardPreview: 'Discard preview',
+  downloadOwnerData: 'Download owner data',
+  downloadData: 'Download data',
+  preparing: 'Preparing...',
+  downloadFailed: "Couldn't prepare the download. Try again.",
+  downloaded: 'Downloaded',
+  downloadedWhen: 'Downloaded {when}',
+  neverDownloaded: "You haven't downloaded your owner data yet.",
+  changesSince: '{n} changes since your last download',
+  oneChangeSince: '1 change since your last download',
+  changesNotDownloaded: '{n} changes not downloaded',
+  oneChangeNotDownloaded: '1 change not downloaded',
+  changesOnlyHere: '{n} changes are only on this server.',
+  oneChangeOnlyHere: '1 change is only on this server.',
+  atTime: '{day} at {time}',
+  today: 'today',
+  yesterday: 'yesterday',
 });
+
+/** The locale every owner time is written in: English words, day before month and a 24-hour clock. */
+const TIME_LOCALE = 'en-NL';
+
+/** The length of a day in milliseconds, for telling whole calendar days apart. */
+const MS_PER_DAY = 86_400_000;
 
 /**
  * Writes a size in bytes as millions of bytes with at most one decimal, the way the owner reads a picture's size.
@@ -398,4 +420,97 @@ export function effectiveLocationIds(rows, removedId = '') {
   }
 
   return shown;
+}
+
+/**
+ * The reminder sentence of the backup banner on a wide screen and on the Settings page.
+ * @param {number} count How many changes were made since the last download.
+ * @returns {string} `1 change since your last download` or `{n} changes since your last download`.
+ */
+export function changesBanner(count) {
+  return count === 1 ? OWNER_TEXT.oneChangeSince : fill(OWNER_TEXT.changesSince, { n: count });
+}
+
+/**
+ * The one-line reminder of the backup banner on a phone.
+ * @param {number} count How many changes were made since the last download.
+ * @returns {string} `1 change not downloaded` or `{n} changes not downloaded`.
+ */
+export function compactBanner(count) {
+  return count === 1 ? OWNER_TEXT.oneChangeNotDownloaded : fill(OWNER_TEXT.changesNotDownloaded, { n: count });
+}
+
+/**
+ * The reminder sentence when nothing was ever downloaded.
+ * @param {number} count How many changes were made.
+ * @returns {string} For example `You haven't downloaded your owner data yet. 3 changes are only on this server.`
+ */
+export function neverDownloaded(count) {
+  const rest = count === 1 ? OWNER_TEXT.oneChangeOnlyHere : fill(OWNER_TEXT.changesOnlyHere, { n: count });
+
+  return `${OWNER_TEXT.neverDownloaded} ${rest}`;
+}
+
+/**
+ * What the banner says for a state of the backup: the full sentence and the one for a phone, or nothing when there is no change.
+ * @param {number} count How many changes were made since the last download.
+ * @param {boolean} neverDownloadedYet Whether the owner has never downloaded the data.
+ * @returns {{ full: string, compact: string }} Both texts; both empty at zero changes.
+ */
+export function bannerTexts(count, neverDownloadedYet) {
+  if (!(count > 0)) {
+    return { full: '', compact: '' };
+  }
+
+  return {
+    full: neverDownloadedYet ? neverDownloaded(count) : changesBanner(count),
+    compact: compactBanner(count),
+  };
+}
+
+/**
+ * Finds the calendar day of a moment in a time zone, as a number that counts days, so two moments can be compared by day.
+ * @param {Date} moment The moment.
+ * @param {string | undefined} timeZone The zone to read the day in; the viewer's own when left out.
+ * @returns {number} Days since 1 January 1970 of that day in the zone.
+ */
+function dayNumber(moment, timeZone) {
+  const parts = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone }).formatToParts(moment);
+  const part = (type) => Number(parts.find((each) => each.type === type)?.value);
+
+  return Math.round(Date.UTC(part('year'), part('month') - 1, part('day')) / MS_PER_DAY);
+}
+
+/**
+ * Writes a moment the way every owner page does, in the viewer's own clock: `today at 21:14`, `yesterday at 21:14` or
+ * `9 October at 21:14`, on a 24-hour clock with English words. At the start of a line the first letter is capitalised.
+ * @param {string | Date} when The moment, as the text of a `datetime` attribute or a date.
+ * @param {Date} [now] The current moment, replaceable in tests.
+ * @param {{ capitalise?: boolean, timeZone?: string }} [options] Whether the text starts a line, and the zone to read the clock
+ * and the day in; the viewer's own by default.
+ * @returns {string} The text, or an empty text when the moment is not a date.
+ */
+export function whenText(when, now = new Date(), options = {}) {
+  const moment = new Date(when);
+
+  if (Number.isNaN(moment.getTime())) {
+    return '';
+  }
+
+  const { timeZone } = options;
+  const time = new Intl.DateTimeFormat(TIME_LOCALE, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone }).format(moment);
+  const daysAgo = dayNumber(now, timeZone) - dayNumber(moment, timeZone);
+  let day;
+
+  if (daysAgo === 0) {
+    day = OWNER_TEXT.today;
+  } else if (daysAgo === 1) {
+    day = OWNER_TEXT.yesterday;
+  } else {
+    day = new Intl.DateTimeFormat(TIME_LOCALE, { day: 'numeric', month: 'long', timeZone }).format(moment);
+  }
+
+  const text = fill(OWNER_TEXT.atTime, { day, time });
+
+  return options.capitalise ? text.charAt(0).toUpperCase() + text.slice(1) : text;
 }

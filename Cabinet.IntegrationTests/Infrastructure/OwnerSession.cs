@@ -9,8 +9,13 @@ namespace Cabinet.IntegrationTests.Infrastructure;
 /// <param name="Status">The status code.</param>
 /// <param name="Body">The whole body as text.</param>
 /// <param name="Location">The redirect target exactly as the server wrote it, or null when it did not redirect.</param>
-public sealed record OwnerReply(HttpStatusCode Status, string Body, string? Location)
+/// <param name="Headers">The response and content headers by name, each as the text the server wrote; null when a test built the reply by hand.</param>
+public sealed record OwnerReply(HttpStatusCode Status, string Body, string? Location, IReadOnlyDictionary<string, string>? Headers = null)
 {
+    /// <summary>The text of a response header, or null when the answer did not carry it.</summary>
+    /// <param name="name">The header name.</param>
+    public string? Header(string name) => Headers is not null && Headers.TryGetValue(name, out var value) ? value : null;
+
     /// <summary>Reads the body as JSON.</summary>
     public JsonElement Json => JsonDocument.Parse(Body).RootElement.Clone();
 
@@ -129,7 +134,11 @@ public sealed partial class OwnerSession : IDisposable
     private static async Task<OwnerReply> ReadAsync(HttpResponseMessage response) => new(
         response.StatusCode,
         await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken),
-        response.Headers.Location?.OriginalString);
+        response.Headers.Location?.OriginalString,
+        response.Headers.Concat(response.Content.Headers).ToDictionary(
+            header => header.Key,
+            header => string.Join(", ", header.Value),
+            StringComparer.OrdinalIgnoreCase));
 
     [GeneratedRegex("""<meta name="request-verification-token" content="([^"]*)" />""")]
     private static partial Regex TokenMeta();

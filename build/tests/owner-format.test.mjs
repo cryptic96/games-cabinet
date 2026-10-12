@@ -43,6 +43,11 @@ const {
   megabytes,
   shortAddress,
   leadAndRest,
+  changesBanner,
+  compactBanner,
+  neverDownloaded,
+  bannerTexts,
+  whenText,
 } =
   await loadPageScript('owner-format.js');
 
@@ -249,4 +254,73 @@ test('the words of the link buttons and the stored link are in the table', () =>
   assert.equal(OWNER_TEXT.linkRemoved, 'Link removed');
   assert.equal(OWNER_TEXT.tileFetching, 'Fetching...');
   assert.equal(OWNER_TEXT.markFetching, 'Fetching your link...');
+});
+
+test('the banner counts changes since the last download in the singular and the plural', () => {
+  assert.equal(changesBanner(1), '1 change since your last download');
+  assert.equal(changesBanner(3), '3 changes since your last download');
+  assert.equal(changesBanner(23), '23 changes since your last download');
+});
+
+test('the phone banner is one short line', () => {
+  assert.equal(compactBanner(1), '1 change not downloaded');
+  assert.equal(compactBanner(3), '3 changes not downloaded');
+});
+
+test('the banner of data that was never downloaded says the changes are only on the server', () => {
+  assert.equal(neverDownloaded(1), "You haven't downloaded your owner data yet. 1 change is only on this server.");
+  assert.equal(neverDownloaded(3), "You haven't downloaded your owner data yet. 3 changes are only on this server.");
+});
+
+test('the banner texts follow the state of the backup and are empty at zero changes', () => {
+  assert.deepEqual(bannerTexts(0, false), { full: '', compact: '' });
+  assert.deepEqual(bannerTexts(0, true), { full: '', compact: '' });
+  assert.deepEqual(bannerTexts(2, false), { full: '2 changes since your last download', compact: '2 changes not downloaded' });
+  assert.deepEqual(bannerTexts(1, true), {
+    full: "You haven't downloaded your owner data yet. 1 change is only on this server.",
+    compact: '1 change not downloaded',
+  });
+});
+
+test('the words of the backup buttons are in the table', () => {
+  assert.equal(OWNER_TEXT.downloadOwnerData, 'Download owner data');
+  assert.equal(OWNER_TEXT.downloadData, 'Download data');
+  assert.equal(OWNER_TEXT.preparing, 'Preparing...');
+  assert.equal(OWNER_TEXT.downloadFailed, "Couldn't prepare the download. Try again.");
+});
+
+const AMSTERDAM = 'Europe/Amsterdam';
+const NOW = new Date('2030-10-12T10:30:00Z');
+
+test('a moment on the same local day reads today at the time on the viewer clock', () => {
+  assert.equal(whenText('2030-10-12T07:14:00Z', NOW, { timeZone: AMSTERDAM }), 'today at 09:14');
+  assert.equal(whenText('2030-10-12T19:14:00Z', NOW, { timeZone: AMSTERDAM }), 'today at 21:14');
+});
+
+test('the day is read in the viewer zone, so the same moment can be yesterday in one zone and today in another', () => {
+  const moment = '2030-10-11T22:30:00Z';
+
+  assert.equal(whenText(moment, NOW, { timeZone: AMSTERDAM }), 'today at 00:30');
+  assert.equal(whenText(moment, NOW, { timeZone: 'America/New_York' }), 'yesterday at 18:30');
+});
+
+test('the day before reads yesterday and an older day reads the day and the month', () => {
+  assert.equal(whenText('2030-10-11T19:14:00Z', NOW, { timeZone: AMSTERDAM }), 'yesterday at 21:14');
+  assert.equal(whenText('2030-10-09T19:14:00Z', NOW, { timeZone: AMSTERDAM }), '9 October at 21:14');
+  assert.equal(whenText('2030-01-02T08:05:00Z', NOW, { timeZone: AMSTERDAM }), '2 January at 09:05');
+});
+
+test('the clock is a 24-hour clock with midnight as 00', () => {
+  assert.equal(whenText('2030-10-11T22:05:00Z', NOW, { timeZone: AMSTERDAM }), 'today at 00:05');
+});
+
+test('a moment that starts a line gets a capital letter and a date keeps its own', () => {
+  assert.equal(whenText('2030-10-12T19:14:00Z', NOW, { timeZone: AMSTERDAM, capitalise: true }), 'Today at 21:14');
+  assert.equal(whenText('2030-10-11T19:14:00Z', NOW, { timeZone: AMSTERDAM, capitalise: true }), 'Yesterday at 21:14');
+  assert.equal(whenText('2030-10-09T19:14:00Z', NOW, { timeZone: AMSTERDAM, capitalise: true }), '9 October at 21:14');
+});
+
+test('text that is not a moment gives an empty text and a Date works as well', () => {
+  assert.equal(whenText('not a time', NOW, { timeZone: AMSTERDAM }), '');
+  assert.equal(whenText(new Date('2030-10-12T19:14:00Z'), NOW, { timeZone: AMSTERDAM }), 'today at 21:14');
 });
