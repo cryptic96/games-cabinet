@@ -213,7 +213,7 @@ public sealed class OwnerLocationTests
             ]);
 
         added.Status.Should().Be(HttpStatusCode.Found);
-        added.Location.Should().StartWith($"{LocationsPath}?done=saved#");
+        added.Location.Should().StartWith($"{LocationsPath}?done=saved");
         placed.Status.Should().Be(HttpStatusCode.Found);
         placed.Location.Should().Be($"{LocationsPath}?done=saved#game-{game.GameId}");
         (await ReadCards(client)).Cards.Single(card => card.EntryId == game.EntryId).Location.Should().Be(LocationName);

@@ -36,7 +36,8 @@ public static class OwnerResponses
     /// <param name="result">What the writer answered.</param>
     /// <param name="pagePath">The page to send a form back to, as the page's own path, written in code.</param>
     /// <param name="anchor">The row to land on, built by the server.</param>
-    public static IActionResult For(PageModel page, OwnerResult result, string pagePath, string anchor)
+    /// <param name="createdId">The identifier of what the change created, which a script needs to build its row; null when nothing was created.</param>
+    public static IActionResult For(PageModel page, OwnerResult result, string pagePath, string anchor, string? createdId = null)
     {
         ArgumentNullException.ThrowIfNull(page);
         ArgumentNullException.ThrowIfNull(result);
@@ -45,14 +46,21 @@ public static class OwnerResponses
 
         if (AcceptsJson(page.Request))
         {
-            return new JsonResult(new
+            var body = new Dictionary<string, object?>
             {
-                outcome = JsonName(result.Outcome),
-                revision = result.Data?.Revision ?? 0,
-                status = result.StatusKey,
-                canUndo = result.CanUndo,
-                message = OwnerStrings.Message(result.StatusKey),
-            })
+                ["outcome"] = JsonName(result.Outcome),
+                ["revision"] = result.Data?.Revision ?? 0,
+                ["status"] = result.StatusKey,
+                ["canUndo"] = result.CanUndo,
+                ["message"] = OwnerStrings.Message(result.StatusKey),
+            };
+
+            if (createdId is not null)
+            {
+                body["id"] = createdId;
+            }
+
+            return new JsonResult(body)
             {
                 StatusCode = (int)StatusOf(result.Outcome),
             };
