@@ -22,11 +22,13 @@ public abstract record ArtDownload
 
     /// <summary>The picture was not fetched because it broke a rule.</summary>
     /// <param name="Reason">One category word that says which rule: host, redirect, type or size.</param>
-    public sealed record Turned(string Reason) : ArtDownload;
+    /// <param name="AnnouncedBytes">The size the host announced for the body when the picture was refused for its size and the host announced one; otherwise null.</param>
+    public sealed record Turned(string Reason, long? AnnouncedBytes = null) : ArtDownload;
 
     /// <summary>The picture could not be fetched although no rule was broken.</summary>
     /// <param name="Reason">One category word: status, unavailable or timeout.</param>
-    public sealed record Missed(string Reason) : ArtDownload;
+    /// <param name="StatusCode">The HTTP status the host answered with when the picture was missed by status; otherwise null.</param>
+    public sealed record Missed(string Reason, int? StatusCode = null) : ArtDownload;
 
     /// <summary>The picture was fetched.</summary>
     /// <param name="bytes">The body of the answer.</param>
@@ -34,11 +36,13 @@ public abstract record ArtDownload
 
     /// <summary>The picture was refused by a rule.</summary>
     /// <param name="reason">One category word that says which rule.</param>
-    public static ArtDownload Refused(string reason) => new Turned(reason);
+    /// <param name="announcedBytes">The size the host announced for the body, when it announced one.</param>
+    public static ArtDownload Refused(string reason, long? announcedBytes = null) => new Turned(reason, announcedBytes);
 
     /// <summary>The picture could not be fetched.</summary>
     /// <param name="reason">One category word that says why.</param>
-    public static ArtDownload Failed(string reason) => new Missed(reason);
+    /// <param name="statusCode">The HTTP status the host answered with, when it answered.</param>
+    public static ArtDownload Failed(string reason, int? statusCode = null) => new Missed(reason, statusCode);
 }
 
 /// <summary>Fetches the bytes of a picture from an address.</summary>
@@ -188,7 +192,7 @@ public sealed class ImageDownloader : IArtSource
     {
         if (!response.IsSuccessStatusCode)
         {
-            return ArtDownload.Failed("status");
+            return ArtDownload.Failed("status", (int)response.StatusCode);
         }
 
         var mediaType = response.Content.Headers.ContentType?.MediaType;
@@ -198,9 +202,9 @@ public sealed class ImageDownloader : IArtSource
             return ArtDownload.Refused("type");
         }
 
-        if (response.Content.Headers.ContentLength > _limits.MaxBytes)
+        if (response.Content.Headers.ContentLength is { } announced && announced > _limits.MaxBytes)
         {
-            return ArtDownload.Refused("size");
+            return ArtDownload.Refused("size", announced);
         }
 
         await using var body = await response.Content.ReadAsStreamAsync(cancellationToken);

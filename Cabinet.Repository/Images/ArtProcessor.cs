@@ -10,6 +10,14 @@ namespace Cabinet.Repository.Images;
 /// <param name="Bytes">The encoded WebP file.</param>
 public sealed record EncodedArt(int Width, int Height, string Name, byte[] Bytes);
 
+/// <summary>What the header of a picture says, read without decoding any pixels.</summary>
+/// <param name="Width">The width in pixels, or 0 when the bytes are not a picture.</param>
+/// <param name="Height">The height in pixels, or 0 when the bytes are not a picture.</param>
+/// <param name="Decodable">Whether the bytes begin as a picture the processor can read.</param>
+/// <param name="TooManyPixels">Whether the picture holds more pixels than the limits allow.</param>
+/// <param name="ExtremeShape">Whether one side is more than <see cref="ArtAnalysis.MaxAspectRatio"/> times the other.</param>
+public sealed record ArtInspection(int Width, int Height, bool Decodable, bool TooManyPixels, bool ExtremeShape);
+
 /// <summary>How a picture came out of processing.</summary>
 public abstract record ArtProcessing
 {
@@ -108,6 +116,39 @@ public static class ArtProcessor
         catch (Exception)
         {
             return ArtProcessing.Undecodable;
+        }
+    }
+
+    /// <summary>
+    /// Reads the size of the picture from its header and says whether it is too big in pixels or too long and thin, without
+    /// decoding any pixels. It tells such a picture apart from bytes that are not a picture, which <see cref="Process(byte[], ArtLimits)"/> alone cannot.
+    /// It never throws.
+    /// </summary>
+    /// <param name="bytes">The downloaded bytes.</param>
+    /// <param name="limits">The limits; only the pixel cap is used here.</param>
+    public static ArtInspection Inspect(byte[] bytes, ArtLimits limits)
+    {
+        ArgumentNullException.ThrowIfNull(bytes);
+        ArgumentNullException.ThrowIfNull(limits);
+
+        try
+        {
+            using var stream = new SKMemoryStream(bytes);
+            using var codec = SKCodec.Create(stream);
+
+            if (codec is null || codec.Info.Width <= 0 || codec.Info.Height <= 0)
+            {
+                return new ArtInspection(0, 0, false, false, false);
+            }
+
+            var width = codec.Info.Width;
+            var height = codec.Info.Height;
+
+            return new ArtInspection(width, height, true, (long)width * height > limits.MaxPixels, !ArtAnalysis.HasUsableShape(width, height));
+        }
+        catch (Exception)
+        {
+            return new ArtInspection(0, 0, false, false, false);
         }
     }
 
