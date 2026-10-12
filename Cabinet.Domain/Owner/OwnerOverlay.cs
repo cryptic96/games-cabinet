@@ -14,22 +14,26 @@ public sealed class OwnerOverlay
     private readonly IReadOnlyDictionary<int, Place> _places;
     private readonly IReadOnlyDictionary<string, string> _names;
     private readonly IReadOnlyDictionary<int, string> _ownLocations;
+    private readonly IReadOnlyDictionary<int, int> _pairedBases;
 
     private OwnerOverlay(
         IReadOnlyDictionary<int, Place> places,
         IReadOnlyDictionary<string, string> names,
-        IReadOnlyDictionary<int, string> ownLocations)
+        IReadOnlyDictionary<int, string> ownLocations,
+        IReadOnlyDictionary<int, int> pairedBases)
     {
         _places = places;
         _names = names;
         _ownLocations = ownLocations;
+        _pairedBases = pairedBases;
     }
 
     /// <summary>An overlay that places nothing: every game has no location. It is what applies while the owner data cannot be read.</summary>
     public static OwnerOverlay None { get; } = new(
         new Dictionary<int, Place>(),
         new Dictionary<string, string>(),
-        new Dictionary<int, string>());
+        new Dictionary<int, string>(),
+        new Dictionary<int, int>());
 
     /// <summary>Works out the place of every game in a collection.</summary>
     /// <param name="snapshot">The synced collection.</param>
@@ -60,6 +64,7 @@ public sealed class OwnerOverlay
             .ToHashSet();
         var pairing = ExpansionPairing.Pair(snapshot);
         var places = new Dictionary<int, Place>();
+        var pairedBases = new Dictionary<int, int>();
 
         foreach (var item in snapshot.Items)
         {
@@ -69,9 +74,14 @@ public sealed class OwnerOverlay
             }
 
             places[item.GameId] = PlaceOf(item, own, ownedBases, pairing);
+
+            if (OwnedBaseOf(item, ownedBases, pairing) is { } baseGameId)
+            {
+                pairedBases[item.GameId] = baseGameId;
+            }
         }
 
-        return new OwnerOverlay(places, names, own);
+        return new OwnerOverlay(places, names, own, pairedBases);
     }
 
     /// <summary>The identifier of the location the owner gave a game itself, or null when it has none of its own.</summary>
@@ -90,6 +100,13 @@ public sealed class OwnerOverlay
     /// <summary>The game an expansion follows because it has no location of its own and an owned base game, or null when it follows none.</summary>
     /// <param name="gameId">The game.</param>
     public int? FollowsBaseGameId(int gameId) => _places.TryGetValue(gameId, out var place) ? place.FollowsBaseGameId : null;
+
+    /// <summary>
+    /// The owned base game an expansion stands beside, or null for any other game. Unlike <see cref="FollowsBaseGameId"/> it
+    /// does not depend on whether the expansion has a location of its own.
+    /// </summary>
+    /// <param name="gameId">The game.</param>
+    public int? OwnedBaseGameId(int gameId) => _pairedBases.TryGetValue(gameId, out var baseGameId) ? baseGameId : null;
 
     /// <summary>The collection with every item's location replaced by the one this overlay gives it; nothing else changes.</summary>
     /// <param name="snapshot">The synced collection the overlay was worked out from.</param>
@@ -114,16 +131,24 @@ public sealed class OwnerOverlay
             return new Place(ownId, null);
         }
 
-        if (item.Kind == ItemKind.Expansion
-            && pairing.TryGetValue(item.CollectionId, out var references)
-            && references is [{ } paired]
-            && ownedBases.Contains(paired.BggId))
+        if (OwnedBaseOf(item, ownedBases, pairing) is { } baseGameId)
         {
-            return new Place(own.TryGetValue(paired.BggId, out var baseId) ? baseId : null, paired.BggId);
+            return new Place(own.TryGetValue(baseGameId, out var baseId) ? baseId : null, baseGameId);
         }
 
         return new Place(null, null);
     }
+
+    private static int? OwnedBaseOf(
+        SnapshotItem item,
+        IReadOnlySet<int> ownedBases,
+        IReadOnlyDictionary<long, IReadOnlyList<BaseGameRef>> pairing) =>
+        item.Kind == ItemKind.Expansion
+            && pairing.TryGetValue(item.CollectionId, out var references)
+            && references is [{ } paired]
+            && ownedBases.Contains(paired.BggId)
+            ? paired.BggId
+            : null;
 
     private sealed record Place(string? LocationId, int? FollowsBaseGameId);
 }

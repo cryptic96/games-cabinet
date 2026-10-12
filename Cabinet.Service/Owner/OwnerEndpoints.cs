@@ -48,6 +48,8 @@ public static class OwnerEndpoints
         services.AddSingleton<OwnerDataService>();
         services.AddSingleton<CollectionPublisher>();
 
+        services.Configure<RouteOptions>(options => options.LowercaseUrls = true);
+
         services.Configure<RazorPagesOptions>(options =>
             options.Conventions.AddFolderApplicationModelConvention("/Owner", model =>
             {

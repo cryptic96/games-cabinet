@@ -1,0 +1,84 @@
+@page
+@using Cabinet.Service.Owner
+@model Cabinet.Service.Pages.Owner.LocationsModel
+<h2>@OwnerStrings.Locations</h2>
+<p class="owner-intro">@OwnerStrings.LocationsIntro</p>
+@if (Model.Notice is not null)
+{
+    <div class="owner-notice" data-problem="@(Model.NoticeIsProblem ? "true" : null)">
+        <p id="owner-notice" role="@(Model.NoticeIsProblem ? "alert" : "status")">@Model.Notice</p>
+        @if (Model.UndoRevision is { } undoRevision)
+        {
+            <form method="post" asp-page-handler="Undo">
+                <input type="hidden" name="revision" value="@undoRevision" />
+                <button type="submit" class="owner-btn">@OwnerStrings.UndoButton</button>
+            </form>
+        }
+    </div>
+}
+@if (!Model.Readable)
+{
+    <section class="owner-panel">
+        <p>@OwnerStrings.OwnerDataUnreadable</p>
+    </section>
+}
+else
+{
+    <section class="owner-panel" aria-labelledby="locations-heading">
+        <h3 id="locations-heading">@OwnerStrings.LocationsHeading(Model.Locations.Count)</h3>
+        @if (Model.Locations.Count == 0)
+        {
+            <p>@OwnerStrings.NoLocationsYet</p>
+        }
+        else
+        {
+            <ol class="loc-list">
+                @foreach (var location in Model.Locations)
+                {
+                    <li dir="auto">@location.Name</li>
+                }
+            </ol>
+        }
+        <form method="post" asp-page-handler="AddLocation">
+            <input type="hidden" name="revision" value="@Model.Revision" />
+            <label for="new-location">@OwnerStrings.NewLocationLabel</label>
+            <input id="new-location" name="name" type="text" maxlength="60" required dir="auto" autocomplete="off" aria-describedby="new-location-hint" />
+            <p id="new-location-hint" class="owner-hint">@OwnerStrings.NewLocationHint</p>
+            <button type="submit" class="owner-btn-primary">@OwnerStrings.AddLocationButton</button>
+        </form>
+    </section>
+    <section class="owner-panel" aria-labelledby="games-heading">
+        <h3 id="games-heading">@OwnerStrings.GamesHeading</h3>
+        @if (Model.Games.Count == 0)
+        {
+            <p>@OwnerStrings.NoGamesYet</p>
+        }
+        else
+        {
+            @if (Model.Locations.Count == 0)
+            {
+                <p>@OwnerStrings.AddLocationFirst</p>
+            }
+            <ul class="game-list" role="list">
+                @foreach (var game in Model.Games)
+                {
+                    <li class="game-row" id="game-@game.GameId">
+                        <form method="post" asp-page-handler="Assign">
+                            <input type="hidden" name="revision" value="@Model.Revision" />
+                            <input type="hidden" name="gameId" value="@game.GameId" />
+                            <span class="game-title" dir="auto">@game.Title</span>
+                            <select name="locationId" aria-label="@OwnerStrings.PickerLabel(game.Title)">
+                                <option value="" selected="@(game.OwnLocationId is null)">@(game.BaseTitle is null ? OwnerStrings.NotPlaced : OwnerStrings.SameAs(game.BaseTitle))</option>
+                                @foreach (var location in Model.Locations)
+                                {
+                                    <option value="@location.Id" selected="@(location.Id == game.OwnLocationId)">@location.Name</option>
+                                }
+                            </select>
+                            <button type="submit" class="owner-btn">@OwnerStrings.SaveButton</button>
+                        </form>
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+}

@@ -7,16 +7,104 @@ namespace Cabinet.Domain.Owner;
 /// <param name="Changed">Whether the edit changed anything.</param>
 public sealed record OwnerChange(OwnerData Data, string? LogText, string StatusKey, bool Changed = true)
 {
-    /// <summary>The answer of an edit that has nothing to do, such as assigning the location a game already has.</summary>
-    public static OwnerChange None { get; } = new(OwnerData.Empty, null, "unchanged", false);
+    private const string NoneStatusKey = "unchanged";
 
-    /// <summary>Whether this is the answer of an edit that has nothing to do.</summary>
-    public bool IsNone => !Changed;
+    /// <summary>The answer of an edit that has nothing to do, such as assigning the location a game already has.</summary>
+    public static OwnerChange None { get; } = new(OwnerData.Empty, null, NoneStatusKey, false);
+
+    /// <summary>Whether this is the answer of an edit that has nothing to do, as opposed to one that was refused.</summary>
+    public bool IsNone => !Changed && StatusKey == NoneStatusKey;
 
     /// <summary>An edit that was refused and changed nothing.</summary>
     /// <param name="data">The data as it was.</param>
     /// <param name="statusKey">Why the edit was refused.</param>
     public static OwnerChange Refused(OwnerData data, string statusKey) => new(data, null, statusKey, false);
+}
+
+/// <summary>Why a location name was refused.</summary>
+public enum LocationNameProblem
+{
+    /// <summary>The name is fine.</summary>
+    None,
+
+    /// <summary>The name is empty or only spaces.</summary>
+    Empty,
+
+    /// <summary>The name is longer than <see cref="OwnerData.MaxNameLength"/> characters.</summary>
+    TooLong,
+
+    /// <summary>The name holds a control character or a character that overrides the direction of text.</summary>
+    ForbiddenCharacter,
+
+    /// <summary>The list already holds <see cref="OwnerData.MaxLocations"/> locations.</summary>
+    TooMany,
+
+    /// <summary>Another location already has this name, ignoring case.</summary>
+    Taken,
+}
+
+/// <summary>The verdict on a location name.</summary>
+/// <param name="Problem">Why the name was refused, or <see cref="LocationNameProblem.None"/>.</param>
+/// <param name="Name">The name with its edge spaces removed; this is what is stored when there is no problem.</param>
+public readonly record struct LocationNameCheck(LocationNameProblem Problem, string Name)
+{
+    /// <summary>The short key the page turns into the words it shows the owner.</summary>
+    public string StatusKey => Problem switch
+    {
+        LocationNameProblem.Empty => "name-empty",
+        LocationNameProblem.TooLong => "name-too-long",
+        LocationNameProblem.ForbiddenCharacter => "name-characters",
+        LocationNameProblem.TooMany => "too-many-locations",
+        LocationNameProblem.Taken => "name-taken",
+        _ => "location-added",
+    };
+}
+
+/// <summary>The rules a location name has to meet. Every visitor sees the name on a card, so it is plain text of a sensible length.</summary>
+public static class LocationNames
+{
+    /// <summary>Checks a name the owner entered against the locations that exist.</summary>
+    /// <param name="existing">The locations that exist now.</param>
+    /// <param name="candidate">The name as entered.</param>
+    /// <param name="exceptId">The location being renamed, which may keep its own name or change its case; null when adding.</param>
+    public static LocationNameCheck Validate(IReadOnlyList<OwnerLocation> existing, string candidate, string? exceptId = null)
+    {
+        ArgumentNullException.ThrowIfNull(existing);
+        ArgumentNullException.ThrowIfNull(candidate);
+
+        var name = candidate.Trim();
+
+        if (name.Length == 0)
+        {
+            return new LocationNameCheck(LocationNameProblem.Empty, name);
+        }
+
+        if (name.Length > OwnerData.MaxNameLength)
+        {
+            return new LocationNameCheck(LocationNameProblem.TooLong, name);
+        }
+
+        if (name.Any(IsForbidden))
+        {
+            return new LocationNameCheck(LocationNameProblem.ForbiddenCharacter, name);
+        }
+
+        if (exceptId is null && existing.Count >= OwnerData.MaxLocations)
+        {
+            return new LocationNameCheck(LocationNameProblem.TooMany, name);
+        }
+
+        var taken = existing.Any(location =>
+            !string.Equals(location.Id, exceptId, StringComparison.Ordinal)
+            && string.Equals(location.Name, name, StringComparison.OrdinalIgnoreCase));
+
+        return new LocationNameCheck(taken ? LocationNameProblem.Taken : LocationNameProblem.None, name);
+    }
+
+    private static bool IsForbidden(char character) =>
+        char.IsControl(character)
+        || character is >= '‪' and <= '‮'
+        || character is >= '⁦' and <= '⁩';
 }
 
 /// <summary>The edits of the location list and of where each game is kept. Every edit is pure: it gives back new data and leaves the old untouched.</summary>
@@ -34,26 +122,11 @@ public static class LocationEdits
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(newId);
 
-        var trimmed = name.Trim();
+        var check = LocationNames.Validate(data.Locations, name);
 
-        if (trimmed.Length == 0)
+        if (check.Problem != LocationNameProblem.None)
         {
-            return OwnerChange.Refused(data, "name-empty");
-        }
-
-        if (trimmed.Length > OwnerData.MaxNameLength)
-        {
-            return OwnerChange.Refused(data, "name-too-long");
-        }
-
-        if (data.Locations.Count >= OwnerData.MaxLocations)
-        {
-            return OwnerChange.Refused(data, "too-many-locations");
-        }
-
-        if (data.Locations.Any(location => string.Equals(location.Name, trimmed, StringComparison.OrdinalIgnoreCase)))
-        {
-            return OwnerChange.Refused(data, "name-taken");
+            return OwnerChange.Refused(data, check.StatusKey);
         }
 
         var id = FreshId(data, newId);
@@ -64,8 +137,8 @@ public static class LocationEdits
         }
 
         return new OwnerChange(
-            data with { Locations = [.. data.Locations, new OwnerLocation(id, trimmed)] },
-            $"Added location \"{trimmed}\"",
+            data with { Locations = [.. data.Locations, new OwnerLocation(id, check.Name)] },
+            $"Added location \"{check.Name}\"",
             "location-added");
     }
 

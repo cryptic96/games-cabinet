@@ -232,3 +232,91 @@ header > .owner-plate {
   white-space: nowrap;
   border: 0;
 }
+
+.owner-intro {
+  margin: 0 0 24px;
+  color: var(--wall-text);
+}
+
+.owner-panel + .owner-panel,
+.owner-notice + .owner-panel {
+  margin-top: 24px;
+}
+
+.owner-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 24px;
+  padding: 8px 16px;
+  border-radius: 4px;
+  border-inline-start: 4px solid var(--paper-label);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.owner-notice[data-problem="true"] {
+  border-inline-start-color: var(--danger);
+}
+
+.owner-notice p {
+  margin: 0;
+}
+
+.owner-panel h3 {
+  margin-bottom: 8px;
+}
+
+.owner-panel form > label {
+  display: block;
+  margin-top: 16px;
+  color: var(--paper-label);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.owner-panel input[type="text"],
+.owner-panel select {
+  min-height: 44px;
+  max-width: 100%;
+  padding: 8px;
+  border: 1px solid var(--paper-label);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}
+
+.owner-hint {
+  margin: 4px 0 16px;
+  color: var(--paper-label);
+  font-size: 14px;
+}
+
+.loc-list,
+.game-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.loc-list li,
+.game-row {
+  padding-block: 8px;
+  border-bottom: 1px solid var(--paper-rule);
+  overflow-wrap: anywhere;
+}
+
+.game-row form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.game-title {
+  flex: 1 1 14rem;
+  font-weight: 600;
+}

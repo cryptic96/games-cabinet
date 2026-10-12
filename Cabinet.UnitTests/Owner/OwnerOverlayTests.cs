@@ -51,6 +51,19 @@ public sealed class OwnerOverlayTests
     }
 
     [Fact]
+    public void An_expansion_reports_its_owned_base_game_whether_or_not_it_has_a_location_of_its_own()
+    {
+        var snapshot = Snapshot([Base(1, 100), Expansion(2, 200), Expansion(3, 300)], (200, [Ref(100)]));
+
+        var overlay = OwnerOverlay.From(snapshot, Data((200, ShelfB)));
+
+        overlay.OwnedBaseGameId(200).Should().Be(100);
+        overlay.FollowsBaseGameId(200).Should().BeNull();
+        overlay.OwnedBaseGameId(300).Should().BeNull();
+        overlay.OwnedBaseGameId(100).Should().BeNull();
+    }
+
+    [Fact]
     public void An_orphan_expansion_with_no_location_is_not_placed()
     {
         var snapshot = Snapshot([Expansion(2, 200)], (200, [Ref(100)]));
