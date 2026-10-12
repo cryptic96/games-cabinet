@@ -511,6 +511,81 @@ public sealed class SnapshotStoreTests : IDisposable
             .Should().BeEquivalentTo(["snapshot.json", "notes.tmp"]);
     }
 
+    [Fact]
+    public void A_good_file_loads_read_only_and_is_left_alone()
+    {
+        CreateStore().Save(Snapshot());
+        var before = Listing();
+        var bytes = File.ReadAllBytes(SnapshotPath);
+
+        var result = SnapshotStore.LoadReadOnly(_directory);
+
+        result.Snapshot.Should().BeEquivalentTo(Snapshot());
+        result.Reason.Should().BeNull();
+        Listing().Should().Equal(before);
+        File.ReadAllBytes(SnapshotPath).Should().Equal(bytes);
+    }
+
+    [Theory]
+    [InlineData("{ \"schemaVersion\": 1, \"items\": [", "malformed")]
+    [InlineData("", "malformed")]
+    [InlineData("null", "malformed")]
+    [InlineData("{ \"schemaVersion\": 0, \"capturedAtUtc\": \"2026-01-01T00:00:00Z\", \"items\": [] }", "malformed")]
+    [InlineData("{ \"schemaVersion\": 3, \"capturedAtUtc\": \"2026-01-01T00:00:00Z\", \"items\": [] }", "newer")]
+    public void A_damaged_or_newer_file_read_only_gives_no_collection_a_reason_and_stays_byte_for_byte_in_place(string content, string reasonPart)
+    {
+        File.WriteAllText(SnapshotPath, content);
+        var before = Listing();
+        var bytes = File.ReadAllBytes(SnapshotPath);
+
+        var result = SnapshotStore.LoadReadOnly(_directory);
+
+        result.Snapshot.Should().BeNull();
+        result.Reason.Should().Contain(reasonPart);
+        Listing().Should().Equal(before);
+        File.Exists(BadPath).Should().BeFalse();
+        File.ReadAllBytes(SnapshotPath).Should().Equal(bytes);
+    }
+
+    [Fact]
+    public void A_missing_file_read_only_gives_no_collection_a_reason_and_creates_nothing()
+    {
+        var result = SnapshotStore.LoadReadOnly(_directory);
+
+        result.Snapshot.Should().BeNull();
+        result.Reason.Should().NotBeNullOrWhiteSpace();
+        Listing().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_missing_directory_read_only_gives_no_collection_and_a_reason()
+    {
+        var result = SnapshotStore.LoadReadOnly(Path.Combine(_directory, "absent"));
+
+        result.Snapshot.Should().BeNull();
+        result.Reason.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public void A_file_that_cannot_be_read_gives_no_collection_a_reason_and_stays_in_place_when_loaded_read_only()
+    {
+        CreateStore().Save(Snapshot());
+
+        using (new FileStream(SnapshotPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            var result = SnapshotStore.LoadReadOnly(_directory);
+
+            result.Snapshot.Should().BeNull();
+            result.Reason.Should().Contain("could not be read");
+        }
+
+        File.Exists(SnapshotPath).Should().BeTrue();
+        File.Exists(BadPath).Should().BeFalse();
+    }
+
+    private List<string?> Listing() =>
+        [.. Directory.EnumerateFileSystemEntries(_directory).Select(Path.GetFileName).Order()];
+
     private static string Items(string item) =>
         $"{{ \"schemaVersion\": 1, \"capturedAtUtc\": \"2026-01-01T00:00:00Z\", \"items\": [ {item} ] }}";
 

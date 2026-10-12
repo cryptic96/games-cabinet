@@ -3,7 +3,6 @@ using Cabinet.Domain.Collection;
 using Cabinet.Repository.Images;
 using Cabinet.Repository.Storage;
 using Cabinet.Service.Layout;
-using Microsoft.Extensions.Logging.Abstractions;
 using SkiaSharp;
 
 namespace Cabinet.Service.Review;
@@ -79,11 +78,11 @@ public static class ReviewSheetCommand
             return Usage;
         }
 
-        var snapshot = new SnapshotStore(options.State, NullLogger<SnapshotStore>.Instance).Load();
+        var loaded = SnapshotStore.LoadReadOnly(options.State);
 
-        if (snapshot is null)
+        if (loaded.Snapshot is not { } snapshot)
         {
-            error.WriteLine("no stored collection in the state directory");
+            error.WriteLine(loaded.Reason);
 
             return NoCollection;
         }

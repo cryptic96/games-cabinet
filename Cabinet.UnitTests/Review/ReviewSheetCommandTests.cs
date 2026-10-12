@@ -54,6 +54,38 @@ public sealed class ReviewSheetCommandTests : IDisposable
     }
 
     [Fact]
+    public void A_newer_format_snapshot_is_left_in_place_by_the_review_sheet()
+    {
+        var snapshotPath = Path.Combine(_fixture.StatePath, "snapshot.json");
+        File.WriteAllText(snapshotPath, "{ \"schemaVersion\": 99, \"capturedAtUtc\": \"2026-01-01T00:00:00Z\", \"items\": [] }");
+        var bytes = File.ReadAllBytes(snapshotPath);
+        var listing = Directory.EnumerateFileSystemEntries(_fixture.StatePath).Select(Path.GetFileName).Order().ToList();
+
+        var result = Run(["--state", _fixture.StatePath, "--out", _out.FullPath]);
+
+        result.ExitCode.Should().Be(3);
+        result.Error.Trim().Split('\n').Should().ContainSingle().Which.Should().Contain("newer");
+        File.ReadAllBytes(snapshotPath).Should().Equal(bytes);
+        File.Exists(snapshotPath + ".bad").Should().BeFalse();
+        Directory.EnumerateFileSystemEntries(_fixture.StatePath).Select(Path.GetFileName).Order().Should().Equal(listing);
+    }
+
+    [Fact]
+    public void A_malformed_snapshot_is_left_in_place_by_the_review_sheet()
+    {
+        var snapshotPath = Path.Combine(_fixture.StatePath, "snapshot.json");
+        File.WriteAllText(snapshotPath, "{ not json");
+        var bytes = File.ReadAllBytes(snapshotPath);
+
+        var result = Run(["--state", _fixture.StatePath, "--out", _out.FullPath]);
+
+        result.ExitCode.Should().Be(3);
+        result.Error.Should().Contain("malformed");
+        File.ReadAllBytes(snapshotPath).Should().Equal(bytes);
+        File.Exists(snapshotPath + ".bad").Should().BeFalse();
+    }
+
+    [Fact]
     public void A_font_that_cannot_be_loaded_exits_with_4_and_names_the_package()
     {
         AddStoredGames(2);

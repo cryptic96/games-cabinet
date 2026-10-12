@@ -5,6 +5,11 @@ using Microsoft.Extensions.Logging;
 
 namespace Cabinet.Repository.Storage;
 
+/// <summary>What a read-only load found.</summary>
+/// <param name="Snapshot">The stored collection, or null when there is none to use.</param>
+/// <param name="Reason">A one-line reason when there is no collection, otherwise null.</param>
+public sealed record SnapshotReadResult(CollectionSnapshot? Snapshot, string? Reason);
+
 /// <summary>Keeps the last good collection as <c>snapshot.json</c> in the storage directory.</summary>
 public sealed class SnapshotStore : ISnapshotStore
 {
@@ -13,6 +18,9 @@ public sealed class SnapshotStore : ISnapshotStore
 
     /// <summary>The name a damaged or too-new file is renamed to. A file that could not be read at all is left in place.</summary>
     public const string SetAsideFileName = "snapshot.json.bad";
+
+    private const string MalformedProblem = "malformed";
+    private const string NewerSchemaProblem = "newer schema";
 
     private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
 
@@ -75,7 +83,44 @@ public sealed class SnapshotStore : ISnapshotStore
         _unread = false;
     }
 
-    private CollectionSnapshot? Parse(byte[] content)
+    /// <summary>
+    /// Reads the stored collection from a directory without changing anything in it. A damaged or too-new file is left in
+    /// place under its own name, unlike <see cref="Load"/>, so a tool that only reads can never alter the stored state.
+    /// </summary>
+    /// <param name="directory">The storage directory.</param>
+    /// <returns>The collection, or no collection and a one-line reason.</returns>
+    public static SnapshotReadResult LoadReadOnly(string directory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(directory);
+
+        var path = Path.Combine(directory, FileName);
+        byte[] content;
+
+        try
+        {
+            if (!File.Exists(path))
+            {
+                return new SnapshotReadResult(null, "no stored collection in the state directory");
+            }
+
+            content = File.ReadAllBytes(path);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return new SnapshotReadResult(null, "the stored collection could not be read and was left in place");
+        }
+
+        var (snapshot, problem) = Classify(content);
+
+        return problem switch
+        {
+            null => new SnapshotReadResult(snapshot, null),
+            NewerSchemaProblem => new SnapshotReadResult(null, "the stored collection is in a newer format than this version reads and was left in place"),
+            _ => new SnapshotReadResult(null, "the stored collection is malformed and was left in place"),
+        };
+    }
+
+    private static (CollectionSnapshot? Snapshot, string? Problem) Classify(byte[] content)
     {
         CollectionSnapshot? snapshot;
 
@@ -85,20 +130,27 @@ public sealed class SnapshotStore : ISnapshotStore
         }
         catch (JsonException)
         {
-            return SetAside("malformed");
+            return (null, MalformedProblem);
         }
 
         if (snapshot is null || snapshot.Items is null || snapshot.Items.Any(item => item is null))
         {
-            return SetAside("malformed");
+            return (null, MalformedProblem);
         }
 
         if (snapshot.SchemaVersion > CollectionSnapshot.CurrentSchemaVersion)
         {
-            return SetAside("newer schema");
+            return (null, NewerSchemaProblem);
         }
 
-        return snapshot.SchemaVersion < 1 ? SetAside("malformed") : snapshot;
+        return snapshot.SchemaVersion < 1 ? (null, MalformedProblem) : (snapshot, null);
+    }
+
+    private CollectionSnapshot? Parse(byte[] content)
+    {
+        var (snapshot, problem) = Classify(content);
+
+        return problem is null ? snapshot : SetAside(problem);
     }
 
     private CollectionSnapshot? SetAside(string reason)
