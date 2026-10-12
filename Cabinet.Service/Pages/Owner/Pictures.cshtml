@@ -1,15 +1,10 @@
 @page
 @using Cabinet.Domain.Owner
 @using Cabinet.Service.Owner
+@using Cabinet.Service.Pages.Owner
 @model Cabinet.Service.Pages.Owner.PicturesModel
-@{
-    var choices = new (PictureChoice Kind, string Label)[]
-    {
-        (PictureChoice.Automatic, OwnerStrings.ChoiceAutomatic),
-        (PictureChoice.OwnedEdition, OwnerStrings.ChoiceOwnedEdition),
-        (PictureChoice.MainPicture, OwnerStrings.ChoiceMainPicture),
-        (PictureChoice.Link, OwnerStrings.ChoiceYourLink),
-    };
+@section Head {
+    <link rel="stylesheet" href="~/css/card.css" asp-append-version="true" />
 }
 <h2>@OwnerStrings.Pictures</h2>
 <p class="owner-intro">@OwnerStrings.PicturesIntro</p>
@@ -34,29 +29,29 @@
 }
 else if (Model.Games.Count == 0)
 {
-    <section class="owner-panel">
-        <p>@OwnerStrings.NoGamesYet</p>
+    <section class="owner-panel pic-empty">
+        <h3>@OwnerStrings.PicturesNoGamesHeading</h3>
+        <p>@OwnerStrings.PicturesNoGamesBody</p>
     </section>
 }
 else
 {
-    <ul class="pic-list" role="list">
+    <ul class="pic-list" role="list" id="pic-list">
         @foreach (var game in Model.Games)
         {
-            <li class="pic-row" id="game-@game.GameId" data-game-id="@game.GameId">
+            var rowId = $"game-{game.GameId}";
+            var group = PicturesModel.GroupName(game.GameId);
+
+            <li class="pic-row" id="@rowId" data-game-id="@game.GameId">
                 <form method="post" asp-page-handler="Choose">
-                    <input type="hidden" name="revision" value="@Model.Revision" />
+                    <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
                     <input type="hidden" name="gameId" value="@game.GameId" />
                     <div class="pic-head">
-                        @if (game.CoverUrl is not null)
+                        <h3 class="game-title" dir="auto">@game.Title</h3>
+                        @if (game.Year is { } year)
                         {
-                            <img class="game-cover" src="@game.CoverUrl" width="@game.CoverWidth" height="@game.CoverHeight" alt="" loading="lazy" decoding="async" />
+                            <span class="pic-year">@year</span>
                         }
-                        else
-                        {
-                            <span class="game-cover game-swatch" aria-hidden="true"></span>
-                        }
-                        <h3 dir="auto">@game.Title</h3>
                         @if (game.IsExpansion)
                         {
                             <span class="game-tag">@OwnerStrings.ExpansionTag</span>
@@ -64,17 +59,69 @@ else
                     </div>
                     <fieldset class="pic-choices">
                         <legend class="visually-hidden" dir="auto">@OwnerStrings.PictureLegend(game.Title)</legend>
-                        @foreach (var (kind, label) in choices)
+                        @foreach (var tile in game.Tiles)
                         {
-                            <label class="pic-choice" data-unavailable="@(game.Offers(kind) ? "false" : "true")">
-                                <input type="radio" name="choice" value="@kind" checked="@(game.Choice == kind)" disabled="@(!game.Offers(kind))" />
-                                <span>@label</span>
+                            var isLink = tile.Kind == PictureChoice.Link;
+                            var showsCover = tile.Url is null && tile.Available && !tile.Fetching;
+                            var state = tile.Fetching ? "fetching"
+                                : tile.Url is not null ? "picture"
+                                : showsCover ? "cover"
+                                : isLink ? "none" : "missing";
+
+                            <label class="pic-tile" data-kind="@tile.Kind" data-state="@state" data-automatic-pick="@(tile.IsAutomaticPick ? "true" : null)">
+                                <span class="pic-art" data-art="@state" data-bg="@game.CoverBackground" data-fg="@game.CoverText" data-pattern="@game.CoverPattern">
+                                    @if (tile.Url is not null)
+                                    {
+                                        <img src="@tile.Url" width="@tile.Width" height="@tile.Height" alt="" loading="lazy" decoding="async" />
+                                    }
+                                    else if (showsCover)
+                                    {
+                                        <span class="pic-cover-text" dir="auto">@game.Title</span>
+                                    }
+                                </span>
+                                <span class="pic-caption">
+                                    <input type="radio" name="@group" value="@tile.Kind" checked="@(game.Choice == tile.Kind)"
+                                           disabled="@(!tile.Available)" aria-disabled="@(tile.Available ? null : "true")" />
+                                    <span class="pic-label">@OwnerStrings.TileLabel(tile.Kind)</span>
+                                </span>
+                                @if (tile.Verdict is { } verdict)
+                                {
+                                    <span class="pic-verdict">@OwnerStrings.VerdictTag(verdict)</span>
+                                }
+                                @if (tile.Kind == PictureChoice.Automatic)
+                                {
+                                    <span class="pic-sub">@OwnerStrings.AutomaticSubLine(game.AutomaticSource)</span>
+                                }
+                                else if (state == "missing")
+                                {
+                                    <span class="pic-sub">@OwnerStrings.TileBggHasNone</span>
+                                }
+                                else if (state == "none")
+                                {
+                                    <span class="pic-sub">@OwnerStrings.TileNoLinkYet</span>
+                                }
+                                else if (state == "fetching")
+                                {
+                                    <span class="pic-sub">@OwnerStrings.TileFetching</span>
+                                }
+                                @if (tile.LinkAddress is not null)
+                                {
+                                    <span class="pic-address" dir="ltr" title="@tile.LinkFullAddress">@tile.LinkAddress</span>
+                                }
+                                @if (tile.IsAutomaticPick)
+                                {
+                                    <span class="pic-tag">@OwnerStrings.AutomaticsPick</span>
+                                }
                             </label>
                         }
                     </fieldset>
-                    <button type="submit" class="owner-btn">@OwnerStrings.SavePictureButton</button>
+                    <button type="submit" class="owner-btn" data-save>@OwnerStrings.SavePictureButton</button>
                 </form>
+                <p class="row-status" role="status"></p>
             </li>
         }
     </ul>
+}
+@section Scripts {
+    <script type="module" src="~/js/owner-pictures.js" asp-append-version="true"></script>
 }

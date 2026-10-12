@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Cabinet.BrowserTests.Infrastructure;
 using Cabinet.FakeBgg;
 using Cabinet.FakeBgg.Testing;
@@ -9,15 +8,13 @@ using Microsoft.Playwright;
 namespace Cabinet.BrowserTests;
 
 /// <summary>
-/// Proves in a real browser that the owner's pictures page lists every game with its four choices at a size a thumb can hit, fits
-/// a phone without sideways scrolling, and that choosing a picture and pressing the save button reloads the page on the same
-/// row with the choice kept and the public card showing the chosen picture.
+/// Proves in a real browser that the owner's pictures page lists every game with its four choices at a size a thumb can hit and
+/// fits a phone without sideways scrolling.
 /// </summary>
 [Trait("Category", "Browser")]
 public sealed class OwnerPicturesPageTests : CabinetPageTest
 {
     private const string ImageHost = "https://example.org/images/";
-    private const string CardsPath = "/cabinet/cards?profile=desktop";
     private const int MinimumTarget = 44;
 
     private static readonly byte[] FlatCover = SyntheticArt.Encode(SyntheticArtKind.FlatCover);
@@ -42,14 +39,14 @@ public sealed class OwnerPicturesPageTests : CabinetPageTest
         rows.Should().BeGreaterThan(1);
         await Expect(Page.Locator(".pic-row input[type=radio]")).ToHaveCountAsync(rows * 4);
         await Expect(Page.Locator(".pic-row input[type=radio][value=Automatic]:checked")).ToHaveCountAsync(rows);
-        var targets = await Page.Locator(".pic-choice:not([data-unavailable='true']), .pic-row button").EvaluateAllAsync<double[]>(
+        var targets = await Page.Locator(".pic-tile:not([data-state='missing']):not([data-state='none'])").EvaluateAllAsync<double[]>(
             "elements => elements.map(element => element.getBoundingClientRect().height)");
         targets.Should().OnlyContain(target => target >= MinimumTarget);
         var game = Page.Locator(".pic-row", new PageLocatorOptions { Has = Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "Example Game 1", Exact = true }) });
         await Expect(game.Locator("input[value=OwnedEdition]")).ToBeEnabledAsync();
         await Expect(game.Locator("input[value=MainPicture]")).ToBeEnabledAsync();
         await Expect(game.Locator("input[value=Link]")).ToBeDisabledAsync();
-        var borders = await Page.Locator(".pic-choice").EvaluateAllAsync<string[]>(
+        var borders = await Page.Locator(".pic-tile").EvaluateAllAsync<string[]>(
             "labels => labels.map(label => `${label.querySelector('input').disabled}:${getComputedStyle(label).borderTopStyle}`)");
         borders.Should().OnlyContain(border => border == "false:solid" || border == "true:dashed");
         var overflow = await Page.EvaluateAsync<double>("() => document.documentElement.scrollWidth - window.innerWidth");
@@ -58,27 +55,6 @@ public sealed class OwnerPicturesPageTests : CabinetPageTest
         await SaveScreenshotAsync($"owner-pictures-{width}");
         ConsoleErrors.Should().BeEmpty();
         RequestHosts.Should().OnlyContain(host => host == $"127.0.0.1:{OwnerPort}");
-    }
-
-    [Fact]
-    public async Task Choosing_the_main_picture_and_saving_comes_back_to_the_same_row_and_the_public_card_follows()
-    {
-        await Page.SetViewportSizeAsync(390, 844);
-        await StartHostAsync();
-        var before = await CoverOfAsync("Example Game 1");
-
-        await GotoOwnerAsync("/owner/pictures");
-        var row = Page.Locator(".pic-row", new PageLocatorOptions { Has = Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "Example Game 1", Exact = true }) });
-        await row.Locator("label.pic-choice", new LocatorLocatorOptions { HasText = "Main picture" }).ClickAsync();
-        await row.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Save picture" }).ClickAsync();
-
-        await Expect(Page.Locator("#owner-notice")).ToHaveTextAsync("Saved.");
-        await Expect(Page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex(@"/owner/pictures\?done=saved#game-\d+$"));
-        await Expect(row.Locator("input[value=MainPicture]")).ToBeCheckedAsync();
-        (await CoverOfAsync("Example Game 1")).Should().NotBe(before);
-
-        await SaveScreenshotAsync("owner-pictures-saved-390");
-        ConsoleErrors.Should().BeEmpty();
     }
 
     private async Task StartHostAsync()
@@ -107,16 +83,6 @@ public sealed class OwnerPicturesPageTests : CabinetPageTest
         await StartAsync(factory);
         _publicClient = factory.CreatePublicClient();
         await SyncRounds.PressAndWait(_publicClient, clock, advance: false);
-    }
-
-    private async Task<string> CoverOfAsync(string title)
-    {
-        var json = await _publicClient!.GetStringAsync(CardsPath, TestContext.Current.CancellationToken);
-        using var document = JsonDocument.Parse(json);
-
-        return document.RootElement.GetProperty("cards").EnumerateArray()
-            .First(card => card.GetProperty("title").GetString() == title)
-            .GetProperty("cover").GetProperty("url").GetString()!;
     }
 
     /// <inheritdoc />

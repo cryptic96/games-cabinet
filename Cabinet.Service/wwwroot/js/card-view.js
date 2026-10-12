@@ -123,7 +123,7 @@ function coverRatio(record) {
  * @param {string} title The title to put on the plate.
  * @param {number} patternIndex The pattern index of the record.
  */
-function drawGeneratedCover(art, title, patternIndex) {
+export function drawGeneratedCover(art, title, patternIndex) {
   art.dataset.pattern = PATTERN_NAMES[patternIndex] ?? 'plain';
 
   const label = document.createElement('span');

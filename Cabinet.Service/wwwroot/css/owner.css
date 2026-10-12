@@ -929,7 +929,7 @@ header > .owner-plate {
   color: var(--ink);
   box-shadow: 0 1px 2px rgb(20 10 4 / 0.4);
   content-visibility: auto;
-  contain-intrinsic-size: auto 200px;
+  contain-intrinsic-size: auto 280px;
 }
 
 @media (min-width: 40.0625rem) {
@@ -940,6 +940,10 @@ header > .owner-plate {
   .pic-row {
     padding: 24px;
   }
+}
+
+.pic-row [hidden] {
+  display: none;
 }
 
 .pic-row form {
@@ -958,8 +962,8 @@ header > .owner-plate {
 .pic-head {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
+  align-items: baseline;
+  gap: 4px 12px;
 }
 
 .pic-head h3 {
@@ -972,10 +976,25 @@ header > .owner-plate {
   overflow-wrap: anywhere;
 }
 
+.pic-year {
+  color: var(--paper-label);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pic-empty h3 {
+  margin: 0 0 8px;
+}
+
+.pic-empty p {
+  margin: 0;
+}
+
 .pic-choices {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px 24px;
+  gap: 24px;
+  min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
@@ -988,44 +1007,152 @@ header > .owner-plate {
   }
 }
 
-.pic-choice {
+.pic-tile {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 8px;
-  min-height: 44px;
-  padding-inline: 8px;
+  min-width: 0;
+  padding: 8px;
   border: 1px solid var(--paper-label);
   border-radius: 2px;
-  font-size: 16px;
-  font-weight: 600;
+  background-color: var(--paper);
+  font-size: 14px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
   cursor: pointer;
 }
 
-.pic-choice input {
+.pic-art {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  height: var(--tile-h);
+  padding: 4px;
+  background: var(--paper-photo);
+  box-shadow: 0 1px 2px rgb(20 10 4 / 0.35);
+}
+
+.pic-art > img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+}
+
+.pic-art .pic-cover {
+  display: block;
+  flex: none;
+  width: auto;
+  height: 100%;
+  aspect-ratio: 1;
+}
+
+.pic-cover-text {
+  padding: 4px;
+  color: var(--paper-label);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.pic-art[data-art="missing"],
+.pic-art[data-art="none"],
+.pic-art[data-art="fetching"] {
+  border: 1px dashed var(--paper-label);
+  background: transparent;
+  box-shadow: none;
+}
+
+.pic-caption {
+  flex-wrap: wrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.pic-caption input {
   flex: none;
   width: 24px;
   height: 24px;
   margin: 0;
   accent-color: var(--ink);
+  cursor: inherit;
 }
 
-.pic-choice:has(input:checked) {
+.pic-label {
+  overflow-wrap: break-word;
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.pic-verdict,
+.pic-sub {
+  color: var(--paper-label);
+  font-size: 14px;
+}
+
+.pic-address {
+  overflow: hidden;
+  color: var(--paper-label);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pic-tag {
+  align-self: flex-start;
+  padding: 0 8px;
+  border: 1px solid var(--paper-label);
+  border-radius: 4px;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.pic-tile:has(input:checked) {
+  background-image: linear-gradient(var(--hover-tint), var(--hover-tint));
   box-shadow: inset 0 0 0 3px var(--ink);
-  background: var(--hover-tint);
 }
 
-.pic-choice:has(:focus-visible) {
+@media (hover: hover) {
+  .pic-tile:has(input:not(:disabled)):hover {
+    background-image: linear-gradient(var(--hover-tint), var(--hover-tint));
+  }
+}
+
+.pic-tile:has(:focus-visible) {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
 
-.pic-choice[data-unavailable="true"] {
+.pic-tile input:focus-visible {
+  outline: none;
+}
+
+.pic-tile[data-state="missing"],
+.pic-tile[data-state="none"],
+.pic-tile[data-state="fetching"] {
   border-style: dashed;
   color: var(--paper-label);
-  font-weight: 400;
   cursor: default;
+}
+
+.pic-tile[data-state="missing"] .pic-label,
+.pic-tile[data-state="none"] .pic-label {
+  font-weight: 400;
 }
 
 .pic-row .owner-btn {
   align-self: flex-start;
+}
+
+.pic-row .row-status {
+  margin: 12px 0 0;
 }
