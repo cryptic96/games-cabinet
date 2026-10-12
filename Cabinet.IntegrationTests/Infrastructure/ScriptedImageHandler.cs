@@ -10,7 +10,8 @@ namespace Cabinet.IntegrationTests.Infrastructure;
 /// <param name="AuthorizationScheme">The scheme of the Authorization header, or null when there was none.</param>
 /// <param name="AuthorizationParameter">The credentials of the Authorization header, or null when there was none.</param>
 /// <param name="UserAgent">The User-Agent header text, or null when there was none.</param>
-public sealed record RecordedImageRequest(Uri Uri, string? AuthorizationScheme, string? AuthorizationParameter, string? UserAgent);
+/// <param name="HasCookie">Whether the request carried a Cookie header.</param>
+public sealed record RecordedImageRequest(Uri Uri, string? AuthorizationScheme, string? AuthorizationParameter, string? UserAgent, bool HasCookie = false);
 
 /// <summary>
 /// A transport for tests that answers picture requests from a dictionary of invented bodies, by absolute address, with
@@ -123,7 +124,8 @@ public sealed class ScriptedImageHandler : HttpMessageHandler
                 uri,
                 request.Headers.Authorization?.Scheme,
                 request.Headers.Authorization?.Parameter,
-                userAgent.Length == 0 ? null : userAgent));
+                userAgent.Length == 0 ? null : userAgent,
+                request.Headers.Contains("Cookie")));
             found = _bodies.TryGetValue(uri.AbsoluteUri, out body);
             broken = _broken.Contains(uri.AbsoluteUri);
             stalled = _stalled.Contains(uri.AbsoluteUri);
