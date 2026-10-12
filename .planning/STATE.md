@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 05
 current_phase_name: game-detail-accessibility-language
 status: executing
-stopped_at: Completed 05-15-PLAN.md
-last_updated: "2026-10-11T18:26:07.721Z"
-last_activity: 2026-10-11
-last_activity_desc: Plan 05-15 complete (review round answered and applied)
+stopped_at: Completed 05-16-PLAN.md
+last_updated: "2026-10-12T08:52:30.390Z"
+last_activity: 2026-10-12
+last_activity_desc: Plan 05-16 complete (v0.6.0 released and deployed; device check partly open)
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 78
-  completed_plans: 77
+  completed_plans: 78
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-10-06)
 ## Current Position
 
 Phase: 05 (game-detail-accessibility-language) — EXECUTING
-Plan: 15 of 16 complete (next: 05-16)
-Status: Executing Phase 05
-Last activity: 2026-10-11 — Plan 05-15 complete (review round answered and applied)
+Plan: 16 of 16 complete (awaiting phase verification)
+Status: Phase 05 plans complete; verification pending
+Last activity: 2026-10-12 — Plan 05-16 complete (v0.6.0 released and deployed; device check partly open)
 
-Progress: [██████████] 99%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -63,6 +63,7 @@ Progress: [██████████] 99%
 |------|----------|-------|-------|
 | Phase 01 P01 | 25min | 3 tasks | 1 files |
 | Phase 05 P05-15 | two sessions | 4 tasks | 14 files |
+| Phase 05 P16 | several sessions | 5 tasks | 0 files |
 
 ## Accumulated Context
 
@@ -121,6 +122,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-11T18:26:07.704Z
-Stopped at: Completed 05-15-PLAN.md
+Last session: 2026-10-12T08:52:30.374Z
+Stopped at: Completed 05-16-PLAN.md
 Resume file: None

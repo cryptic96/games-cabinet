@@ -300,7 +300,7 @@ Plans:
   4. A keyboard-only user can move through the games in the cabinet and open any detail card, and a screen-reader user gets an accessible list of all games behind the visual cabinet.
   5. The site's own labels appear in English or Dutch: the default follows the browser language, a visitor can switch, the choice is remembered, and game titles stay exactly as BGG provides them.
 
-**Plans:** 15/16 plans executed
+**Plans:** 16/16 plans executed
 
 Plans:
 **Wave 1**
@@ -344,7 +344,7 @@ Plans:
 
 **Wave 9**
 
-- [ ] 05-16-PLAN.md — Release v0.6.0 and the owner's check on real devices (owner-gated)
+- [x] 05-16-PLAN.md — Release v0.6.0 and the owner's check on real devices (owner-gated)
 
 **UI hint**: yes
 
@@ -410,7 +410,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 2. Layout Engine & Cabinet Prototype | 9/9 | Complete    | 2026-10-06 |
 | 3. BGG Access Spike, Real Sync & Snapshot | 15/15 | Complete    | 2026-10-07 |
 | 4. Enrichment, Box Images & Shape | 23/23 | Complete    | 2026-10-09 |
-| 5. Game Detail, Accessibility & Language | 15/16 | In Progress|  |
+| 5. Game Detail, Accessibility & Language | 16/16 | In Progress|  |
 | 6. Owner Tools & Persistence | 0/0 | Not started | - |
 | 7. Game-Night Filters & Location Cabinets | 0/0 | Not started | - |
 | 8. Public Hardening & Go-Public | 0/0 | Not started | - |
