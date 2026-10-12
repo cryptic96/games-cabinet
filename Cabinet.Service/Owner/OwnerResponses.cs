@@ -18,23 +18,26 @@ public static class OwnerResponses
 
     private const string FallbackRefusal = "save-failed";
 
-    private static readonly HashSet<string> RefusalKeys = new(StringComparer.Ordinal)
-    {
-        "name-empty",
-        "name-too-long",
-        "name-taken",
-        "too-many-locations",
-        "name-characters",
-        "unknown-location",
-        "unknown-game",
-        "no-picture",
-        "no-link",
-        "link-failed",
-        "link-expired",
-        "nothing-selected",
-        "id-clash",
-        "save-failed",
-    };
+    private const string LinkRemovedKey = "link-removed";
+
+    private static readonly HashSet<string> RefusalKeys = new(
+        [
+            "name-empty",
+            "name-too-long",
+            "name-taken",
+            "too-many-locations",
+            "name-characters",
+            "unknown-location",
+            "unknown-game",
+            "no-picture",
+            "no-link",
+            "link-expired",
+            "nothing-selected",
+            "id-clash",
+            "save-failed",
+            .. Enum.GetValues<LinkProblem>().Select(OwnerStrings.LinkKey),
+        ],
+        StringComparer.Ordinal);
 
     /// <summary>Answers a post with the result of the change it asked for.</summary>
     /// <param name="page">The page that handled the post.</param>
@@ -98,7 +101,12 @@ public static class OwnerResponses
 
         return result.Outcome switch
         {
-            OwnerOutcome.Saved => result.StatusKey == "undone" ? "undone" : "saved",
+            OwnerOutcome.Saved => result.StatusKey switch
+            {
+                "undone" => "undone",
+                LinkRemovedKey => LinkRemovedKey,
+                _ => "saved",
+            },
             OwnerOutcome.NoChange => "unchanged",
             OwnerOutcome.OutOfDate => result.StatusKey == "cant-undo" ? "cant-undo" : "out-of-date",
             OwnerOutcome.Unreadable => "unreadable",
@@ -110,9 +118,16 @@ public static class OwnerResponses
     /// <param name="done">The query value of the page.</param>
     public static string? NoticeFor(string? done) => StatusKeyOf(done) is { } key ? OwnerStrings.Message(key) : null;
 
+    /// <summary>The problem with a pasted address that a code a redirect carried stands for, or null when it stands for anything else.</summary>
+    /// <param name="done">The query value of the page.</param>
+    public static LinkProblem? LinkProblemOf(string? done) =>
+        done is not null && done.StartsWith(RefusedPrefix, StringComparison.Ordinal)
+            ? OwnerStrings.LinkProblemOf(done[RefusedPrefix.Length..])
+            : null;
+
     /// <summary>Whether a code a redirect carried says something went wrong.</summary>
     /// <param name="done">The query value of the page.</param>
-    public static bool IsProblem(string? done) => StatusKeyOf(done) is { } key && key is not ("game-moved" or "unchanged" or "undone");
+    public static bool IsProblem(string? done) => StatusKeyOf(done) is { } key && key is not ("game-moved" or "unchanged" or "undone" or LinkRemovedKey);
 
     private static string? StatusKeyOf(string? done)
     {
@@ -133,6 +148,7 @@ public static class OwnerResponses
             "saved" => "game-moved",
             "unchanged" => "unchanged",
             "undone" => "undone",
+            LinkRemovedKey => LinkRemovedKey,
             "out-of-date" => "out-of-date",
             "cant-undo" => "cant-undo",
             "unreadable" => "unreadable",

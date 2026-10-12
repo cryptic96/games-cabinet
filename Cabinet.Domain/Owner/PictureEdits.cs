@@ -9,6 +9,7 @@ public static class PictureEdits
     private const string NoPictureStatusKey = "no-picture";
     private const string NoLinkStatusKey = "no-link";
     private const string CheckedStatusKey = "picture-checked";
+    private const string RemovedStatusKey = "link-removed";
 
     /// <summary>
     /// Sets which picture a game is drawn from. A choice other than Automatic marks the game as checked, and every choice
@@ -120,6 +121,45 @@ public static class PictureEdits
             data with { Games = [.. games.OrderBy(game => game.GameId)] },
             $"Picture of {title}: {Words(PictureChoice.Link)}",
             ChosenStatusKey);
+    }
+
+    /// <summary>
+    /// Removes the picture link a game has, and with it the record of the stored copy; the files are tidied away later by the
+    /// clean-up, which keeps what the owner data refers to. When the link was the choice, the choice becomes Automatic and the
+    /// game no longer counts as checked, so it asks for a look again by the normal rule; any other choice stays as it is. A game
+    /// without a link has nothing to remove.
+    /// </summary>
+    /// <param name="data">The data to change.</param>
+    /// <param name="gameId">The game.</param>
+    /// <param name="title">The game's title, for the change log.</param>
+    public static OwnerChange RemoveLink(OwnerData data, int gameId, string title)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(title);
+
+        var current = data.Games.FirstOrDefault(game => game.GameId == gameId);
+
+        if (current?.Picture is not { Link: not null } setting)
+        {
+            return OwnerChange.None;
+        }
+
+        var wasChoice = setting.Choice == PictureChoice.Link;
+        var next = setting with
+        {
+            Link = null,
+            Choice = wasChoice ? PictureChoice.Automatic : setting.Choice,
+            Checked = !wasChoice && setting.Checked,
+        };
+        var kept = next.Choice == PictureChoice.Automatic && !next.Checked ? null : next;
+        var updated = current with { Picture = kept };
+        var others = data.Games.Where(game => game.GameId != gameId);
+        var games = LocationEdits.IsEmpty(updated) ? others : others.Append(updated);
+
+        return new OwnerChange(
+            data with { Games = [.. games.OrderBy(game => game.GameId)] },
+            $"Removed the picture link of {title}",
+            RemovedStatusKey);
     }
 
     /// <summary>

@@ -40,6 +40,9 @@ const {
   counterText,
   worthALookLinkText,
   allGamesLinkText,
+  megabytes,
+  shortAddress,
+  leadAndRest,
 } =
   await loadPageScript('owner-format.js');
 
@@ -212,4 +215,38 @@ test('the words of the looks-right button and its status are in the table', () =
   assert.equal(OWNER_TEXT.checked, 'Checked');
   assert.equal(OWNER_TEXT.markedChecked, 'Marked as checked');
   assert.equal(OWNER_TEXT.wontLoad, "Picture won't load");
+});
+
+test('a size in bytes is written as millions of bytes with at most one decimal', () => {
+  assert.equal(megabytes(5_400_000), '5.4');
+  assert.equal(megabytes(1_000_000), '1');
+  assert.equal(megabytes(12_582_912), '12.6');
+  assert.equal(megabytes(0), '0');
+});
+
+test('a stored picture address is shortened to its host and its file name', () => {
+  assert.equal(shortAddress('https://cf.geekdo-images.com/abc__original/img/x/0x0/pic1.png'), 'cf.geekdo-images.com/.../pic1.png');
+  assert.equal(shortAddress('https://example.org/a%20b.png'), 'example.org/.../a b.png');
+  assert.equal(shortAddress('https://example.org/'), 'example.org');
+  assert.equal(shortAddress('not an address'), '');
+  assert.equal(shortAddress(''), '');
+});
+
+test('a message is split into its lead sentence and the next step', () => {
+  assert.deepEqual(leadAndRest('Paste a picture link first.'), { lead: 'Paste a picture link first.', rest: '' });
+  assert.deepEqual(leadAndRest("That picture isn't there. Check that you copied the whole link."), {
+    lead: "That picture isn't there.",
+    rest: 'Check that you copied the whole link.',
+  });
+  assert.deepEqual(leadAndRest('That picture is too large to use (5.4 MB; the limit is 12.6 MB). Pick a smaller version from the gallery.'), {
+    lead: 'That picture is too large to use (5.4 MB; the limit is 12.6 MB).',
+    rest: 'Pick a smaller version from the gallery.',
+  });
+});
+
+test('the words of the link buttons and the stored link are in the table', () => {
+  assert.equal(OWNER_TEXT.removeLink, 'Remove link');
+  assert.equal(OWNER_TEXT.linkRemoved, 'Link removed');
+  assert.equal(OWNER_TEXT.tileFetching, 'Fetching...');
+  assert.equal(OWNER_TEXT.markFetching, 'Fetching your link...');
 });

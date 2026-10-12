@@ -423,6 +423,81 @@ public static class OwnerStrings
         _ => null,
     };
 
+    /// <summary>The button that removes the picture link of a game and the copy stored for it.</summary>
+    public const string RemoveLinkButton = "Remove link";
+
+    /// <summary>The status after a link was removed.</summary>
+    public const string LinkRemoved = "Link removed";
+
+    /// <summary>What stands in for the picture host's name where a message is made without knowing it.</summary>
+    public const string AnyPictureHost = "the picture host";
+
+    private const string LinkKeyPrefix = "link-";
+
+    private static readonly Dictionary<LinkProblem, string> LinkKeys = new()
+    {
+        [LinkProblem.Blank] = "link-blank",
+        [LinkProblem.NotAWebAddress] = "link-address",
+        [LinkProblem.PageLink] = "link-page",
+        [LinkProblem.OtherHost] = "link-host",
+        [LinkProblem.FetchFailed] = "link-failed",
+        [LinkProblem.NotFound] = "link-not-found",
+        [LinkProblem.NotAPicture] = "link-not-picture",
+        [LinkProblem.TooLarge] = "link-too-large",
+        [LinkProblem.TooManyPixels] = "link-pixels",
+        [LinkProblem.ExtremeShape] = "link-shape",
+    };
+
+    /// <summary>The words in front of the short address of the stored link, under the field.</summary>
+    public const string CurrentLinkLabel = "Current link:";
+
+    /// <summary>The refusal key a redirect or an answer carries for a problem with an address.</summary>
+    /// <param name="problem">The problem.</param>
+    public static string LinkKey(LinkProblem problem) => LinkKeys[problem];
+
+    /// <summary>The problem a refusal key stands for, or null when the key is not the key of a problem with an address.</summary>
+    /// <param name="key">The key.</param>
+    public static LinkProblem? LinkProblemOf(string? key) =>
+        key is not null && key.StartsWith(LinkKeyPrefix, StringComparison.Ordinal)
+            ? LinkKeys.Where(pair => pair.Value == key).Select(pair => (LinkProblem?)pair.Key).FirstOrDefault()
+            : null;
+
+    /// <summary>Millions of bytes with at most one decimal, as the owner reads a picture's size.</summary>
+    /// <param name="bytes">The size in bytes.</param>
+    public static string Megabytes(long bytes) =>
+        (bytes / 1_000_000d).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// The words for one problem with a pasted address: what went wrong in a lead sentence, then the next step. Only the picture
+    /// host's name and sizes are put in, never anything the owner pasted.
+    /// </summary>
+    /// <param name="problem">The problem.</param>
+    /// <param name="host">The name of the picture host a link has to point at.</param>
+    /// <param name="bytes">For a picture that is too large, the size the host announced; otherwise null.</param>
+    /// <param name="limitBytes">For a picture that is too large, the most bytes a picture may have; otherwise null.</param>
+    public static string LinkError(LinkProblem problem, string host, long? bytes, long? limitBytes) => problem switch
+    {
+        LinkProblem.Blank => "Paste a picture link first.",
+        LinkProblem.NotAWebAddress => "That isn't a web address. Paste the full picture link, starting with https://.",
+        LinkProblem.PageLink =>
+            "That's a page link, not a picture link. In BGG's gallery, open the picture and choose \"Copy image address\", then paste that here.",
+        LinkProblem.OtherHost =>
+            $"That link isn't from BGG's picture host. Only links from {host} work here. Copy the picture's address from BGG's gallery.",
+        LinkProblem.NotFound => "That picture isn't there. Check that you copied the whole link.",
+        LinkProblem.NotAPicture => "That isn't a picture the cabinet can read. Try another one.",
+        LinkProblem.TooLarge => $"That picture is too large to use{TooLargeSizes(bytes, limitBytes)}. Pick a smaller version from the gallery.",
+        LinkProblem.TooManyPixels => "That picture has too many pixels to process. Pick a smaller version from the gallery.",
+        LinkProblem.ExtremeShape => "That picture is very long and thin, so it can't be a box front. Try another one.",
+        _ => "Couldn't fetch that picture. The link may be wrong or the picture host may be busy. Check the link and try again.",
+    };
+
+    private static string TooLargeSizes(long? bytes, long? limitBytes) => (bytes, limitBytes) switch
+    {
+        ({ } size, { } limit) => $" ({Megabytes(size)} MB; the limit is {Megabytes(limit)} MB)",
+        (null, { } limit) => $" (the limit is {Megabytes(limit)} MB)",
+        _ => string.Empty,
+    };
+
     /// <summary>The words for a status key, or null when the key is not one the owner tools use.</summary>
     /// <param name="statusKey">The key an owner result carries.</param>
     public static string? Message(string? statusKey) => statusKey switch
@@ -447,10 +522,11 @@ public static class OwnerStrings
         "unknown-game" => "That game isn't in your collection any more.",
         "no-picture" => "That picture isn't available for this game.",
         "no-link" => "This game has no link saved yet.",
-        "link-failed" => "Couldn't use that link. Check it and try again.",
+        "link-removed" => $"{LinkRemoved}.",
         "link-expired" => "This preview expired. Check the link again.",
         "nothing-selected" => "Tick at least one game first.",
         "id-clash" or "save-failed" => "Couldn't save that. Try again.",
+        _ when LinkProblemOf(statusKey) is { } problem => LinkError(problem, AnyPictureHost, null, null),
         _ => null,
     };
 }

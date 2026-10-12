@@ -8,7 +8,7 @@
  * from the server is checked before it is used, sizes are set only through custom properties, and every text is written with
  * `textContent`.
  */
-import { OWNER_TEXT, fill } from './owner-format.js';
+import { OWNER_TEXT, fill, leadAndRest, shortAddress } from './owner-format.js';
 import { postOwner, showRowProblem, showRowStatus } from './owner-shared.js';
 
 /** The handler addresses, relative to the page the script runs on. */
@@ -16,6 +16,7 @@ const HANDLERS = Object.freeze({
   check: '?handler=CheckLink',
   use: '?handler=UseLink',
   discard: '?handler=DiscardPreview',
+  remove: '?handler=RemoveLink',
   undo: '?handler=Undo',
 });
 
@@ -269,50 +270,93 @@ function checkedValue(fieldset) {
   return fieldset.querySelector('input[type="radio"]:checked')?.value ?? '';
 }
 
+/** The states the Your link tile can be drawn in. */
+const TILE_STATES = ['picture', 'fetching', 'none'];
+
 /**
- * Fills the Your link tile with the stored copy the server answered with: the picture, its verdict, the short address, and the
- * radio made available.
+ * Draws the Your link tile as the server describes it: with the stored copy, its verdict and the short address and the radio
+ * available; while the link's picture is being fetched, with the text `Fetching...`; or with no link, with `None yet` and the
+ * radio unavailable. Nothing is drawn from a description that is not valid.
  * @param {Element} tile The Your link tile.
- * @param {{ url?: string, width?: number, height?: number, verdictText?: string | null, address?: string | null, fullAddress?: string | null }} data The tile as the server knows it.
+ * @param {{ state?: string, url?: string, width?: number, height?: number, verdictText?: string | null, address?: string | null, fullAddress?: string | null }} data The tile as the server knows it.
  * @param {(image: HTMLImageElement) => void} watch Swaps a picture the browser cannot show to the generated cover.
  */
-function fillLinkTile(tile, data, watch) {
+function renderLinkTile(tile, data, watch) {
   const doc = tile.ownerDocument;
   const art = tile.querySelector('.pic-art');
   const radio = tile.querySelector('input[type="radio"]');
+  const state = data.state ?? 'picture';
 
-  if (!art || !radio || !ART_PATH.test(data.url ?? '') || !isCount(data.width, 4096) || !isCount(data.height, 4096)) {
+  if (!art || !radio || !TILE_STATES.includes(state)) {
     return;
   }
 
-  const image = make(doc, 'img');
+  if (state === 'picture' && (!ART_PATH.test(data.url ?? '') || !isCount(data.width, 4096) || !isCount(data.height, 4096))) {
+    return;
+  }
 
-  image.src = data.url;
-  image.width = data.width;
-  image.height = data.height;
-  image.alt = '';
-  image.decoding = 'async';
-  art.replaceChildren(image);
-  art.dataset.art = 'picture';
-  tile.dataset.state = 'picture';
-  watch(image);
-  radio.disabled = false;
-  radio.removeAttribute('aria-disabled');
+  art.replaceChildren();
+  art.dataset.art = state;
+  tile.dataset.state = state;
   tile.querySelector('.pic-sub')?.remove();
   tile.querySelector('.pic-verdict')?.remove();
   tile.querySelector('.pic-address')?.remove();
 
-  if (typeof data.verdictText === 'string' && data.verdictText !== '') {
-    tile.querySelector('.pic-caption')?.after(make(doc, 'span', 'pic-verdict', data.verdictText));
+  if (state === 'picture') {
+    const image = make(doc, 'img');
+
+    image.src = data.url;
+    image.width = data.width;
+    image.height = data.height;
+    image.alt = '';
+    image.decoding = 'async';
+    art.append(image);
+    watch(image);
   }
 
+  radio.disabled = state === 'none';
+
+  if (state === 'none') {
+    radio.setAttribute('aria-disabled', 'true');
+    radio.checked = false;
+  } else {
+    radio.removeAttribute('aria-disabled');
+  }
+
+  const caption = tile.querySelector('.pic-caption');
+
+  if (state === 'picture' && typeof data.verdictText === 'string' && data.verdictText !== '') {
+    caption?.after(make(doc, 'span', 'pic-verdict', data.verdictText));
+  }
+
+  if (state !== 'picture') {
+    const text = state === 'fetching' ? OWNER_TEXT.tileFetching : OWNER_TEXT.tileNoLinkYet;
+
+    caption?.after(make(doc, 'span', 'pic-sub', text));
+  }
+
+  const address = storedAddress(data);
+
+  if (state !== 'none' && address !== '') {
+    const line = make(doc, 'span', 'pic-address', address);
+
+    line.setAttribute('dir', 'ltr');
+    line.title = typeof data.fullAddress === 'string' ? data.fullAddress : '';
+    tile.append(line);
+  }
+}
+
+/**
+ * The short address of a stored link as the server describes it: the one the server made, or one made from the whole address.
+ * @param {{ address?: string | null, fullAddress?: string | null }} data The tile as the server knows it.
+ * @returns {string} The short address, or an empty text when the link has none.
+ */
+function storedAddress(data) {
   if (typeof data.address === 'string' && data.address !== '') {
-    const address = make(doc, 'span', 'pic-address', data.address);
-
-    address.setAttribute('dir', 'ltr');
-    address.title = typeof data.fullAddress === 'string' ? data.fullAddress : '';
-    tile.append(address);
+    return data.address;
   }
+
+  return typeof data.fullAddress === 'string' ? shortAddress(data.fullAddress) : '';
 }
 
 /**
@@ -353,7 +397,15 @@ export function initLinkBox(row, helpers) {
   };
 
   const showError = (text) => {
-    error.textContent = text;
+    const { lead, rest } = leadAndRest(text);
+    const leadElement = make(doc, 'strong', 'pic-link-lead', lead);
+
+    error.replaceChildren(leadElement);
+
+    if (rest !== '') {
+      error.append(doc.createTextNode(` ${rest}`));
+    }
+
     error.hidden = false;
     field.setAttribute('aria-invalid', 'true');
     field.setAttribute('aria-describedby', `${hint.split(' ')[0]} ${error.id}`);
@@ -361,6 +413,29 @@ export function initLinkBox(row, helpers) {
   };
 
   const currentPreview = () => box.querySelector('.pic-preview');
+  const current = form.querySelector('[data-current-link]');
+  const removeButton = form.querySelector('[data-remove-link]');
+  const linkTile = () => row.querySelector('.pic-tile[data-kind="Link"]');
+
+  /**
+   * Makes the line `Current link` and the `Remove link` button follow the address the Your link tile shows: they are there while
+   * a link is stored and gone when it is not.
+   */
+  const showStoredLink = () => {
+    const line = linkTile()?.querySelector('.pic-address');
+    const address = line?.textContent ?? '';
+    const named = current?.querySelector('.pic-current-address');
+
+    if (current && named) {
+      named.textContent = address;
+      named.title = line?.title ?? '';
+      current.hidden = address === '';
+    }
+
+    if (removeButton) {
+      removeButton.hidden = address === '';
+    }
+  };
 
   /**
    * Captures how the row stands before a link is used, so Undo can put the Your link tile, the choice and the mark back.
@@ -404,6 +479,7 @@ export function initLinkBox(row, helpers) {
 
       if (result.outcome === 'saved') {
         restore();
+        showStoredLink();
         helpers.applyRowState(row, result);
         helpers.showCounts(result);
         showRowStatus(region, OWNER_TEXT.undone);
@@ -427,7 +503,7 @@ export function initLinkBox(row, helpers) {
       button.removeAttribute('aria-disabled');
 
       if (result.outcome === 'saved') {
-        fillLinkTile(row.querySelector('.pic-tile[data-kind="Link"]'), result.linkTile ?? {}, helpers.watchPicture);
+        renderLinkTile(row.querySelector('.pic-tile[data-kind="Link"]'), result.linkTile ?? {}, helpers.watchPicture);
 
         const radio = row.querySelector('.pic-tile[data-kind="Link"] input[type="radio"]');
 
@@ -437,6 +513,7 @@ export function initLinkBox(row, helpers) {
 
         fieldset.dataset.saved = 'Link';
         markYours();
+        showStoredLink();
         helpers.applyRowState(row, result);
         helpers.showCounts(result);
         section.remove();
@@ -448,6 +525,68 @@ export function initLinkBox(row, helpers) {
       } else if (result.outcome === 'refused' && result.status === 'link-expired') {
         section.remove();
         showError(result.message ?? OWNER_TEXT.linkExpired);
+      } else {
+        helpers.showProblem(region, result);
+      }
+    });
+
+  const undoRemove = (previousChoice) => () =>
+    helpers.enqueue(async () => {
+      const result = await postOwner(HANDLERS.undo, { gameId });
+
+      if (result.outcome === 'saved') {
+        renderLinkTile(linkTile(), result.linkTile ?? {}, helpers.watchPicture);
+
+        for (const radio of fieldset.querySelectorAll('input[type="radio"]')) {
+          radio.checked = radio.value === previousChoice;
+        }
+
+        fieldset.dataset.saved = previousChoice;
+        showStoredLink();
+        helpers.applyRowState(row, result);
+        helpers.showCounts(result);
+        showRowStatus(region, OWNER_TEXT.undone);
+        (fieldset.querySelector('input[type="radio"]:checked') ?? removeButton)?.focus();
+      } else if (result.outcome === 'outOfDate' && result.status === 'cant-undo') {
+        showRowProblem(region, OWNER_TEXT.cantUndo);
+      } else {
+        helpers.showProblem(region, result);
+      }
+    });
+
+  const remove = () =>
+    helpers.enqueue(async () => {
+      const previousChoice = checkedValue(fieldset);
+
+      removeButton.setAttribute('aria-disabled', 'true');
+
+      const result = await postOwner(HANDLERS.remove, { gameId });
+
+      removeButton.removeAttribute('aria-disabled');
+
+      if (result.outcome === 'saved' || result.outcome === 'noChange') {
+        renderLinkTile(linkTile(), { state: 'none' }, helpers.watchPicture);
+
+        if (typeof result.choice === 'string') {
+          for (const radio of fieldset.querySelectorAll('input[type="radio"]')) {
+            radio.checked = radio.value === result.choice;
+          }
+
+          fieldset.dataset.saved = result.choice;
+        }
+
+        currentPreview()?.remove();
+        clearError();
+        field.value = '';
+        showStoredLink();
+        helpers.applyRowState(row, result);
+        helpers.showCounts(result);
+
+        if (result.outcome === 'saved') {
+          showRowStatus(region, OWNER_TEXT.linkRemoved, { undoLabel: OWNER_TEXT.undo, onUndo: undoRemove(previousChoice) });
+        }
+
+        button.focus();
       } else {
         helpers.showProblem(region, result);
       }
@@ -511,6 +650,13 @@ export function initLinkBox(row, helpers) {
     section.querySelector('h4').focus();
   };
 
+  removeButton?.addEventListener('click', (event) => {
+    event.preventDefault();
+
+    if (removeButton.getAttribute('aria-disabled') !== 'true') {
+      remove();
+    }
+  });
   field.addEventListener('input', clearError);
   form.addEventListener('submit', (event) => {
     event.preventDefault();
