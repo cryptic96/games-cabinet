@@ -40,16 +40,26 @@ public sealed class CollectionPublisher
     /// <summary>Builds the view of a synced collection with the owner data on top and shows it when it differs from the one shown.</summary>
     /// <param name="snapshot">The synced collection, exactly as the sync stored it.</param>
     /// <returns>True when the view changed.</returns>
+    /// <remarks>
+    /// Only a collection the sync accepted gets here, so it also starts and stops the thirty-day clocks of the owner data.
+    /// That housekeeping runs after the lock is released, because a save holds the owner data's turn and then asks for this
+    /// lock, and it waits for its turn, which is at most one small file write.
+    /// </remarks>
     public bool Publish(CollectionSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
 
+        bool changed;
+
         lock (_gate)
         {
             _raw = snapshot;
-
-            return Replace(snapshot);
+            changed = Replace(snapshot);
         }
+
+        _owner?.ReconcileAsync(snapshot.Items.Select(item => item.GameId).ToHashSet(), CancellationToken.None).GetAwaiter().GetResult();
+
+        return changed;
     }
 
     /// <summary>Builds the view again from the last synced collection with the owner data as it is now. It does nothing before any collection was published.</summary>

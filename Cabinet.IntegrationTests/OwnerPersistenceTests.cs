@@ -124,6 +124,31 @@ public sealed class OwnerPersistenceTests
         cards.Cards.Where(card => card.GameId == seededGame.ObjectId && !card.IsExpansion).Should().NotBeEmpty().And.OnlyContain(card => card.Location == LocationName);
     }
 
+    [Fact]
+    public async Task A_held_back_answer_never_starts_the_thirty_day_clock_of_any_game()
+    {
+        using var storage = new TemporaryDirectory();
+        var items = SyntheticBggCollection.Create(65);
+        var source = new HeldBgg(items);
+        var clock = SyncHarness.NewClock();
+        await using var factory = SyncHarness.CreateFactory(source.Handler, clock, StorageSettings(storage));
+        using var client = factory.CreatePublicClient();
+        await SyncRounds.PressAndWait(client, clock, advance: false);
+        var placedGame = (await ReadCards(client)).Cards.First(card => !card.IsExpansion);
+        await PlaceAsync(factory, placedGame.GameId, placedGame.Title);
+        var ownerFile = Path.Combine(storage.FullPath, OwnerFileName);
+        var bytesBefore = await File.ReadAllBytesAsync(ownerFile, TestContext.Current.CancellationToken);
+        source.Serve([]);
+
+        await SyncRounds.PressAndWait(client, clock);
+        await SyncRounds.PressAndWait(client, clock);
+
+        (await SyncHarness.ReadStatus(client)).LastResult.Should().Be("heldBack");
+        (await File.ReadAllBytesAsync(ownerFile, TestContext.Current.CancellationToken)).Should().Equal(bytesBefore);
+        var service = factory.ServingServices.GetRequiredService<OwnerDataService>();
+        ((OwnerDataState.Ready)service.State).Data.Games.Should().OnlyContain(game => game.AbsentSinceUtc == null);
+    }
+
     private static Dictionary<string, string?> StorageSettings(TemporaryDirectory storage) =>
         new() { ["Storage:Directory"] = storage.FullPath };
 

@@ -17,6 +17,8 @@ public sealed class OwnerDataStoreTests : IDisposable
 
     private string FilePath => Path.Combine(_directory.FullPath, OwnerDataStore.FileName);
 
+    private string VersionsPath => Path.Combine(_directory.FullPath, "owner-data-versions");
+
     public void Dispose() => _directory.Dispose();
 
     [Fact]
@@ -100,6 +102,102 @@ public sealed class OwnerDataStoreTests : IDisposable
         undone.Outcome.Should().Be(OwnerOutcome.Unreadable);
         File.ReadAllBytes(FilePath).Should().Equal(bytesBeforeLoad).And.Equal(bytes);
         Listing().Should().Equal(listingBefore);
+    }
+
+    [Fact]
+    public void Keeping_an_earlier_version_copies_the_file_as_it_is_even_when_it_cannot_be_read()
+    {
+        var bytes = Encoding.UTF8.GetBytes("{ this is not json");
+        File.WriteAllBytes(FilePath, bytes);
+        var store = CreateStore();
+
+        store.KeepEarlierVersion(OwnerTestKit.Start);
+
+        var versionPath = Path.Combine(VersionsPath, "owner-data.20300115T120000Z.json");
+        File.ReadAllBytes(versionPath).Should().Equal(bytes);
+        File.ReadAllBytes(FilePath).Should().Equal(bytes);
+        store.EarlierVersions().Should().Equal(new EarlierVersion(0, OwnerTestKit.Start));
+        store.ReadEarlierVersion(0).Should().Equal(bytes);
+        store.NewestEarlierVersionAt().Should().Be(OwnerTestKit.Start);
+    }
+
+    [Fact]
+    public void Keeping_an_earlier_version_with_no_file_yet_keeps_nothing_and_creates_nothing()
+    {
+        var store = CreateStore();
+
+        store.KeepEarlierVersion(OwnerTestKit.Start);
+
+        Directory.Exists(VersionsPath).Should().BeFalse();
+        store.EarlierVersions().Should().BeEmpty();
+        store.NewestEarlierVersionAt().Should().BeNull();
+        store.ReadEarlierVersion(0).Should().BeNull();
+    }
+
+    [Fact]
+    public void After_twelve_copies_exactly_the_newest_ten_remain_listed_newest_first()
+    {
+        var store = CreateStore();
+        byte[] newestCopied = [];
+
+        for (var number = 0; number < 12; number++)
+        {
+            store.Save(OwnerData.Empty with { Revision = number + 1 });
+            newestCopied = File.ReadAllBytes(FilePath);
+            store.KeepEarlierVersion(OwnerTestKit.Start.AddHours(number));
+        }
+
+        var listed = store.EarlierVersions();
+        listed.Should().HaveCount(OwnerDataStore.KeptVersions);
+        listed.Select(version => version.SavedAtUtc).Should().Equal(Enumerable.Range(2, 10).Reverse().Select(number => OwnerTestKit.Start.AddHours(number)));
+        listed.Select(version => version.Index).Should().Equal(Enumerable.Range(0, 10));
+        Directory.EnumerateFiles(VersionsPath).Should().HaveCount(OwnerDataStore.KeptVersions);
+        store.ReadEarlierVersion(0).Should().Equal(newestCopied);
+    }
+
+    [Fact]
+    public void A_version_is_read_by_its_place_in_the_listing_only_and_other_files_in_the_folder_are_ignored()
+    {
+        var store = CreateStore();
+        store.Save(OwnerData.Empty with { Revision = 1 });
+        store.KeepEarlierVersion(OwnerTestKit.Start);
+        File.WriteAllText(Path.Combine(VersionsPath, "owner-data.notatime.json"), "stranger");
+        File.WriteAllText(Path.Combine(VersionsPath, "notes.txt"), "stranger");
+
+        store.EarlierVersions().Should().HaveCount(1);
+        store.ReadEarlierVersion(1).Should().BeNull();
+        store.ReadEarlierVersion(-1).Should().BeNull();
+        store.ReadEarlierVersion(int.MaxValue).Should().BeNull();
+    }
+
+    [Fact]
+    public void Temporary_files_an_interrupted_copy_left_in_the_versions_folder_are_removed_when_the_store_starts()
+    {
+        Directory.CreateDirectory(VersionsPath);
+        var stray = Path.Combine(VersionsPath, ".owner-data.20300115T120000Z.json.0123456789abcdef.tmp");
+        var real = Path.Combine(VersionsPath, "owner-data.20300115T110000Z.json");
+        File.WriteAllText(stray, "half");
+        File.WriteAllText(real, "whole");
+
+        var store = CreateStore();
+
+        File.Exists(stray).Should().BeFalse();
+        File.Exists(real).Should().BeTrue();
+        store.EarlierVersions().Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void Keeping_a_version_leaves_no_temporary_file_and_does_not_touch_the_live_file()
+    {
+        var store = CreateStore();
+        store.Save(OwnerData.Empty with { Revision = 1 });
+        var before = File.ReadAllBytes(FilePath);
+
+        store.KeepEarlierVersion(OwnerTestKit.Start);
+
+        File.ReadAllBytes(FilePath).Should().Equal(before);
+        Directory.EnumerateFileSystemEntries(VersionsPath).Should().HaveCount(1);
+        Directory.EnumerateFileSystemEntries(_directory.FullPath).Should().BeEquivalentTo([FilePath, VersionsPath]);
     }
 
     private OwnerDataStore CreateStore() => new(_directory.FullPath, NullLogger<OwnerDataStore>.Instance);

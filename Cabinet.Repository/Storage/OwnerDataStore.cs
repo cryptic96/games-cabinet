@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Cabinet.Domain.Collection;
 using Cabinet.Domain.Layout;
@@ -16,9 +17,18 @@ public sealed class OwnerDataStore : IOwnerDataStore
     /// <summary>The name of the stored file.</summary>
     public const string FileName = "owner-data.json";
 
+    /// <summary>How many earlier copies of the file are kept; older ones are removed.</summary>
+    public const int KeptVersions = 10;
+
+    private const string VersionsDirectoryName = "owner-data-versions";
+    private const string VersionNamePrefix = "owner-data.";
+    private const string VersionNameSuffix = ".json";
+    private const string VersionTimeFormat = "yyyyMMdd'T'HHmmss'Z'";
+
     private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
 
     private readonly string _path;
+    private readonly string _versionsDirectory;
     private readonly ILogger<OwnerDataStore> _logger;
 
     /// <summary>Creates a store over a directory.</summary>
@@ -30,7 +40,9 @@ public sealed class OwnerDataStore : IOwnerDataStore
         ArgumentNullException.ThrowIfNull(logger);
 
         _path = Path.Combine(directory, FileName);
+        _versionsDirectory = Path.Combine(directory, VersionsDirectoryName);
         _logger = logger;
+        AtomicJsonFile.RemoveStrayTemporaryFiles(_versionsDirectory);
     }
 
     /// <inheritdoc />
@@ -61,6 +73,71 @@ public sealed class OwnerDataStore : IOwnerDataStore
         ArgumentNullException.ThrowIfNull(data);
 
         AtomicJsonFile.WriteAtomically(_path, JsonSerializer.SerializeToUtf8Bytes(data, JsonOptions));
+    }
+
+    /// <inheritdoc />
+    public void KeepEarlierVersion(DateTimeOffset now)
+    {
+        if (!File.Exists(_path))
+        {
+            return;
+        }
+
+        var content = File.ReadAllBytes(_path);
+        Directory.CreateDirectory(_versionsDirectory);
+        AtomicJsonFile.WriteAtomically(Path.Combine(_versionsDirectory, VersionFileName(now)), content);
+
+        foreach (var (path, _) in ListVersionFiles().Skip(KeptVersions))
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyList<EarlierVersion> EarlierVersions() =>
+        [.. ListVersionFiles().Select((version, index) => new EarlierVersion(index, version.SavedAtUtc))];
+
+    /// <inheritdoc />
+    public byte[]? ReadEarlierVersion(int index)
+    {
+        var files = ListVersionFiles();
+
+        return index >= 0 && index < files.Count ? File.ReadAllBytes(files[index].Path) : null;
+    }
+
+    /// <inheritdoc />
+    public DateTimeOffset? NewestEarlierVersionAt() => ListVersionFiles() is [var newest, ..] ? newest.SavedAtUtc : null;
+
+    private List<(string Path, DateTimeOffset SavedAtUtc)> ListVersionFiles()
+    {
+        if (!Directory.Exists(_versionsDirectory))
+        {
+            return [];
+        }
+
+        return [.. Directory.EnumerateFiles(_versionsDirectory)
+            .Select(path => (Path: path, SavedAtUtc: ParseVersionTime(System.IO.Path.GetFileName(path))))
+            .Where(version => version.SavedAtUtc is not null)
+            .Select(version => (version.Path, SavedAtUtc: version.SavedAtUtc!.Value))
+            .OrderByDescending(version => version.SavedAtUtc)
+            .ThenByDescending(version => version.Path, StringComparer.Ordinal)];
+    }
+
+    private static string VersionFileName(DateTimeOffset moment) =>
+        VersionNamePrefix + moment.UtcDateTime.ToString(VersionTimeFormat, CultureInfo.InvariantCulture) + VersionNameSuffix;
+
+    private static DateTimeOffset? ParseVersionTime(string fileName)
+    {
+        if (!fileName.StartsWith(VersionNamePrefix, StringComparison.Ordinal) || !fileName.EndsWith(VersionNameSuffix, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var stamp = fileName[VersionNamePrefix.Length..^VersionNameSuffix.Length];
+
+        return DateTimeOffset.TryParseExact(stamp, VersionTimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var moment)
+            ? moment
+            : null;
     }
 
     private OwnerDataState Parse(byte[] content)

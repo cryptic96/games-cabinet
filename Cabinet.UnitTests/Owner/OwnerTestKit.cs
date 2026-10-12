@@ -20,6 +20,12 @@ internal sealed class InMemoryOwnerDataStore : IOwnerDataStore
     /// <summary>When true, the next save fails the way a full disk does.</summary>
     public bool FailNextSave { get; set; }
 
+    /// <summary>Whether a file exists to copy; a save creates it, and a test that starts from stored data sets it.</summary>
+    public bool FileExists { get; set; }
+
+    /// <summary>The moments earlier versions were kept, oldest first.</summary>
+    public List<DateTimeOffset> KeptAt { get; } = [];
+
     /// <inheritdoc />
     public OwnerDataState Load() => State;
 
@@ -34,8 +40,28 @@ internal sealed class InMemoryOwnerDataStore : IOwnerDataStore
         }
 
         Saved.Add(data);
+        FileExists = true;
         State = new OwnerDataState.Ready(data);
     }
+
+    /// <inheritdoc />
+    public void KeepEarlierVersion(DateTimeOffset now)
+    {
+        if (FileExists)
+        {
+            KeptAt.Add(now);
+        }
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyList<EarlierVersion> EarlierVersions() =>
+        [.. KeptAt.OrderByDescending(moment => moment).Select((moment, index) => new EarlierVersion(index, moment))];
+
+    /// <inheritdoc />
+    public byte[]? ReadEarlierVersion(int index) => index >= 0 && index < KeptAt.Count ? [] : null;
+
+    /// <inheritdoc />
+    public DateTimeOffset? NewestEarlierVersionAt() => KeptAt.Count == 0 ? null : KeptAt.Max();
 }
 
 /// <summary>A writer wired to an in-memory store, a clock the test moves, and a publisher that fills a collection store.</summary>
@@ -96,6 +122,11 @@ internal static class OwnerTestKit
 
         return new OwnerHarness(keeping, clock, service, collection, publisher);
     }
+
+    /// <summary>A synced collection holding only the invented base games with these game identifiers, named after them.</summary>
+    /// <param name="gameIds">The games the collection lists.</param>
+    public static CollectionSnapshot Listing(params int[] gameIds) => Snapshot(
+        [.. gameIds.Select((gameId, index) => Base(index + 1, gameId, $"Game {gameId}"))]);
 
     /// <summary>A synced collection of invented games: two base games, an expansion of the first, one of both, and one of a game that is not owned.</summary>
     public static CollectionSnapshot Collection() => Snapshot(
