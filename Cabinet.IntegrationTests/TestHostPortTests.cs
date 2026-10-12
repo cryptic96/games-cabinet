@@ -22,7 +22,7 @@ public class TestHostPortTests
             () =>
             {
                 var ports = CabinetWebApplicationFactory.PickFreeLoopbackPorts();
-                return ++picks == 1 ? (takenPort, ports.Ops) : ports;
+                return ++picks == 1 ? (takenPort, ports.Ops, ports.Owner) : ports;
             });
         using var publicClient = factory.CreatePublicClient();
         using var ops = factory.CreateOpsClient();
@@ -55,10 +55,12 @@ public class TestHostPortTests
     }
 
     [Fact]
-    public void Picked_ports_are_two_different_ports()
+    public void Picked_ports_are_three_different_ports()
     {
-        var (publicPort, opsPort) = CabinetWebApplicationFactory.PickFreeLoopbackPorts();
+        var (publicPort, opsPort, ownerPort) = CabinetWebApplicationFactory.PickFreeLoopbackPorts();
 
         publicPort.Should().NotBe(opsPort);
+        publicPort.Should().NotBe(ownerPort);
+        opsPort.Should().NotBe(ownerPort);
     }
 }
