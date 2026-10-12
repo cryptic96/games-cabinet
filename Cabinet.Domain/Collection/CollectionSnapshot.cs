@@ -78,12 +78,14 @@ public sealed record ImageRecord(
 /// <param name="Items">The owned items.</param>
 /// <param name="Images">What is known about each picture address the items name, keyed by the canonical address; null when nothing is known.</param>
 /// <param name="Games">The details known about each owned game, by game identifier; null when none are known.</param>
+/// <param name="DetailAttempts">When each owned game that the details source left out of its answer was last asked about, by game identifier; null when there are none. A reader that does not know this member ignores it.</param>
 public sealed record CollectionSnapshot(
     int SchemaVersion,
     DateTimeOffset CapturedAtUtc,
     IReadOnlyList<SnapshotItem> Items,
     IReadOnlyDictionary<string, ImageRecord>? Images = null,
-    IReadOnlyDictionary<int, GameDetails>? Games = null)
+    IReadOnlyDictionary<int, GameDetails>? Games = null,
+    IReadOnlyDictionary<int, DateTimeOffset>? DetailAttempts = null)
 {
     /// <summary>The stored shape this build writes and understands.</summary>
     public const int CurrentSchemaVersion = 2;

@@ -116,7 +116,8 @@ public sealed class SyncRunner
             _time.GetUtcNow(),
             collection.Items,
             StillNamedImages(baseline, collection.Items, games),
-            games);
+            games,
+            StillOwnedAttempts(baseline, collection.Items, games));
 
         if (ContentChanged(baseline, snapshot))
         {
@@ -166,9 +167,30 @@ public sealed class SyncRunner
         return kept.Count == 0 ? null : kept;
     }
 
+    private static Dictionary<int, DateTimeOffset>? StillOwnedAttempts(
+        CollectionSnapshot? baseline,
+        IReadOnlyList<SnapshotItem> items,
+        IReadOnlyDictionary<int, GameDetails>? games)
+    {
+        if (baseline?.DetailAttempts is not { Count: > 0 } known)
+        {
+            return null;
+        }
+
+        var owned = items.Select(item => item.GameId).ToHashSet();
+        var kept = known
+            .Where(pair => owned.Contains(pair.Key) && games?.ContainsKey(pair.Key) != true)
+            .ToDictionary(pair => pair.Key, pair => pair.Value);
+
+        return kept.Count == 0 ? null : kept;
+    }
+
     private static bool ContentChanged(CollectionSnapshot? baseline, CollectionSnapshot next)
     {
-        if (baseline is null || !baseline.Items.SequenceEqual(next.Items) || !SameGames(baseline.Games, next.Games))
+        if (baseline is null
+            || !baseline.Items.SequenceEqual(next.Items)
+            || !SameGames(baseline.Games, next.Games)
+            || !SameAttempts(baseline.DetailAttempts, next.DetailAttempts))
         {
             return true;
         }
@@ -187,6 +209,15 @@ public sealed class SyncRunner
 
         return before.Count == after.Count
             && before.All(pair => after.TryGetValue(pair.Key, out var details) && pair.Value.SameAs(details));
+    }
+
+    private static bool SameAttempts(IReadOnlyDictionary<int, DateTimeOffset>? left, IReadOnlyDictionary<int, DateTimeOffset>? right)
+    {
+        var before = left ?? new Dictionary<int, DateTimeOffset>();
+        var after = right ?? new Dictionary<int, DateTimeOffset>();
+
+        return before.Count == after.Count
+            && before.All(pair => after.TryGetValue(pair.Key, out var asked) && asked == pair.Value);
     }
 
     private static bool SameRecord(ImageRecord left, ImageRecord right) =>

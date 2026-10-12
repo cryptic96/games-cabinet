@@ -158,6 +158,47 @@ public sealed class EnrichmentPlannerTests
         EnrichmentPlanner.Plan(Items(1), known, Now, EnrichmentOptions.Default).Should().ContainSingle().Which.Should().Equal(1);
     }
 
+    [Fact]
+    public void A_game_without_details_that_was_asked_less_than_a_day_ago_is_not_planned()
+    {
+        var attempts = new Dictionary<int, DateTimeOffset> { [1] = Now - EnrichmentPlanner.MissingDetailsRetry + TimeSpan.FromMinutes(1) };
+
+        var plan = EnrichmentPlanner.Plan(Items(2), null, attempts, Now, EnrichmentOptions.Default);
+
+        plan.Should().ContainSingle().Which.Should().Equal(2);
+    }
+
+    [Fact]
+    public void A_game_without_details_that_was_asked_a_day_ago_or_longer_is_planned_again()
+    {
+        var attempts = new Dictionary<int, DateTimeOffset>
+        {
+            [1] = Now - EnrichmentPlanner.MissingDetailsRetry,
+            [2] = Now - EnrichmentPlanner.MissingDetailsRetry - TimeSpan.FromHours(5),
+        };
+
+        var plan = EnrichmentPlanner.Plan(Items(3), null, attempts, Now, EnrichmentOptions.Default);
+
+        plan.Should().ContainSingle().Which.Should().Equal(1, 2, 3);
+    }
+
+    [Fact]
+    public void The_retry_interval_for_a_game_the_source_never_describes_is_one_day()
+    {
+        EnrichmentPlanner.MissingDetailsRetry.Should().Be(TimeSpan.FromDays(1));
+    }
+
+    [Fact]
+    public void A_recorded_attempt_does_not_hold_back_a_game_that_has_details()
+    {
+        var known = new Dictionary<int, GameDetails> { [1] = OlderDetails(Now - TimeSpan.FromHours(1)) };
+        var attempts = new Dictionary<int, DateTimeOffset> { [1] = Now };
+
+        var plan = EnrichmentPlanner.Plan(Items(1), known, attempts, Now, EnrichmentOptions.Default);
+
+        plan.Should().ContainSingle().Which.Should().Equal(1);
+    }
+
     private static SnapshotItem[] Items(int count) => [.. Enumerable.Range(1, count).Select(id => Item(id, id))];
 
     private static SnapshotItem Item(long collectionId, int gameId) =>
