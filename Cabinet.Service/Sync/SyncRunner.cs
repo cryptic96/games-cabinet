@@ -1,6 +1,7 @@
 using Cabinet.Domain.Collection;
 using Cabinet.Repository.Images;
 using Cabinet.Service.Collection;
+using Cabinet.Service.Owner;
 
 namespace Cabinet.Service.Sync;
 
@@ -34,7 +35,7 @@ public sealed class SyncRunner
     private readonly ArtCache? _cache;
     private readonly ImageOptions? _images;
     private readonly EnrichmentSync? _enrichment;
-    private readonly ArtRules _artRules;
+    private readonly CollectionPublisher _publisher;
     private CollectionSnapshot? _stored;
 
     /// <summary>Creates the runner.</summary>
@@ -47,7 +48,8 @@ public sealed class SyncRunner
     /// <param name="cache">The stored pictures, pruned after the run; null leaves them alone.</param>
     /// <param name="images">The picture rules; the picture step needs them.</param>
     /// <param name="enrichment">Fetches the game details; null leaves the run without a details step.</param>
-    /// <param name="artRules">The rules that choose each game's picture; the defaults when null.</param>
+    /// <param name="artRules">The rules that choose each game's picture; the defaults when null. Only used when no publisher is given.</param>
+    /// <param name="publisher">Builds the collection visitors see and shows it; a publisher without owner data when null, which only a test without the owner tools relies on.</param>
     public SyncRunner(
         Func<ICollectionSource> sourceFactory,
         ISnapshotStore snapshots,
@@ -58,7 +60,8 @@ public sealed class SyncRunner
         ArtCache? cache = null,
         ImageOptions? images = null,
         EnrichmentSync? enrichment = null,
-        ArtRules? artRules = null)
+        ArtRules? artRules = null,
+        CollectionPublisher? publisher = null)
     {
         ArgumentNullException.ThrowIfNull(sourceFactory);
         ArgumentNullException.ThrowIfNull(snapshots);
@@ -75,7 +78,7 @@ public sealed class SyncRunner
         _cache = cache;
         _images = images;
         _enrichment = enrichment;
-        _artRules = artRules ?? ArtRules.Default;
+        _publisher = publisher ?? new CollectionPublisher(collection, artRules ?? ArtRules.Default);
     }
 
     /// <summary>Fetches the collection and applies it when the guard accepts it and it changed, then fetches the box pictures that are due.</summary>
@@ -236,12 +239,7 @@ public sealed class SyncRunner
         _snapshots.Save(snapshot);
         _stored = snapshot;
 
-        var next = CollectionState.FromSnapshot(snapshot, _artRules);
-
-        if (next.Version != _collection.Current.Version)
-        {
-            _collection.Replace(next);
-        }
+        _publisher.Publish(snapshot);
     }
 
     /// <summary>Fetches the game details that are due and returns the collection with every answer applied, or the one it was given when nothing changed.</summary>
@@ -347,7 +345,7 @@ public sealed class SyncRunner
         }
 
         _stored = stored;
-        _collection.Replace(CollectionState.FromSnapshot(stored, _artRules));
+        _publisher.Publish(stored);
 
         return false;
     }

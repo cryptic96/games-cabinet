@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Cabinet.Domain.Cards;
 using Cabinet.Domain.Collection;
 using Cabinet.Domain.Layout;
+using Cabinet.Domain.Owner;
 using Cabinet.Service.Cards;
 using Cabinet.Service.Layout;
 
@@ -22,12 +23,17 @@ public sealed class CollectionState
     /// <param name="version">The identifier of the collection version; it changes whenever the collection does.</param>
     /// <param name="capturedAtUtc">When the collection was read from its source.</param>
     public CollectionState(IReadOnlyList<CabinetItem> items, string version, DateTimeOffset capturedAtUtc)
-        : this(items, version, (DateTimeOffset?)capturedAtUtc, null)
+        : this(items, version, (DateTimeOffset?)capturedAtUtc, null, null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
     }
 
-    private CollectionState(IReadOnlyList<CabinetItem> items, string? version, DateTimeOffset? capturedAtUtc, CollectionSnapshot? snapshot)
+    private CollectionState(
+        IReadOnlyList<CabinetItem> items,
+        string? version,
+        DateTimeOffset? capturedAtUtc,
+        CollectionSnapshot? snapshot,
+        CollectionSnapshot? cardSnapshot)
     {
         ArgumentNullException.ThrowIfNull(items);
 
@@ -35,6 +41,7 @@ public sealed class CollectionState
         Version = version;
         CapturedAtUtc = capturedAtUtc;
         Snapshot = snapshot;
+        CardSnapshot = cardSnapshot ?? snapshot;
     }
 
     /// <summary>Creates the view of a stored collection: its items are mapped in a fixed order and its version is derived from them.</summary>
@@ -54,17 +61,43 @@ public sealed class CollectionState
 
         var items = SnapshotMapper.ToCabinetItems(snapshot, rules);
 
-        return new CollectionState(items, SnapshotMapper.Version(items, rules, snapshot), snapshot.CapturedAtUtc, snapshot);
+        return new CollectionState(items, SnapshotMapper.Version(items, rules, snapshot), snapshot.CapturedAtUtc, snapshot, snapshot);
+    }
+
+    /// <summary>
+    /// Creates the view of a stored collection with what the owner entered on top: every item's location is the one the
+    /// overlay gives it, and the items, the version and the cards are built from that collection. <see cref="Snapshot"/> stays
+    /// the collection as the sync stored it, so the sync keeps comparing against what BGG said.
+    /// </summary>
+    /// <param name="snapshot">The stored collection, exactly as the sync stored it.</param>
+    /// <param name="rules">The rules that choose each game's picture.</param>
+    /// <param name="overlay">Where the owner keeps each game.</param>
+    public static CollectionState FromSnapshot(CollectionSnapshot snapshot, ArtRules rules, OwnerOverlay overlay)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(rules);
+        ArgumentNullException.ThrowIfNull(overlay);
+
+        var effective = overlay.Effective(snapshot);
+        var items = SnapshotMapper.ToCabinetItems(effective, rules);
+
+        return new CollectionState(items, SnapshotMapper.Version(items, rules, effective), snapshot.CapturedAtUtc, snapshot, effective);
     }
 
     /// <summary>The view before any collection has been synced: no items and no version.</summary>
-    public static CollectionState Empty { get; } = new([], null, null, null);
+    public static CollectionState Empty { get; } = new([], null, null, null, null);
 
     /// <summary>The items to draw.</summary>
     public IReadOnlyList<CabinetItem> Items { get; }
 
     /// <summary>The stored collection this view was made from, or null for a view that was not made from one.</summary>
     public CollectionSnapshot? Snapshot { get; }
+
+    /// <summary>
+    /// The collection the cards and the version were built from: the stored collection with the owner's locations on top, or
+    /// the stored collection itself for a view made without owner data. It is null for a view that was not made from one.
+    /// </summary>
+    public CollectionSnapshot? CardSnapshot { get; }
 
     /// <summary>The collection version, or null before the first sync.</summary>
     public string? Version { get; }
@@ -106,7 +139,7 @@ public sealed class CollectionState
 
     private CachedCards BuildCards(SectionDesign design, LayoutOptions options)
     {
-        var cards = CardRecords.Build(Items, Snapshot, design);
+        var cards = CardRecords.Build(Items, CardSnapshot, design);
 
         return CachedCards.From(new CardsDocument(LayoutFor(design, options).ETag, cards));
     }

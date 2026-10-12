@@ -1,3 +1,6 @@
+using Cabinet.Domain.Owner;
+using Cabinet.Repository.Storage;
+using Cabinet.Service.Collection;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -38,6 +41,12 @@ public static class OwnerEndpoints
         ArgumentNullException.ThrowIfNull(environment);
 
         services.AddSingleton(OwnerAccess.FromConfiguration(configuration));
+
+        services.AddSingleton<IOwnerDataStore>(provider => new OwnerDataStore(
+            provider.GetRequiredService<StorageDirectory>().Path,
+            provider.GetRequiredService<ILogger<OwnerDataStore>>()));
+        services.AddSingleton<OwnerDataService>();
+        services.AddSingleton<CollectionPublisher>();
 
         services.Configure<RazorPagesOptions>(options =>
             options.Conventions.AddFolderApplicationModelConvention("/Owner", model =>

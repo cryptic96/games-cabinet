@@ -1,6 +1,7 @@
 using Cabinet.Domain.Collection;
 using Cabinet.Repository.Bgg;
 using Cabinet.Service.Collection;
+using Cabinet.Service.Owner;
 using Cabinet.Service.Sync;
 using Cabinet.UnitTests.Infrastructure;
 using FluentAssertions;
@@ -133,7 +134,7 @@ public class BggSettingsTests
     }
 
     private static SyncStartup Startup(TemporaryDirectory storage, BggOptions options, ILogger<SyncStartup> logger) =>
-        new(new StorageDirectory(storage.FullPath), new EmptyStore(), new CollectionStore(), options, ImageSettings.FromConfiguration(new ConfigurationBuilder().Build(), new TestEnvironment("Production")), ArtRules.Default, logger);
+        new(new StorageDirectory(storage.FullPath), new EmptyStore(), new CollectionPublisher(new CollectionStore(), ArtRules.Default), options, ImageSettings.FromConfiguration(new ConfigurationBuilder().Build(), new TestEnvironment("Production")), logger);
 
     private static BggOptions Read(string environment, params (string Key, string? Value)[] values)
     {
