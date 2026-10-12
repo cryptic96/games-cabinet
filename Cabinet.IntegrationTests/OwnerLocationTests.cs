@@ -1,5 +1,8 @@
+using System.Globalization;
+using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Cabinet.Domain.Owner;
 using Cabinet.FakeBgg;
 using Cabinet.FakeBgg.Testing;
@@ -20,6 +23,7 @@ public sealed class OwnerLocationTests
 {
     private const string CardsPath = "/cabinet/cards?profile=desktop";
     private const string LocationName = "Cabinet A";
+    private const string LocationsPath = "/owner/locations";
 
     [Fact]
     public async Task A_location_placed_through_the_writer_is_on_the_public_card_of_the_game_and_of_its_expansion()
@@ -157,6 +161,102 @@ public sealed class OwnerLocationTests
         (await File.ReadAllBytesAsync(path, TestContext.Current.CancellationToken)).Should().Equal(content);
     }
 
+    [Fact]
+    public async Task The_locations_page_does_not_exist_on_the_public_port()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        using var client = factory.CreatePublicClient();
+
+        using var response = await client.GetAsync(LocationsPath, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task The_locations_page_renders_in_the_owner_shell_with_locations_as_the_current_item()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        using var session = new OwnerSession(factory);
+
+        var page = await session.GetAsync(LocationsPath);
+
+        page.Status.Should().Be(HttpStatusCode.OK);
+        page.Body.Should().Contain("class=\"owner-plate\"").And.Contain("<h2>Locations</h2>").And.Contain("Say where each game is stored.");
+        page.Body.Should().Contain("aria-current=\"page\">Locations</a>");
+    }
+
+    [Fact]
+    public async Task The_owner_adds_a_location_and_places_a_game_with_forms_and_every_visitor_sees_it_on_the_card()
+    {
+        using var storage = new TemporaryDirectory();
+        var clock = SyncHarness.NewClock();
+        await using var factory = SyncHarness.CreateFactory(
+            ScriptedBggHandler.ForCollection(SyntheticBggCollection.Create(5)),
+            clock,
+            StorageSettings(storage));
+        using var client = factory.CreatePublicClient();
+        await SyncRounds.PressAndWait(client, clock, advance: false);
+        var game = (await ReadCards(client)).Cards.First(card => !card.IsExpansion);
+        using var session = new OwnerSession(factory);
+        var page = await session.GetAsync(LocationsPath);
+
+        var added = await session.PostFormAsync(
+            $"{LocationsPath}?handler=AddLocation",
+            [Field("name", LocationName), Field("revision", OwnerSession.FieldValue(page.Body, "revision"))]);
+        var afterAdd = await session.GetAsync(LocationsPath);
+        var placed = await session.PostFormAsync(
+            $"{LocationsPath}?handler=Assign",
+            [
+                Field("gameId", game.GameId.ToString(CultureInfo.InvariantCulture)),
+                Field("locationId", LocationIdOf(afterAdd.Body, LocationName)),
+                Field("revision", OwnerSession.FieldValue(afterAdd.Body, "revision")),
+            ]);
+
+        added.Status.Should().Be(HttpStatusCode.Found);
+        added.Location.Should().StartWith($"{LocationsPath}?done=saved#");
+        placed.Status.Should().Be(HttpStatusCode.Found);
+        placed.Location.Should().Be($"{LocationsPath}?done=saved#game-{game.GameId}");
+        (await ReadCards(client)).Cards.Single(card => card.EntryId == game.EntryId).Location.Should().Be(LocationName);
+    }
+
+    [Fact]
+    public async Task The_same_posts_asking_for_json_answer_with_the_outcome_the_revision_and_whether_undo_is_possible()
+    {
+        using var storage = new TemporaryDirectory();
+        var clock = SyncHarness.NewClock();
+        await using var factory = SyncHarness.CreateFactory(
+            ScriptedBggHandler.ForCollection(SyntheticBggCollection.Create(5)),
+            clock,
+            StorageSettings(storage));
+        using var client = factory.CreatePublicClient();
+        await SyncRounds.PressAndWait(client, clock, advance: false);
+        var game = (await ReadCards(client)).Cards.First(card => !card.IsExpansion);
+        using var session = new OwnerSession(factory);
+        var page = await session.GetAsync(LocationsPath);
+
+        var added = await session.PostJsonAsync(
+            $"{LocationsPath}?handler=AddLocation",
+            [Field("name", LocationName), Field("revision", OwnerSession.FieldValue(page.Body, "revision"))]);
+        var afterAdd = await session.GetAsync(LocationsPath);
+        var placed = await session.PostJsonAsync(
+            $"{LocationsPath}?handler=Assign",
+            [
+                Field("gameId", game.GameId.ToString(CultureInfo.InvariantCulture)),
+                Field("locationId", LocationIdOf(afterAdd.Body, LocationName)),
+                Field("revision", added.Json.GetProperty("revision").GetInt64().ToString(CultureInfo.InvariantCulture)),
+            ]);
+
+        added.Status.Should().Be(HttpStatusCode.OK);
+        added.JsonText("outcome").Should().Be("saved");
+        added.Json.GetProperty("revision").GetInt64().Should().Be(1);
+        added.Json.GetProperty("canUndo").GetBoolean().Should().BeTrue();
+        added.JsonText("status").Should().Be("location-added");
+        placed.Status.Should().Be(HttpStatusCode.OK);
+        placed.JsonText("outcome").Should().Be("saved");
+        placed.Json.GetProperty("revision").GetInt64().Should().Be(2);
+        (await ReadCards(client)).Cards.Single(card => card.EntryId == game.EntryId).Location.Should().Be(LocationName);
+    }
+
     private static Dictionary<string, string?> StorageSettings(TemporaryDirectory storage) =>
         new() { ["Storage:Directory"] = storage.FullPath };
 
@@ -174,6 +274,15 @@ public sealed class OwnerLocationTests
             added.Data!.Revision,
             data => LocationEdits.Assign(data, gameId, data.Locations.Single(location => location.Name == LocationName).Id, title),
             TestContext.Current.CancellationToken);
+    }
+
+    private static KeyValuePair<string, string> Field(string name, string value) => new(name, value);
+
+    private static string LocationIdOf(string html, string name)
+    {
+        var match = Regex.Match(html, "<option value=\"([^\"]+)\"[^>]*>" + Regex.Escape(name) + "</option>");
+
+        return match.Success ? match.Groups[1].Value : throw new InvalidOperationException($"The page offers no location called {name}.");
     }
 
     private static async Task<CardsReading> ReadCards(HttpClient client)
