@@ -99,7 +99,51 @@ public sealed partial class OwnerSession : IDisposable
         return await SendAsync(request);
     }
 
+    /// <summary>
+    /// Posts a file the way a browser does with a multipart form: the file is one part, under a client-side name the server must
+    /// never use, and the token travels as a form field, or as a header with a JSON answer asked for when the post is a script's.
+    /// </summary>
+    /// <param name="path">The path, with the handler in its query.</param>
+    /// <param name="fieldName">The name of the file field.</param>
+    /// <param name="content">The bytes of the file; null sends the form with no file part at all, as a browser does when none was chosen.</param>
+    /// <param name="asScript">Whether to post as a script does: token in the header and a JSON answer asked for.</param>
+    /// <param name="withToken">Whether to send the token.</param>
+    /// <param name="expectContinue">Whether to ask the server to agree before the body is sent, so a refusal of a huge body is read as the answer it is.</param>
+    public async Task<OwnerReply> PostFileAsync(string path, string fieldName, byte[]? content, bool asScript = false, bool withToken = true, bool expectContinue = false)
+    {
+        var token = withToken ? await TokenAsync() : null;
+        using var form = new MultipartFormDataContent();
+
+        if (content is not null)
+        {
+            var file = new ByteArrayContent(content);
+            file.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+            form.Add(file, fieldName, "..\\..\\client-chosen-name.json");
+        }
+
+        if (token is not null && !asScript)
+        {
+            form.Add(new StringContent(token), TokenFieldName);
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = form };
+        request.Headers.ExpectContinue = expectContinue;
+
+        if (asScript)
+        {
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+            if (token is not null)
+            {
+                request.Headers.Add(TokenHeaderName, token);
+            }
+        }
+
+        return await SendAsync(request);
+    }
+
     /// <summary>Reads the value of the first hidden form field of that name on a page; the field names its name before its value.</summary>
+
     /// <param name="html">The page.</param>
     /// <param name="name">The field name.</param>
     public static string FieldValue(string html, string name)

@@ -65,6 +65,7 @@ public static class OwnerEndpoints
             provider.GetRequiredService<TimeProvider>()));
         services.AddHostedService<OwnerLinkWorker>();
         services.AddSingleton(provider => new StagedItems<StagedLink>(provider.GetRequiredService<TimeProvider>()));
+        services.AddSingleton(provider => new StagedItems<RestoreCandidate>(provider.GetRequiredService<TimeProvider>()));
 
         services.Configure<RouteOptions>(options => options.LowercaseUrls = true);
 
@@ -72,7 +73,11 @@ public static class OwnerEndpoints
             options.Conventions.AddFolderApplicationModelConvention("/Owner", model =>
             {
                 model.EndpointMetadata.Add(new OwnerOnlyAttribute());
-                model.Filters.Add(new RequestSizeLimitAttribute(DefaultBodyLimitBytes));
+
+                if (!model.HandlerType.IsDefined(typeof(RequestSizeLimitAttribute), inherit: true))
+                {
+                    model.Filters.Add(new RequestSizeLimitAttribute(DefaultBodyLimitBytes));
+                }
             }));
 
         services.AddAntiforgery(options =>
