@@ -133,6 +133,47 @@ check_listeners() {
   fi
 }
 
+### Prints the HTTP status curl gets for URL $1, with optional extra curl
+### arguments after it; prints 000 when nothing answers. Never prints the URL.
+http_status() {
+  local url="$1"
+  shift
+  curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$@" "$url" 2>/dev/null || true
+}
+
+###
+### Proves the owner tools' inner walls from the host: the public port must
+### hide the owner pages with a 404, and, when the owner port listens, a
+### request through loopback that claims an out-of-range client address in
+### X-Forwarded-For must be refused with a 403. Reports status codes only;
+### no address or hostname is ever printed.
+###
+check_owner_wall() {
+  local sockets status
+  status="$(http_status "http://127.0.0.1:5080/owner/pictures")"
+  if [[ "$status" == "404" ]]; then
+    pass "the public port answers 404 for the owner pages"
+  else
+    fail "the public port answers status ${status} for the owner pages, expected 404"
+  fi
+
+  if ! sockets="$(ss -ltnH 2>&1)"; then
+    fail "could not list listening sockets: ${sockets}"
+    return
+  fi
+  if [[ -z "$(listener_addresses "$sockets" 5082)" ]]; then
+    pass "the owner tools are off, so there is no owner port to probe"
+    return
+  fi
+
+  status="$(http_status "http://127.0.0.1:5082/" -H "X-Forwarded-For: 203.0.113.7")"
+  if [[ "$status" == "403" ]]; then
+    pass "the owner port refuses a client address outside the allowed ranges"
+  else
+    fail "the owner port answers status ${status} to a forged out-of-range client address, expected 403"
+  fi
+}
+
 check_firewall() {
   local ruleset pattern='hook input priority [^;]*; policy drop'
   if ! ruleset="$(nft list table inet cabinet_filter 2>&1)"; then
@@ -326,6 +367,7 @@ main() {
   check_units
   check_modes
   check_listeners
+  check_owner_wall
   check_firewall
   check_health
   check_provisioning_current
