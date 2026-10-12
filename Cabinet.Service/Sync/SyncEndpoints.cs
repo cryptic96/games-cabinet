@@ -131,7 +131,8 @@ public static class SyncEndpoints
             provider.GetRequiredService<ImageOptions>(),
             provider.GetRequiredService<EnrichmentSync>(),
             provider.GetRequiredService<ArtRules>(),
-            provider.GetRequiredService<CollectionPublisher>()));
+            provider.GetRequiredService<CollectionPublisher>(),
+            provider.GetRequiredService<IOwnerArtReferences>()));
         services.AddSingleton<SyncCoordinator>();
         services.AddSingleton<SyncStatusService>();
         services.AddHostedService<SyncStartup>();

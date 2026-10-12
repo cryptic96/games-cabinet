@@ -1,6 +1,8 @@
 using Cabinet.Domain.Owner;
+using Cabinet.Repository.Images;
 using Cabinet.Repository.Storage;
 using Cabinet.Service.Collection;
+using Cabinet.Service.Sync;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -46,8 +48,15 @@ public static class OwnerEndpoints
             provider.GetRequiredService<StorageDirectory>().Path,
             provider.GetRequiredService<ILogger<OwnerDataStore>>()));
         services.AddSingleton<OwnerDataService>();
+        services.AddSingleton<IOwnerArtReferences>(provider => provider.GetRequiredService<OwnerDataService>());
         services.AddSingleton<CollectionPublisher>();
         services.AddHostedService<OwnerChangeNotifier>();
+
+        services.AddSingleton(provider => new OwnerLinkFetcher(
+            provider.GetRequiredService<IArtSource>,
+            provider.GetRequiredService<ImageOptions>(),
+            provider.GetRequiredService<TimeProvider>()));
+        services.AddHostedService<OwnerLinkWorker>();
 
         services.Configure<RouteOptions>(options => options.LowercaseUrls = true);
 

@@ -29,6 +29,16 @@ public enum OwnerOutcome
 /// <param name="CanUndo">Whether the latest change can still be undone: nothing was written after it.</param>
 public sealed record OwnerResult(OwnerOutcome Outcome, OwnerData? Data, string StatusKey, bool CanUndo = false);
 
+/// <summary>Tells the art clean-up which stored pictures the owner's data still needs.</summary>
+public interface IOwnerArtReferences
+{
+    /// <summary>
+    /// The file names of every stored picture the owner's linked pictures refer to, whichever picture each game is drawn from
+    /// now; null while the stored owner data cannot be read, which means the answer is unknown and nothing may be removed.
+    /// </summary>
+    IReadOnlySet<string>? ReferencedArtFiles();
+}
+
 /// <summary>
 /// The only code that changes the owner data. Writes are one at a time, each one is checked against the revision the writer
 /// worked from, and each saved change is logged for the owner, stored atomically and announced so the collection shown to
@@ -36,7 +46,7 @@ public sealed record OwnerResult(OwnerOutcome Outcome, OwnerData? Data, string S
 /// The housekeeping the sync triggers, stamping and forgetting games that left the collection, goes through the same lock
 /// but is not an owner change. It writes nothing to the application log but counts and categories.
 /// </summary>
-public sealed class OwnerDataService
+public sealed class OwnerDataService : IOwnerArtReferences
 {
     /// <summary>How old the newest earlier copy of the file must be before a write keeps another one.</summary>
     public static readonly TimeSpan VersionInterval = TimeSpan.FromHours(1);
@@ -70,6 +80,9 @@ public sealed class OwnerDataService
     /// <summary>Raised after a change was stored, with the new data already readable through <see cref="State"/>.</summary>
     public event Action? Changed;
 
+    /// <summary>Raised when something asks for the pictures the owner linked to be fetched, so the background work wakes up before its next turn.</summary>
+    public event Action? LinkWorkRequested;
+
     /// <summary>What the stored owner data is right now.</summary>
     public OwnerDataState State => Volatile.Read(ref _state);
 
@@ -80,6 +93,18 @@ public sealed class OwnerDataService
     public long? UndoableRevision => _undo is { } slot && State is OwnerDataState.Ready ready && ready.Data.Revision == slot.Revision
         ? slot.Revision
         : null;
+
+    /// <summary>Asks the background work to look for linked pictures that have no usable stored copy now instead of at its next turn.</summary>
+    public void RequestLinkWork() => LinkWorkRequested?.Invoke();
+
+    /// <inheritdoc />
+    public IReadOnlySet<string>? ReferencedArtFiles() =>
+        State is OwnerDataState.Ready ready
+            ? ready.Data.Games
+                .SelectMany(game => game.Picture?.Link?.Record?.Files ?? [])
+                .Select(file => file.Name)
+                .ToHashSet(StringComparer.Ordinal)
+            : null;
 
     /// <summary>Makes a fresh identifier for a location.</summary>
     public static string NewId() => RandomNumberGenerator.GetHexString(8, lowercase: true);
@@ -181,13 +206,16 @@ public sealed class OwnerDataService
 
     /// <summary>
     /// Applies a change the system makes on its own, alone and in turn with the owner's changes. It adds no log line, does not
-    /// count as a change since the last download, does not move the revision and does not announce itself, because it never
-    /// changes what visitors see; it does end the chance to undo, so an undo can never bring back what it removed. It does
-    /// nothing while the stored file cannot be read, and a failed save only leaves the data as it was.
+    /// count as a change since the last download and does not move the revision; it does end the chance to undo, so an undo
+    /// can never bring back what it removed. It does not announce itself unless asked to, because the housekeeping never
+    /// changes what visitors see; a change that does, such as the stored copy of a linked picture, asks to be announced so the
+    /// collection visitors see is built again. It does nothing while the stored file cannot be read, and a failed save only
+    /// leaves the data as it was.
     /// </summary>
     /// <param name="change">Works out the new data from the stored data, or returns null when there is nothing to change.</param>
     /// <param name="cancellationToken">Cancels the wait for a turn.</param>
-    public async Task MutateSystemAsync(Func<OwnerData, OwnerData?> change, CancellationToken cancellationToken)
+    /// <param name="announce">Whether to raise <see cref="Changed"/> after the change was stored.</param>
+    public async Task MutateSystemAsync(Func<OwnerData, OwnerData?> change, CancellationToken cancellationToken, bool announce = false)
     {
         ArgumentNullException.ThrowIfNull(change);
 
@@ -215,6 +243,11 @@ public sealed class OwnerDataService
             _undo = null;
             Volatile.Write(ref _state, new OwnerDataState.Ready(next));
             _logger.LogInformation("Owner data tidied: revision {Revision}, {Games} games with decisions.", next.Revision, next.Games.Count);
+
+            if (announce)
+            {
+                Changed?.Invoke();
+            }
         }
         finally
         {
