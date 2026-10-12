@@ -1,4 +1,5 @@
 @page
+@using Cabinet.Domain.Owner
 @using Cabinet.Repository.Storage
 @using Cabinet.Service.Owner
 @model Cabinet.Service.Pages.Owner.SettingsModel
@@ -7,6 +8,35 @@
     var backup = Model.Backup;
 }
 <h2>@OwnerStrings.Settings</h2>
+<section class="owner-panel" id="finish" aria-labelledby="finish-heading">
+    <h3 id="finish-heading">@OwnerStrings.FinishHeading</h3>
+    <p class="owner-hint">@OwnerStrings.FinishHelper</p>
+    <form method="post" class="finish-form" asp-page-handler="Finish" data-finish-form>
+        <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
+        <fieldset class="pic-choices finish-choices">
+            <legend class="visually-hidden">@OwnerStrings.FinishHeading</legend>
+            @foreach (var finish in Finishes.Allowed)
+            {
+                <label class="pic-tile finish-tile">
+                    <span class="finish-swatch" aria-hidden="true"></span>
+                    <span class="pic-caption">
+                        <input type="radio" name="finish" value="@finish" checked="@(finish == Model.Finish)" />
+                        <span class="pic-label">@OwnerStrings.FinishName(finish)</span>
+                    </span>
+                    <span class="pic-sub">@OwnerStrings.FinishSubLine(finish)</span>
+                </label>
+            }
+        </fieldset>
+        <p class="owner-hint finish-note">@OwnerStrings.FinishOnlyNote</p>
+        <button type="submit" class="owner-btn" data-save>@OwnerStrings.SaveFinishButton</button>
+    </form>
+    <p class="row-status" id="finish-status" role="status" data-problem="@(Model.FinishNoticeIsProblem ? "true" : null)">
+        @if (Model.FinishNotice is not null)
+        {
+            <span>@Model.FinishNotice</span>
+        }
+    </p>
+</section>
 <section class="owner-panel" id="backup" aria-labelledby="backup-heading">
     <h3 id="backup-heading">@OwnerStrings.BackupHeading</h3>
     @if (Model.Notice is not null)
@@ -72,4 +102,7 @@
             </ol>
         }
     </section>
+}
+@section Scripts {
+    <script type="module" src="~/js/owner-finish.js" asp-append-version="true"></script>
 }

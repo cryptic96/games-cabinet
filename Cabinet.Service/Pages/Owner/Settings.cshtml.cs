@@ -5,13 +5,15 @@ using Microsoft.AspNetCore.Mvc;
 namespace Cabinet.Service.Pages.Owner;
 
 /// <summary>
-/// The owner's settings page. It exists only on the owner port. It holds the backup, where the owner downloads all the owner
+/// The owner's settings page. It exists only on the owner port. It holds the finish of the cabinet, the backup, where the owner downloads all the owner
 /// data as a file and sees how long ago that was, and the list of the latest changes with a line at the last download.
 /// </summary>
 public class SettingsModel : OwnerPage
 {
     private const string PagePath = "/Owner/Settings";
     private const string DownloadFailedCode = "download-failed";
+    private const string UnchangedCode = "unchanged";
+    private const string FinishAnchor = "finish";
     private const string JsonMediaType = "application/json";
     private const string NoStore = "no-store";
 
@@ -44,11 +46,27 @@ public class SettingsModel : OwnerPage
     /// <summary>The words for what went wrong with the post that sent the browser here, or null.</summary>
     public string? Notice { get; private set; }
 
+    /// <summary>The revision of the owner data the page was built from, which the finish form posts back.</summary>
+    public long Revision { get; private set; }
+
+    /// <summary>The finish in use, which the checked tile shows.</summary>
+    public string Finish { get; private set; } = OwnerData.DefaultFinish;
+
+    /// <summary>The words for the result of the finish post that sent the browser here, or null.</summary>
+    public string? FinishNotice { get; private set; }
+
+    /// <summary>Whether <see cref="FinishNotice"/> says something went wrong.</summary>
+    public bool FinishNoticeIsProblem { get; private set; }
+
     /// <summary>Shows the page.</summary>
     /// <param name="done">The code of the post that sent the browser here; anything outside the fixed set is ignored.</param>
     public void OnGet(string? done)
     {
         Backup = _owner.Backup;
+        Revision = _owner.Revision;
+        Finish = _owner.State is OwnerDataState.Ready current ? Finishes.Normalize(current.Data.Finish) : OwnerData.DefaultFinish;
+        FinishNotice = string.Equals(done, UnchangedCode, StringComparison.Ordinal) ? OwnerStrings.FinishSaved : OwnerResponses.NoticeFor(done);
+        FinishNoticeIsProblem = OwnerResponses.IsProblem(done);
 
         if (_owner.State is OwnerDataState.Ready ready)
         {
@@ -59,6 +77,17 @@ public class SettingsModel : OwnerPage
         }
 
         Notice = string.Equals(done, DownloadFailedCode, StringComparison.Ordinal) ? OwnerStrings.DownloadFailed : null;
+    }
+
+    /// <summary>Saves the finish of the cabinet. A finish that is not on the allow-list is refused, and the finish already in use is nothing to change.</summary>
+    /// <param name="revision">The revision the form was built from.</param>
+    /// <param name="finish">The finish the owner chose.</param>
+    /// <param name="cancellationToken">Cancels the wait for the writer.</param>
+    public async Task<IActionResult> OnPostFinishAsync(long revision, string? finish, CancellationToken cancellationToken)
+    {
+        var result = await _owner.MutateAsync(revision, data => Finishes.SetFinish(data, finish), cancellationToken);
+
+        return OwnerResponses.For(this, result, PagePath, FinishAnchor);
     }
 
     /// <summary>

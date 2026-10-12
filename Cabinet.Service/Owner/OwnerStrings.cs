@@ -500,6 +500,37 @@ public static class OwnerStrings
         _ => string.Empty,
     };
 
+    /// <summary>The heading of the cabinet finish panel, and the name of its group of choices.</summary>
+    public const string FinishHeading = "Cabinet finish";
+
+    /// <summary>The line under the finish panel's heading.</summary>
+    public const string FinishHelper = "The look of the cabinet for every visitor.";
+
+    /// <summary>The quiet note under the finish tiles while there is only one.</summary>
+    public const string FinishOnlyNote = "Classic is the only finish for now.";
+
+    /// <summary>The button that saves the chosen finish for a browser that runs no script.</summary>
+    public const string SaveFinishButton = "Save finish";
+
+    /// <summary>The words shown for a finish whose post found nothing to change; the finish is as it was chosen.</summary>
+    public const string FinishSaved = "Saved";
+
+    /// <summary>The name a finish is shown under on its tile.</summary>
+    /// <param name="finish">The finish, as it is stored.</param>
+    public static string FinishName(string finish) => finish switch
+    {
+        "classic" => "Classic",
+        _ => finish,
+    };
+
+    /// <summary>The line under a finish's name on its tile.</summary>
+    /// <param name="finish">The finish, as it is stored.</param>
+    public static string FinishSubLine(string finish) => finish switch
+    {
+        "classic" => "Warm wood, as it is today.",
+        _ => string.Empty,
+    };
+
     /// <summary>The heading of the backup panel.</summary>
     public const string BackupHeading = "Backup";
 
@@ -576,7 +607,8 @@ public static class OwnerStrings
         "location-renamed" => "Location renamed.",
         "location-moved" => "Location moved.",
         "location-deleted" => "Location deleted.",
-        "game-moved" or "game-unplaced" or "picture-chosen" => "Saved.",
+        "game-moved" or "game-unplaced" or "picture-chosen" or "finish-set" => "Saved.",
+        "unknown-finish" => "That finish isn't available.",
         "picture-checked" => "Marked as checked.",
         "unchanged" => "Nothing to change.",
         "undone" => "Undone.",

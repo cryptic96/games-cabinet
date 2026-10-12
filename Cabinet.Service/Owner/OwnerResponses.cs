@@ -34,6 +34,7 @@ public static class OwnerResponses
             "link-expired",
             "nothing-selected",
             "id-clash",
+            "unknown-finish",
             "save-failed",
             .. Enum.GetValues<LinkProblem>().Select(OwnerStrings.LinkKey),
         ],
