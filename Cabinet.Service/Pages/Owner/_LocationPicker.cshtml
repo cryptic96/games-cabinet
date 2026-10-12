@@ -11,6 +11,10 @@
     <form method="post" asp-page="/Owner/Locations" asp-page-handler="Assign" class="game-form">
         <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
         <input type="hidden" name="gameId" value="@Model.GameId" />
+        @if (Model.ReturnTo is not null)
+        {
+            <input type="hidden" name="returnTo" value="@Model.ReturnTo" />
+        }
         <select id="@selectId" name="locationId" aria-label="@OwnerStrings.PickerLabel(Model.Title)" data-picker>
             @foreach (var option in Model.Options)
             {

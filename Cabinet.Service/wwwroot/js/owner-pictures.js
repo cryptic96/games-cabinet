@@ -5,7 +5,8 @@
  * one save and one change-log entry. It also draws the generated cover on tiles that have no picture to show, puts the rows of the
  * all-games view in collator order, and works the worklist: `Looks right` records a game as checked, every save or undo carries
  * the counts the counter above the games shows, a resolved row stays where it is with a `Checked` mark until the next load, and
- * a search box narrows the rows. Every title is written with `textContent`, never as markup.
+ * a search box narrows the rows. In the single-game view, which shows one game on its own, focus goes to the title and the location
+ * picker under the choices saves the value it settles on through the locations page's handler. Every title is written with `textContent`, never as markup.
  */
 import { drawGeneratedCover } from './card-view.js';
 import {
@@ -16,6 +17,7 @@ import {
   showingText,
   worthALookLinkText,
 } from './owner-format.js';
+import { initPickers } from './owner-games.js';
 import {
   announce,
   createFinder,
@@ -211,7 +213,7 @@ function initRow(row, enqueue, showCounts) {
   const form = row.querySelector('form.pic-form');
   const looksRight = row.querySelector('[data-looks-right]');
   const fieldset = row.querySelector('fieldset.pic-choices');
-  const region = row.querySelector('.row-status');
+  const region = row.querySelector(':scope > .row-status');
   const doc = row.ownerDocument;
   let lastKeyAt = Number.NEGATIVE_INFINITY;
   let timer = null;
@@ -423,7 +425,47 @@ export function initPictures(doc = globalThis.document) {
   }
 
   initFind(doc, list);
+
+  if (list.dataset.view === 'single') {
+    initSingleGame(doc, list, enqueue);
+  }
+
   list.dataset.enhanced = '';
+}
+
+/**
+ * Wires the single-game view: focus goes to the game's title, and the location picker saves what it settles on. The picker is the
+ * one the locations page uses and posts to the same handler; an Undo takes the change back through this page's Undo handler.
+ * @param {Document} doc The page.
+ * @param {HTMLElement} list The list that holds the one row.
+ * @param {(task: () => Promise<void>) => void} enqueue Runs a task after every earlier one, so only one change is in flight.
+ */
+function initSingleGame(doc, list, enqueue) {
+  list.querySelector('.game-title')?.focus();
+
+  /**
+   * Takes back the latest change on the server and, when that worked, on the page too.
+   * @param {HTMLElement} region The status region the Undo button was in.
+   * @param {() => void} apply Takes the change back on the page.
+   * @param {() => HTMLElement} focusAfter Gives the element that takes focus once the Undo button is gone.
+   * @returns {() => void} The click handler of the Undo button.
+   */
+  const undoer = (region, apply, focusAfter) => () =>
+    enqueue(async () => {
+      const result = await postOwner(HANDLERS.undo, {});
+
+      if (result.outcome === 'saved') {
+        apply();
+        showRowStatus(region, OWNER_TEXT.undone);
+        focusAfter().focus();
+      } else if (result.outcome === 'outOfDate' && result.status === 'cant-undo') {
+        showRowProblem(region, OWNER_TEXT.cantUndo);
+      } else {
+        showProblem(region, result);
+      }
+    });
+
+  initPickers(doc, { enqueue, showProblem, undoer, gamesChanged: () => {} });
 }
 
 /**

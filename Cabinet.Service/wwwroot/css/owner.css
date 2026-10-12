@@ -1335,3 +1335,77 @@ header > .owner-plate {
 .pic-row .row-status {
   margin: 12px 0 0;
 }
+
+.pic-single {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 24px;
+  margin-bottom: 16px;
+  color: var(--wall-text);
+}
+
+.pic-single p {
+  margin: 0;
+}
+
+.pic-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: inherit;
+  text-decoration: underline 1px;
+  text-underline-offset: 4px;
+}
+
+.pic-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.pic-row .game-title:focus {
+  outline: none;
+}
+
+.pic-row .game-picker {
+  gap: 8px;
+}
+
+.pic-row .game-form {
+  flex-direction: row;
+  gap: 8px;
+}
+
+.pic-row .game-picker select {
+  min-height: 44px;
+  max-width: 100%;
+  padding: 8px;
+  border: 1px solid var(--paper-label);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}
+
+.pic-row .game-form select {
+  flex: 0 1 22rem;
+}
+
+.pic-row .game-picker select:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.pic-row .picker-label {
+  line-height: 1.5;
+}
+
+.pic-row .owner-hint {
+  margin: 0;
+}
+
+.pic-row .owner-hint .pic-link {
+  display: inline;
+  min-height: 0;
+}

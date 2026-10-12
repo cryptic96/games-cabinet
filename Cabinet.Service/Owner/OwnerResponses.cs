@@ -42,6 +42,7 @@ public static class OwnerResponses
     /// <param name="createdId">The identifier of what the change created, which a script needs to build its row; null when nothing was created.</param>
     /// <param name="extra">More facts a script needs from the answer, such as the counts a page shows; they are only part of the JSON answer.</param>
     /// <param name="view">The view of the page to send a form back to, one of a fixed set the page maps in code; null for the page's default view.</param>
+    /// <param name="game">The game whose single-game view a form is sent back to, which the server has looked up in the collection; null for the page's list.</param>
     public static IActionResult For(
         PageModel page,
         OwnerResult result,
@@ -49,7 +50,8 @@ public static class OwnerResponses
         string anchor,
         string? createdId = null,
         IReadOnlyDictionary<string, object?>? extra = null,
-        string? view = null)
+        string? view = null,
+        int? game = null)
     {
         ArgumentNullException.ThrowIfNull(page);
         ArgumentNullException.ThrowIfNull(result);
@@ -83,7 +85,7 @@ public static class OwnerResponses
             };
         }
 
-        return page.RedirectToPage(pagePath, pageHandler: null, routeValues: new { done = DoneCode(result), view }, fragment: anchor);
+        return page.RedirectToPage(pagePath, pageHandler: null, routeValues: new { done = DoneCode(result), view, game }, fragment: anchor);
     }
 
     /// <summary>The code a redirect carries for a result; always one of a fixed set.</summary>
