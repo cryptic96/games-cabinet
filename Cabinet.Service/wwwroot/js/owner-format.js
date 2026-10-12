@@ -79,7 +79,12 @@ export const OWNER_TEXT = Object.freeze({
   checkLink: 'Check link',
   checking: 'Checking...',
   yours: 'Yours',
-  linkFailed: "Couldn't use that link. Check it and try again.",
+  linkFailed: "Couldn't fetch that picture. The link may be wrong or the picture host may be busy. Check the link and try again.",
+  removeLink: 'Remove link',
+  linkRemoved: 'Link removed',
+  tileNoLinkYet: 'None yet',
+  tileFetching: 'Fetching...',
+  markFetching: 'Fetching your link...',
   linkExpired: 'This preview expired. Check the link again.',
   previewHeading: 'Preview',
   previewSub: 'How this picture will look in the cabinet.',
@@ -91,6 +96,50 @@ export const OWNER_TEXT = Object.freeze({
   useThis: 'Use this',
   discardPreview: 'Discard preview',
 });
+
+/**
+ * Writes a size in bytes as millions of bytes with at most one decimal, the way the owner reads a picture's size.
+ * @param {number} bytes The size in bytes.
+ * @returns {string} For example `5.4`, and `1` for a million bytes.
+ */
+export function megabytes(bytes) {
+  return String(Math.round(bytes / 100_000) / 10);
+}
+
+/**
+ * Shortens a picture address to its host and its file name, as the pictures page shows a stored link: the part in between is
+ * replaced by `/.../`. An address that is not a web address gives an empty text.
+ * @param {string} address The whole address.
+ * @returns {string} For example `cf.example.org/.../pic1.png`, or just the host when the address has no file name.
+ */
+export function shortAddress(address) {
+  let parsed;
+
+  try {
+    parsed = new URL(address);
+  } catch {
+    return '';
+  }
+
+  if (parsed.hostname === '') {
+    return '';
+  }
+
+  const file = decodeURIComponent(parsed.pathname.split('/').filter(Boolean).pop() ?? '');
+
+  return file === '' ? parsed.hostname : `${parsed.hostname}/.../${file}`;
+}
+
+/**
+ * Splits a message into its lead sentence and the next step, so the page can set the lead in semibold.
+ * @param {string} message The whole message.
+ * @returns {{ lead: string, rest: string }} The first sentence, and everything after it; the rest is empty for a one-sentence message.
+ */
+export function leadAndRest(message) {
+  const match = /^(.+?[.!?])\s+(.+)$/s.exec(message);
+
+  return match ? { lead: match[1], rest: match[2] } : { lead: message, rest: '' };
+}
 
 /**
  * Puts values into a template of the table: every `{key}` is replaced by the value of that key.

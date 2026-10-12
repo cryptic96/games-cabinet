@@ -129,14 +129,17 @@ public class PicturesModel : OwnerPage
     /// <param name="view">The view to show; <c>all</c> is the only value that is not the default, and anything else is the default.</param>
     /// <param name="game">The game to show on its own; read as a positive whole number and looked up, so anything else shows that the game is gone.</param>
     /// <param name="preview">The token of a previewed linked picture; it is looked up among the staged pictures and never echoed, and a text of any other shape is ignored.</param>
-    public void OnGet(string? done, string? view, string? game, string? preview)
+    /// <param name="size">For a picture that was too large, the size in bytes the picture host announced; it is only ever shown as a number of megabytes.</param>
+    public void OnGet(string? done, string? view, string? game, string? preview, long? size)
     {
         View = game is null ? ViewOf(view) : PicturesView.Single;
         SingleGameId = game is null ? null : ParseGameId(game);
         Load();
-        Notice = OwnerResponses.NoticeFor(done);
+        Notice = OwnerResponses.LinkProblemOf(done) is { } problem
+            ? OwnerStrings.LinkError(problem, _fetcher.AllowedHost, size is > 0 ? size : null, _fetcher.MaxBytes)
+            : OwnerResponses.NoticeFor(done);
         NoticeIsProblem = Notice is not null && OwnerResponses.IsProblem(done);
-        UndoRevision = done == "saved" ? _owner.UndoableRevision : null;
+        UndoRevision = done is "saved" or "link-removed" ? _owner.UndoableRevision : null;
         LoadPreview(preview);
     }
 
@@ -180,6 +183,28 @@ public class PicturesModel : OwnerPage
         return OwnerResponses.For(this, result, PagePath, RowAnchor(gameId), extra: StateAfter(result, gameId), view: ViewQueryOf(view, game), game: KnownGame(game));
     }
 
+    /// <summary>
+    /// Removes the picture link of a game and the record of its stored copy. When the link was the choice, the choice falls back
+    /// to Automatic. The change can be undone, which puts the link back and fetches its picture again.
+    /// </summary>
+    /// <param name="revision">The revision the form was built from.</param>
+    /// <param name="gameId">The game.</param>
+    /// <param name="view">The view the form was on, so a form posted without script returns to it.</param>
+    /// <param name="game">The game of the single-game view the form was on, so a form posted without script returns to it.</param>
+    /// <param name="cancellationToken">Cancels the wait for the writer.</param>
+    public async Task<IActionResult> OnPostRemoveLinkAsync(long revision, int gameId, string? view, int? game, CancellationToken cancellationToken)
+    {
+        var snapshot = _collection.Current.Snapshot;
+        var item = snapshot?.Items.FirstOrDefault(candidate => candidate.GameId == gameId);
+
+        var result = await _owner.MutateAsync(
+            revision,
+            data => item is null ? OwnerChange.Refused(data, "unknown-game") : PictureEdits.RemoveLink(data, gameId, PictureRows.TitleOf(item)),
+            cancellationToken);
+
+        return OwnerResponses.For(this, result, PagePath, RowAnchor(gameId), extra: StateAfter(result, gameId, withLinkTile: true), view: ViewQueryOf(view, game), game: KnownGame(game));
+    }
+
     /// <summary>Takes back the latest change, when nothing was written after it.</summary>
     /// <param name="revision">The revision the change produced, which the Undo form carries.</param>
     /// <param name="gameId">The game the change was about, so the answer can tell how that game stands now; missing when not known.</param>
@@ -189,7 +214,12 @@ public class PicturesModel : OwnerPage
     {
         var result = await _owner.UndoAsync(revision, cancellationToken);
 
-        return OwnerResponses.For(this, result, PagePath, game is null ? NoticeAnchor : RowAnchor(game.Value), extra: StateAfter(result, gameId), game: KnownGame(game));
+        if (result.Outcome == OwnerOutcome.Saved)
+        {
+            result = await FetchLinksWithoutCopiesAsync(result, cancellationToken);
+        }
+
+        return OwnerResponses.For(this, result, PagePath, game is null ? NoticeAnchor : RowAnchor(game.Value), extra: StateAfter(result, gameId, withLinkTile: true), game: KnownGame(game));
     }
 
     /// <summary>
@@ -209,9 +239,13 @@ public class PicturesModel : OwnerPage
             return Refused("unknown-game", gameId, null, gameId);
         }
 
-        if (await _fetcher.CheckAsync(link, cancellationToken) is not LinkCheck.Ready ready)
+        var check = await _fetcher.CheckAsync(link, cancellationToken);
+
+        if (check is not LinkCheck.Ready ready)
         {
-            return Refused("link-failed", gameId, null, gameId);
+            var failed = check as LinkCheck.Failed;
+
+            return LinkRefused(gameId, failed?.Problem ?? LinkProblem.FetchFailed, failed?.Bytes);
         }
 
         var preview = LinkPreview.Build(snapshot, gameId, _rules, ready.Link.Record);
@@ -334,6 +368,59 @@ public class PicturesModel : OwnerPage
             view: ViewQueryOf(view, game),
             game: KnownGame(game));
 
+    /// <summary>
+    /// After an undo has put a link back, a copy of its picture that was tidied away in the meantime is forgotten, so the link
+    /// shows as being fetched, and the background work is asked to fetch it again now.
+    /// </summary>
+    private async Task<OwnerResult> FetchLinksWithoutCopiesAsync(OwnerResult undone, CancellationToken cancellationToken)
+    {
+        await _owner.MutateSystemAsync(data => WithoutMissingCopies(data), cancellationToken);
+        _owner.RequestLinkWork();
+
+        return _owner.State is OwnerDataState.Ready ready ? undone with { Data = ready.Data } : undone;
+    }
+
+    private OwnerData? WithoutMissingCopies(OwnerData data)
+    {
+        var missing = data.Games.Where(game => game.Picture?.Link is { Record: { } record } && record.Files?.All(file => _cache.Has(file.Name)) != true).ToList();
+
+        if (missing.Count == 0)
+        {
+            return null;
+        }
+
+        return data with
+        {
+            Games =
+            [
+                .. data.Games.Select(game => missing.Contains(game) ? game with { Picture = game.Picture! with { Link = game.Picture.Link! with { Record = null } } } : game),
+            ],
+        };
+    }
+
+    private IActionResult LinkRefused(int gameId, LinkProblem problem, long? announcedBytes)
+    {
+        var key = OwnerStrings.LinkKey(problem);
+        var refusal = new OwnerResult(OwnerOutcome.Refused, null, key);
+
+        if (!OwnerResponses.AsksForJson(Request))
+        {
+            return RedirectToPage(
+                PagePath,
+                pageHandler: null,
+                routeValues: new { done = OwnerResponses.DoneCode(refusal), game = gameId, size = problem == LinkProblem.TooLarge ? announcedBytes : null },
+                fragment: RowAnchor(gameId));
+        }
+
+        var extra = new Dictionary<string, object?>
+        {
+            ["problem"] = CamelName(problem),
+            ["message"] = OwnerStrings.LinkError(problem, _fetcher.AllowedHost, announcedBytes, _fetcher.MaxBytes),
+        };
+
+        return OwnerResponses.For(this, refusal, PagePath, RowAnchor(gameId), extra: extra, game: gameId);
+    }
+
     private bool TryStore(ProcessedLink link)
     {
         try
@@ -415,6 +502,7 @@ public class PicturesModel : OwnerPage
 
         return new Dictionary<string, object?>
         {
+            ["state"] = tile.Fetching ? "fetching" : tile.Url is not null ? "picture" : "none",
             ["url"] = tile.Url,
             ["width"] = tile.Width,
             ["height"] = tile.Height,
@@ -453,6 +541,8 @@ public class PicturesModel : OwnerPage
         if (gameId is { } id && rows.FirstOrDefault(row => row.GameId == id) is { } row)
         {
             state["resolved"] = row.Look.Resolved;
+            state["choice"] = row.Choice.ToString();
+            state["fetching"] = row.Look.Fetching;
 
             if (withLinkTile && result.Outcome == OwnerOutcome.Saved)
             {

@@ -291,8 +291,8 @@ public sealed partial class OwnerLinkPreviewTests
         var page = await host.Session.GetAsync(reply.Location!);
 
         reply.Status.Should().Be(HttpStatusCode.Found);
-        reply.Location.Should().Be($"/owner/pictures?done=refused-link-failed&game={host.GameId}#game-{host.GameId}");
-        page.Body.Should().Contain("Couldn&#x27;t use that link. Check it and try again.");
+        reply.Location.Should().Be($"/owner/pictures?done=refused-link-address&game={host.GameId}#game-{host.GameId}");
+        page.Body.Should().Contain("That isn&#x27;t a web address. Paste the full picture link, starting with https://.");
     }
 
     [Fact]
@@ -309,6 +309,37 @@ public sealed partial class OwnerLinkPreviewTests
         noToken.Status.Should().Be(HttpStatusCode.BadRequest);
         publicPost.StatusCode.Should().Be(HttpStatusCode.NotFound);
         host.Images.Requests.Should().NotContain(request => request.Uri.AbsoluteUri == LinkUrl);
+    }
+
+    [Fact]
+    public async Task Removing_a_link_without_the_token_is_answered_400_and_the_page_does_not_exist_on_the_public_port()
+    {
+        await using var host = await PreviewHost.StartAsync();
+        var fields = new[] { Field("gameId", host.GameId.ToString(CultureInfo.InvariantCulture)), Field("revision", host.Service.Revision.ToString(CultureInfo.InvariantCulture)) };
+
+        var noToken = await host.Session.PostJsonAsync("/owner/pictures?handler=RemoveLink", fields, withToken: false);
+        using var publicPost = await host.PublicClient.PostAsync("/owner/pictures?handler=RemoveLink", new FormUrlEncodedContent(fields), TestContext.Current.CancellationToken);
+
+        noToken.Status.Should().Be(HttpStatusCode.BadRequest);
+        publicPost.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Theory]
+    [InlineData("", "blank", "Paste a picture link first.")]
+    [InlineData("not a link", "notAWebAddress", "That isn't a web address. Paste the full picture link, starting with https://.")]
+    [InlineData("https://img.example.net/owner/linked-picture.png", "otherHost", "That link isn't from BGG's picture host. Only links from example.org work here. Copy the picture's address from BGG's gallery.")]
+    [InlineData("https://example.org/owner/missing.png", "notFound", "That picture isn't there. Check that you copied the whole link.")]
+    public async Task A_link_that_cannot_be_used_answers_its_problem_and_its_own_words_and_changes_nothing(string link, string problem, string message)
+    {
+        await using var host = await PreviewHost.StartAsync();
+        var revision = host.Service.Revision;
+
+        var reply = await host.CheckAsync(link);
+
+        reply.Status.Should().Be(HttpStatusCode.UnprocessableEntity);
+        reply.JsonText("problem").Should().Be(problem);
+        reply.JsonText("message").Should().Be(message);
+        host.Service.Revision.Should().Be(revision);
     }
 
     private static KeyValuePair<string, string> Field(string name, string value) => new(name, value);

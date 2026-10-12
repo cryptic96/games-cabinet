@@ -1499,6 +1499,45 @@ header > .owner-plate {
   line-height: 1.5;
 }
 
+.pic-link-lead {
+  font-weight: 600;
+}
+
+.pic-current {
+  display: flex;
+  gap: 4px;
+  max-width: 100%;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.pic-current[hidden] {
+  display: none;
+}
+
+.pic-current-label {
+  flex: none;
+  white-space: nowrap;
+}
+
+.pic-current-address {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pic-link-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pic-link-actions [hidden] {
+  display: none;
+}
+
 .pic-link-form .owner-btn-primary {
   align-self: flex-start;
 }

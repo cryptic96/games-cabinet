@@ -82,6 +82,9 @@ public sealed class OwnerLinkFetcher(Func<IArtSource> sourceFactory, ImageOption
     /// <summary>The name of the picture host a link must point at, for a message that says where pictures may come from.</summary>
     public string AllowedHost => options.AllowedHosts.Order(StringComparer.Ordinal).First();
 
+    /// <summary>The most bytes a picture may have, for a message that says how large is too large.</summary>
+    public long MaxBytes => options.MaxBytes;
+
     /// <summary>Classifies, fetches and processes the picture at an address the owner entered.</summary>
     /// <param name="text">The address as the owner typed it, or null.</param>
     /// <param name="cancellationToken">Cancels the check.</param>

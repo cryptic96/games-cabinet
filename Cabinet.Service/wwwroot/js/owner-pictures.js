@@ -128,6 +128,42 @@ function markWontLoad(row) {
 }
 
 /**
+ * Makes a mark of a row present or absent. A mark that is wanted and missing is made; one that is not wanted is taken away.
+ * @param {Element} row The row.
+ * @param {string} name The mark's name, as in its `data-mark`.
+ * @param {boolean} wanted Whether the row has the mark.
+ * @param {string} className The class names of a mark that has to be made.
+ * @param {string} text The text of a mark that has to be made.
+ * @param {boolean} first Whether a mark that has to be made goes first in the list.
+ */
+function setMark(row, name, wanted, className, text, first) {
+  const marks = row.querySelector('.pic-marks');
+  const present = row.querySelector(`[data-mark="${name}"]`);
+
+  if (!wanted) {
+    present?.remove();
+
+    return;
+  }
+
+  if (present || !marks) {
+    return;
+  }
+
+  const mark = row.ownerDocument.createElement('li');
+
+  mark.className = className;
+  mark.dataset.mark = name;
+  mark.textContent = text;
+
+  if (first) {
+    marks.prepend(mark);
+  } else {
+    marks.append(mark);
+  }
+}
+
+/**
  * Shows how a row stands after the server answered: the `Checked` mark and the button follow whether the game is resolved, and
  * the marks and notes that a resolution clears are hidden while it holds and shown again when an undo takes it back. An answer
  * that does not say leaves the row as it is.
@@ -135,6 +171,14 @@ function markWontLoad(row) {
  * @param {{ resolved?: boolean }} result What the server answered.
  */
 function applyRowState(row, result) {
+  if (typeof result.choice === 'string') {
+    setMark(row, 'yours', result.choice === 'Link', 'pic-tag pic-tag-strong', OWNER_TEXT.yours, true);
+  }
+
+  if (typeof result.fetching === 'boolean') {
+    setMark(row, 'fetching', result.fetching, 'pic-tag pic-tag-dashed', OWNER_TEXT.markFetching, false);
+  }
+
   if (typeof result.resolved !== 'boolean') {
     return;
   }

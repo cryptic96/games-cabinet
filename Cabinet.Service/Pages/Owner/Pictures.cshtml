@@ -254,17 +254,31 @@ else
                     var linkFieldId = $"pic-link-{game.GameId}";
                     var linkHintId = $"pic-link-hint-{game.GameId}";
                     var linkErrorId = $"pic-link-error-{game.GameId}";
+                    var storedLink = game.Tile(PictureChoice.Link);
                     }
                     <details class="pic-linkbox" open="@(preview is not null)">
                         <summary>@OwnerStrings.LinkSummary</summary>
-                        <form method="post" class="pic-link-form" asp-page-handler="CheckLink">
+                        <form method="post" class="pic-link-form" asp-page-handler="CheckLink" novalidate>
                             <input type="hidden" name="gameId" value="@game.GameId" />
+                            <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
+                            @if (showsAll)
+                            {
+                                <input type="hidden" name="view" value="@PicturesModel.AllViewQuery" />
+                            }
+                            else if (single)
+                            {
+                                <input type="hidden" name="game" value="@game.GameId" />
+                            }
                             <label for="@linkFieldId">@OwnerStrings.LinkLabel</label>
                             <input id="@linkFieldId" name="link" type="url" inputmode="url" autocomplete="off" spellcheck="false" autocapitalize="none" dir="ltr"
                                    aria-describedby="@linkHintId" />
                             <p class="owner-hint" id="@linkHintId">@OwnerStrings.LinkHint</p>
                             <p class="pic-link-error" id="@linkErrorId" role="alert" hidden></p>
-                            <button type="submit" class="owner-btn-primary" data-check-link>@OwnerStrings.CheckLinkButton</button>
+                            <p class="pic-current" data-current-link hidden="@(storedLink.LinkAddress is null)"><span class="pic-current-label">@OwnerStrings.CurrentLinkLabel</span> <span class="pic-current-address" dir="ltr" title="@storedLink.LinkFullAddress">@storedLink.LinkAddress</span></p>
+                            <div class="pic-link-actions">
+                                <button type="submit" class="owner-btn-primary" data-check-link>@OwnerStrings.CheckLinkButton</button>
+                                <button type="submit" class="owner-btn" asp-page-handler="RemoveLink" data-remove-link hidden="@(storedLink.LinkAddress is null)">@OwnerStrings.RemoveLinkButton</button>
+                            </div>
                         </form>
                         @if (preview is not null)
                         {
