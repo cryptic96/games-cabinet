@@ -4,6 +4,7 @@ using Cabinet.Domain;
 using Cabinet.Repository.Images;
 using Cabinet.Service.Collection;
 using Cabinet.Service.Hosting;
+using Cabinet.Service.Language;
 using Cabinet.Service.Layout;
 using Cabinet.Service.Live;
 using Cabinet.Service.Review;
@@ -48,6 +49,7 @@ builder.Services.AddRazorPages();
 builder.Services.AddCabinetLayout(builder.Configuration, builder.Environment);
 builder.Services.AddCabinetSync(builder.Configuration, builder.Environment);
 builder.Services.AddCabinetLive(builder.Configuration);
+builder.Services.AddSingleton<ArtFileAudit>();
 
 var buildInfo = BuildInfo.Parse(
     typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
@@ -71,6 +73,8 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     }
 });
 
+SiteLanguage.EnsureAvailable();
+
 var app = builder.Build();
 
 var opsPort = OpsEndpoint.FromConfiguration(app.Configuration);
@@ -84,12 +88,14 @@ app.UseHealthChecks("/health", opsPort, new HealthCheckOptions
     {
         context.Response.ContentType = "application/json";
         var build = context.RequestServices.GetRequiredService<BuildInfo>();
+        var audit = context.RequestServices.GetRequiredService<ArtFileAudit>();
 
         return context.Response.WriteAsJsonAsync(new
         {
             status = result.Status.ToString(),
             version = build.Version,
             commit = build.Commit,
+            missingArt = audit.CountMissing(),
         });
     }
 });
@@ -101,6 +107,7 @@ app.UseRouting();
 app.MapStaticAssets();
 app.MapRazorPages().WithStaticAssets();
 app.MapCabinetLayout();
+app.MapCabinetLanguage();
 app.MapCabinetSync();
 app.MapCabinetLive();
 

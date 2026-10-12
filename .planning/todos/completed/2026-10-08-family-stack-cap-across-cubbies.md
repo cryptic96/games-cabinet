@@ -16,3 +16,7 @@ The phase 4 code review (domain WR-01) found that a family whose expansions cont
 ## Solution
 
 Decide with the owner: either document the per-column cap as intended (a family that continues may show up to two stacks), or carry one layer budget across both columns and refuse to split when the cap, not the shelf height, is what hides expansions.
+
+## Resolution
+
+Kept per column and documented in the layout guide: a family that continues into the next cubby may show up to twice `Layout:ExpansionStackMax`. No engine change and no layout change.

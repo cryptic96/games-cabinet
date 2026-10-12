@@ -15,6 +15,11 @@ updates:
       skiasharp:
         patterns:
           - "SkiaSharp*"
+      # The Playwright core package and its xunit integration must always move
+      # on the same version, so they are proposed together.
+      playwright:
+        patterns:
+          - "Microsoft.Playwright*"
 
   - package-ecosystem: "docker-compose"
     directory: "/build/lint"

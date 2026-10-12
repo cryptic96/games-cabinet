@@ -129,7 +129,7 @@ public partial class CreditTests
 
         var html = await client.GetStringAsync("/", TestContext.Current.CancellationToken);
         var references = Reference().Matches(html).Select(match => match.Groups["url"].Value)
-            .Where(url => url != "https://boardgamegeek.com")
+            .Where(url => url != "https://boardgamegeek.com" && !url.StartsWith('#'))
             .ToList();
 
         references.Should().NotBeEmpty();

@@ -18,3 +18,7 @@ The layout prototype's code review left two accessibility notes for Phase 5 (Gam
 ## Solution
 
 Handle the remaining note when Phase 5 adds the pull-out detail card and keyboard navigation: use a roving tabindex (or a composite widget) so the cabinet is one tab stop with arrow-key movement, alongside the accessible list of all games that phase plans.
+
+## Resolution
+
+Done: the cabinet is now one tab stop with arrow keys (roving tabindex in `keys.js`; arrows, Home, End, Enter and Space). The screen-reader list of all games arrives in the games-list plan of this phase.

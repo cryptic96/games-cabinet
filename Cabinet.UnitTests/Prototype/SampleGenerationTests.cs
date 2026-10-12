@@ -60,7 +60,10 @@ public class SampleGenerationTests
 
         for (var view = 0; view < 3; view++)
         {
-            var page = new IndexModel(catalog, store, status);
+            var page = new IndexModel(catalog, store, status)
+            {
+                PageContext = new Microsoft.AspNetCore.Mvc.RazorPages.PageContext { HttpContext = new DefaultHttpContext() },
+            };
             page.OnGet("400");
             page.ItemCount.Should().Be(400);
         }

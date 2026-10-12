@@ -20,9 +20,13 @@ public class ContentSecurityPolicyTests
     [InlineData("/?sample=400", HttpStatusCode.OK)]
     [InlineData("/cabinet/layout?sample=65&profile=desktop", HttpStatusCode.OK)]
     [InlineData("/cabinet/layout?sample=65&profile=phone", HttpStatusCode.OK)]
+    [InlineData("/cabinet/cards?sample=65&profile=desktop", HttpStatusCode.OK)]
+    [InlineData("/cabinet/cards?profile=desktop", HttpStatusCode.OK)]
+    [InlineData("/cabinet/cards?profile=tablet", HttpStatusCode.NotFound)]
     [InlineData("/js/render.js", HttpStatusCode.OK)]
     [InlineData("/lib/signalr/signalr.min.js", HttpStatusCode.OK)]
     [InlineData("/img/powered-by-bgg.svg", HttpStatusCode.OK)]
+    [InlineData("/img/icons.svg", HttpStatusCode.OK)]
     [InlineData("/cabinet/status", HttpStatusCode.OK)]
     [InlineData("/cabinet/layout?profile=tablet", HttpStatusCode.NotFound)]
     [InlineData("/no-such-page", HttpStatusCode.NotFound)]
@@ -34,6 +38,18 @@ public class ContentSecurityPolicyTests
         using var response = await client.GetAsync(path, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(status);
+        PolicyOf(response).Should().Be(ExpectedPolicy);
+    }
+
+    [Fact]
+    public async Task The_language_switch_redirect_carries_the_strict_policy()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        using var client = LanguageTests.PlainClient(factory);
+
+        using var response = await client.GetAsync("/language/en", TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.SeeOther);
         PolicyOf(response).Should().Be(ExpectedPolicy);
     }
 

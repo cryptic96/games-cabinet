@@ -39,13 +39,16 @@ jobs:
       - name: Package release
         run: build/package-release.sh --version 0.0.0 --commit "$GITHUB_SHA" --output artifacts/release
 
+      # Browser tests run in their own job, so this run excludes them by trait.
+      # The browser project then runs zero tests, which the test platform
+      # reports as exit code 8; that one code is ignored here.
       - name: Run tests
-        run: dotnet test --solution Cabinet.slnx --no-restore
+        run: dotnet test --solution Cabinet.slnx --no-restore --filter-not-trait "Category=Browser" --ignore-exit-code 8
         env:
           CI: true
 
       - name: Run page script tests
-        run: node --test build/tests/page-scripts.test.mjs
+        run: node --test build/tests/*.test.mjs
 
       - name: Run release layout end-to-end test
         run: bash build/tests/package-release-e2e-test.sh
@@ -56,6 +59,50 @@ jobs:
         run: bash deploy/tests/cabinet-deploy-e2e-test.sh
         env:
           CABINET_E2E: 1
+
+  # Drives a real Chromium against the cabinet host. Playwright's dependency
+  # installer may not know this runner image yet; if the install step fails on
+  # an unsupported platform, set PLAYWRIGHT_HOST_PLATFORM_OVERRIDE to
+  # ubuntu24.04-x64 on that step. It is left out until a run shows it is needed.
+  browser-tests:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore packages
+        run: dotnet restore Cabinet.slnx --locked-mode
+
+      - name: Build browser tests
+        run: dotnet build Cabinet.BrowserTests --no-restore
+
+      - name: Install Chromium
+        run: Cabinet.BrowserTests/bin/Debug/net10.0/.playwright/node/linux-x64/node Cabinet.BrowserTests/bin/Debug/net10.0/.playwright/package/cli.js install --with-deps chromium-headless-shell
+
+      - name: Run browser tests
+        run: dotnet test --project Cabinet.BrowserTests --no-build
+        env:
+          CI: true
+          CABINET_SCREENSHOT_DIR: ${{ runner.temp }}/screenshots
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-screenshots
+          path: ${{ runner.temp }}/screenshots
+          if-no-files-found: ignore
 
   lint:
     runs-on: ubuntu-26.04

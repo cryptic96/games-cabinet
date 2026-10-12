@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 04
-current_phase_name: enrichment-box-images-shape
+current_phase: 05
+current_phase_name: game-detail-accessibility-language
 status: executing
-stopped_at: Phase 4 UI-SPEC approved
-last_updated: "2026-10-07T15:18:31.865Z"
-last_activity: 2026-10-07
-last_activity_desc: Phase 03 complete, transitioned to Phase 4
+stopped_at: Completed 05-15-PLAN.md
+last_updated: "2026-10-11T18:26:07.721Z"
+last_activity: 2026-10-11
+last_activity_desc: Plan 05-15 complete (review round answered and applied)
 progress:
-  total_phases: 4
-  completed_phases: 3
-  total_plans: 55
-  completed_plans: 39
+  total_phases: 5
+  completed_phases: 4
+  total_plans: 78
+  completed_plans: 77
 ---
 
 # Project State
@@ -23,22 +23,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-06)
 
 **Core value:** Anyone with the link sees an up-to-date, good-looking cabinet of exactly the games the owner owns on BGG, with no manual data entry in the app.
-**Current focus:** Phase 04 — enrichment-box-images-shape
+**Current focus:** Phase 05 — game-detail-accessibility-language
 
 ## Current Position
 
-Phase: 04 (enrichment-box-images-shape) — EXECUTING
-Plan: 1 of 16
-Status: Executing Phase 04
-Last activity: 2026-10-07 — Phase 04 execution started
+Phase: 05 (game-detail-accessibility-language) — EXECUTING
+Plan: 15 of 16 complete (next: 05-16)
+Status: Executing Phase 05
+Last activity: 2026-10-11 — Plan 05-15 complete (review round answered and applied)
 
-Progress: [██████████] 100%
+Progress: [██████████] 99%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 39
+- Total plans completed: 62
 - Average duration: - min
 - Total execution time: 0.0 hours
 
@@ -49,6 +49,7 @@ Progress: [██████████] 100%
 | 01 | 15 | - | - |
 | 2 | 9 | - | - |
 | 03 | 15 | - | - |
+| 04 | 23 | - | - |
 
 **Recent Trend:**
 
@@ -61,6 +62,7 @@ Progress: [██████████] 100%
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 01 P01 | 25min | 3 tasks | 1 files |
+| Phase 05 P05-15 | two sessions | 4 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -78,6 +80,10 @@ Recent decisions affecting current work:
 - [Phase 2]: Layout is a pure versioned function guarded by golden files; later visual changes are a version bump plus a release, with no stored state to migrate.
 - [Phase 2]: Remaining taste calls deferred as todos to Phases 4, 5 and 7; selectable finishes stay an unscheduled todo.
 - [Phase 2]: Front-end work in GSD agents uses the owner's personal senior-frontend skill via agent_skills (planner, executor, UI agents).
+- [Phase 05]: [05-15] Dutch site name stays Spellenkast (owner review round 1)
+- [Phase 05]: [05-15] Card has no punched hole (owner review round 1)
+- [Phase 05]: [05-15] Swap rows are grids packed to the start so one-line titles sit on their first ruling on a phone
+- [Phase 05]: [05-15] Uneven desktop sections accepted for now; todo recorded for a later layout pass
 
 ### Pending Todos
 
@@ -115,6 +121,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-07T13:26:34.961Z
-Stopped at: Phase 4 UI-SPEC approved
-Resume file: .planning/phases/04-enrichment-box-images-shape/04-UI-SPEC.md
+Last session: 2026-10-11T18:26:07.704Z
+Stopped at: Completed 05-15-PLAN.md
+Resume file: None

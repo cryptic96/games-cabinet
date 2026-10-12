@@ -49,6 +49,13 @@ run on otherwise, when the next game of its series needs the room that second
 column would take (see the series rules below). A cubby takes at most one family
 that continues next door, and at most one such column.
 
+Each column of a family's expansion stack has its own cap, the setting
+`Layout:ExpansionStackMax`. A family whose expansions continue into the next
+cubby may therefore show two full stacks, up to twice the setting, and this is
+intended: a large family shows more of its expansions instead of hiding them
+behind "+N more" as soon as the first column is full. The ones that fit in
+neither column stay behind the marker.
+
 Games of one series stand next to each other. Two things make games a series.
 The first is BoardGameGeek's family names: only families whose name starts with
 `Game: ` (a game, its spin-offs and standalone games) or `Series: ` (a named
@@ -400,6 +407,17 @@ the automated workflows.
 
 ## What the page shows
 
+The text on a spine or a flat box is the title cut at its first colon or spaced
+dash and shortened to what the box has room for, with an ellipsis. A shortened
+label always shows at least five characters before its ellipsis; when the room
+allows fewer, the box shows no text at all, only its colour and rules. A scrap
+such as "Ex..." reads as noise rather than as a title, and the full title is
+never lost: it stays in the box's accessible name and tooltip and on the card one
+tap away. A title that fits is never shortened or hidden, however short it is.
+Characters are counted as the reader sees them, so an emoji or a letter with an
+accent counts as one and is never split. Changing this rule changes the layout
+version, because only the label text of the recorded layouts changes.
+
 The deployed site always draws the owner's synced collection. Layouts for it
 are built once per collection version and screen profile and kept with that
 collection, so a visit costs no layout work, and the entity tag changes when the
@@ -411,6 +429,52 @@ copied over, above a cabinet of two rows of bare cubbies with nothing in it. The
 layout address answers normally with that empty cabinet. When a sync finishes
 with no games at all, the bare cabinet stays and the message goes, because the
 collection really is empty.
+
+### The card
+
+Tapping or clicking a box, or pressing Enter on it, opens a card for that game. The
+box, the `+N more` marker and every entry of the games list open the same card.
+A box that is mostly on screen slides out of its slot, turns and becomes the card's
+cover, and slides back into the same slot when the card closes; a box that is off
+screen, a browser without view transitions and a visitor who asked for reduced
+motion get a short fade instead, and with reduced motion the box is only outlined
+in place. The `+N more` marker opens the card of its base game scrolled to the
+expansions. An expansion's card names its base game or games and swaps to a base
+game's card in place.
+
+The facts on a card (players, play time, weight, minimum age, rating, designers,
+mechanics, stored location, and for a family its expansions and bases) are served
+with the layout from the same address family, under the same entity tag rules, and
+revalidated the same way. A game whose details have not arrived yet still opens and
+says more details follow after the next sync. A value BoardGameGeek reports as zero
+or leaves out is left out of the card, never shown as unknown. Neither the layout
+nor the card data carries any language-dependent text: the page script writes the
+words in the visitor's language, and game titles, designers, mechanics and storage
+locations are never translated.
+
+Escape, a tap outside the card, the close button and, on a phone, dragging the
+sheet down all close the card. The browser's Back button closes it too and leaves
+no dead history step; the address never changes. A sync that finishes while a card
+is open waits: the cabinet is redrawn only once the card is closed.
+
+### Keyboard and screen readers
+
+The cabinet is one tab stop. Inside it the arrow keys move to the nearest box in
+that direction by position on screen, Home and End go to the first and last box,
+and Enter opens the card. A skip link at the top of the page leads to the games
+list: every game from A to Z with its expansions nested under it and the facts a
+card shows, so a screen reader user can read the whole collection without walking
+the shelves. The list is visually hidden except while focus is inside it. The
+cabinet is announced as a group with a hint about the arrow keys, and there is no
+live region beyond the existing sync status.
+
+### Languages
+
+The page is rendered in English or Dutch from the first byte. The language comes
+from a one-year functional cookie, which the toggle in the header sets, and
+otherwise from the browser's language preference; the page language attribute follows
+it and the language is never part of the address. Switching reloads the page and
+keeps the scroll position where the browser allows it.
 
 ## Invented collections
 

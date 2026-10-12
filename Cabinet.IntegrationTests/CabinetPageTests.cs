@@ -100,10 +100,11 @@ public partial class CabinetPageTests
         html.Should().Contain("The games are being copied over from BoardGameGeek. Check back in a few minutes.");
         html.Should().Contain("class=\"cabinet-message cabinet-filling\"");
         html.IndexOf("cabinet-filling", StringComparison.Ordinal).Should().BeLessThan(html.IndexOf("id=\"cabinet\"", StringComparison.Ordinal));
-        html.Should().MatchRegex("<div id=\"cabinet\" class=\"cabinet\"></div>");
+        html.Should().MatchRegex("<div id=\"cabinet\" class=\"cabinet\" role=\"group\" aria-label=\"Cabinet\" aria-describedby=\"cabinet-hint\"></div>");
+        html.Should().Contain("<p id=\"cabinet-hint\" class=\"visually-hidden\">Use the arrow keys to move between games and press Enter to open one.</p>");
         html.Should().NotContain("data-sample");
         html.Should().Contain("type=\"module\"");
-        html.Should().NotContain("<nav");
+        html.Should().NotContain("sample-switcher");
         html.Should().NotContain("The cabinet is being built");
         html.Should().NotContain("Invented collection");
     }
@@ -119,7 +120,7 @@ public partial class CabinetPageTests
         html.Should().Contain("The cabinet is being filled.");
         html.Should().NotContain("data-sample");
         html.Should().NotContain("Invented collection");
-        html.Should().NotContain("<nav");
+        html.Should().NotContain("sample-switcher");
     }
 
     [Fact]
@@ -144,7 +145,7 @@ public partial class CabinetPageTests
         var html = await client.GetStringAsync("/?sample=65", TestContext.Current.CancellationToken);
         var hrefs = SampleLink().Matches(html).Select(match => match.Groups["name"].Value).ToList();
 
-        html.Should().Contain("<nav aria-label=\"Collection to show\">");
+        html.Should().Contain("<nav class=\"sample-switcher\" aria-label=\"Collection to show\">");
         html.Should().NotContain("Sample collection size");
         hrefs.Should().Equal(SyntheticCollections.SampleNames);
         html.Should().Contain("<a href=\"/\">Synced</a>");
@@ -160,9 +161,9 @@ public partial class CabinetPageTests
         using var client = factory.CreatePublicClient();
 
         var html = await client.GetStringAsync("/", TestContext.Current.CancellationToken);
-        var navigation = html[html.IndexOf("<nav", StringComparison.Ordinal)..html.IndexOf("</nav>", StringComparison.Ordinal)];
+        var navigation = html[html.IndexOf("<nav class=\"sample-switcher\"", StringComparison.Ordinal)..html.LastIndexOf("</nav>", StringComparison.Ordinal)];
 
-        html.Should().Contain("<nav aria-label=\"Collection to show\">");
+        html.Should().Contain("<nav class=\"sample-switcher\" aria-label=\"Collection to show\">");
         navigation.Should().Contain("<a href=\"/\" aria-current=\"page\">Synced</a>");
         CurrentLink().Matches(navigation).Should().ContainSingle();
         navigation.IndexOf(">Synced</a>", StringComparison.Ordinal)
@@ -193,7 +194,7 @@ public partial class CabinetPageTests
 
         var html = await client.GetStringAsync("/?sample=12", TestContext.Current.CancellationToken);
 
-        html.Should().NotContain("<nav");
+        html.Should().NotContain("sample-switcher");
         html.Should().NotContain("Synced");
         html.Should().NotContain("Collection to show");
         html.Should().NotContain("sample");

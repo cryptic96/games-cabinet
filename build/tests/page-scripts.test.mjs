@@ -5,7 +5,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { copyFileSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -21,7 +21,7 @@ async function loadPageScript(name) {
   return import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 }
 
-const { COPY } = await loadPageScript('copy.js');
+const { COPY, copyFor } = await loadPageScript('copy.js');
 const { serverOffsetMs, elapsedSeconds, isStale, buttonState, countdownText, pressOutcome, shouldRedraw, reconnectDelayMs, isOutdatedStatus, ownSyncStillWaiting } = await loadPageScript('status.js');
 const cases = JSON.parse(readFileSync(new URL('./fixtures/relative-time-cases.json', import.meta.url), 'utf8'));
 
@@ -29,9 +29,9 @@ const SYNCED = '2030-01-15T12:00:00.000Z';
 const SYNCED_MS = Date.parse(SYNCED);
 const THREE_HOURS = 3 * 60 * 60;
 
-for (const { elapsedSeconds: seconds, text } of cases) {
-  test(`${seconds} seconds reads as "${text}"`, () => {
-    assert.equal(COPY.syncedAgo(seconds), text);
+for (const { language = 'en', elapsedSeconds: seconds, text } of cases) {
+  test(`${seconds} seconds reads as "${text}" in ${language}`, () => {
+    assert.equal(copyFor(language).syncedAgo(seconds), text);
   });
 }
 
@@ -229,7 +229,7 @@ const PAGE_FOLDER = mkdtempSync(join(tmpdir(), 'cabinet-page-scripts-'));
 
 writeFileSync(join(PAGE_FOLDER, 'package.json'), '{"type":"module"}');
 
-for (const name of ['copy.js', 'status.js', 'sync.js', 'live.js', 'render.js', 'cabinet.js']) {
+for (const name of readdirSync(new URL('../../Cabinet.Service/wwwroot/js/', import.meta.url)).filter((file) => file.endsWith('.js'))) {
   copyFileSync(new URL('../../Cabinet.Service/wwwroot/js/' + name, import.meta.url), join(PAGE_FOLDER, name));
 }
 
@@ -1307,10 +1307,14 @@ class FakeElement {
   }
 
   matches(selector) {
-    const entry = /^\[data-entry-id="(.*)"\]$/.exec(selector);
+    const attributes = [...selector.matchAll(/\[data-([a-z-]+)="(.*?)"\]/g)];
 
-    if (entry !== null) {
-      return this.dataset.entryId === entry[1];
+    if (attributes.length > 0) {
+      return attributes.every(([, name, value]) => this.dataset[name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] === value);
+    }
+
+    if (/^[a-z]+$/.test(selector)) {
+      return this.tagName === selector.toUpperCase();
     }
 
     return selector.startsWith('.') && this.className.split(' ').includes(selector.slice(1));
@@ -1318,6 +1322,24 @@ class FakeElement {
 
   querySelector(selector) {
     return this.descendants().find((node) => node.matches(selector)) ?? null;
+  }
+
+  querySelectorAll(selector) {
+    return this.descendants().filter((node) => node.matches(selector));
+  }
+
+  closest(selector) {
+    for (let node = this; node !== null; node = node.parent) {
+      if (node.matches(selector)) {
+        return node;
+      }
+    }
+
+    return null;
+  }
+
+  get isConnected() {
+    return !this.removed;
   }
 
   contains(node) {
@@ -1442,6 +1464,25 @@ test('an expansion whose base game is not known says it is an expansion in its n
   assert.equal(blank.querySelector('.placement-label').textContent, COPY.untitled);
   assert.equal(cover.getAttribute('aria-label'), 'Invented Harbour Winds, expansion');
   assert.equal(cover.querySelector('.placement-sub').textContent, 'Expansion');
+});
+
+test('a box with a real title and an empty label draws no text and keeps the full title in its name and tooltip', () => {
+  const [thin] = drawPlacements([
+    { kind: 'spine', gameId: 12, entryId: 120, title: 'Invented Harbour Tides', label: '', isExpansion: false },
+  ]);
+
+  assert.equal(thin.querySelector('.placement-label').textContent, '');
+  assert.equal(thin.getAttribute('aria-label'), 'Invented Harbour Tides');
+  assert.equal(thin.title, 'Invented Harbour Tides');
+});
+
+test('a box with a blank title and an empty label reads as an untitled game', () => {
+  const [blank] = drawPlacements([
+    { kind: 'spine', gameId: 13, entryId: 130, title: '  ', label: '', isExpansion: false },
+  ]);
+
+  assert.equal(blank.querySelector('.placement-label').textContent, COPY.untitled);
+  assert.equal(blank.getAttribute('aria-label'), COPY.untitled);
 });
 
 test('an expansion whose base game is not owned names that game on its second line and in its name', () => {
@@ -1583,7 +1624,7 @@ test('a picture that fails to load is swapped for the generated cover, keeping t
   }
 
   assert.equal(image.removed, true);
-  assert.equal(cover.dataset.art, undefined);
+  assert.equal(cover.dataset.art, 'failed');
   assert.equal(cover.dataset.fit, undefined);
   assert.equal(cover.dataset.pattern, 'dots');
   assert.equal(cover.querySelector('.cover-art'), null);
@@ -1715,7 +1756,7 @@ test('a cover with art takes the art colour and a failed picture keeps it while 
     globalThis.document = previous;
   }
 
-  assert.equal(cover.dataset.art, undefined);
+  assert.equal(cover.dataset.art, 'failed');
   assert.equal(cover.properties.get('--bg'), ART_COLOUR.background);
   assert.equal(cover.properties.get('--fg'), ART_COLOUR.text);
 
@@ -1781,7 +1822,7 @@ let cabinetPageCount = 0;
  * @param {{ firstLayout: object, status: () => object }} setup The first layout drawn and the status the server reports.
  * @returns {Promise<object>} The page, its parts and the levers the tests pull.
  */
-async function startCabinetPage({ firstLayout, status }) {
+async function startCabinetPage({ firstLayout, status, cards = [], withList = false }) {
   const clock = createClock(true);
   const page = createFakeDocument();
   const mount = page.createElement('main');
@@ -1790,6 +1831,7 @@ async function startCabinetPage({ firstLayout, status }) {
   const documentHandlers = {};
   const windowHandlers = {};
   const layoutRequests = [];
+  const cardRequests = [];
   const replaced = [];
   const fire = (handlers, type) => (handlers[type] ?? []).forEach((handler) => handler());
   const syncElements = { '.sync-exact': page.createElement('p'), '.sync-stale': page.createElement('p'), '.sync-note': note };
@@ -1801,6 +1843,21 @@ async function startCabinetPage({ firstLayout, status }) {
 
   filling.className = 'cabinet-message cabinet-filling';
   page.body.append(filling, mount);
+
+  const skipLink = page.createElement('a');
+  const listSection = page.createElement('section');
+  const listHeading = page.createElement('h2');
+  const listItems = page.createElement('ul');
+
+  skipLink.className = 'skip-link';
+  listSection.className = 'games-list';
+  listHeading.className = 'games-list-heading';
+  listItems.className = 'games-list-items';
+  listSection.append(listHeading, listItems);
+
+  if (withList) {
+    page.body.append(skipLink, listSection);
+  }
 
   const replaceChildren = mount.replaceChildren.bind(mount);
 
@@ -1820,9 +1877,15 @@ async function startCabinetPage({ firstLayout, status }) {
   };
   globalThis.document = page;
   globalThis.CSS = { escape: (value) => value };
-  globalThis.fetch = (url) => {
+  globalThis.fetch = (url, init) => {
     if (url === '/cabinet/status') {
       return Promise.resolve(answer(200, { ...status(), serverTimeUtc: isoAt(clock.elapsed()) }));
+    }
+
+    if (url.startsWith('/cabinet/cards?')) {
+      cardRequests.push({ url, init });
+
+      return Promise.resolve(answer(200, { layout: '', cards }));
     }
 
     assert.equal(url, CABINET_LAYOUT_ROUTE);
@@ -1851,6 +1914,10 @@ async function startCabinetPage({ firstLayout, status }) {
     note,
     replaced,
     layoutRequests,
+    cardRequests,
+    skipLink,
+    listHeading,
+    listButtons: () => listItems.querySelectorAll('button'),
     settle,
     boxes: () => mount.descendants().filter((node) => node.tagName === 'BUTTON'),
     box: (entryId) => mount.querySelector('[data-entry-id="' + entryId + '"]'),
@@ -1926,6 +1993,141 @@ test('when the focused entry is gone after a redraw the focus leaves the cabinet
   } finally {
     leaveCabinetPage();
   }
+});
+
+const MARKER_AND_BASE = [
+  { gameId: 10, entryId: 1, title: 'Invented Lighthouse', label: 'Invented Lighthouse' },
+  { kind: 'moreMarker', gameId: 10, entryId: 1, baseTitle: 'Invented Lighthouse', moreCount: 2, xMm: 40 },
+  { gameId: 20, entryId: 2, title: 'Invented Orchard', label: 'Invented Orchard', xMm: 80 },
+];
+
+const tabIndexes = (cabinet) => cabinet.boxes().map((box) => box.getAttribute('tabindex'));
+
+test('a focused marker returns to the marker, not to its base box, after a redraw', async () => {
+  let version = 'v1';
+
+  try {
+    const cabinet = await startCabinetPage({ firstLayout: layoutWith(MARKER_AND_BASE), status: () => ({ running: false, snapshotVersion: version }) });
+    const marker = cabinet.boxes().find((box) => box.dataset.kind === 'moreMarker');
+
+    marker.focus();
+    version = 'v2';
+    await cabinet.comeOnline();
+    cabinet.layoutRequests.shift().resolve(answer(200, layoutWith(MARKER_AND_BASE)));
+    await cabinet.settle();
+
+    const drawn = cabinet.boxes().find((box) => box.dataset.kind === 'moreMarker');
+
+    assert.notEqual(drawn, marker);
+    assert.equal(cabinet.page.activeElement, drawn);
+  } finally {
+    leaveCabinetPage();
+  }
+});
+
+test('the cabinet is one tab stop: the first box holds it, a focused box takes it, and a redraw keeps it on the same box and kind', async () => {
+  let version = 'v1';
+
+  try {
+    const cabinet = await startCabinetPage({ firstLayout: layoutWith(MARKER_AND_BASE), status: () => ({ running: false, snapshotVersion: version }) });
+    const focusin = cabinet.mount.listeners.find((listener) => listener.type === 'focusin').handler;
+
+    assert.deepEqual(tabIndexes(cabinet), ['0', '-1', '-1']);
+
+    const marker = cabinet.boxes().find((box) => box.dataset.kind === 'moreMarker');
+
+    focusin({ target: marker });
+
+    assert.deepEqual(tabIndexes(cabinet), ['-1', '0', '-1']);
+
+    version = 'v2';
+    await cabinet.comeOnline();
+    cabinet.layoutRequests.shift().resolve(answer(200, layoutWith(MARKER_AND_BASE)));
+    await cabinet.settle();
+
+    assert.deepEqual(tabIndexes(cabinet), ['-1', '0', '-1']);
+  } finally {
+    leaveCabinetPage();
+  }
+});
+
+test('when the box that held the tab stop is gone after a redraw the first box takes it, and an empty cabinet has no tab stop', async () => {
+  let version = 'v1';
+
+  try {
+    const cabinet = await startCabinetPage({ firstLayout: layoutWith(MARKER_AND_BASE), status: () => ({ running: false, snapshotVersion: version }) });
+    const focusin = cabinet.mount.listeners.find((listener) => listener.type === 'focusin').handler;
+
+    focusin({ target: cabinet.box('2') });
+    version = 'v2';
+    await cabinet.comeOnline();
+    cabinet.layoutRequests.shift().resolve(answer(200, layoutWith(MARKER_AND_BASE.slice(0, 2))));
+    await cabinet.settle();
+
+    assert.deepEqual(tabIndexes(cabinet), ['0', '-1']);
+
+    version = 'v3';
+    await cabinet.comeOnline();
+    cabinet.layoutRequests.shift().resolve(answer(200, layoutWith([])));
+    await cabinet.settle();
+
+    assert.deepEqual(tabIndexes(cabinet), []);
+  } finally {
+    leaveCabinetPage();
+  }
+});
+
+/**
+ * Draws a layout into a fresh mount on a fake document and returns the drawn boxes.
+ * @param {object} layout The layout to draw.
+ * @returns {FakeElement[]} The placement buttons in drawing order.
+ */
+function drawLayout(layout) {
+  const previous = globalThis.document;
+  const page = createFakeDocument();
+  const mount = page.createElement('div');
+
+  globalThis.document = page;
+
+  try {
+    renderCabinet(mount, layout, COPY);
+  } finally {
+    globalThis.document = previous;
+  }
+
+  return mount.descendants().filter((node) => node.tagName === 'BUTTON');
+}
+
+test('every drawn box carries the shelf it stands on as section and shelf ordinal, and no two shelves share a value', () => {
+  const placement = (entryId, xMm) => ({ ...PLACEMENT_DEFAULTS, gameId: entryId, entryId, title: 'Invented Lighthouse', label: 'Invented Lighthouse', xMm });
+  const cubby = (yMm, ...placements) => ({ xMm: 0, yMm, widthMm: 600, heightMm: 300, placements });
+  const section = (index, ...cubbies) => ({ index, widthMm: 600, heightMm: 900, frameMm: 20, cubbies });
+  const boxes = drawLayout({
+    palette: [],
+    sections: [
+      section(0, cubby(0, placement(1, 0), placement(2, 40)), cubby(320, placement(3, 0)), cubby(640, placement(4, 0))),
+      section(1, cubby(0, placement(5, 0)), cubby(320, placement(6, 0))),
+    ],
+  });
+
+  const shelfOf = (entryId) => boxes.find((box) => box.dataset.entryId === String(entryId)).dataset.shelf;
+
+  assert.deepEqual([1, 2, 3, 4, 5, 6].map(shelfOf), ['0:0', '0:0', '0:1', '0:2', '1:0', '1:1']);
+  assert.ok(boxes.every((box) => /^\d+:\d+$/.test(box.dataset.shelf)));
+  assert.equal(new Set(boxes.map((box) => box.dataset.shelf)).size, 5);
+});
+
+test('seven shelves in a section keep seven different shelf values although the board tone repeats', () => {
+  const cubbies = [0, 1, 2, 3, 4, 5, 6].map((row) => ({
+    xMm: 0,
+    yMm: row * 320,
+    widthMm: 600,
+    heightMm: 300,
+    placements: [{ ...PLACEMENT_DEFAULTS, gameId: row + 1, entryId: row + 1, title: 'Invented Lighthouse', label: 'Invented Lighthouse' }],
+  }));
+  const boxes = drawLayout({ palette: [], sections: [{ index: 0, widthMm: 600, heightMm: 2300, frameMm: 20, cubbies }] });
+
+  assert.equal(new Set(boxes.map((box) => box.dataset.shelf)).size, 7);
 });
 
 test('a status with the version already on screen fetches no layout', async () => {
@@ -2044,5 +2246,137 @@ test('the stylesheet carries the apron arch tokens, the length registration of t
       new RegExp(`${query} \\{[^}]*-webkit-line-clamp: ${lines};\\s*line-clamp: ${lines};`),
       `${lines} lines`,
     );
+  }
+});
+
+const { initLanguageToggle } = await import(pathToFileURL(join(PAGE_FOLDER, 'language.js')).href);
+
+/**
+ * A language toggle with a click handler the test can run without a browser, and a record of what the browser would have done.
+ * @param {{ fetch: () => Promise<object> }} actions The answer the request gets.
+ * @returns {{ click: (current: boolean, overrides?: object) => Promise<{ prevented?: boolean }>, calls: string[] }} The toggle.
+ */
+function createToggle(actions) {
+  const calls = [];
+  const handlers = [];
+  const toggle = { addEventListener: (type, handler) => handlers.push(handler) };
+  const target = (current) => ({
+    closest: () => ({ href: 'http://127.0.0.1/language/nl', getAttribute: () => (current ? 'true' : null) }),
+  });
+
+  initLanguageToggle(toggle, {
+    fetch: async (address, options) => {
+      calls.push(`fetch ${address} ${options.redirect}`);
+
+      return actions.fetch();
+    },
+    reload: () => calls.push('reload'),
+    assign: (address) => calls.push(`assign ${address}`),
+  });
+
+  return {
+    calls,
+    async click(current, overrides = {}) {
+      const event = { button: 0, target: target(current), defaultPrevented: false, preventDefault() { this.prevented = true; }, ...overrides };
+
+      await handlers[0](event);
+
+      return event;
+    },
+  };
+}
+
+test('a plain click on the other language asks the server and reloads the same address', async () => {
+  const toggle = createToggle({ fetch: async () => ({ type: 'opaqueredirect', ok: false }) });
+  const event = await toggle.click(false);
+
+  assert.equal(event.prevented, true);
+  assert.deepEqual(toggle.calls, ['fetch http://127.0.0.1/language/nl manual', 'reload']);
+});
+
+test('a failed request or a refused answer follows the link instead', async () => {
+  const failing = createToggle({ fetch: async () => Promise.reject(new TypeError('offline')) });
+
+  await failing.click(false);
+  assert.deepEqual(failing.calls, ['fetch http://127.0.0.1/language/nl manual', 'assign http://127.0.0.1/language/nl']);
+
+  const refused = createToggle({ fetch: async () => ({ type: 'basic', ok: false }) });
+
+  await refused.click(false);
+  assert.deepEqual(refused.calls, ['fetch http://127.0.0.1/language/nl manual', 'assign http://127.0.0.1/language/nl']);
+});
+
+test('a click on the current language, with a modifier key or a non-primary button is left to the browser', async () => {
+  const toggle = createToggle({ fetch: async () => ({ type: 'opaqueredirect', ok: false }) });
+
+  for (const event of [await toggle.click(true), await toggle.click(false, { ctrlKey: true }), await toggle.click(false, { metaKey: true }), await toggle.click(false, { button: 1 })]) {
+    assert.equal(event.prevented, undefined);
+  }
+
+  assert.deepEqual(toggle.calls, []);
+});
+
+test('a page without a toggle gets no handler and no error', () => {
+  assert.doesNotThrow(() => initLanguageToggle(null));
+  assert.doesNotThrow(() => initLanguageToggle(undefined));
+});
+
+test('the card data is fetched once right after the cabinet draws, at low priority, and again after the cabinet is redrawn', async () => {
+  let version = 'v1';
+
+  try {
+    const cabinet = await startCabinetPage({ firstLayout: layoutOfEntries([1, 2]), status: () => ({ running: false, snapshotVersion: version }) });
+
+    assert.deepEqual(cabinet.cardRequests, [{ url: '/cabinet/cards?profile=desktop', init: { priority: 'low' } }]);
+
+    version = 'v2';
+    await cabinet.comeOnline();
+    cabinet.layoutRequests.shift().resolve(answer(200, layoutOfEntries([3])));
+    await cabinet.settle();
+
+    assert.equal(cabinet.cardRequests.length, 2);
+  } finally {
+    leaveCabinetPage();
+  }
+});
+
+test('the games list shows every drawn game by title, then the facts when the card data arrives, and the skip link leads into it', async () => {
+  try {
+    const cards = [
+      { entryId: 1, title: 'Invented Lighthouse', year: 2019, minPlayers: 2, maxPlayers: 4, expansions: [], bases: [] },
+      { entryId: 2, title: 'Invented Orchard', expansions: [], bases: [] },
+      { entryId: 3, title: 'Invented Harbour', playTime: 45, expansions: [], bases: [] },
+    ];
+    const cabinet = await startCabinetPage({ firstLayout: layoutOfEntries([1, 2, 3]), status: () => ({ running: false, snapshotVersion: 'v1' }), cards, withList: true });
+
+    assert.deepEqual(cabinet.listButtons().map((button) => button.textContent), [
+      'Invented Harbour, 45 minutes',
+      'Invented Lighthouse (2019), 2–4 players',
+      'Invented Orchard',
+    ]);
+    assert.equal(cabinet.listButtons()[0].getAttribute('id'), 'games-list-start');
+
+    let prevented = false;
+
+    cabinet.skipLink.listeners.find((listener) => listener.type === 'click').handler({ preventDefault: () => { prevented = true; } });
+
+    assert.equal(prevented, true);
+    assert.equal(cabinet.page.activeElement, cabinet.listButtons()[0]);
+  } finally {
+    leaveCabinetPage();
+  }
+});
+
+test('with nothing drawn the games list has no entries and the skip link lands on its heading', async () => {
+  try {
+    const cabinet = await startCabinetPage({ firstLayout: layoutWith([]), status: () => ({ running: false, snapshotVersion: 'v1' }), withList: true });
+
+    assert.equal(cabinet.listButtons().length, 0);
+
+    cabinet.skipLink.listeners.find((listener) => listener.type === 'click').handler({ preventDefault: () => undefined });
+
+    assert.equal(cabinet.page.activeElement, cabinet.listHeading);
+  } finally {
+    leaveCabinetPage();
   }
 });

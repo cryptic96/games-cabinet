@@ -14,19 +14,19 @@ Requirements for the initial release. Each maps to a roadmap phase.
 - [x] **SYNC-03**: Visitors can see when the collection was last synced.
 - [x] **SYNC-04**: When BGG is down, throttling, or returns an error or a suspiciously empty or shrunken result, visitors keep seeing the last good collection with a "showing last sync from …" note. The cabinet is never wiped.
 - [x] **SYNC-05**: Before the first successful sync, visitors see an intentional "cabinet is being filled" state instead of an error.
-- [ ] **SYNC-06**: Each game is enriched from BGG with:
+- [x] **SYNC-06**: Each game is enriched from BGG with:
   - player count and play time
   - weight, designers, mechanics and minimum age
   - BGG rating
   - for expansions, which base game(s) it expands
-- [ ] **SYNC-07**: Box art is downloaded during sync, downscaled and served from the site itself. Visitors' browsers never load images from BGG.
+- [x] **SYNC-07**: Box art is downloaded during sync, downscaled and served from the site itself. Visitors' browsers never load images from BGG.
 - [x] **SYNC-08**: Every public page credits BGG with the linked "Powered by BGG" logo, as BGG's API licence requires.
 
 ### Cabinet
 
 - [x] **CAB-01**: Visitors see every owned game in a cabinet drawn to fit the collection. Shelves and cubbies grow with it, from an empty collection to several hundred games. The design target is the current collection: about 65 owned items, expansions included.
 - [x] **CAB-02**: Boxes appear as a mix of face-out covers and spines, like a real game shelf.
-- [ ] **CAB-03**: Each spine shows the game's title legibly, in a colour taken from its box art, with readable text contrast. Plain backgrounds around product shots are ignored when picking the colour.
+- [x] **CAB-03**: Each spine shows the game's title legibly, in a colour taken from its box art, with readable text contrast. Plain backgrounds around product shots are ignored when picking the colour.
 - [x] **CAB-04**: Boxes are packed to look natural and full, sized by box shape (see IMG-03), in irregular cubbies like the inspiration photo rather than a uniform grid.
 - [x] **CAB-05**: The layout is stable: the same collection always renders the same cabinet, and adding a game does not reshuffle existing boxes.
 - [x] **CAB-06**: Small or empty collections look intentional. There is always a minimum cabinet, and boxes face out when there are only a few.
@@ -41,14 +41,14 @@ Requirements for the initial release. Each maps to a roadmap phase.
 
 ### Game Detail
 
-- [ ] **DET-01**: Tapping or clicking a game pulls its box out of the shelf with an animation, then opens a detail card.
-- [ ] **DET-02**: The detail card shows:
+- [x] **DET-01**: Tapping or clicking a game pulls its box out of the shelf with an animation, then opens a detail card.
+- [x] **DET-02**: The detail card shows:
   - cover, title and year
   - player count, play time and weight
   - storage location and owned expansions
   - BGG rating, designers, minimum age and mechanics
   - a link to the game on BGG
-- [ ] **DET-03**: Visitors who prefer reduced motion get the detail card without the pull-out animation.
+- [x] **DET-03**: Visitors who prefer reduced motion get the detail card without the pull-out animation.
 
 ### Filters
 
@@ -70,12 +70,12 @@ Requirements for the initial release. Each maps to a roadmap phase.
 
 ### Box Images & Shape
 
-- [ ] **IMG-01**: Each game's box image defaults to the owned version's image when that image is a flat front cover. When it looks like a 3D or perspective product shot (a slanted box on a plain background), the base game's main image is used instead.
+- [x] **IMG-01**: Each game's box image defaults to the owned version's image when that image is a flat front cover. When it looks like a 3D or perspective product shot (a slanted box on a plain background), the base game's main image is used instead.
 - [ ] **IMG-02**: The owner can override any game's image with one of:
   - the owned version's image
   - the base game's image
   - a specific image from the game's BGG gallery, given by link (only BGG image links are accepted)
-- [ ] **IMG-03**: Box proportions come from the first of these that is available:
+- [x] **IMG-03**: Box proportions come from the first of these that is available:
   1. the owned version's real dimensions in BGG
   2. a flat cover's aspect ratio
   3. a realistic default
@@ -89,12 +89,12 @@ Requirements for the initial release. Each maps to a roadmap phase.
 
 ### Language
 
-- [ ] **I18N-01**: The site's own labels are available in English and Dutch. The default follows the browser language, a visitor can switch, and the choice is remembered. Game titles stay as BGG provides them.
+- [x] **I18N-01**: The site's own labels are available in English and Dutch. The default follows the browser language, a visitor can switch, and the choice is remembered. Game titles stay as BGG provides them.
 
 ### Accessibility
 
-- [ ] **A11Y-01**: Keyboard users can move through the games in the cabinet and open any game's detail card.
-- [ ] **A11Y-02**: Screen-reader users get an accessible list of all games behind the visual cabinet.
+- [x] **A11Y-01**: Keyboard users can move through the games in the cabinet and open any game's detail card.
+- [x] **A11Y-02**: Screen-reader users get an accessible list of all games behind the visual cabinet.
 
 ### Repository & Release
 
@@ -177,12 +177,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SYNC-03 | Phase 3 | Complete |
 | SYNC-04 | Phase 3 | Complete |
 | SYNC-05 | Phase 3 | Complete |
-| SYNC-06 | Phase 4 | Pending |
-| SYNC-07 | Phase 4 | Pending |
+| SYNC-06 | Phase 4 | Complete |
+| SYNC-07 | Phase 4 | Complete |
 | SYNC-08 | Phase 3 | Complete |
 | CAB-01 | Phase 2 | Complete |
 | CAB-02 | Phase 2 | Complete |
-| CAB-03 | Phase 4 | Pending |
+| CAB-03 | Phase 4 | Complete |
 | CAB-04 | Phase 2 | Complete |
 | CAB-05 | Phase 2 | Complete |
 | CAB-06 | Phase 2 | Complete |
@@ -191,9 +191,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EXP-02 | Phase 2 | Complete |
 | EXP-03 | Phase 2 | Complete |
 | EXP-04 | Phase 7 | Pending |
-| DET-01 | Phase 5 | Pending |
-| DET-02 | Phase 5 | Pending |
-| DET-03 | Phase 5 | Pending |
+| DET-01 | Phase 5 | Complete |
+| DET-02 | Phase 5 | Complete |
+| DET-03 | Phase 5 | Complete |
 | FILT-01 | Phase 7 | Pending |
 | FILT-02 | Phase 7 | Pending |
 | FILT-03 | Phase 7 | Pending |
@@ -204,14 +204,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LOC-03 | Phase 6 | Pending (conditional on LOC-02 outcome) |
 | LOC-04 | Phase 6 | Pending (conditional on LOC-02 outcome) |
 | LOC-05 | Phase 7 | Pending |
-| IMG-01 | Phase 4 | Pending |
+| IMG-01 | Phase 4 | Complete |
 | IMG-02 | Phase 6 | Pending |
-| IMG-03 | Phase 4 | Pending |
+| IMG-03 | Phase 4 | Complete |
 | OWN-01 | Phase 6 | Pending |
 | OWN-02 | Phase 6 | Pending |
-| I18N-01 | Phase 5 | Pending |
-| A11Y-01 | Phase 5 | Pending |
-| A11Y-02 | Phase 5 | Pending |
+| I18N-01 | Phase 5 | Complete |
+| A11Y-01 | Phase 5 | Complete |
+| A11Y-02 | Phase 5 | Complete |
 | OPS-01 | Phase 1 | Complete |
 | OPS-02 | Phase 1 | Complete |
 | OPS-03 | Phase 1 | Complete |

@@ -186,15 +186,24 @@ function buildSubLabel(placement, copy) {
 
 /**
  * Returns the text drawn on a placement. The marker shows its hidden count; the rest show the label the layout
- * prepared, or the fallback when it is blank.
+ * prepared. An empty label on a box with a real title stays empty, so a thin box shows only its colour and rules; the
+ * untitled fallback is used only when the title itself is blank.
  * @param {object} placement One placement from the layout.
  * @param {object} copy The visitor-facing strings.
  * @returns {string}
  */
 function labelText(placement, copy) {
-  return placement.kind === 'moreMarker'
-    ? copy.moreLabel(placement.moreCount)
-    : textOrFallback(placement.label, copy.untitled);
+  if (placement.kind === 'moreMarker') {
+    return copy.moreLabel(placement.moreCount);
+  }
+
+  const hasTitle = textOrFallback(placement.title, '') !== '';
+
+  if (!hasTitle) {
+    return copy.untitled;
+  }
+
+  return typeof placement.label === 'string' ? placement.label : '';
 }
 
 /**
@@ -267,7 +276,9 @@ function drawGeneratedCover(button, placement, lines) {
 /**
  * Draws a box picture into a button: one image that is shown whole, with its stored size set so nothing moves while the
  * file loads. When the browser cannot show the file the picture is taken away and the generated cover is drawn instead,
- * silently, keeping the colours the button already has.
+ * silently, keeping the colours the button already has. The button is then marked data-art="failed", which no picture
+ * style matches, so visitors see the same cover as for a game without a picture while the page structure still tells the
+ * two apart.
  * @param {HTMLButtonElement} button The cover button.
  * @param {object} placement One placement from the layout.
  * @param {object} art The valid picture from the layout.
@@ -291,7 +302,7 @@ function drawArtCover(button, placement, art, lines) {
     'error',
     () => {
       image.remove();
-      delete button.dataset.art;
+      button.dataset.art = 'failed';
       delete button.dataset.fit;
 
       for (const [, property] of EDGE_PROPERTIES) {
@@ -390,7 +401,15 @@ function buildCubby(cubby, copy, palette, section, rowTops) {
   setNumber(element, '--y', cubby.yMm);
   setNumber(element, '--w', cubby.widthMm);
   setNumber(element, '--h', cubby.heightMm);
-  element.append(...cubby.placements.map((placement) => buildPlacement(placement, copy, palette)));
+
+  const shelf = section.index + ':' + rowTops.indexOf(cubby.yMm);
+  const boxes = cubby.placements.map((placement) => buildPlacement(placement, copy, palette));
+
+  for (const box of boxes) {
+    box.dataset.shelf = shelf;
+  }
+
+  element.append(...boxes);
 
   return element;
 }

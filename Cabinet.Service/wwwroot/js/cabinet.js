@@ -2,16 +2,39 @@
  * Entry point of the cabinet page: fetches the layout for the viewport's profile (and the mount's sample when it carries one), hands it to the
  * renderer, and shows loading and error states. The profile follows one media query; nothing else listens to resize.
  */
+import './language.js';
 import { renderCabinet } from './render.js';
-import { COPY } from './copy.js';
+import { COPY, pageLanguage } from './copy.js';
 import { initSyncStatus, fetchStatus } from './sync.js';
 import { startLive } from './live.js';
+import { initCardDialog } from './detail.js';
+import { indexPlacements, recordFromPlacement } from './card-flow.js';
+import { initRoving } from './keys.js';
+import { initGamesList } from './games-list.js';
 
 const mount = document.getElementById('cabinet');
 const syncRoot = document.querySelector('.sync');
+const dialog = document.querySelector('.card-dialog');
 const phoneQuery = window.matchMedia('(max-width: 40rem)');
 
+const roving = mount === null ? null : initRoving(mount);
+const listSection = document.querySelector('.games-list');
+const skipLink = document.querySelector('.skip-link');
+let cardControls = null;
+
+const gamesList = listSection === null
+  ? null
+  : initGamesList({
+    section: listSection,
+    copy: COPY,
+    language: pageLanguage(),
+    openCard: (entryId, from) => cardControls?.openCard(entryId, from),
+  });
+
 let latestLoad = 0;
+let cardRecords = new Map();
+let drawnPlacements = new Map();
+let drawnPalette = [];
 
 /**
  * Returns the profile name the layout endpoint expects for the current viewport.
@@ -29,6 +52,85 @@ function layoutUrl() {
   const sample = mount.dataset.sample;
 
   return '/cabinet/layout?profile=' + currentProfile() + (sample ? '&sample=' + encodeURIComponent(sample) : '');
+}
+
+/**
+ * Builds the card data address for the current profile and the mount's sample, if it carries one.
+ * @returns {string}
+ */
+function cardsUrl() {
+  const sample = mount.dataset.sample;
+
+  return '/cabinet/cards?profile=' + currentProfile() + (sample ? '&sample=' + encodeURIComponent(sample) : '');
+}
+
+/**
+ * Gives the card record of an entry: the record the card data holds, or the least the drawn box knows when the data did not
+ * arrive or does not hold that entry.
+ * @param {string} entryId The collection entry id as text.
+ * @returns {object | null} The record, or null when the entry is not on screen either.
+ */
+function recordFor(entryId) {
+  const record = cardRecords.get(entryId);
+
+  if (record !== undefined) {
+    return record;
+  }
+
+  const placement = drawnPlacements.get(entryId);
+
+  return placement === undefined ? null : recordFromPlacement(placement);
+}
+
+/**
+ * Fetches the card data of the layout just drawn, once more when it belongs to a different layout than the one on screen, and
+ * keeps it in memory so a tap finds it ready. It never shows anything and ignores every failure: a card without its data still
+ * opens with what the drawn box knows. A newer load or redraw supersedes it.
+ * @param {number} epoch The load counter when the layout was drawn.
+ * @param {string | null} etag The entity tag of the layout on screen, when the response carried one.
+ * @returns {Promise<void>}
+ */
+async function fetchCards(epoch, etag) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await fetch(cardsUrl(), { priority: 'low' });
+
+      if (epoch !== latestLoad) {
+        return;
+      }
+
+      if (!response.ok) {
+        return;
+      }
+
+      const body = await response.json();
+
+      if (epoch !== latestLoad) {
+        return;
+      }
+
+      if (etag === null || body.layout === etag) {
+        cardRecords = new Map(body.cards.map((record) => [String(record.entryId), record]));
+        gamesList?.showCards(body.cards);
+
+        return;
+      }
+    } catch {
+      return;
+    }
+  }
+}
+
+/**
+ * Remembers what the layout just drawn holds and starts fetching the card data that goes with it.
+ * @param {object} layout The layout drawn.
+ * @param {string | null} etag The entity tag of the layout response.
+ */
+function afterDraw(layout, etag) {
+  drawnPlacements = indexPlacements(layout);
+  drawnPalette = layout.palette ?? [];
+  gamesList?.showTitles(drawnPlacements);
+  fetchCards(latestLoad, etag);
 }
 
 /**
@@ -72,6 +174,7 @@ function showError() {
 async function load() {
   latestLoad += 1;
   const thisLoad = latestLoad;
+  cardRecords = new Map();
   showLoading();
 
   try {
@@ -93,6 +196,8 @@ async function load() {
     }
 
     renderCabinet(mount, layout, COPY);
+    roving.refresh();
+    afterDraw(layout, response.headers.get('ETag'));
   } catch {
     if (thisLoad === latestLoad) {
       showError();
@@ -102,12 +207,12 @@ async function load() {
 
 /**
  * Fetches the layout for the current profile and the mount's sample, if it carries one.
- * @returns {Promise<object | null>} The layout, or null when the answer is not a success.
+ * @returns {Promise<{ layout: object, etag: string | null } | null>} The layout and its entity tag, or null when the answer is not a success.
  */
 async function fetchLayout() {
   const response = await fetch(layoutUrl());
 
-  return response.ok ? response.json() : null;
+  return response.ok ? { layout: await response.json(), etag: response.headers.get('ETag') } : null;
 }
 
 /**
@@ -127,7 +232,7 @@ function whenVisible() {
 /**
  * Redraws the cabinet quietly after the collection changed: no loading line, no error state, no animation. The old cabinet stays
  * until the new layout is ready and is swapped for it in one step, together with the being-filled message. Keyboard focus returns
- * to the box with the same entry id when it still exists. Any failure leaves the old cabinet and says nothing. A newer load or
+ * to the box with the same entry id and kind when it still exists. Any failure leaves the old cabinet and says nothing. A newer load or
  * redraw supersedes this one.
  * @returns {Promise<boolean>} True when the new cabinet is on screen; false when nothing changed on screen.
  */
@@ -138,19 +243,24 @@ async function redraw() {
   const thisRedraw = latestLoad;
 
   try {
-    const layout = await fetchLayout();
+    const fetched = await fetchLayout();
 
     if (thisRedraw !== latestLoad) {
       return false;
     }
 
-    if (layout === null) {
+    if (fetched === null) {
       return abandonRedraw();
     }
 
-    const focused = mount.contains(document.activeElement) ? document.activeElement.dataset.entryId : undefined;
+    const { layout, etag } = fetched;
+
+    const active = document.activeElement;
+    const focused = mount.contains(active) ? { entryId: active.dataset.entryId, kind: active.dataset.kind } : undefined;
 
     renderCabinet(mount, layout, COPY);
+    roving.refresh();
+    afterDraw(layout, etag);
 
     const filling = document.querySelector('.cabinet-filling');
 
@@ -159,7 +269,7 @@ async function redraw() {
     }
 
     if (focused !== undefined) {
-      const same = mount.querySelector('[data-entry-id="' + CSS.escape(focused) + '"]');
+      const same = mount.querySelector('[data-entry-id="' + CSS.escape(focused.entryId) + '"][data-kind="' + CSS.escape(focused.kind) + '"]');
 
       if (same !== null) {
         same.focus({ preventScroll: true });
@@ -187,13 +297,68 @@ function abandonRedraw() {
   return false;
 }
 
+let redrawWaitingForCard = null;
+
+/**
+ * Redraws the cabinet quietly once no card is open. While a card is open nothing under it is redrawn, refetched or replaced; the
+ * redraw waits until the card has closed and its box is back in its slot. Changes that arrive during that wait share the one
+ * pending redraw, which fetches the newest layout when the wait is over.
+ * @returns {Promise<boolean>} What the redraw reports: true when the new cabinet is on screen.
+ */
+function redrawWhenCardIsClosed() {
+  if (redrawWaitingForCard !== null) {
+    return redrawWaitingForCard;
+  }
+
+  const closed = cardControls === null ? Promise.resolve() : cardControls.whenClosed();
+
+  redrawWaitingForCard = closed.then(() => {
+    redrawWaitingForCard = null;
+
+    return redraw();
+  });
+
+  return redrawWaitingForCard;
+}
+
+/**
+ * Draws the cabinet again for the profile the viewport now matches. A card that is open is closed at once with the plain fade, with
+ * no box flying, before the cabinet is loaded, so no card is left floating over a cabinet drawn for the other profile.
+ * @returns {Promise<void>}
+ */
+async function reloadForNewProfile() {
+  if (cardControls !== null) {
+    await cardControls.closeCard({ path: 'fade' });
+  }
+
+  await load();
+}
+
 if (syncRoot !== null) {
-  const sync = initSyncStatus(syncRoot, { onCollectionChanged: redraw });
+  const sync = initSyncStatus(syncRoot, { onCollectionChanged: redrawWhenCardIsClosed });
 
   startLive({ applyStatus: sync.applyStatus, fetchStatus });
 }
 
+if (mount !== null && dialog !== null) {
+  cardControls = initCardDialog({
+    dialog,
+    mount,
+    getRecord: recordFor,
+    getCopy: () => COPY,
+    getPalette: () => drawnPalette,
+    iconsUrl: dialog.dataset.icons ?? '',
+  });
+}
+
+if (skipLink !== null && gamesList !== null) {
+  skipLink.addEventListener('click', (event) => {
+    event.preventDefault();
+    gamesList.focusStart();
+  });
+}
+
 if (mount !== null) {
-  phoneQuery.addEventListener('change', load);
+  phoneQuery.addEventListener('change', reloadForNewProfile);
   load();
 }

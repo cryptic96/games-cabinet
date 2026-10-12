@@ -1,5 +1,5 @@
 ---
-status: awaiting_human_verify
+status: resolved
 trigger: "Fix three confirmed defects in the picture pipeline: T-04-16 oversized analysis working copy (escalated to high), CR-01 a mid-download failure stops the picture step, WR-01 no deadline on the picture body read. Test-first."
 created: 2026-10-09T00:00:00Z
 updated: 2026-10-09T10:15:00Z
@@ -173,3 +173,10 @@ residual:
   - "Pending picture records (up to nine) are still dropped when the whole run is cancelled by a service stop or the run limit; the review's optional commit-in-finally was not done."
   - "Each redirect hop has its own time limit, so one picture can take up to four limits (2 minutes at the default) plus pacer gaps."
   - "The MSBuild multi-node build in this sandbox crashes intermittently with Internal CLR error (0x80131506), before and after the change; retries succeed."
+
+## Resolution
+
+- Released in v0.5.2 (PR #15, merge `5475a5a`), published 2026-10-09 after the owner approved the deploy; `build/verify-published-release.sh v0.5.2` passed all checks.
+- Server after install: healthy on 0.5.2, self-check 21 of 21, 98 picture records ok at analysis version 3 (no re-measure, as expected because normal pictures measure identically), 0 BGG image-host links in the layout.
+- The failure paths (broken body, stalled body, hairline pictures, processing exceptions) are verified by tests only; no real picture failure occurred on the server to observe, so the journal check suggested by the debugger is left for whenever a real failure happens.
+- The release workflow's own test job failed once on an unrelated, timing-sensitive live-update test and passed on a re-run; that flake is recorded in the test-sharpening todo.

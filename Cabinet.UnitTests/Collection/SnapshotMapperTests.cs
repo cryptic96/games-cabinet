@@ -170,10 +170,95 @@ public class SnapshotMapperTests
     }
 
     [Fact]
+    public void The_version_with_the_stored_collection_changes_when_the_designers_change()
+    {
+        CardVersion(WithDetails(Details([]) with { Designers = ["Invented Designer 1"] }))
+            .Should().NotBe(CardVersion(WithDetails(Details([]) with { Designers = ["Invented Designer 2"] })));
+    }
+
+    [Fact]
+    public void The_version_with_the_stored_collection_changes_when_the_mechanics_change()
+    {
+        CardVersion(WithDetails(Details([]) with { Mechanics = ["Example Mechanic A"] }))
+            .Should().NotBe(CardVersion(WithDetails(Details([]) with { Mechanics = ["Example Mechanic B"] })));
+    }
+
+    [Fact]
+    public void The_version_with_the_stored_collection_changes_when_the_year_or_the_location_changes()
+    {
+        var plain = CardVersion(Snapshot(Items));
+        var otherYear = CardVersion(Snapshot(Items.Select(item => item.GameId == 9 ? item with { Year = 2000 } : item)));
+        var otherLocation = CardVersion(Snapshot(Items.Select(item => item.GameId == 9 ? item with { Location = "Crate 1" } : item)));
+
+        otherYear.Should().NotBe(plain);
+        otherLocation.Should().NotBe(plain);
+        otherYear.Should().NotBe(otherLocation);
+    }
+
+    [Fact]
+    public void The_version_with_the_stored_collection_changes_when_a_count_or_a_time_or_a_rating_changes()
+    {
+        var plain = Details([]);
+        var baseline = CardVersion(WithDetails(plain));
+        var changed = new[]
+        {
+            plain with { MinPlayers = 2 },
+            plain with { MaxPlayers = 4 },
+            plain with { PlayingTime = 60 },
+            plain with { MinPlayTime = 30 },
+            plain with { MaxPlayTime = 90 },
+            plain with { MinAge = 10 },
+            plain with { Weight = 2.5 },
+            plain with { Average = 7.25 },
+        };
+
+        changed.Select(details => CardVersion(WithDetails(details))).Should().OnlyContain(version => version != baseline);
+        changed.Select(details => CardVersion(WithDetails(details))).Should().OnlyHaveUniqueItems();
+    }
+
+    [Fact]
+    public void The_version_with_the_stored_collection_changes_when_the_games_an_expansion_expands_change()
+    {
+        CardVersion(WithDetails(Details([new BaseGameRef(2, "Second Base")])))
+            .Should().NotBe(CardVersion(WithDetails(Details([new BaseGameRef(3, "Third")]))));
+    }
+
+    [Fact]
+    public void The_version_with_the_stored_collection_ignores_what_the_card_does_not_show()
+    {
+        var plain = WithDetails(Details([]) with { Families = [new FamilyLink(7101, "Theme: Invented Theme 1")] });
+        var other = WithDetails(
+            Details([]) with
+            {
+                EnrichedAtUtc = DateTimeOffset.UnixEpoch.AddDays(30),
+                BayesAverage = 6.5,
+                DetailsVersion = 7,
+                Families = [new FamilyLink(7102, "Theme: Invented Theme 2")],
+            });
+
+        CardVersion(other).Should().Be(CardVersion(plain));
+    }
+
+    [Fact]
+    public void The_version_with_the_stored_collection_has_the_same_shape_and_is_stable()
+    {
+        var snapshot = WithDetails(Details([]) with { Designers = ["Invented Designer 1"] });
+
+        CardVersion(snapshot).Should().MatchRegex("^[0-9a-f]{16}$");
+        CardVersion(snapshot).Should().Be(CardVersion(snapshot));
+    }
+
+    [Fact]
     public void An_empty_collection_has_a_version_too()
     {
         SnapshotMapper.Version(SnapshotMapper.ToCabinetItems(Snapshot([]))).Should().MatchRegex("^[0-9a-f]{16}$");
     }
+
+    private static string CardVersion(CollectionSnapshot snapshot) =>
+        SnapshotMapper.Version(SnapshotMapper.ToCabinetItems(snapshot), ArtRules.Default, snapshot);
+
+    private static CollectionSnapshot WithDetails(GameDetails details) =>
+        Snapshot(Items) with { Games = new Dictionary<int, GameDetails> { [9] = details } };
 
     private static Dictionary<int, GameDetails> Games(params (int GameId, IReadOnlyList<BaseGameRef> Expands)[] games) =>
         games.ToDictionary(entry => entry.GameId, entry => Details(entry.Expands));

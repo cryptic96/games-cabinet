@@ -66,17 +66,17 @@ public class SpineLabelTests
     public void A_title_is_never_cut_inside_an_emoji_or_a_combining_sequence()
     {
         var emoji = SpineLabel.Shorten("Voss \U0001F3B2\U0001F3B2\U0001F3B2 Tarn", 7);
-        var combining = SpineLabel.Shorten("Orvä Kelmont", 5);
+        var combining = SpineLabel.Shorten("Orva\u0308kelmont", 6);
 
         emoji.Should().Be("Voss \U0001F3B2" + Ellipsis);
-        combining.Should().Be("Orvä" + Ellipsis);
+        combining.Should().Be("Orva\u0308k" + Ellipsis);
         IsWholeTextElements(emoji).Should().BeTrue();
         IsWholeTextElements(combining).Should().BeTrue();
     }
 
     [Theory]
     [InlineData("Keeper of the Ash Accord", 14, "Keeper" + Ellipsis)]
-    [InlineData("Rise of the Dragon Court", 13, "Rise" + Ellipsis)]
+    [InlineData("Rise of the Dragon Court", 13, "")]
     [InlineData("Tides and Embers of Vell", 11, "Tides" + Ellipsis)]
     [InlineData("Keeper of the Ash Accord", 18, "Keeper of the Ash" + Ellipsis)]
     [Trait("Category", "Layout")]
@@ -90,6 +90,7 @@ public class SpineLabelTests
     public void Stop_words_are_trimmed_one_after_another_and_a_separator_left_behind_goes_too()
     {
         SpineLabel.Shorten("Wardens of the, Ash Accord", 17).Should().Be("Wardens" + Ellipsis);
+        SpineLabel.Shorten("Wardens of the, Ash Accord", 8).Should().Be("Wardens" + Ellipsis);
     }
 
     [Fact]
@@ -104,6 +105,35 @@ public class SpineLabelTests
     public void A_title_made_only_of_stop_words_keeps_its_cut()
     {
         SpineLabel.Shorten("Of the And In", 8).Should().Be("Of the " + Ellipsis);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_shortened_label_shows_at_least_five_text_elements_before_its_ellipsis_or_none()
+    {
+        SpineLabel.MinVisibleLabelChars.Should().Be(5);
+        SpineLabel.Shorten("Example Expansion Title", 3).Should().BeEmpty();
+        SpineLabel.Shorten("Example Expansion Title", 5).Should().BeEmpty();
+        SpineLabel.Shorten("Example Expansion Title", 6).Should().Be("Examp" + Ellipsis);
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void A_title_that_fits_is_never_hidden_however_short()
+    {
+        SpineLabel.Shorten("Example", 7).Should().Be("Example");
+        SpineLabel.Shorten("Nox", 3).Should().Be("Nox");
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void Visible_label_characters_are_counted_in_text_elements()
+    {
+        SpineLabel.Shorten("ブリンドルゲーム", 4).Should().BeEmpty();
+        SpineLabel.Shorten("ブリンドルゲーム", 6).Should().Be("ブリンドル" + Ellipsis);
+        SpineLabel.Shorten("\U0001F3B2\U0001F3B2\U0001F3B2\U0001F3B2\U0001F3B2\U0001F3B2\U0001F3B2", 5).Should().BeEmpty();
+        SpineLabel.Shorten("\U0001F3B2\U0001F3B2\U0001F3B2\U0001F3B2\U0001F3B2\U0001F3B2\U0001F3B2", 6)
+            .Should().Be("\U0001F3B2\U0001F3B2\U0001F3B2\U0001F3B2\U0001F3B2" + Ellipsis);
     }
 
     [Theory]
@@ -124,7 +154,7 @@ public class SpineLabelTests
     public void The_budget_never_goes_below_the_minimum(int budget)
     {
         SpineLabel.MinTextElements.Should().Be(3);
-        SpineLabel.Shorten("Zimdrelsulorv", budget).Should().Be("Zi" + Ellipsis);
+        SpineLabel.Shorten("Zimdrelsulorv", budget).Should().BeEmpty();
     }
 
     [Fact]

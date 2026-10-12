@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Repo, Guardrails & Walking-Skeleton Deploy** - Public repo with enforced guardrails and a hello page proven through release, deploy and rollback (completed 2026-10-04)
 - [x] **Phase 2: Layout Engine & Cabinet Prototype** - Deterministic, natural-looking cabinet on synthetic data, approved visually by the owner (completed 2026-10-06)
 - [x] **Phase 3: BGG Access Spike, Real Sync & Snapshot** - The owner's real collection appears automatically in the deployed cabinet, resilient to BGG outages (completed 2026-10-07)
-- [ ] **Phase 4: Enrichment, Box Images & Shape** - Real box art, art-coloured spines, true box proportions and full game details, all served from the site
+- [x] **Phase 4: Enrichment, Box Images & Shape** - Real box art, art-coloured spines, true box proportions and full game details, all served from the site (completed 2026-10-09)
 - [ ] **Phase 5: Game Detail, Accessibility & Language** - Pull-out animation, detail card, keyboard and screen-reader access, English and Dutch labels
 - [ ] **Phase 6: Owner Tools & Persistence** - Home/VPN-only image overrides (and location editing if needed), persisted and backed up
 - [ ] **Phase 7: Game-Night Filters & Location Cabinets** - Dim-to-filter search and a per-location cabinet toggle
@@ -218,7 +218,7 @@ Plans:
   4. Box proportions come from the owned version's real BGG dimensions when available, else from a flat cover's aspect ratio, else from a realistic default, and a 3D shot's outline is never used, so real boxes in the cabinet visibly differ in size and shape.
   5. Each spine takes its colour from its box art (ignoring plain backgrounds around product shots) and shows the title legibly with readable text contrast.
 
-**Plans:** 23/23 plans executed
+**Plans:** 23/23 plans complete
 
 Plans:
 **Wave 1**
@@ -300,7 +300,52 @@ Plans:
   4. A keyboard-only user can move through the games in the cabinet and open any detail card, and a screen-reader user gets an accessible list of all games behind the visual cabinet.
   5. The site's own labels appear in English or Dutch: the default follows the browser language, a visitor can switch, the choice is remembered, and game titles stay exactly as BGG provides them.
 
-**Plans**: TBD
+**Plans:** 15/16 plans executed
+
+Plans:
+**Wave 1**
+
+- [x] 05-01-PLAN.md — Browser test harness: Playwright .NET project, smoke test, CI browser job and node test glob
+- [x] 05-02-PLAN.md — Card data for every game: `/cabinet/cards` for samples and the synced collection, expansions on every owned base
+- [x] 05-04-PLAN.md — The page in Dutch from the first byte, the EN · NL toggle and the language cookie
+
+**Wave 2**
+
+- [x] 05-03-PLAN.md — Synced cards stay fresh: card fields in the collection version, shared 304 helper
+- [x] 05-05-PLAN.md — Status line and script strings in both languages, shared vectors, toggle script and switch test
+
+**Wave 3**
+
+- [x] 05-06-PLAN.md — Tracer: a tap opens the card (dialog, sheet shape, cover, BGG link); every close path and Back
+
+**Wave 4**
+
+- [x] 05-07-PLAN.md — The card tells you everything: game-night strip, location, rating, designers, mechanics, missing details
+- [x] 05-08-PLAN.md — The cabinet is one tab stop with spatial arrow keys
+
+**Wave 5**
+
+- [x] 05-09-PLAN.md — Owned expansions, the in-place swap, "+N more" at the expansions, and the index-card look
+- [x] 05-10-PLAN.md — A games list for screen readers, with a skip link
+
+**Wave 6**
+
+- [x] 05-11-PLAN.md — The pull-out with View Transitions, plain-fade fallbacks, and reduced motion
+- [x] 05-12-PLAN.md — No title scraps on thin spines (layout version 15) and the family stack cap documented
+
+**Wave 7**
+
+- [x] 05-13-PLAN.md — The open card holds still during a sync; the phone sheet drags to close; breakpoint changes close cleanly
+- [x] 05-14-PLAN.md — Cabinet polish: broken art marked and counted, two-step spine titles, tokens, plinth lip
+
+**Wave 8**
+
+- [x] 05-15-PLAN.md — Owner review round: synthetic screenshots, English and Dutch table, decisions, docs (owner-gated)
+
+**Wave 9**
+
+- [ ] 05-16-PLAN.md — Release v0.6.0 and the owner's check on real devices (owner-gated)
+
 **UI hint**: yes
 
 ### Phase 6: Owner Tools & Persistence
@@ -364,8 +409,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 1. Repo, Guardrails & Walking-Skeleton Deploy | 15/15 | Complete    | 2026-10-04 |
 | 2. Layout Engine & Cabinet Prototype | 9/9 | Complete    | 2026-10-06 |
 | 3. BGG Access Spike, Real Sync & Snapshot | 15/15 | Complete    | 2026-10-07 |
-| 4. Enrichment, Box Images & Shape | 23/23 | In Progress|  |
-| 5. Game Detail, Accessibility & Language | 0/0 | Not started | - |
+| 4. Enrichment, Box Images & Shape | 23/23 | Complete    | 2026-10-09 |
+| 5. Game Detail, Accessibility & Language | 15/16 | In Progress|  |
 | 6. Owner Tools & Persistence | 0/0 | Not started | - |
 | 7. Game-Night Filters & Location Cabinets | 0/0 | Not started | - |
 | 8. Public Hardening & Go-Public | 0/0 | Not started | - |

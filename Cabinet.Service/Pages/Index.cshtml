@@ -1,7 +1,13 @@
 @page
 @model Cabinet.Service.Pages.IndexModel
+@inject Microsoft.AspNetCore.Mvc.ViewFeatures.IFileVersionProvider FileVersions
+<a class="skip-link" href="#games-list-start">@Model.Language.Text.SkipLink</a>
 <header>
-    <h1>Games Cabinet</h1>
+    <h1>@Model.Language.Text.SiteName</h1>
+    <nav class="lang-toggle" aria-label="@Model.Language.Text.LanguageLabel">
+        <a href="@Model.LanguageHref("en")" lang="en" hreflang="en" aria-label="@Model.Language.Text.EnglishName" aria-current="@(Model.Language.Code == "en" ? "true" : null)">EN</a>
+        <a href="@Model.LanguageHref("nl")" lang="nl" hreflang="nl" aria-label="@Model.Language.Text.DutchName" aria-current="@(Model.Language.Code == "nl" ? "true" : null)">NL</a>
+    </nav>
     @if (Model.ShowSyncBlock)
     {
         <div class="sync" data-server-time="@Model.ServerTimeIso" data-last-synced="@Model.LastSyncedIso" data-cooldown-ends="@Model.CooldownEndsIso" data-running="@(Model.Status.Running ? "true" : "false")" data-held-back="@(Model.Status.HeldBack ? "true" : "false")" data-stale-after="@Model.Status.StaleAfterSeconds" data-snapshot-version="@Model.SnapshotVersion">
@@ -13,9 +19,9 @@
             {
                 <span class="sync-time-text">@Model.RelativeText</span>
             }
-            <button type="button" class="sync-button" aria-disabled="false" hidden>Sync now</button>
+            <button type="button" class="sync-button" aria-disabled="false" hidden>@Model.Language.Text.SyncNow</button>
         </div>
-        <p id="sync-exact" class="sync-exact" hidden>@(Model.HasSyncTime ? "Last synced " + Model.ExactText : string.Empty)</p>
+        <p id="sync-exact" class="sync-exact" hidden>@(Model.HasSyncTime ? Model.Language.Text.LastSynced(Model.ExactText) : string.Empty)</p>
         <p id="sync-note" class="sync-note" role="status" aria-atomic="true"></p>
         <p class="sync-stale" hidden="@(!Model.StaleNoteVisible)">@Model.StaleNoteText</p>
     }
@@ -25,7 +31,7 @@
     }
     @if (Model.PrototypeEnabled)
     {
-        <nav aria-label="Collection to show">
+        <nav class="sample-switcher" aria-label="Collection to show">
             @if (Model.ShowingSample)
             {
                 <a href="/">Synced</a>
@@ -49,22 +55,28 @@
     }
 </header>
 <main>
+    <section class="games-list" aria-labelledby="games-list-title">
+        <h2 id="games-list-title" class="games-list-heading" tabindex="-1">@Model.Language.Text.GamesListHeading</h2>
+        <ul class="games-list-items" role="list"></ul>
+    </section>
     @if (!Model.ShowingSample && !Model.HasSynced)
     {
         <div class="cabinet-message cabinet-filling">
-            <p class="cabinet-message-heading">The cabinet is being filled.</p>
-            <p>The games are being copied over from BoardGameGeek. Check back in a few minutes.</p>
+            <p class="cabinet-message-heading">@Model.Language.Text.FillingHeading</p>
+            <p>@Model.Language.Text.FillingBody</p>
         </div>
     }
     @if (Model.ShowingSample)
     {
-        <div id="cabinet" class="cabinet" data-sample="@Model.SampleName"></div>
+        <div id="cabinet" class="cabinet" role="group" aria-label="@Model.Language.Text.CabinetLabel" aria-describedby="cabinet-hint" data-sample="@Model.SampleName"></div>
     }
     else
     {
-        <div id="cabinet" class="cabinet"></div>
+        <div id="cabinet" class="cabinet" role="group" aria-label="@Model.Language.Text.CabinetLabel" aria-describedby="cabinet-hint"></div>
     }
-    <noscript><p class="cabinet-message">The cabinet needs JavaScript to be drawn. Please turn it on and reload.</p></noscript>
+    <p id="cabinet-hint" class="visually-hidden">@Model.Language.Text.CabinetHint</p>
+    <dialog class="card-dialog" aria-labelledby="card-title" data-icons="@FileVersions.AddFileVersionToPath(Request.PathBase, "/img/icons.svg")"></dialog>
+    <noscript><p class="cabinet-message">@Model.Language.Text.NoScript</p></noscript>
 </main>
 @section Scripts {
     <script src="~/lib/signalr/signalr.min.js" asp-append-version="true"></script>
