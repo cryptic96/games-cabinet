@@ -1,28 +1,34 @@
 ---
 phase: 05-game-detail-accessibility-language
 verified: 2026-10-12T12:00:00Z
-status: human_needed
+status: passed
 score: 5/5 must-haves verified (automated); 5 owner device checks still open
 behavior_unverified: 0
 overrides_applied: 0
 gaps: []
 deferred:
+
   - truth: "Storage location is visible on the card for every game on the deployed site"
     addressed_in: "Phase 6 (assignment via owner tools) and Phase 7 (LOC-01 shown to every visitor)"
     evidence: "Phase 6 SC4: owner defines and assigns locations; Phase 7 SC4: 'Every game's storage location is visible to every visitor'. LOC-01/03/04 are Pending in REQUIREMENTS.md; the Phase 3 access check recorded that BGG's private field is not readable with the token. Phase 5 context D-12/D-13 deliberately hides the row when no location exists."
 human_verification:
+
   - test: "Chrome for Android Back: open a card, press Back (button and gesture), once straight after opening and once after tapping inside the card; then Back again"
     expected: "First Back closes the card (box returns to its slot); second Back leaves the site"
     why_human: "Real-device history behaviour; owner has no Android device"
+
   - test: "iOS Safari: close a card with the edge swipe, then swipe again"
     expected: "Second swipe leaves the site (first swipe was confirmed to close the card)"
     why_human: "Real-device gesture; not confirmed by owner"
+
   - test: "Desktop browser Back with a card open"
     expected: "One Back closes the card, a second leaves the site"
     why_human: "History-step behaviour across real browsers; not reported by owner"
+
   - test: "Turn on reduced motion in the OS, then open a card on desktop and phone"
     expected: "Card fades in (no pull-out flight, no view transition); the source box stays in place with a clear outline"
     why_human: "Owner was unsure; automated tests emulate the media query but not a real OS setting"
+
   - test: "Screen reader (VoiceOver/TalkBack/NVDA): press Tab once, activate the skip link, read the games list in English and in Dutch"
     expected: "Skip link lands on the games list; entries read title plus game-night facts; Dutch page reads Dutch labels with titles unchanged"
     why_human: "Real assistive-technology output cannot be asserted from DOM tests"
@@ -133,6 +139,7 @@ Debt-marker scan of the phase's shipped diff (`965df1b..ef6ee75`, excluding test
 ### Prohibitions
 
 All 26 plan prohibitions are marked resolved. 19 are test-tier and enforced by automated tests that passed. The remaining 12 are soft gates and need human review (non-authoritative; flagged, not silently passed):
+
 - Judgment, synthetic-data-only items (05-01, 05-02, 05-15): my scan of the shipped diff found no real titles, locations, hostnames or personal data; recommend the owner confirms the public CI screenshot artifact contains only synthetic collections.
 - Judgment, UI look items (05-06, 05-07, 05-11, 05-14): visual judgements; the owner's device check confirmed pull-out and card on spine, flat and face-out; the spine-evenness and plinth-lip item (05-14) has no recorded owner confirmation.
 - Backstop, release conduct (05-16): `unverified-prohibition - human review recommended` for no merge/tag/publish without approval, no personal data in SUMMARY, and private info staying off. The SUMMARY records owner approvals verbatim and production shows 0 cards with a location, consistent with private info off.
@@ -154,3 +161,25 @@ No gaps. The goal is achieved in the codebase for the normal path: pull-out, com
 
 _Verified: 2026-10-12_
 _Verifier: Claude (gsd-verifier)_
+
+## Human Verification Results (2026-10-12)
+
+UAT session recorded in `05-UAT.md`: 4 passed, 0 issues, 1 blocked, 1 skipped.
+
+| # | Check | Result |
+|---|-------|--------|
+| 1 | Chrome for Android Back | blocked: owner has no Android device |
+| 2 | iOS Safari second swipe leaves the site | pass |
+| 3 | Desktop browser Back | pass |
+| 4 | Reduced motion on a real system setting | pass |
+| 5 | Screen reader: skip link and games list | skipped: deferred by the owner |
+| 6 | Spine titles and plinth lip by eye | pass |
+
+## Acknowledged Gaps
+
+The owner accepted the two open checks and closed the phase ("mark as todo and close the phase", 2026-10-12). Neither is a recorded defect: no issue was reported in UAT, and both behaviours are covered by passing browser tests.
+
+| Check | Why it is open | Follow-up |
+|-------|----------------|-----------|
+| Chrome for Android Back (UAT 1) | No Android device available; the same history step passed on iPhone Safari and desktop, and Back browser tests run in Chromium | `.planning/todos/pending/2026-10-12-android-back-check-on-deployed-cabinet.md` |
+| Screen reader: skip link and games list (UAT 5) | Owner could not do it during the session; markup covered by browser tests | `.planning/todos/pending/2026-10-12-screen-reader-check-of-games-list.md` |
