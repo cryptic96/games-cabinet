@@ -186,7 +186,7 @@ The UI decisions were reviewed through the owner's senior-frontend skill during 
 
 ### For the inserted finishes phase (recorded here, built there)
 - **D-30: The owner picks the finish site-wide.** There is no visitor switcher for now.
-- **D-31: All seven finishes ship:**
+- **D-31: All seven finishes ship.** They are:
   - classic (B, exists);
   - modern birch plywood (A);
   - walnut display (C);
@@ -197,7 +197,7 @@ The UI decisions were reviewed through the owner's senior-frontend skill during 
 
   Descriptions are in `.planning/todos/pending/2026-10-06-selectable-cabinet-finishes-and-lit-cubbies-toggle.md`.
 - **D-32: Each finish brings its own wall** (page backdrop). Header, status line and footer are contrast-checked on each wall.
-- **D-33: The extras are three owner settings that combine with any finish:**
+- **D-33: The extras are three owner settings.** Each combines with any finish:
   - a "Lit cubbies" on/off switch;
   - a **"Follow day and night"** switch (the owner's addition);
   - a cubby-depth setting (flat, shaded or deep).

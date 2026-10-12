@@ -21,6 +21,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Enrichment, Box Images & Shape** - Real box art, art-coloured spines, true box proportions and full game details, all served from the site (completed 2026-10-09)
 - [x] **Phase 5: Game Detail, Accessibility & Language** - Pull-out animation, detail card, keyboard and screen-reader access, English and Dutch labels (completed 2026-10-12)
 - [ ] **Phase 6: Owner Tools & Persistence** - Home/VPN-only image overrides (and location editing if needed), persisted and backed up
+- [ ] **Phase 6.1: Selectable Cabinet Finishes & Lighting** (INSERTED) - Seven owner-chosen finishes with their walls, lit cubbies with an optional day-and-night mode, and cubby depth
 - [ ] **Phase 7: Game-Night Filters & Location Cabinets** - Dim-to-filter search and a per-location cabinet toggle
 - [ ] **Phase 8: Public Hardening & Go-Public** - HTTPS exposure through Traefik with rate limits, headers, resource caps and a go-public checklist
 
@@ -362,6 +363,118 @@ Plans:
   3. Overrides (and locations, if edited in the app) survive syncs, restarts and new releases, and a backup exists from which a fresh container can be restored without losing them.
   4. Conditional on the Phase 3 spike outcome: if BGG cannot supply locations, the owner can define their own list of storage locations (rooms, cabinets, "Lent out") and assign one to each game; if BGG does supply them, this criterion is closed by recording that no location editor is needed.
 
+**Plans:** 30 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 06-01-PLAN.md — Tracer - the owner port answers only at home
+- [ ] 06-02-PLAN.md — The owner host's road through the firewall and the reverse proxy
+- [ ] 06-03-PLAN.md — Verdict kinds and the review sheet's fixes
+- [ ] 06-04-PLAN.md — Details backoff - a game BGG never describes is not asked for every hour
+- [ ] 06-05-PLAN.md — Plausible cover shapes and an order-independent mapping
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 06-06-PLAN.md — The walls hold - bad settings, forged headers, path tricks and forgotten endpoints
+- [ ] 06-07-PLAN.md — The owner shell - English pages with the plate, the bar, the shared footer and the owner stylesheet
+- [ ] 06-08-PLAN.md — Tracer for owner data - a location written once shows on every visitor's card
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 06-09-PLAN.md — The Locations page's first forms, and the single writer's rules
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 06-10-PLAN.md — Owner data that lasts - earlier versions, the 30-day rule, surviving syncs and restarts, quiet live updates
+- [ ] 06-11-PLAN.md — Your locations - the owner's own list, edited on a phone
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 06-12-PLAN.md — Placing games in bulk - the games list, ticked rows, the dock and the move dialog
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 06-13-PLAN.md — The row picker that saves once, and finding games fast
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 06-14-PLAN.md — Tracer for pictures - choosing a candidate changes the cover for every visitor
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [ ] 06-15-PLAN.md — Linked pictures stay - the token-less fetch, the background worker, and no clean-up of owner pictures
+- [ ] 06-16-PLAN.md — The picture tiles - four mounted photos per game, saved with one tap and an Undo
+
+**Wave 9** *(blocked on Wave 8 completion)*
+
+- [ ] 06-17-PLAN.md — Every pasted link gets one precise reason, and dead links keep their copy
+- [ ] 06-18-PLAN.md — Worth a look - the worklist, the counter and the marks
+
+**Wave 10** *(blocked on Wave 9 completion)*
+
+- [ ] 06-19-PLAN.md — The single-game view - one game's picture and location in one place
+
+**Wave 11** *(blocked on Wave 10 completion)*
+
+- [ ] 06-20-PLAN.md — Tracer for links - paste a gallery picture link, preview it on a mini shelf, use it
+
+**Wave 12** *(blocked on Wave 11 completion)*
+
+- [ ] 06-21-PLAN.md — Links that go wrong, and links that stay - every message, the preview's details, Remove link
+
+**Wave 13** *(blocked on Wave 12 completion)*
+
+- [ ] 06-22-PLAN.md — Backups - download the owner data, the reminder banner, the change log and local times
+
+**Wave 14** *(blocked on Wave 13 completion)*
+
+- [ ] 06-23-PLAN.md — The finish slot - one Classic tile, a stored value, and the class on every page
+
+**Wave 15** *(blocked on Wave 14 completion)*
+
+- [ ] 06-24-PLAN.md — Restore from a file - a fresh container gets its data back
+
+**Wave 16** *(blocked on Wave 15 completion)*
+
+- [ ] 06-25-PLAN.md — When the stored file can't be read - recovery on every owner page
+
+**Wave 17** *(blocked on Wave 16 completion)*
+
+- [ ] 06-26-PLAN.md — Tracer for the owner-address cabinet - the Edit link and the not-placed tag
+
+**Wave 18** *(blocked on Wave 17 completion)*
+
+- [ ] 06-27-PLAN.md — The owner-address cabinet's plate and strip, contrast checks, and a tag that never covers a title
+
+**Wave 19** *(blocked on Wave 18 completion)*
+
+- [ ] 06-28-PLAN.md — The owner's review round on synthetic data, and the guides (owner-gated)
+
+**Wave 20** *(blocked on Wave 19 completion)*
+
+- [ ] 06-29-PLAN.md — Release v0.7.0 with the owner tools switched off by default (owner-gated)
+
+**Wave 21** *(blocked on Wave 20 completion)*
+
+- [ ] 06-30-PLAN.md — The owner host goes live, and the owner's first session (owner-gated)
+
+**UI hint**: yes
+
+### Phase 06.1: Selectable Cabinet Finishes & Lighting (INSERTED)
+
+**Goal:** From the owner pages, the owner picks the cabinet's finish for every visitor from seven furniture looks, each with its own wall, and switches warm cubby lighting on, optionally only at night by each visitor's own clock, plus a cubby-depth look.
+**Mode:** mvp
+**Requirements:** none from the v1 list. This is folded from the selectable-finishes todo, and the decisions are recorded in the owner-tools context (D-29 to D-36).
+**Depends on:** Phase 6 (the owner pages and the finish setting's slot)
+**Success Criteria** (what must be TRUE):
+
+  1. Before anything is built, all seven finishes are mocked on the real cabinet with synthetic content at desktop and phone width, and the owner approves or adjusts each one.
+  2. The owner chooses one of the seven finishes on the owner pages by rendered swatch. Every visitor then sees it from the first paint, with its own wall behind the cabinet, and no layout shift or clipping from legs, crowns or plinths.
+  3. The owner can switch lit cubbies on or off. With "follow day and night" on, the lights come on only during the visitor's own night hours with a gentle fade, and switch instantly under reduced motion.
+  4. The owner can choose the cubby depth (flat, shaded or deep), and it combines with every finish and with the lights.
+  5. Every spine label keeps at least 4.5:1 contrast under every finish, light and depth combination. Header, status line and footer stay readable on every wall, and the cabinet stays smooth on a phone.
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -412,5 +525,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 4. Enrichment, Box Images & Shape | 23/23 | Complete    | 2026-10-09 |
 | 5. Game Detail, Accessibility & Language | 16/16 | Complete    | 2026-10-12 |
 | 6. Owner Tools & Persistence | 0/0 | Not started | - |
+| 6.1. Selectable Cabinet Finishes & Lighting (INSERTED) | 0/0 | Not started | - |
 | 7. Game-Night Filters & Location Cabinets | 0/0 | Not started | - |
 | 8. Public Hardening & Go-Public | 0/0 | Not started | - |

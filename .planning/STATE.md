@@ -4,15 +4,15 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 6
 current_phase_name: Owner Tools & Persistence
-status: planning
-stopped_at: Phase 6 context gathered
-last_updated: "2026-10-12T12:14:38.987Z"
+status: executing
+stopped_at: Phase 6 UI-SPEC approved
+last_updated: "2026-10-12T14:26:51.610Z"
 last_activity: 2026-10-12
 last_activity_desc: Plan 05-16 complete (v0.6.0 released and deployed; device check partly open)
 progress:
-  total_phases: 6
+  total_phases: 7
   completed_phases: 5
-  total_plans: 78
+  total_plans: 108
   completed_plans: 78
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-06)
 
 Phase: 6 — Owner Tools & Persistence
 Plan: Not started
-Status: Ready to plan
+Status: Ready to execute
 Last activity: 2026-10-12 — Phase 05 complete, transitioned to Phase 6
 
 Progress: [██████████] 100%
@@ -113,6 +113,10 @@ Recent decisions affecting current work:
 | 2 | Move CI and release workflows to ubuntu-26.04 (actionlint label config added) | 2026-10-06 | 7d802a1 | — |
 | 3 | Fix flaky port race in integration tests (retry host start on fresh ports) | 2026-10-06 | 3376015 | — |
 
+### Roadmap Evolution
+
+- Phase 06.1 inserted after Phase 6: Selectable cabinet finishes and lighting, split out of the Phase 6 discussion (owner chose its own phase); runs after Phase 6, before Phase 7
+
 ## Deferred Items
 
 Items acknowledged and carried forward from previous milestone close:
@@ -123,6 +127,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-12T12:14:38.970Z
-Stopped at: Phase 6 context gathered
-Resume file: .planning/phases/06-owner-tools-persistence/06-CONTEXT.md
+Last session: 2026-10-12T12:41:37.217Z
+Stopped at: Phase 6 UI-SPEC approved
+Resume file: .planning/phases/06-owner-tools-persistence/06-UI-SPEC.md
