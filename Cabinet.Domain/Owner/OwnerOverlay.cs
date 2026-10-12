@@ -3,11 +3,18 @@ using Cabinet.Domain.Layout;
 
 namespace Cabinet.Domain.Owner;
 
+/// <summary>The owner's picture choice for one game when it is anything other than Automatic.</summary>
+/// <param name="Choice">Which picture the owner chose.</param>
+/// <param name="LinkRecord">What was stored of the owner's own picture, or null when there is none; it is drawn only while <paramref name="Choice"/> is <see cref="PictureChoice.Link"/>.</param>
+/// <param name="LinkUrl">The address of the owner's own picture, or null when there is none.</param>
+public sealed record PictureOverride(PictureChoice Choice, ImageRecord? LinkRecord, string? LinkUrl);
+
 /// <summary>
 /// Works out where every owned game is kept from what the owner entered, and applies that to the synced collection.
 /// A game is in the location the owner gave it; an expansion without one of its own follows the base game it stands beside
 /// (the one <see cref="ExpansionPairing"/> pairs it with, when that base game is owned); every other game has no location.
-/// The synced collection itself carries no location the cabinet uses.
+/// The synced collection itself carries no location the cabinet uses. It also holds the picture the owner chose for each game
+/// that is not left to the automatic pick.
 /// </summary>
 public sealed class OwnerOverlay
 {
@@ -15,17 +22,20 @@ public sealed class OwnerOverlay
     private readonly IReadOnlyDictionary<string, string> _names;
     private readonly IReadOnlyDictionary<int, string> _ownLocations;
     private readonly IReadOnlyDictionary<int, int> _pairedBases;
+    private readonly IReadOnlyDictionary<int, PictureOverride> _pictures;
 
     private OwnerOverlay(
         IReadOnlyDictionary<int, Place> places,
         IReadOnlyDictionary<string, string> names,
         IReadOnlyDictionary<int, string> ownLocations,
-        IReadOnlyDictionary<int, int> pairedBases)
+        IReadOnlyDictionary<int, int> pairedBases,
+        IReadOnlyDictionary<int, PictureOverride> pictures)
     {
         _places = places;
         _names = names;
         _ownLocations = ownLocations;
         _pairedBases = pairedBases;
+        _pictures = pictures;
     }
 
     /// <summary>An overlay that places nothing: every game has no location. It is what applies while the owner data cannot be read.</summary>
@@ -33,7 +43,8 @@ public sealed class OwnerOverlay
         new Dictionary<int, Place>(),
         new Dictionary<string, string>(),
         new Dictionary<int, string>(),
-        new Dictionary<int, int>());
+        new Dictionary<int, int>(),
+        new Dictionary<int, PictureOverride>());
 
     /// <summary>Works out the place of every game in a collection.</summary>
     /// <param name="snapshot">The synced collection.</param>
@@ -81,8 +92,24 @@ public sealed class OwnerOverlay
             }
         }
 
-        return new OwnerOverlay(places, names, own, pairedBases);
+        var pictures = data.Games
+            .Where(game => game.Picture is { Choice: not PictureChoice.Automatic })
+            .GroupBy(game => game.GameId)
+            .ToDictionary(
+                group => group.Key,
+                group =>
+                {
+                    var setting = group.First().Picture!;
+
+                    return new PictureOverride(setting.Choice, setting.Link?.Record, setting.Link?.Url);
+                });
+
+        return new OwnerOverlay(places, names, own, pairedBases, pictures);
     }
+
+    /// <summary>The picture the owner chose for a game, or null when the game is left to the automatic pick.</summary>
+    /// <param name="gameId">The game.</param>
+    public PictureOverride? PictureOverrideOf(int gameId) => _pictures.TryGetValue(gameId, out var setting) ? setting : null;
 
     /// <summary>The identifier of the location the owner gave a game itself, or null when it has none of its own.</summary>
     /// <param name="gameId">The game.</param>

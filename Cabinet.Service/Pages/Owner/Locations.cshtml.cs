@@ -509,7 +509,9 @@ public class LocationsModel : OwnerPage
             variant?.Height ?? 0);
     }
 
-    private static ArtVariant? CoverOf(CabinetItem? item)
+    /// <summary>The small stored picture an item is drawn from, at the width the owner pages show, or null when it has none.</summary>
+    /// <param name="item">The item the cabinet draws, or null.</param>
+    internal static ArtVariant? CoverOf(CabinetItem? item)
     {
         var variants = item?.Art?.Variants;
 

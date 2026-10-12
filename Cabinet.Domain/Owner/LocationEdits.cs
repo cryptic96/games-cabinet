@@ -488,7 +488,7 @@ public static class LocationEdits
         return null;
     }
 
-    private static bool IsEmpty(OwnerGame game) =>
+    internal static bool IsEmpty(OwnerGame game) =>
         game.LocationId is null && game.AbsentSinceUtc is null && game.Picture is null;
 
     private static string LogLine(string title, OwnerLocation? target, bool followsBase)

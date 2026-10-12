@@ -1,0 +1,80 @@
+@page
+@using Cabinet.Domain.Owner
+@using Cabinet.Service.Owner
+@model Cabinet.Service.Pages.Owner.PicturesModel
+@{
+    var choices = new (PictureChoice Kind, string Label)[]
+    {
+        (PictureChoice.Automatic, OwnerStrings.ChoiceAutomatic),
+        (PictureChoice.OwnedEdition, OwnerStrings.ChoiceOwnedEdition),
+        (PictureChoice.MainPicture, OwnerStrings.ChoiceMainPicture),
+        (PictureChoice.Link, OwnerStrings.ChoiceYourLink),
+    };
+}
+<h2>@OwnerStrings.Pictures</h2>
+<p class="owner-intro">@OwnerStrings.PicturesIntro</p>
+@if (Model.Notice is not null)
+{
+    <div class="owner-notice" data-problem="@(Model.NoticeIsProblem ? "true" : null)">
+        <p id="owner-notice" role="@(Model.NoticeIsProblem ? "alert" : "status")">@Model.Notice</p>
+        @if (Model.UndoRevision is { } undoRevision)
+        {
+            <form method="post" asp-page-handler="Undo">
+                <input type="hidden" name="revision" value="@undoRevision" />
+                <button type="submit" class="owner-btn">@OwnerStrings.UndoButton</button>
+            </form>
+        }
+    </div>
+}
+@if (!Model.Readable)
+{
+    <section class="owner-panel">
+        <p>@OwnerStrings.OwnerDataUnreadable</p>
+    </section>
+}
+else if (Model.Games.Count == 0)
+{
+    <section class="owner-panel">
+        <p>@OwnerStrings.NoGamesYet</p>
+    </section>
+}
+else
+{
+    <ul class="pic-list" role="list">
+        @foreach (var game in Model.Games)
+        {
+            <li class="pic-row" id="game-@game.GameId" data-game-id="@game.GameId">
+                <form method="post" asp-page-handler="Choose">
+                    <input type="hidden" name="revision" value="@Model.Revision" />
+                    <input type="hidden" name="gameId" value="@game.GameId" />
+                    <div class="pic-head">
+                        @if (game.CoverUrl is not null)
+                        {
+                            <img class="game-cover" src="@game.CoverUrl" width="@game.CoverWidth" height="@game.CoverHeight" alt="" loading="lazy" decoding="async" />
+                        }
+                        else
+                        {
+                            <span class="game-cover game-swatch" aria-hidden="true"></span>
+                        }
+                        <h3 dir="auto">@game.Title</h3>
+                        @if (game.IsExpansion)
+                        {
+                            <span class="game-tag">@OwnerStrings.ExpansionTag</span>
+                        }
+                    </div>
+                    <fieldset class="pic-choices">
+                        <legend class="visually-hidden" dir="auto">@OwnerStrings.PictureLegend(game.Title)</legend>
+                        @foreach (var (kind, label) in choices)
+                        {
+                            <label class="pic-choice" data-unavailable="@(game.Offers(kind) ? null : "true")">
+                                <input type="radio" name="choice" value="@kind" checked="@(game.Choice == kind)" disabled="@(!game.Offers(kind))" />
+                                <span>@label</span>
+                            </label>
+                        }
+                    </fieldset>
+                    <button type="submit" class="owner-btn">@OwnerStrings.SavePictureButton</button>
+                </form>
+            </li>
+        }
+    </ul>
+}

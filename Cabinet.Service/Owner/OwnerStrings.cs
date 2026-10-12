@@ -30,6 +30,24 @@ public static class OwnerStrings
     /// <summary>The line under the locations page's heading.</summary>
     public const string LocationsIntro = "Say where each game is stored.";
 
+    /// <summary>The line under the pictures page's heading.</summary>
+    public const string PicturesIntro = "Choose the picture the cabinet and the game card use for each game.";
+
+    /// <summary>The button that saves the picture chosen for one game.</summary>
+    public const string SavePictureButton = "Save picture";
+
+    /// <summary>The picture choice that leaves the pick to the cabinet.</summary>
+    public const string ChoiceAutomatic = "Automatic";
+
+    /// <summary>The picture choice that draws the picture of the owned edition.</summary>
+    public const string ChoiceOwnedEdition = "Owned edition";
+
+    /// <summary>The picture choice that draws the game's main picture.</summary>
+    public const string ChoiceMainPicture = "Main picture";
+
+    /// <summary>The picture choice that draws the picture at the owner's own link.</summary>
+    public const string ChoiceYourLink = "Your link";
+
     /// <summary>The heading of the games panel on the locations page.</summary>
     public const string GamesHeading = "Games";
 
@@ -136,6 +154,10 @@ public static class OwnerStrings
     public static bool IsNameProblem(string? statusKey) =>
         statusKey is "name-empty" or "name-too-long" or "name-taken" or "too-many-locations" or "name-characters";
 
+    /// <summary>The name of the group of picture choices of one game.</summary>
+    /// <param name="title">The game's title.</param>
+    public static string PictureLegend(string title) => $"Picture for {title}";
+
     /// <summary>The accessible name of the picker of one game.</summary>
     /// <param name="title">The game's title.</param>
     public static string PickerLabel(string title) => $"Location for {title}";
@@ -181,7 +203,7 @@ public static class OwnerStrings
         "location-renamed" => "Location renamed.",
         "location-moved" => "Location moved.",
         "location-deleted" => "Location deleted.",
-        "game-moved" or "game-unplaced" => "Saved.",
+        "game-moved" or "game-unplaced" or "picture-chosen" => "Saved.",
         "unchanged" => "Nothing to change.",
         "undone" => "Undone.",
         "out-of-date" => "This page was out of date, so nothing was saved. It has been reloaded; try again.",
@@ -194,6 +216,8 @@ public static class OwnerStrings
         "name-characters" => "Use letters, numbers and ordinary punctuation only.",
         "unknown-location" => "That location isn't in your list.",
         "unknown-game" => "That game isn't in your collection any more.",
+        "no-picture" => "That picture isn't available for this game.",
+        "no-link" => "This game has no link saved yet.",
         "nothing-selected" => "Tick at least one game first.",
         "id-clash" or "save-failed" => "Couldn't save that. Try again.",
         _ => null,
