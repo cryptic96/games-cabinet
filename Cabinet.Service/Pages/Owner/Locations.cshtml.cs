@@ -56,6 +56,7 @@ public class LocationsModel : OwnerPage
     private const string LocationTargetPrefix = "location:";
     private const string NotPlacedTarget = "not-placed";
     private const string SameAsBaseTarget = "same-as-base";
+    private const string UnplacedFilter = "unplaced";
     private const int CoverWidthPx = 240;
 
     private readonly OwnerDataService _owner;
@@ -97,6 +98,12 @@ public class LocationsModel : OwnerPage
     /// <summary>Every owned game once, by title.</summary>
     public IReadOnlyList<LocationGameRow> Games { get; private set; } = [];
 
+    /// <summary>Whether the page opens showing only the games that are not placed yet.</summary>
+    public bool FilterUnplaced { get; private set; }
+
+    /// <summary>How many games are shown in no location.</summary>
+    public int UnplacedCount => Games.Count(game => game.EffectiveLocationId is null);
+
     /// <summary>The words for the outcome of the post that sent the browser here, or null.</summary>
     public string? Notice { get; private set; }
 
@@ -110,9 +117,11 @@ public class LocationsModel : OwnerPage
     /// <param name="done">The code of the post that sent the browser here; anything outside the fixed set is ignored.</param>
     /// <param name="item">The location the post was about; ignored unless it is one of the owner's locations.</param>
     /// <param name="confirm">The location the owner is about to delete; ignored unless it is one of the owner's locations.</param>
-    public void OnGet(string? done, string? item, string? confirm)
+    /// <param name="filter">Which games to show first; only <c>unplaced</c> is honoured and anything else is ignored.</param>
+    public void OnGet(string? done, string? item, string? confirm, string? filter)
     {
         Load();
+        FilterUnplaced = string.Equals(filter, UnplacedFilter, StringComparison.Ordinal);
 
         var notice = OwnerResponses.NoticeFor(done);
         var problem = notice is not null && OwnerResponses.IsProblem(done);

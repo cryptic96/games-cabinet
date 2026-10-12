@@ -59,6 +59,12 @@ export const OWNER_TEXT = Object.freeze({
   oneExpansionFollows: '1 expansion now follows its base game',
   and: 'and',
   nothingToChange: 'Nothing to change.',
+  saved: 'Saved',
+  showing: 'Showing {n} of {m} games',
+  noMatchQuery: 'No games match "{query}".',
+  noMatch: 'No games match.',
+  everyPlaced: 'Every game is placed.',
+  unplacedLabel: 'Not placed yet ({n})',
 });
 
 /**
@@ -217,6 +223,51 @@ export function clearedGamesText(notPlaced, following) {
   }
 
   return parts.join(` ${OWNER_TEXT.and} `);
+}
+
+/**
+ * The count line of the games list.
+ * @param {number} shown How many games are shown.
+ * @param {number} total How many games there are.
+ * @returns {string} `Showing {n} of {m} games`.
+ */
+export function showingText(shown, total) {
+  return fill(OWNER_TEXT.showing, { n: shown, m: total });
+}
+
+/**
+ * The line for a search that found nothing. The query is part of the text only; the page writes it with `textContent`.
+ * @param {string} query What the owner typed.
+ * @returns {string} `No games match "{query}".`
+ */
+export function noMatchText(query) {
+  return fill(OWNER_TEXT.noMatchQuery, { query });
+}
+
+/**
+ * What the page says about the games it shows now: the count, or why there are none.
+ * @param {{ shown: number, total: number, query: string, unplacedOnly: boolean }} state What is shown and which rules are on.
+ * @returns {string}
+ */
+export function resultText({ shown, total, query, unplacedOnly }) {
+  if (shown === 0 && query !== '') {
+    return noMatchText(query);
+  }
+
+  if (shown === 0 && unplacedOnly) {
+    return OWNER_TEXT.everyPlaced;
+  }
+
+  return showingText(shown, total);
+}
+
+/**
+ * The label of the switch that shows only the games that are not placed.
+ * @param {number} count How many games are not placed.
+ * @returns {string} `Not placed yet ({n})`.
+ */
+export function unplacedLabel(count) {
+  return fill(OWNER_TEXT.unplacedLabel, { n: count });
 }
 
 /**

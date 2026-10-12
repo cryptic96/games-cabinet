@@ -280,6 +280,7 @@ header > .owner-plate {
 }
 
 .owner-panel input[type="text"],
+.owner-panel input[type="search"],
 .owner-panel select {
   min-height: 44px;
   max-width: 100%;
@@ -621,12 +622,125 @@ header > .owner-plate {
   border-color: var(--paper-label);
 }
 
-.game-form {
+.game-picker {
   display: flex;
   grid-area: form;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.picker-label {
+  color: var(--paper-label);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.game-form {
+  display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
+}
+
+.game-row[data-context] .game-title {
+  color: var(--paper-label);
+  font-weight: 400;
+}
+
+.games-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 24px;
+  margin-bottom: 8px;
+}
+
+.owner-find {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.owner-find label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--paper-label);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.owner-panel .owner-find input[type="search"] {
+  width: 100%;
+}
+
+.owner-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.owner-switch input {
+  flex: none;
+  margin: 0;
+  cursor: pointer;
+}
+
+.owner-switch input[role="switch"] {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border: 2px solid var(--paper-label);
+  border-radius: 12px;
+  background: transparent;
+  appearance: none;
+}
+
+.owner-switch input[role="switch"]::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  inset-inline-start: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--paper-label);
+  transition: translate 120ms ease-out;
+}
+
+.owner-switch input[role="switch"]:checked {
+  border-color: var(--ink);
+  background: var(--ink);
+}
+
+.owner-switch input[role="switch"]:checked::after {
+  background: var(--paper);
+  translate: 20px 0;
+}
+
+.owner-selectall input {
+  width: 24px;
+  height: 24px;
+  accent-color: var(--ink);
+}
+
+.games-count {
+  margin: 0 0 8px;
+}
+
+.games-empty {
+  margin: 16px 0;
+  padding-inline-start: 12px;
+  border-inline-start: 4px solid var(--paper-label);
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .owner-switch input[role="switch"]::after {
+    transition: none;
+  }
 }
 
 .game-form select {
