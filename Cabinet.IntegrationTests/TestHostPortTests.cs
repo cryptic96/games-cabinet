@@ -3,6 +3,9 @@ using System.Net.Sockets;
 using Cabinet.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.AspNetCore.Connections;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Cabinet.IntegrationTests;
 
@@ -34,6 +37,42 @@ public class TestHostPortTests
         factory.PublicPort.Should().NotBe(takenPort);
         pageResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         healthResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task An_owner_port_taken_before_binding_is_replaced_with_a_free_one()
+    {
+        using var squatter = new TcpListener(IPAddress.Loopback, 0);
+        squatter.Start();
+        var takenPort = ((IPEndPoint)squatter.LocalEndpoint).Port;
+        var picks = 0;
+
+        await using var factory = new CabinetWebApplicationFactory(
+            new Dictionary<string, string?>(),
+            () =>
+            {
+                var ports = CabinetWebApplicationFactory.PickFreeLoopbackPorts();
+                return ++picks == 1 ? (ports.Public, ports.Ops, takenPort) : ports;
+            });
+        using var owner = factory.CreateOwnerClient();
+
+        using var response = await owner.GetAsync("/owner/settings", TestContext.Current.CancellationToken);
+
+        picks.Should().Be(2);
+        factory.OwnerPort.Should().NotBe(takenPort);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task The_owner_listener_is_bound_to_loopback_on_its_own_port()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        var addresses = factory.ServingServices.GetRequiredService<IServer>()
+            .Features.Get<IServerAddressesFeature>()!.Addresses;
+
+        factory.OwnerPort.Should().NotBe(factory.PublicPort);
+        factory.OwnerPort.Should().NotBe(factory.OpsPort);
+        addresses.Should().Contain($"http://127.0.0.1:{factory.OwnerPort}");
     }
 
     [Fact]

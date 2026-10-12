@@ -9,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Cabinet.IntegrationTests;
 
-/// <summary>Verifies every HTML page carries the linked BoardGameGeek credit and the robots tag through the shared layout.</summary>
+/// <summary>Verifies every public HTML page carries the linked BoardGameGeek credit, and every page the robots tag, through its layout.</summary>
 [Trait("Category", "Credit")]
 public partial class CreditTests
 {
@@ -18,7 +18,7 @@ public partial class CreditTests
     {
         await using var factory = new CabinetWebApplicationFactory();
         using var client = factory.CreatePublicClient();
-        var routes = PageRoutes(factory);
+        var routes = PageRoutes(factory).Where(route => !IsOwnerRoute(route)).ToList();
 
         routes.Should().NotBeEmpty("the app serves at least the cabinet page");
 
@@ -36,13 +36,15 @@ public partial class CreditTests
     public async Task Every_razor_page_asks_search_engines_not_to_index_it()
     {
         await using var factory = new CabinetWebApplicationFactory();
-        using var client = factory.CreatePublicClient();
+        using var publicClient = factory.CreatePublicClient();
+        using var ownerClient = factory.CreateOwnerClient();
         var routes = PageRoutes(factory);
 
         routes.Should().NotBeEmpty("the app serves at least the cabinet page");
 
         foreach (var route in routes)
         {
+            var client = IsOwnerRoute(route) ? ownerClient : publicClient;
             using var response = await client.GetAsync(route, TestContext.Current.CancellationToken);
             var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
@@ -143,6 +145,9 @@ public partial class CreditTests
             .Select(endpoint => RouteOf(endpoint.RoutePattern))
             .Distinct(StringComparer.Ordinal)
             .ToList();
+
+    private static bool IsOwnerRoute(string route) =>
+        route.StartsWith("/owner/", StringComparison.OrdinalIgnoreCase);
 
     private static string RouteOf(RoutePattern pattern)
     {
