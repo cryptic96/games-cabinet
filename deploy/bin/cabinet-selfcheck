@@ -38,7 +38,8 @@ usage() {
 Usage: cabinet-selfcheck [-h|--help]
 
 Checks, as root, that this host is correctly provisioned: units, file modes,
-listeners, firewall, health at the installed version, that the installed
+listeners (the app, the loopback ops port and the optional owner port),
+the owner tools' address walls when the owner port is on, firewall, health at the installed version, that the installed
 scripts, libraries and units match the active release, SSH key-only login, no
 GitHub credential or Actions runner, and the image smoke in a sandbox.
 Prints PASS or FAIL per check and exits 1 when any check fails.
@@ -123,6 +124,12 @@ check_listeners() {
     pass "the ops port 5081 is bound to loopback only"
   else
     fail "the ops port 5081 is reachable beyond loopback"
+  fi
+
+  if [[ -n "$(listener_addresses "$sockets" 5082)" ]]; then
+    pass "the owner port 5082 is listening"
+  else
+    pass "the owner tools are off (nothing listens on port 5082)"
   fi
 }
 

@@ -159,8 +159,10 @@ assert_matches "rendered nftables: admits SSH only from the configured admin ran
   'tcp dport 22 ip saddr \{ 192\.0\.2\.0/24,198\.51\.100\.0/24 \} accept' "$nft_content"
 assert_matches "rendered nftables: admits the app port only from the Traefik address" \
   'tcp dport 5080 ip saddr 192\.0\.2\.10 accept' "$nft_content"
-assert_eq "rendered nftables: exactly two tcp dport rules exist" \
-  "2" "$(grep -c 'tcp dport' <<<"$nft_content")"
+assert_matches "rendered nftables: admits the owner port only from the Traefik address" \
+  'tcp dport 5082 ip saddr 192\.0\.2\.10 accept' "$nft_content"
+assert_eq "rendered nftables: exactly three tcp dport rules exist" \
+  "3" "$(grep -c 'tcp dport' <<<"$nft_content")"
 assert_lacks "rendered nftables: no unreplaced token remains" \
   '@[A-Z][A-Z0-9_]*@' "$nft_content"
 assert_lacks "rendered nftables: no rule mentions the loopback ops port" \

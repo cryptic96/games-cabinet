@@ -309,15 +309,23 @@ check "image smoke fails when the binary prints nothing" "0 1" "${RUN_PASSED} ${
 STUB_SS_OUTPUT=$'LISTEN 0 512 0.0.0.0:5080 0.0.0.0:*\nLISTEN 0 512 127.0.0.1:5081 0.0.0.0:*'
 export STUB_SS_OUTPUT
 run_selfcheck_function check_listeners
-check "listeners pass with 5080 public and 5081 on loopback" "2 0" "${RUN_PASSED} ${RUN_FAILED}"
+check "listeners pass with 5080 public, 5081 on loopback and the owner tools off" "3 0" "${RUN_PASSED} ${RUN_FAILED}"
+check "listeners say the owner tools are off when nothing listens on 5082" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "the owner tools are off (nothing listens on port 5082)")"
+
+STUB_SS_OUTPUT=$'LISTEN 0 512 0.0.0.0:5080 0.0.0.0:*\nLISTEN 0 512 127.0.0.1:5081 0.0.0.0:*\nLISTEN 0 512 0.0.0.0:5082 0.0.0.0:*'
+run_selfcheck_function check_listeners
+check "listeners pass three checks with the owner port listening" "3 0" "${RUN_PASSED} ${RUN_FAILED}"
+check "listeners report the owner port when it listens" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "the owner port 5082 is listening")"
 
 STUB_SS_OUTPUT=$'LISTEN 0 512 0.0.0.0:5080 0.0.0.0:*\nLISTEN 0 512 0.0.0.0:5081 0.0.0.0:*'
 run_selfcheck_function check_listeners
-check "listeners fail when the ops port is bound beyond loopback" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "listeners fail when the ops port is bound beyond loopback" "2 1" "${RUN_PASSED} ${RUN_FAILED}"
 
 STUB_SS_OUTPUT=$'LISTEN 0 512 127.0.0.1:5081 0.0.0.0:*'
 run_selfcheck_function check_listeners
-check "listeners fail when nothing serves the public port" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "listeners fail when nothing serves the public port" "2 1" "${RUN_PASSED} ${RUN_FAILED}"
 
 STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain input {\n\t\ttype filter hook input priority filter; policy drop;\n\t}\n}'
 export STUB_NFT_OUTPUT
