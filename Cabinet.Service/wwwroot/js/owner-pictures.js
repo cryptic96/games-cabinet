@@ -6,7 +6,8 @@
  * all-games view in collator order, and works the worklist: `Looks right` records a game as checked, every save or undo carries
  * the counts the counter above the games shows, a resolved row stays where it is with a `Checked` mark until the next load, and
  * a search box narrows the rows. In the single-game view, which shows one game on its own, focus goes to the title and the location
- * picker under the choices saves the value it settles on through the locations page's handler. Every title is written with `textContent`, never as markup.
+ * picker under the choices saves the value it settles on through the locations page's handler. The link form of each row is wired by
+ * `owner-link.js`. Every title is written with `textContent`, never as markup.
  */
 import { drawGeneratedCover } from './card-view.js';
 import {
@@ -18,6 +19,7 @@ import {
   worthALookLinkText,
 } from './owner-format.js';
 import { initPickers } from './owner-games.js';
+import { initLinkBox } from './owner-link.js';
 import {
   announce,
   createFinder,
@@ -171,17 +173,26 @@ function initCovers(doc) {
   }
 
   for (const image of doc.querySelectorAll('.pic-art[data-art="picture"] > img')) {
-    const art = image.parentElement;
-    const swap = () => {
-      drawCover(art, titleOf(art.closest('.pic-row')));
-      markWontLoad(art.closest('.pic-row'));
-    };
+    watchPicture(image);
+  }
+}
 
-    if (image.complete && image.naturalWidth === 0) {
-      swap();
-    } else {
-      image.addEventListener('error', swap, { once: true });
-    }
+/**
+ * Swaps a tile's picture to the generated cover, without a word, when the browser cannot show it, and gives the row the
+ * `Picture won't load` mark.
+ * @param {HTMLImageElement} image The picture of a tile.
+ */
+function watchPicture(image) {
+  const art = image.parentElement;
+  const swap = () => {
+    drawCover(art, titleOf(art.closest('.pic-row')));
+    markWontLoad(art.closest('.pic-row'));
+  };
+
+  if (image.complete && image.naturalWidth === 0) {
+    swap();
+  } else {
+    image.addEventListener('error', swap, { once: true });
   }
 }
 
@@ -422,6 +433,7 @@ export function initPictures(doc = globalThis.document) {
 
   for (const row of list.querySelectorAll('.pic-row')) {
     initRow(row, enqueue, showCounts);
+    initLinkBox(row, { enqueue, showCounts, applyRowState, showProblem, watchPicture });
   }
 
   initFind(doc, list);
@@ -429,6 +441,8 @@ export function initPictures(doc = globalThis.document) {
   if (list.dataset.view === 'single') {
     initSingleGame(doc, list, enqueue);
   }
+
+  doc.querySelector('.pic-preview h4')?.focus();
 
   list.dataset.enhanced = '';
 }

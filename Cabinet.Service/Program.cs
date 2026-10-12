@@ -99,6 +99,7 @@ app.MapCabinetLayout();
 app.MapCabinetLanguage();
 app.MapCabinetSync();
 app.MapCabinetLive();
+app.MapCabinetOwner();
 
 await app.RunAsync();
 

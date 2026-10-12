@@ -276,7 +276,12 @@ public static class PictureRows
             ? ArtVerdictKinds.Of(ArtVerdicts.Classify(features, rules.Thresholds), features)
             : null;
 
-    private static ArtFile? FileOf(ImageRecord record)
+    /// <summary>
+    /// The stored file a small picture of a record is drawn from: the narrowest file that is at least as wide as a tile, and the
+    /// widest one when none is wide enough. Null when the record has no files.
+    /// </summary>
+    /// <param name="record">The stored record.</param>
+    internal static ArtFile? FileOf(ImageRecord record)
     {
         var files = record.Files;
 

@@ -76,6 +76,20 @@ export const OWNER_TEXT = Object.freeze({
   allGamesLink: 'All games ({m})',
   wontLoad: "Picture won't load",
   wontLoadNote: "The picture can't be loaded right now. The cabinet shows a generated cover until it can.",
+  checkLink: 'Check link',
+  checking: 'Checking...',
+  yours: 'Yours',
+  linkFailed: "Couldn't use that link. Check it and try again.",
+  linkExpired: 'This preview expired. Check the link again.',
+  previewHeading: 'Preview',
+  previewSub: 'How this picture will look in the cabinet.',
+  boxFront: 'Box front',
+  spine: 'Spine',
+  boxFrontOf: 'Box front of {title}',
+  spineOf: 'Spine of {title}',
+  previewDisclaimer: "The site can't check that this picture belongs to this game.",
+  useThis: 'Use this',
+  discardPreview: 'Discard preview',
 });
 
 /**

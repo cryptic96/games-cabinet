@@ -29,6 +29,8 @@ public static class OwnerResponses
         "unknown-game",
         "no-picture",
         "no-link",
+        "link-failed",
+        "link-expired",
         "nothing-selected",
         "id-clash",
         "save-failed",
@@ -136,6 +138,15 @@ public static class OwnerResponses
             "unreadable" => "unreadable",
             _ => null,
         };
+    }
+
+    /// <summary>Whether the request asks for a JSON answer, as a script's request does.</summary>
+    /// <param name="request">The request.</param>
+    public static bool AsksForJson(HttpRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return AcceptsJson(request);
     }
 
     private static bool AcceptsJson(HttpRequest request) =>

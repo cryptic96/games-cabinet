@@ -24,7 +24,13 @@ public static class OwnerEndpoints
     /// <summary>The path of the settings page.</summary>
     public const string SettingsPath = "/owner/settings";
 
+    /// <summary>The path a previewed picture is served from, followed by its token.</summary>
+    public const string PreviewPath = "/owner/preview";
+
     private const int DefaultBodyLimitBytes = 64 * 1024;
+    private const string WebpMediaType = "image/webp";
+    private const string NoStore = "no-store";
+    private const string NoSniff = "nosniff";
 
     /// <summary>
     /// Validates the owner access settings now, so a half-configured owner endpoint stops the start-up instead of serving, and
@@ -57,6 +63,7 @@ public static class OwnerEndpoints
             provider.GetRequiredService<ImageOptions>(),
             provider.GetRequiredService<TimeProvider>()));
         services.AddHostedService<OwnerLinkWorker>();
+        services.AddSingleton(provider => new StagedItems<StagedLink>(provider.GetRequiredService<TimeProvider>()));
 
         services.Configure<RouteOptions>(options => options.LowercaseUrls = true);
 
@@ -79,5 +86,34 @@ public static class OwnerEndpoints
         });
 
         return services;
+    }
+
+    /// <summary>
+    /// Maps the owner's own endpoints that are not pages: the preview of a linked picture, served from the copy staged in
+    /// memory by its token. The route carries the owner-only marker, so it answers on the owner port only. A token that is not
+    /// the shape of a token, has run out or was never staged is not found, and no file path is ever built from the request.
+    /// </summary>
+    /// <param name="endpoints">The route builder.</param>
+    public static IEndpointRouteBuilder MapCabinetOwner(this IEndpointRouteBuilder endpoints)
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+
+        endpoints.MapGet(
+            PreviewPath + "/{token}",
+            (string token, StagedItems<StagedLink> staged, HttpContext context) =>
+            {
+                if (!staged.TryGet(token, out var item))
+                {
+                    return Results.NotFound();
+                }
+
+                context.Response.Headers.CacheControl = NoStore;
+                context.Response.Headers.XContentTypeOptions = NoSniff;
+
+                return Results.File(item.Preview.Bytes, WebpMediaType);
+            })
+            .WithMetadata(new OwnerOnlyAttribute());
+
+        return endpoints;
     }
 }

@@ -364,6 +364,65 @@ public static class OwnerStrings
     /// <summary>The dock button that unticks every game.</summary>
     public const string ClearButton = "Clear";
 
+    /// <summary>The summary of the disclosure that holds the form for a picture from a link.</summary>
+    public const string LinkSummary = "Use a picture from a link";
+
+    /// <summary>The label of the field the owner pastes a picture address into.</summary>
+    public const string LinkLabel = "Picture link";
+
+    /// <summary>The hint under the field the owner pastes a picture address into.</summary>
+    public const string LinkHint = "A direct picture link from BGG's gallery. Open the picture there, choose \"Copy image address\", and paste it here.";
+
+    /// <summary>The button that fetches the picture at the pasted address and shows a preview.</summary>
+    public const string CheckLinkButton = "Check link";
+
+    /// <summary>The button that stores the previewed picture and chooses it.</summary>
+    public const string UseThisButton = "Use this";
+
+    /// <summary>The button that throws the previewed picture away.</summary>
+    public const string DiscardPreviewButton = "Discard preview";
+
+    /// <summary>The heading of the preview of a linked picture.</summary>
+    public const string PreviewHeading = "Preview";
+
+    /// <summary>The line under <see cref="PreviewHeading"/>.</summary>
+    public const string PreviewSub = "How this picture will look in the cabinet.";
+
+    /// <summary>The caption of the face-out box in the preview.</summary>
+    public const string BoxFrontCaption = "Box front";
+
+    /// <summary>The caption of the spine in the preview.</summary>
+    public const string SpineCaption = "Spine";
+
+    /// <summary>The line in the preview that says the site cannot tell whether the picture belongs to the game.</summary>
+    public const string PreviewDisclaimer = "The site can't check that this picture belongs to this game.";
+
+    /// <summary>The accessible name of the face-out box in the preview.</summary>
+    /// <param name="title">The game's title.</param>
+    public static string PreviewBoxLabel(string title) => $"Box front of {title}";
+
+    /// <summary>The accessible name of the spine in the preview.</summary>
+    /// <param name="title">The game's title.</param>
+    public static string PreviewSpineLabel(string title) => $"Spine of {title}";
+
+    /// <summary>Says where the size of the box in a preview came from.</summary>
+    /// <param name="source">Where it came from.</param>
+    public static string ShapeText(PreviewShapeSource source) => source switch
+    {
+        PreviewShapeSource.Bgg => "Box shape: from BGG's size",
+        PreviewShapeSource.Picture => "Box shape: from this picture",
+        _ => "Box shape: estimated",
+    };
+
+    /// <summary>The note under a preview whose picture reads as something other than a flat cover, or null when there is none to give.</summary>
+    /// <param name="kind">What the picture reads as.</param>
+    public static string? PreviewNote(ArtVerdictKind kind) => kind switch
+    {
+        ArtVerdictKind.ThreeD or ArtVerdictKind.CutOut or ArtVerdictKind.TightCrop =>
+            $"This picture reads as {ReadsAs(kind)}. You can still use it. The box keeps its shape from BGG's size or an estimate.",
+        _ => null,
+    };
+
     /// <summary>The words for a status key, or null when the key is not one the owner tools use.</summary>
     /// <param name="statusKey">The key an owner result carries.</param>
     public static string? Message(string? statusKey) => statusKey switch
@@ -388,6 +447,8 @@ public static class OwnerStrings
         "unknown-game" => "That game isn't in your collection any more.",
         "no-picture" => "That picture isn't available for this game.",
         "no-link" => "This game has no link saved yet.",
+        "link-failed" => "Couldn't use that link. Check it and try again.",
+        "link-expired" => "This preview expired. Check the link again.",
         "nothing-selected" => "Tick at least one game first.",
         "id-clash" or "save-failed" => "Couldn't save that. Try again.",
         _ => null,

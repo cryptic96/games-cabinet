@@ -1,3 +1,5 @@
+using Cabinet.Domain.Collection;
+
 namespace Cabinet.Domain.Owner;
 
 /// <summary>The edits of the owner's picture decisions. Every edit is pure: it gives back new data and leaves the old untouched.</summary>
@@ -70,6 +72,53 @@ public static class PictureEdits
         return new OwnerChange(
             data with { Games = [.. games.OrderBy(game => game.GameId)] },
             $"Picture of {title}: {Words(choice)}",
+            ChosenStatusKey);
+    }
+
+    /// <summary>
+    /// Stores a picture the owner linked and chooses it: the address and its processed record become the game's link, replacing
+    /// any link the game had before, the choice becomes the link and the game counts as checked. Both picture addresses BGG
+    /// offers right now are remembered so a later change of either is noticed. The pictures themselves are written before this
+    /// edit is applied, so a record never refers to files that are not there.
+    /// </summary>
+    /// <param name="data">The data to change.</param>
+    /// <param name="gameId">The game.</param>
+    /// <param name="url">The canonical address of the linked picture.</param>
+    /// <param name="record">The processed record of the picture.</param>
+    /// <param name="title">The game's title, for the change log.</param>
+    /// <param name="currentOwnedUrl">The address of the owned edition's picture now, or null when BGG offers none.</param>
+    /// <param name="currentMainUrl">The address of the game's main picture now, or null when BGG offers none.</param>
+    public static OwnerChange UseLink(
+        OwnerData data,
+        int gameId,
+        string url,
+        ImageRecord record,
+        string title,
+        string? currentOwnedUrl,
+        string? currentMainUrl)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(record);
+        ArgumentNullException.ThrowIfNull(title);
+
+        if (string.IsNullOrWhiteSpace(url) || record.Status != ImageStatus.Ok || record.Files is not { Count: > 0 })
+        {
+            return OwnerChange.Refused(data, NoLinkStatusKey);
+        }
+
+        var current = data.Games.FirstOrDefault(game => game.GameId == gameId);
+        var next = new PictureSetting(
+            PictureChoice.Link,
+            true,
+            currentOwnedUrl,
+            currentMainUrl,
+            new PictureLink(url, record, 0, null));
+        var updated = (current ?? new OwnerGame(gameId, null, null, null)) with { Picture = next };
+        var games = data.Games.Where(game => game.GameId != gameId).Append(updated);
+
+        return new OwnerChange(
+            data with { Games = [.. games.OrderBy(game => game.GameId)] },
+            $"Picture of {title}: {Words(PictureChoice.Link)}",
             ChosenStatusKey);
     }
 
