@@ -178,6 +178,30 @@ public sealed class OwnerSingleGameTests : CabinetPageTest
     }
 
     [Fact]
+    public async Task Without_script_Save_picture_in_the_single_game_view_returns_to_that_view()
+    {
+        var host = await StartHostAsync();
+        var game = host.Card(QuarryBase);
+        var plain = await Browser.NewContextAsync(new BrowserNewContextOptions
+        {
+            JavaScriptEnabled = false,
+            ViewportSize = new ViewportSize { Width = 1440, Height = 900 },
+            ExtraHTTPHeaders = new Dictionary<string, string> { ["Accept-Encoding"] = "identity" },
+        });
+        var page = await plain.NewPageAsync();
+        await page.GotoAsync($"http://127.0.0.1:{OwnerPort}{PicturesPath}?game={game.GameId}");
+
+        await page.Locator("label.pic-tile", new PageLocatorOptions { HasText = "Main picture" }).ClickAsync();
+        await page.GetByRole(AriaRole.Button, new() { Name = "Save picture" }).ClickAsync();
+
+        await Expect(page.Locator("#owner-notice")).ToHaveTextAsync("Saved.");
+        page.Url.Should().MatchRegex($@"/owner/pictures\?done=saved&game={game.GameId}#game-{game.GameId}$");
+        await Expect(page.Locator(".pic-row")).ToHaveCountAsync(1);
+        await Expect(page.Locator("input[value=MainPicture]")).ToBeCheckedAsync();
+        await plain.CloseAsync();
+    }
+
+    [Fact]
     public async Task A_return_target_outside_the_fixed_set_returns_to_the_locations_page_and_never_follows_the_value()
     {
         var host = await StartHostAsync();
@@ -204,6 +228,7 @@ public sealed class OwnerSingleGameTests : CabinetPageTest
     [Theory]
     [InlineData(1440, 900)]
     [InlineData(390, 844)]
+    [InlineData(320, 640)]
     public async Task A_long_title_wraps_and_the_view_fits_the_width_with_every_control_at_least_44_pixels(int width, int height)
     {
         var host = await StartHostAsync();
