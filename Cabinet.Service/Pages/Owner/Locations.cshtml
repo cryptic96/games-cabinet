@@ -54,7 +54,7 @@ else
         <div class="row-status" id="new-location-status" role="status"></div>
     </details>
     <section class="owner-panel" aria-labelledby="games-heading">
-        <h3 id="games-heading">@OwnerStrings.GamesHeading</h3>
+        <h3 id="games-heading" tabindex="-1">@OwnerStrings.GamesHeading</h3>
         @if (Model.Games.Count == 0)
         {
             <p>@OwnerStrings.NoGamesYet</p>
@@ -68,11 +68,35 @@ else
             <ul class="game-list" role="list">
                 @foreach (var game in Model.Games)
                 {
-                    <li class="game-row" id="game-@game.GameId">
-                        <form method="post" asp-page-handler="Assign">
+                    <li class="game-row" id="game-@game.GameId" data-game-id="@game.GameId" data-base-id="@game.BaseGameId" data-nested="@(game.FollowsBase ? "true" : "false")">
+                        <label class="game-pick">
+                            <input type="checkbox" class="game-check" value="@game.GameId" aria-label="@OwnerStrings.SelectLabel(game.Title)" />
+                        </label>
+                        @if (game.CoverUrl is not null)
+                        {
+                            <img class="game-cover" src="@game.CoverUrl" width="@game.CoverWidth" height="@game.CoverHeight" alt="" loading="lazy" decoding="async" />
+                        }
+                        else
+                        {
+                            <span class="game-cover game-swatch" data-swatch="@game.SwatchColour" aria-hidden="true"></span>
+                        }
+                        <div class="game-text">
+                            <span class="game-title" dir="auto">@game.Title</span>
+                            <span class="game-meta">
+                                <span class="game-where" dir="auto" data-unplaced="@(game.EffectiveLocation is null ? "true" : null)">@(game.EffectiveLocation ?? OwnerStrings.NotPlaced)</span>
+                                @if (game.IsExpansion)
+                                {
+                                    <span class="game-tag">@(game.FollowsBase ? OwnerStrings.ExpansionTag : OwnerStrings.OrphanExpansionTag)</span>
+                                }
+                                @if (game.FollowsBase)
+                                {
+                                    <span class="game-follow" dir="auto" hidden="@(game.OwnLocationId is not null)">@OwnerStrings.SameAs(game.BaseTitle ?? string.Empty)</span>
+                                }
+                            </span>
+                        </div>
+                        <form method="post" asp-page-handler="Assign" class="game-form">
                             <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
                             <input type="hidden" name="gameId" value="@game.GameId" />
-                            <span class="game-title" dir="auto">@game.Title</span>
                             <select name="locationId" aria-label="@OwnerStrings.PickerLabel(game.Title)">
                                 <option value="" selected="@(game.OwnLocationId is null)">@(game.BaseTitle is null ? OwnerStrings.NotPlaced : OwnerStrings.SameAs(game.BaseTitle))</option>
                                 @foreach (var location in Model.Locations)
@@ -87,6 +111,14 @@ else
             </ul>
         }
     </section>
+    <div class="select-dock" id="select-dock" role="region" aria-label="@OwnerStrings.SelectionLabel" hidden>
+        <p class="dock-count" id="dock-count" dir="auto"></p>
+        <div class="dock-status" id="dock-status" role="status" tabindex="-1" dir="auto"></div>
+        <div class="dock-actions" id="dock-actions">
+            <button type="button" class="owner-btn-wall-primary" id="dock-move" aria-haspopup="dialog">@OwnerStrings.MoveToButton</button>
+            <button type="button" class="owner-btn-wall" id="dock-clear">@OwnerStrings.ClearButton</button>
+        </div>
+    </div>
     <dialog class="owner-dialog" id="loc-delete-dialog" aria-labelledby="loc-delete-title" aria-describedby="loc-delete-body">
         <h3 id="loc-delete-title" dir="auto"></h3>
         <p class="warning-line" id="loc-delete-body" dir="auto"><strong></strong> <span></span></p>

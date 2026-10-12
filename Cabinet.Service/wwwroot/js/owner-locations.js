@@ -9,12 +9,14 @@ import {
   OWNER_TEXT,
   deleteDialogParts,
   deletedText,
+  effectiveLocationIds,
   fill,
   gameCount,
   headingText,
   movedText,
   refusalText,
 } from './owner-format.js';
+import { gameStates, initPlacing } from './owner-placing.js';
 import {
   announce,
   getRevision,
@@ -87,6 +89,7 @@ export function initLocationList(doc = globalThis.document) {
   let opener = null;
   let confirmed = false;
   let pendingDelete = null;
+  let placing = null;
 
   initRevision(doc);
 
@@ -228,6 +231,29 @@ export function initLocationList(doc = globalThis.document) {
 
       select.value = Array.from(select.options).some((option) => option.value === previous) ? previous : '';
     }
+
+    placing?.refreshMeta();
+  }
+
+  /**
+   * Brings the game count and the not-placed count of every location in line with where the games are kept now, which is what
+   * the delete question and the count beside each name say. Called after games moved.
+   */
+  function recountGames() {
+    const states = gameStates(doc);
+    const shown = effectiveLocationIds(states);
+
+    for (const item of items()) {
+      const id = item.dataset.locationId;
+      const without = effectiveLocationIds(states, id);
+      const here = states.filter((game) => shown.get(game.id) === id);
+
+      item.dataset.games = String(here.length);
+      item.dataset.notPlaced = String(here.filter((game) => (without.get(game.id) ?? '') === '').length);
+    }
+
+    refresh();
+    placing?.refreshMeta();
   }
 
   /**
@@ -443,6 +469,8 @@ export function initLocationList(doc = globalThis.document) {
           for (const select of placed) {
             select.value = item.dataset.locationId;
           }
+
+          placing?.refreshMeta();
         },
         () => nameField(item),
       ),
@@ -591,6 +619,12 @@ export function initLocationList(doc = globalThis.document) {
   }
 
   refresh();
+  placing = initPlacing(doc, {
+    enqueue,
+    locations: () => items().map((item) => ({ id: item.dataset.locationId, name: item.dataset.saved })),
+    showProblem,
+    gamesChanged: recountGames,
+  });
   panel.dataset.enhanced = '';
 }
 
