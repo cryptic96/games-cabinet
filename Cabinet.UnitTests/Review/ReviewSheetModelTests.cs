@@ -199,6 +199,70 @@ public sealed partial class ReviewSheetModelTests : IDisposable
         rows[1].SpineText.Should().MatchRegex("^#[0-9a-f]{6}$");
     }
 
+    [Fact]
+    public void Each_row_carries_the_shared_verdict_kind_and_no_kind_when_there_is_no_verdict()
+    {
+        AddOneGameOfEachKind();
+
+        var rows = Rows();
+
+        rows.Select(row => row.Kind).Should().Equal(
+            ArtVerdictKind.Flat,
+            ArtVerdictKind.Unsure,
+            ArtVerdictKind.ThreeD,
+            ArtVerdictKind.CutOut,
+            ArtVerdictKind.TightCrop,
+            null);
+    }
+
+    [Fact]
+    public void The_verdict_counts_put_every_game_under_exactly_one_kind_and_add_up()
+    {
+        AddOneGameOfEachKind();
+
+        var rows = Rows();
+        var counts = ReviewSheetModel.CountVerdicts(rows);
+
+        counts.Should().Be(new VerdictCounts(Flat: 1, Unsure: 1, ThreeD: 1, CutOut: 1, TightCrop: 1, NoVerdict: 1));
+        counts.Total.Should().Be(rows.Count);
+    }
+
+    [Fact]
+    public void Games_sharing_a_kind_are_counted_together()
+    {
+        var cutOut = new ArtFeatures(0.13, 1.0, 0.0, 0.0, 0, CutOut: true);
+        _fixture.Game(1, "Invented Lighthouse One", _fixture.MeasuredPicture("one", SyntheticArtKind.CutOutFrontOn, cutOut), null, UprightBox);
+        _fixture.Game(2, "Invented Lighthouse Two", _fixture.MeasuredPicture("two", SyntheticArtKind.CutOutFrontOn, cutOut), null, UprightBox);
+        _fixture.Game(3, "Invented Lighthouse Three", null, null, UprightBox);
+
+        var counts = ReviewSheetModel.CountVerdicts(Rows());
+
+        counts.Should().Be(new VerdictCounts(Flat: 0, Unsure: 0, ThreeD: 0, CutOut: 2, TightCrop: 0, NoVerdict: 1));
+        counts.Total.Should().Be(3);
+    }
+
+    [Fact]
+    public void The_verdict_words_are_one_per_kind()
+    {
+        AddOneGameOfEachKind();
+
+        Rows().Select(row => row.Verdict).Should().Equal("flat", "unsure", "3D shot", "3D shot, cut-out", "3D shot, tight crop", "no verdict");
+    }
+
+    private void AddOneGameOfEachKind()
+    {
+        var unsure = new ArtFeatures(0.2, 0.95, 0.3, 0.2, 4);
+        var cutOut = new ArtFeatures(0.13, 1.0, 0.0, 0.0, 0, CutOut: true);
+        var closeCrop = new ArtFeatures(0.06, 0.94, 0.31, 0.26, 4, CutOut: false, TightCrop: true);
+
+        _fixture.Game(1, "Invented Lighthouse One", _fixture.Picture("flat", SyntheticArtKind.FlatCover), null, UprightBox);
+        _fixture.Game(2, "Invented Lighthouse Two", _fixture.MeasuredPicture("unsure", SyntheticArtKind.FlatCover, unsure), null, UprightBox);
+        _fixture.Game(3, "Invented Lighthouse Three", _fixture.Picture("three-d", SyntheticArtKind.BoxOnWhite), null, UprightBox);
+        _fixture.Game(4, "Invented Lighthouse Four", _fixture.MeasuredPicture("cut-out", SyntheticArtKind.CutOutFrontOn, cutOut), null, UprightBox);
+        _fixture.Game(5, "Invented Lighthouse Five", _fixture.MeasuredPicture("tight", SyntheticArtKind.BoxOnWhiteTightCrop, closeCrop), null, UprightBox);
+        _fixture.Game(6, "Invented Lighthouse Six", null, null, UprightBox);
+    }
+
     private IReadOnlyList<ReviewRow> Rows() => ReviewSheetModel.Build(_fixture.Snapshot(), ArtRules.Default, _fixture.ArtPath);
 
     [GeneratedRegex(@"^\d\.\d\d$")]
