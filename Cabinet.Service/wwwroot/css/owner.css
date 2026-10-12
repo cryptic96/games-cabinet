@@ -911,3 +911,121 @@ header > .owner-plate {
   top: -12px;
   border-top: 1px solid var(--paper-rule);
 }
+
+.pic-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pic-row {
+  padding: 16px;
+  border: 1px solid var(--paper-edge);
+  border-radius: 2px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(20 10 4 / 0.4);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 200px;
+}
+
+@media (min-width: 40.0625rem) {
+  .pic-list {
+    gap: 24px;
+  }
+
+  .pic-row {
+    padding: 24px;
+  }
+}
+
+.pic-row form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pic-row a:focus-visible,
+.pic-row button:focus-visible,
+.pic-row input:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.pic-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.pic-head h3 {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.pic-choices {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 24px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+@media (max-width: 40rem) {
+  .pic-choices {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+}
+
+.pic-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding-inline: 8px;
+  border: 1px solid var(--paper-label);
+  border-radius: 2px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pic-choice input {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  accent-color: var(--ink);
+}
+
+.pic-choice:has(input:checked) {
+  box-shadow: inset 0 0 0 3px var(--ink);
+  background: var(--hover-tint);
+}
+
+.pic-choice:has(:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.pic-choice[data-unavailable="true"] {
+  border-style: dashed;
+  color: var(--paper-label);
+  font-weight: 400;
+  cursor: default;
+}
+
+.pic-row .owner-btn {
+  align-self: flex-start;
+}

@@ -66,12 +66,13 @@ public sealed class CollectionState
 
     /// <summary>
     /// Creates the view of a stored collection with what the owner entered on top: every item's location is the one the
-    /// overlay gives it, and the items, the version and the cards are built from that collection. <see cref="Snapshot"/> stays
+    /// overlay gives it, and the items, the version and the cards are built from that collection. A game the overlay holds a
+    /// picture choice for is drawn from the chosen picture, and the choice is part of the version. <see cref="Snapshot"/> stays
     /// the collection as the sync stored it, so the sync keeps comparing against what BGG said.
     /// </summary>
     /// <param name="snapshot">The stored collection, exactly as the sync stored it.</param>
     /// <param name="rules">The rules that choose each game's picture.</param>
-    /// <param name="overlay">Where the owner keeps each game.</param>
+    /// <param name="overlay">Where the owner keeps each game and which picture the owner chose for it.</param>
     public static CollectionState FromSnapshot(CollectionSnapshot snapshot, ArtRules rules, OwnerOverlay overlay)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
@@ -79,9 +80,9 @@ public sealed class CollectionState
         ArgumentNullException.ThrowIfNull(overlay);
 
         var effective = overlay.Effective(snapshot);
-        var items = SnapshotMapper.ToCabinetItems(effective, rules);
+        var items = SnapshotMapper.ToCabinetItems(effective, rules, overlay);
 
-        return new CollectionState(items, SnapshotMapper.Version(items, rules, effective), snapshot.CapturedAtUtc, snapshot, effective);
+        return new CollectionState(items, SnapshotMapper.Version(items, rules, effective, overlay), snapshot.CapturedAtUtc, snapshot, effective);
     }
 
     /// <summary>The view before any collection has been synced: no items and no version.</summary>

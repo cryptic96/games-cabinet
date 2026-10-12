@@ -35,7 +35,7 @@ public sealed record PictureLink(string Url, ImageRecord? Record, int FailedChec
 /// <param name="Checked">Whether the owner has looked at this game's picture and marked it as seen.</param>
 /// <param name="SeenOwnedUrl">The address of the owned edition's picture when the owner last looked, or null.</param>
 /// <param name="SeenMainUrl">The address of the main picture when the owner last looked, or null.</param>
-/// <param name="Link">The owner's own picture address when <see cref="Choice"/> is <see cref="PictureChoice.Link"/>, otherwise null.</param>
+/// <param name="Link">The owner's own picture address and what is known about it, or null when the owner has none. It is kept when another picture is chosen, so the owner can pick it again.</param>
 public sealed record PictureSetting(
     PictureChoice Choice,
     bool Checked,

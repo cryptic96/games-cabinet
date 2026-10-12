@@ -164,6 +164,7 @@ public static class ReviewSheetModel
     {
         ArtPick.VersionImage => "chosen: version image",
         ArtPick.MainImage => "chosen: main image",
+        ArtPick.OwnerLink => "chosen: owner link",
         _ => "generated cover",
     };
 
