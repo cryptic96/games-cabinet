@@ -114,6 +114,16 @@ public sealed class OwnerRestoreParserTests
     }
 
     [Fact]
+    public void A_revision_or_change_count_too_large_to_keep_counting_from_is_over_the_limits()
+    {
+        Check(Text(Json("\"revision\": 3", $"\"revision\": {OwnerDataExport.MaxRevision}"))).IsOk.Should().BeTrue();
+        Check(Text(Json("\"revision\": 3", $"\"revision\": {OwnerDataExport.MaxRevision + 1L}"))).Refusal.Should().Be(RestoreProblem.OverLimits);
+        Check(Text(Json("\"revision\": 3", "\"revision\": 9223372036854775807"))).Refusal.Should().Be(RestoreProblem.OverLimits);
+        Check(Text(Json("\"changesSinceDownload\": 0", $"\"changesSinceDownload\": {OwnerDataExport.MaxChangesSinceDownload}"))).IsOk.Should().BeTrue();
+        Check(Text(Json("\"changesSinceDownload\": 0", "\"changesSinceDownload\": 2147483647"))).Refusal.Should().Be(RestoreProblem.OverLimits);
+    }
+
+    [Fact]
     public void The_games_of_an_accepted_file_come_out_sorted_by_identifier()
     {
         var data = Valid() with { Games = [.. Valid().Games.Reverse()] };
