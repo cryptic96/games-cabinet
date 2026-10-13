@@ -20,12 +20,13 @@ import { initGamesToolbar, initPickers } from './owner-games.js';
 import { gameStates, initPlacing } from './owner-placing.js';
 import {
   announce,
+  dismissOnBackdrop,
   getRevision,
   initRevision,
   postOwner,
-  reloadButton,
   setPickerValue,
   setRevision,
+  showProblem,
   showRowProblem,
   showRowStatus,
 } from './owner-shared.js';
@@ -271,23 +272,6 @@ export function initLocationList(doc = globalThis.document) {
     refresh();
     placing?.refreshMeta();
     toolbar?.refreshCount();
-  }
-
-  /**
-   * Tells the owner that a request did not go through, in the region of the row it was about.
-   * @param {HTMLElement} region The status region.
-   * @param {{ outcome: string, status?: string }} result What the request came to.
-   */
-  function showProblem(region, result) {
-    if (result.outcome === 'outOfDate') {
-      reloadButton(region, OWNER_TEXT.outOfDate, OWNER_TEXT.reload);
-    } else if (result.outcome === 'expired') {
-      reloadButton(region, OWNER_TEXT.expired, OWNER_TEXT.reload);
-    } else if (result.outcome === 'unreadable') {
-      showRowProblem(region, OWNER_TEXT.unreadable);
-    } else {
-      showRowProblem(region, OWNER_TEXT.failed);
-    }
   }
 
   /**
@@ -616,19 +600,7 @@ export function initLocationList(doc = globalThis.document) {
     });
   });
 
-  dialog.addEventListener('click', (event) => {
-    if (event.target !== dialog) {
-      return;
-    }
-
-    const box = dialog.getBoundingClientRect();
-    const outside =
-      event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom;
-
-    if (outside) {
-      dialog.close();
-    }
-  });
+  dismissOnBackdrop(dialog);
 
   dialog.addEventListener('close', () => {
     if (!confirmed) {
