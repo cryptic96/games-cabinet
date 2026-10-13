@@ -211,6 +211,26 @@ public sealed class OwnerLocationListTests : CabinetPageTest
     }
 
     [Fact]
+    public async Task A_location_added_by_the_script_carries_the_saved_revision_in_its_own_forms()
+    {
+        var host = await StartHostAsync();
+        await Page.SetViewportSizeAsync(1440, 900);
+        await host.SeedAsync("Shelf B");
+        await GotoLocationsAsync();
+
+        await Page.Locator("#new-location").FillAsync("Crate C");
+        await Page.Locator("#new-location").PressAsync("Enter");
+
+        await Expect(Page.Locator(".loc-item")).ToHaveCountAsync(2);
+        var revision = host.Owner.Revision.ToString(CultureInfo.InvariantCulture);
+        await Expect(Page.Locator(".loc-item").Nth(1).Locator("input[name='revision']").First).ToHaveValueAsync(revision);
+        var stale = await Page.Locator("input[name='revision'][data-page-revision]").EvaluateAllAsync<int>(
+            "inputs => inputs.filter(input => input.value !== '" + revision + "').length");
+        stale.Should().Be(0);
+        AssertCleanConsole();
+    }
+
+    [Fact]
     public async Task A_duplicate_name_is_refused_inline_and_nothing_changes()
     {
         var host = await StartHostAsync();

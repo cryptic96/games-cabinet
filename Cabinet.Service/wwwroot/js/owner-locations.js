@@ -510,6 +510,7 @@ export function initLocationList(doc = globalThis.document) {
       const item = buildItem(result.id, name);
 
       list.append(item);
+      setRevision(getRevision(), doc);
       panel.open = true;
       addField.value = '';
       addField.focus();
@@ -550,7 +551,6 @@ export function initLocationList(doc = globalThis.document) {
     item.querySelector('input[name="id"]').value = id;
     nameField(item).value = name;
     item.querySelector('.field-error').id = 'loc-error-' + id;
-    setRevision(getRevision(), doc);
 
     return item;
   }
