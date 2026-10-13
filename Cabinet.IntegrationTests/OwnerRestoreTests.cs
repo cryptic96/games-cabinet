@@ -140,6 +140,7 @@ public sealed class OwnerRestoreTests
         var late = await second.Session.PostFormAsync(RestorePath, [new("token", token)]);
 
         kept.Status.Should().Be(HttpStatusCode.Found);
+        kept.Location.Should().Be(SettingsPath + "#restore-file");
         late.Body.Should().Contain("That check has run out. Choose the file again.");
         second.Data.Locations.Should().BeEmpty();
         second.StartedEmpty().Should().BeTrue();

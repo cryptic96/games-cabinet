@@ -100,6 +100,79 @@ public sealed class OwnerRecoveryTests : CabinetPageTest
         ConsoleErrors.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Keep_current_data_discards_the_check_returns_focus_to_the_file_input_and_leaves_the_unreadable_file_alone()
+    {
+        await Page.SetViewportSizeAsync(1440, 900);
+        await StartAsync(newerFormat: false);
+        var file = Path.Combine(_storage.FullPath, OwnerDataStore.FileName);
+        var before = await File.ReadAllBytesAsync(file, TestContext.Current.CancellationToken);
+        await GotoOwnerAsync(SettingsPath);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Use this version" }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = PreviewHeading })).ToBeFocusedAsync();
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Keep current data" }).ClickAsync();
+
+        await Expect(Page.Locator("#restore-preview")).ToHaveCountAsync(0);
+        await Expect(Page.Locator("#restore-file")).ToBeFocusedAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = Heading })).ToBeVisibleAsync();
+        (await File.ReadAllBytesAsync(file, TestContext.Current.CancellationToken)).Should().Equal(before);
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_chosen_file_puts_focus_on_the_preview_heading_and_keep_current_data_returns_it_to_the_file_input()
+    {
+        await Page.SetViewportSizeAsync(1440, 900);
+        await StartAsync(newerFormat: true);
+        await GotoOwnerAsync(SettingsPath);
+        await Page.Locator("#restore-file").SetInputFilesAsync(new FilePayload { Name = "owner-data.json", MimeType = "application/json", Buffer = FileBytes() });
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Check file" }).ClickAsync();
+
+        var preview = Page.GetByRole(AriaRole.Heading, new() { Name = PreviewHeading });
+        await Expect(preview).ToBeFocusedAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Keep current data" }).ClickAsync();
+        await Expect(Page.Locator("#restore-file")).ToBeFocusedAsync();
+        await Expect(Page.Locator("#restore-preview")).ToHaveCountAsync(0);
+    }
+
+    [Theory]
+    [InlineData(390, 844)]
+    [InlineData(320, 640)]
+    public async Task The_preview_of_an_earlier_version_fits_a_small_phone_without_sideways_scrolling(int width, int height)
+    {
+        await Page.SetViewportSizeAsync(width, height);
+        await StartAsync(newerFormat: false);
+        await GotoOwnerAsync(SettingsPath);
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Use this version" }).ClickAsync();
+
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = PreviewHeading })).ToBeVisibleAsync();
+        var overflow = await Page.EvaluateAsync<double>("() => document.documentElement.scrollWidth - window.innerWidth");
+        var table = (await Page.Locator(".restore-table").BoundingBoxAsync())!;
+        var rightmost = await Page.EvaluateAsync<double>(
+            "() => Math.max(...[...document.querySelectorAll('.restore-table th, .restore-table td')].map((cell) => cell.getBoundingClientRect().right))");
+
+        overflow.Should().BeLessThanOrEqualTo(0);
+        (table.X + table.Width).Should().BeLessThanOrEqualTo(width);
+        rightmost.Should().BeLessThanOrEqualTo(width);
+        await SaveScreenshotAsync($"owner-unreadable-preview-{width}");
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    private static byte[] FileBytes()
+    {
+        var data = OwnerData.Empty with
+        {
+            Revision = 6,
+            SavedAtUtc = new DateTimeOffset(2030, 1, 10, 9, 30, 0, TimeSpan.Zero),
+            Locations = [new OwnerLocation("a1b2c3d4", "Cabinet A")],
+        };
+
+        return OwnerDataExport.Write(data, new DateTimeOffset(2030, 1, 10, 9, 31, 0, TimeSpan.Zero));
+    }
+
     private async Task StartAsync(bool newerFormat)
     {
         var data = OwnerData.Empty with

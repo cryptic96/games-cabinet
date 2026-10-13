@@ -39,7 +39,7 @@ public class SettingsModel : OwnerPage
     private const string DownloadFailedCode = "download-failed";
     private const string UnchangedCode = "unchanged";
     private const string FinishAnchor = "finish";
-    private const string RestoreAnchor = "restore";
+    private const string FileInputAnchor = "restore-file";
     private const string PreviewAnchor = "restore-preview-heading";
     private const string JsonMediaType = "application/json";
     private const string NoStore = "no-store";
@@ -261,7 +261,7 @@ public class SettingsModel : OwnerPage
     {
         _staged.Remove(token);
 
-        return RedirectToPage(PagePath, pageHandler: null, routeValues: null, fragment: RestoreAnchor);
+        return RedirectToPage(PagePath, pageHandler: null, routeValues: null, fragment: FileInputAnchor);
     }
 
     /// <summary>Answers a script with how many changes are not downloaded yet and when the last download was, so it can bring the reminder up to date.</summary>
