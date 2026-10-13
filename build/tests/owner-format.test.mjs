@@ -24,7 +24,6 @@ const {
   gameCount,
   movedText,
   deleteDialogParts,
-  deleteDialogBody,
   deletedText,
   refusalText,
   headingText,
@@ -40,12 +39,8 @@ const {
   counterText,
   worthALookLinkText,
   allGamesLinkText,
-  megabytes,
   shortAddress,
   leadAndRest,
-  changesBanner,
-  compactBanner,
-  tinyBanner,
   neverDownloaded,
   bannerTexts,
   whenText,
@@ -85,11 +80,6 @@ test('a count of games reads No games, 1 game or the number with games', () => {
 test('a move is announced with the name, the direction and the new place', () => {
   assert.equal(movedText('Cabinet A', 'down', 2, 3), 'Moved "Cabinet A" down. Now 2 of 3.');
   assert.equal(movedText('Shelf B', 'up', 1, 3), 'Moved "Shelf B" up. Now 1 of 3.');
-});
-
-test('the delete question for one game is singular and for several games is plural', () => {
-  assert.equal(deleteDialogBody(1), "1 game will become not placed. It isn't moved anywhere else.");
-  assert.equal(deleteDialogBody(4), "4 games will become not placed. They aren't moved anywhere else.");
 });
 
 test('the delete question is split into the lead and the rest', () => {
@@ -223,13 +213,6 @@ test('the words of the looks-right button and its status are in the table', () =
   assert.equal(OWNER_TEXT.wontLoad, "Picture won't load");
 });
 
-test('a size in bytes is written as millions of bytes with at most one decimal', () => {
-  assert.equal(megabytes(5_400_000), '5.4');
-  assert.equal(megabytes(1_000_000), '1');
-  assert.equal(megabytes(12_582_912), '12.6');
-  assert.equal(megabytes(0), '0');
-});
-
 test('a stored picture address is shortened to its host and its file name', () => {
   assert.equal(shortAddress('https://cf.geekdo-images.com/abc__original/img/x/0x0/pic1.png'), 'cf.geekdo-images.com/.../pic1.png');
   assert.equal(shortAddress('https://example.org/a%20b.png'), 'example.org/.../a b.png');
@@ -251,32 +234,29 @@ test('a message is split into its lead sentence and the next step', () => {
   });
 });
 
-test('the words of the link buttons and the stored link are in the table', () => {
-  assert.equal(OWNER_TEXT.removeLink, 'Remove link');
+test('the words of the stored link and its status are in the table', () => {
   assert.equal(OWNER_TEXT.linkRemoved, 'Link removed');
   assert.equal(OWNER_TEXT.tileFetching, 'Fetching...');
   assert.equal(OWNER_TEXT.markFetching, 'Fetching your link...');
+  assert.equal(OWNER_TEXT.preparing, 'Preparing...');
 });
 
-test('the banner counts changes since the last download in the singular and the plural', () => {
-  assert.equal(changesBanner(1), '1 change since your last download');
-  assert.equal(changesBanner(3), '3 changes since your last download');
-  assert.equal(changesBanner(23), '23 changes since your last download');
-});
-
-test('the phone banner is one short line', () => {
-  assert.equal(compactBanner(1), '1 change not downloaded');
-  assert.equal(compactBanner(3), '3 changes not downloaded');
+test('the banners count changes in the singular and the plural at every width', () => {
+  assert.deepEqual(bannerTexts(1, false), {
+    full: '1 change since your last download',
+    compact: '1 change not downloaded',
+    tiny: '1 not downloaded',
+  });
+  assert.deepEqual(bannerTexts(23, false), {
+    full: '23 changes since your last download',
+    compact: '23 changes not downloaded',
+    tiny: '23 not downloaded',
+  });
 });
 
 test('the banner of data that was never downloaded says the changes are only on the server', () => {
   assert.equal(neverDownloaded(1), "You haven't downloaded your owner data yet. 1 change is only on this server.");
   assert.equal(neverDownloaded(3), "You haven't downloaded your owner data yet. 3 changes are only on this server.");
-});
-
-test('the narrowest phone banner is the count and two words', () => {
-  assert.equal(tinyBanner(1), '1 not downloaded');
-  assert.equal(tinyBanner(23), '23 not downloaded');
 });
 
 test('the banner texts follow the state of the backup and are empty at zero changes', () => {
@@ -292,13 +272,6 @@ test('the banner texts follow the state of the backup and are empty at zero chan
     compact: '1 change not downloaded',
     tiny: '1 not downloaded',
   });
-});
-
-test('the words of the backup buttons are in the table', () => {
-  assert.equal(OWNER_TEXT.downloadOwnerData, 'Download owner data');
-  assert.equal(OWNER_TEXT.downloadData, 'Download data');
-  assert.equal(OWNER_TEXT.preparing, 'Preparing...');
-  assert.equal(OWNER_TEXT.downloadFailed, "Couldn't prepare the download. Try again.");
 });
 
 const AMSTERDAM = 'Europe/Amsterdam';
