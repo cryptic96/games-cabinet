@@ -15,7 +15,8 @@ public sealed class OwnerOnlyAttribute : Attribute;
 /// </summary>
 /// <param name="Port">The owner listener's port, or null when the owner tools are switched off.</param>
 /// <param name="Ranges">The client address ranges allowed on the owner port.</param>
-public sealed record OwnerAccessOptions(int? Port, IReadOnlyList<System.Net.IPNetwork> Ranges)
+/// <param name="Proxies">The known proxies; one of them is never a client, so its own address is refused even inside a range.</param>
+public sealed record OwnerAccessOptions(int? Port, IReadOnlyList<System.Net.IPNetwork> Ranges, IReadOnlyList<IPAddress>? Proxies = null)
 {
     /// <summary>Whether the owner tools are switched on.</summary>
     public bool Enabled => Port is not null;
@@ -29,7 +30,12 @@ public sealed record OwnerAccessOptions(int? Port, IReadOnlyList<System.Net.IPNe
         return Port is { } port && context.Connection.LocalPort == port;
     }
 
-    /// <summary>Whether the client address, as the forwarded-headers middleware resolved it, lies in a configured range.</summary>
+    /// <summary>
+    /// Whether the client address, as the forwarded-headers middleware resolved it, lies in a configured range. A proxy's own
+    /// address is never a client: when the proxy sent no usable forwarded address the middleware leaves the proxy's address as
+    /// the client's, and a range that holds the proxy would then let every such request through. A proxy on a loopback address
+    /// is left out of this, because a developer's own machine plays both parts.
+    /// </summary>
     /// <param name="client">The resolved client address, or null when there is none.</param>
     public bool Allows(IPAddress? client)
     {
@@ -40,8 +46,15 @@ public sealed record OwnerAccessOptions(int? Port, IReadOnlyList<System.Net.IPNe
 
         var address = client.IsIPv4MappedToIPv6 ? client.MapToIPv4() : client;
 
+        if (!IPAddress.IsLoopback(address) && (Proxies ?? []).Any(proxy => Normalised(proxy).Equals(address)))
+        {
+            return false;
+        }
+
         return Ranges.Any(range => range.Contains(address));
     }
+
+    private static IPAddress Normalised(IPAddress address) => address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address;
 }
 
 /// <summary>Reads the owner access settings and builds the two walls that keep the owner tools off the public port and off foreign addresses.</summary>
@@ -94,7 +107,9 @@ public static partial class OwnerAccess
                 $"{KnownProxiesKey} needs at least one entry when {UrlKey} is set, so client addresses can be trusted.");
         }
 
-        return new OwnerAccessOptions(uri.Port, ranges);
+        var proxyAddresses = proxies.Where(proxy => IPAddress.TryParse(proxy, out _)).Select(proxy => IPAddress.Parse(proxy)).ToList();
+
+        return new OwnerAccessOptions(uri.Port, ranges, proxyAddresses);
     }
 
     /// <summary>

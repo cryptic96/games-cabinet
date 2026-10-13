@@ -188,6 +188,24 @@ public class OwnerAccessTests
         options.Allows(IPAddress.IPv6Loopback).Should().BeFalse();
     }
 
+    [Fact]
+    public void Allows_refuses_the_address_of_a_known_proxy_even_when_a_range_holds_it()
+    {
+        var options = OwnerAccess.FromConfiguration(Build(OwnerUrl, ranges: ["192.0.2.0/24"], proxies: ["192.0.2.10"]));
+
+        options.Allows(IPAddress.Parse("192.0.2.10")).Should().BeFalse();
+        options.Allows(IPAddress.Parse("::ffff:192.0.2.10")).Should().BeFalse();
+        options.Allows(IPAddress.Parse("192.0.2.11")).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Allows_lets_a_loopback_proxy_through_so_a_single_machine_can_play_both_parts()
+    {
+        var options = OwnerAccess.FromConfiguration(Build(OwnerUrl, ranges: ["127.0.0.0/8"], proxies: ["127.0.0.1"]));
+
+        options.Allows(IPAddress.Loopback).Should().BeTrue();
+    }
+
     private static IConfiguration Build(
         string? ownerUrl,
         string[] ranges,

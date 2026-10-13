@@ -148,6 +148,28 @@ public class OwnerWallTests
         status.Should().Be(403);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("not-an-address")]
+    public async Task A_request_from_the_known_proxy_without_a_usable_forwarded_address_is_refused_even_when_a_range_holds_the_proxy(string? forwardedFor)
+    {
+        await using var host = await UntrustedPeerHost.StartAsync("198.51.100.1", "198.51.100.0/24");
+
+        var (status, _) = await host.GetProbeAsync("198.51.100.1", UntrustedPeerHost.OwnerPort, forwardedFor);
+
+        status.Should().Be(403);
+    }
+
+    [Fact]
+    public async Task Loopback_is_not_believed_as_a_forwarding_proxy_unless_it_is_configured()
+    {
+        await using var host = await UntrustedPeerHost.StartAsync("198.51.100.1", "192.0.2.0/24");
+
+        var (status, _) = await host.GetProbeAsync("127.0.0.1", UntrustedPeerHost.OwnerPort, "192.0.2.10");
+
+        status.Should().Be(403);
+    }
+
     [Fact]
     public async Task A_forged_forwarded_address_from_an_untrusted_peer_is_ignored_and_the_peer_is_refused()
     {
