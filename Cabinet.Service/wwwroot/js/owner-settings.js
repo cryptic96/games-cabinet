@@ -282,10 +282,11 @@ function initRestore(doc) {
     }
 
     setBusy(button, OWNER_TEXT.checking);
-    await submitRestoreCheck(form, doc);
-    clearBusy(button);
-  });
 
+    if (!(await submitRestoreCheck(form, doc))) {
+      clearBusy(button);
+    }
+  });
 }
 
 /** The address fragment the page is sent to after a check is thrown away, which names the file input. */

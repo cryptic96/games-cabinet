@@ -50,7 +50,7 @@ public sealed class SyncStartup(
 
         if (stored is not null)
         {
-            publisher.Publish(stored);
+            publisher.Publish(stored, reconcile: false);
         }
 
         return Task.CompletedTask;

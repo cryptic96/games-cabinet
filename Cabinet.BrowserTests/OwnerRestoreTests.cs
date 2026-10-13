@@ -41,7 +41,7 @@ public sealed class OwnerRestoreTests : CabinetPageTest
         await Expect(heading).ToBeFocusedAsync();
         (await heading.EvaluateAsync<string>("element => getComputedStyle(element).outlineStyle")).Should().Be("none", "a heading that only takes focus shows no ring");
         await Expect(Page.Locator("#restore-preview p").First).ToHaveTextAsync(Summary + ".");
-        await Expect(Page.Locator(".restore-table th[scope=col]")).ToHaveTextAsync(["In the file", "On this server now"]);
+        await Expect(Page.Locator(".restore-table th[scope=col]")).ToHaveTextAsync(["What is compared", "In the file", "On this server now"]);
         await Expect(Page.Locator(".restore-table th[scope=row]")).ToHaveCountAsync(4);
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Restore file" })).ToBeVisibleAsync();
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Keep current data" })).ToBeVisibleAsync();
@@ -51,6 +51,28 @@ public sealed class OwnerRestoreTests : CabinetPageTest
         overflow.Should().BeLessThanOrEqualTo(0);
         (table.X + table.Width).Should().BeLessThanOrEqualTo(width);
         await SaveScreenshotAsync($"owner-restore-preview-{width}");
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task The_check_button_stays_busy_until_the_browser_has_left_for_the_preview()
+    {
+        await Page.SetViewportSizeAsync(1440, 900);
+        await StartAsync();
+        await GotoOwnerAsync(SettingsPath);
+        await Page.EvaluateAsync(
+            "() => { const check = document.querySelector('button[data-check-button]'); const seen = []; sessionStorage.setItem('check-button-states', '[]'); "
+            + "new MutationObserver(() => { seen.push(check.getAttribute('aria-disabled')); sessionStorage.setItem('check-button-states', JSON.stringify(seen)); })"
+            + ".observe(check, { attributes: true, childList: true, subtree: true }); }");
+        await ChooseAsync(FileBytes());
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Check file" }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "This file contains" })).ToBeVisibleAsync();
+
+        var states = await Page.EvaluateAsync<string?[]>("() => JSON.parse(sessionStorage.getItem('check-button-states') ?? '[]')");
+
+        states.Should().NotBeEmpty();
+        states.Should().OnlyContain(state => state == "true");
         ConsoleErrors.Should().BeEmpty();
     }
 

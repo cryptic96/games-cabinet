@@ -1,7 +1,8 @@
 /**
  * The script side of the games list on the locations page, apart from ticking and moving many games at once: each row's picker,
  * which saves the value it settles on and not every key press, and the toolbar above the list, which finds games as the owner
- * types, shows only the games that are not placed yet, ticks everything that is shown, and puts the rows in collator order.
+ * types, shows only the games that are not placed yet, ticks everything that is shown, unticks what a filter hides, and puts the
+ * rows in collator order.
  * Every title and every query is written with `textContent`, never as markup.
  */
 import { OWNER_TEXT, effectiveLocationIds, resultText, unplacedLabel } from './owner-format.js';
@@ -33,7 +34,7 @@ function drawnValue(select) {
  * @param {{
  *   enqueue: (task: () => Promise<void>) => void,
  *   showProblem: (region: HTMLElement, result: object) => void,
- *   undoer: (region: HTMLElement, apply: () => void, focusAfter: () => HTMLElement) => () => void,
+ *   undoer: (region: HTMLElement, apply: () => void, focusAfter: () => HTMLElement) => (saved?: number | null) => void,
  *   gamesChanged: () => void,
  * }} hooks What the page offers: one request at a time, the wording of a failure, the Undo button and the recount after a change.
  */
@@ -47,12 +48,13 @@ export function initPickers(doc, hooks) {
     }
 
     /**
-     * Saves one value for this picker.
+     * Saves one value for this picker. A save that has to outlive the page is sent at once, not behind earlier saves, because a
+     * page that is going away may never get to the end of the queue.
      * @param {string} value The value the picker settled on.
      * @param {{ keepalive?: boolean }} [options] Whether the request has to outlive the page.
      */
-    const commit = (value, options = {}) =>
-      hooks.enqueue(async () => {
+    const commit = (value, options = {}) => {
+      const task = async () => {
         const previous = select.dataset.saved ?? '';
 
         if (value === previous) {
@@ -85,7 +87,14 @@ export function initPickers(doc, hooks) {
           setPickerValue(select, previous);
           hooks.showProblem(region, result);
         }
-      });
+      };
+
+      if (options.keepalive === true) {
+        task();
+      } else {
+        hooks.enqueue(task);
+      }
+    };
 
     setPickerValue(select, drawnValue(select));
     form.querySelector('[data-save]').hidden = true;
@@ -147,6 +156,23 @@ export function initGamesToolbar(doc) {
   }
 
   /**
+   * Unticks the rows a search or a filter has just hidden, so a move only ever acts on games the owner can see, and tells the
+   * rest of the page that the ticks changed so the dock's count stays true.
+   */
+  function untickHidden() {
+    const checks = gameRows()
+      .filter((row) => row.hidden)
+      .map((row) => row.querySelector('.game-check'))
+      .filter((check) => check?.checked);
+
+    for (const check of checks) {
+      check.checked = false;
+    }
+
+    checks.at(-1)?.dispatchEvent(new doc.defaultView.Event('change', { bubbles: true }));
+  }
+
+  /**
    * Counts the games that are shown in no location and writes the count into the switch's label. The rows that are shown do not
    * change here, so a game the owner just placed stays in the list until the owner searches or switches again.
    */
@@ -180,6 +206,7 @@ export function initGamesToolbar(doc) {
       announce(text, doc);
     }
 
+    untickHidden();
     syncSelectAll();
   }
 

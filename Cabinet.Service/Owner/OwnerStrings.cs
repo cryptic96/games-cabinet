@@ -650,6 +650,9 @@ public static class OwnerStrings
     /// <summary>The hidden caption of the comparison table.</summary>
     public const string RestoreTableCaption = "The checked file next to the owner data on this server now";
 
+    /// <summary>The hidden heading of the first column, which holds the names of the rows that are compared.</summary>
+    public const string RestoreColumnWhat = "What is compared";
+
     /// <summary>The heading of the column that describes the checked file.</summary>
     public const string RestoreColumnFile = "In the file";
 
@@ -792,6 +795,7 @@ public static class OwnerStrings
         "link-removed" => $"{LinkRemoved}.",
         "link-expired" => "This preview expired. Check the link again.",
         "nothing-selected" => "Tick at least one game first.",
+        "confirm-needed" => "This location still holds games. Confirm the delete first.",
         "id-clash" or "save-failed" => "Couldn't save that. Try again.",
         _ when LinkProblemOf(statusKey) is { } problem => LinkError(problem, AnyPictureHost, null, null),
         _ => null,

@@ -2,67 +2,79 @@
  * The script side of the cabinet finish panel on the owner's settings page. The page works with a real form and a Save finish
  * button; this script takes over its submission so choosing a tile saves at once without leaving the page, with the panel's own
  * `Saved` line. A tile that is already chosen can be chosen again and saves with `Saved`, because nothing changed and there is
- * nothing to undo. A save that fails leaves the tile checked, because the stored finish did not change, and says so in the
- * panel's status line. Every text is written with `textContent`, never as markup.
+ * nothing to undo. A save that fails puts the tile of the stored finish back and says so in the panel's status line. Every text is written with `textContent`, never as markup.
  */
 import { OWNER_TEXT } from './owner-format.js';
-import { initRevision, postOwner, reloadButton, showRowProblem, showRowStatus } from './owner-shared.js';
+import { initRevision, postOwner, setChecked, showProblem as showSharedProblem, showRowProblem, showRowStatus } from './owner-shared.js';
 
 /** The address of the finish handler, relative to the page the script runs on. */
 const FINISH_HANDLER = '?handler=Finish';
 
 /**
- * Tells the owner that a request did not go through, in the panel's status line.
+ * Tells the owner that a request did not go through, in the panel's status line: the server's own words when it refused the
+ * change, otherwise what every owner page says.
  * @param {HTMLElement} region The status region.
- * @param {{ outcome: string }} result What the request came to.
+ * @param {{ outcome: string, message?: string }} result What the request came to.
  */
 function showProblem(region, result) {
-  if (result.outcome === 'outOfDate') {
-    reloadButton(region, OWNER_TEXT.outOfDate, OWNER_TEXT.reload);
-  } else if (result.outcome === 'expired') {
-    reloadButton(region, OWNER_TEXT.expired, OWNER_TEXT.reload);
-  } else if (result.outcome === 'unreadable') {
-    showRowProblem(region, OWNER_TEXT.unreadable);
-  } else if (result.outcome === 'refused' && typeof result.message === 'string' && result.message !== '') {
+  if (result.outcome === 'refused' && typeof result.message === 'string' && result.message !== '') {
     showRowProblem(region, result.message);
   } else {
-    showRowProblem(region, OWNER_TEXT.failed);
+    showSharedProblem(region, result);
   }
 }
 
 /**
- * Makes the finish form save the finish a tap on a tile settles on, one save at a time.
+ * Makes the finish form save the finish a tap on a tile settles on, one save at a time. A tile chosen while a save is under way
+ * is saved when that one is done, so the stored finish is the one the panel shows; a save that fails puts the tile of the
+ * stored finish back.
  * @param {HTMLFormElement} form The finish form.
  * @param {HTMLElement} region The panel's status line.
  */
 function initForm(form, region) {
   const fieldset = form.querySelector('fieldset');
+  const current = () => fieldset.querySelector('input[type="radio"]:checked');
   let saving = false;
+  let chosenMeanwhile = false;
+  let savedValue = current()?.value ?? '';
 
   form.querySelector('[data-save]').hidden = true;
 
   /**
-   * Saves the finish that is checked now.
+   * Saves the finish that is checked now, then the one chosen while that save was under way, until the stored finish is the one
+   * that is shown.
    * @returns {Promise<void>}
    */
   async function save() {
-    const checked = fieldset.querySelector('input[type="radio"]:checked');
+    if (saving) {
+      chosenMeanwhile = true;
 
-    if (saving || !checked) {
       return;
     }
 
     saving = true;
 
-    const result = await postOwner(form.getAttribute('action') ?? FINISH_HANDLER, { finish: checked.value });
+    try {
+      let checked = current();
 
-    saving = false;
+      while (checked) {
+        chosenMeanwhile = false;
 
-    if (result.outcome === 'saved' || result.outcome === 'noChange') {
-      showRowStatus(region, OWNER_TEXT.saved);
-    } else {
-      checked.checked = true;
-      showProblem(region, result);
+        const result = await postOwner(form.getAttribute('action') ?? FINISH_HANDLER, { finish: checked.value });
+
+        if (result.outcome !== 'saved' && result.outcome !== 'noChange') {
+          setChecked(fieldset, savedValue);
+          showProblem(region, result);
+
+          return;
+        }
+
+        savedValue = checked.value;
+        showRowStatus(region, OWNER_TEXT.saved);
+        checked = chosenMeanwhile && current()?.value !== savedValue ? current() : null;
+      }
+    } finally {
+      saving = false;
     }
   }
 

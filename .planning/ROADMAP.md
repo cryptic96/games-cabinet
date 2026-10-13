@@ -20,7 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: BGG Access Spike, Real Sync & Snapshot** - The owner's real collection appears automatically in the deployed cabinet, resilient to BGG outages (completed 2026-10-07)
 - [x] **Phase 4: Enrichment, Box Images & Shape** - Real box art, art-coloured spines, true box proportions and full game details, all served from the site (completed 2026-10-09)
 - [x] **Phase 5: Game Detail, Accessibility & Language** - Pull-out animation, detail card, keyboard and screen-reader access, English and Dutch labels (completed 2026-10-12)
-- [ ] **Phase 6: Owner Tools & Persistence** - Home/VPN-only image overrides (and location editing if needed), persisted and backed up
+- [x] **Phase 6: Owner Tools & Persistence** - Home/VPN-only image overrides (and location editing if needed), persisted and backed up (completed 2026-10-13)
 - [ ] **Phase 6.1: Selectable Cabinet Finishes & Lighting** (INSERTED) - Seven owner-chosen finishes with their walls, lit cubbies with an optional day-and-night mode, and cubby depth
 - [ ] **Phase 7: Game-Night Filters & Location Cabinets** - Dim-to-filter search and a per-location cabinet toggle
 - [ ] **Phase 8: Public Hardening & Go-Public** - HTTPS exposure through Traefik with rate limits, headers, resource caps and a go-public checklist
@@ -363,7 +363,7 @@ Plans:
   3. Overrides (and locations, if edited in the app) survive syncs, restarts and new releases, and a backup exists from which a fresh container can be restored without losing them.
   4. Conditional on the Phase 3 spike outcome: if BGG cannot supply locations, the owner can define their own list of storage locations (rooms, cabinets, "Lent out") and assign one to each game; if BGG does supply them, this criterion is closed by recording that no location editor is needed.
 
-**Plans:** 28/30 plans executed
+**Plans:** 30/30 plans complete
 
 Plans:
 **Wave 1**
@@ -453,11 +453,11 @@ Plans:
 
 **Wave 20** *(blocked on Wave 19 completion)*
 
-- [ ] 06-29-PLAN.md — Release v0.7.0 with the owner tools switched off by default (owner-gated)
+- [x] 06-29-PLAN.md — Release v0.7.0 with the owner tools switched off by default (owner-gated)
 
 **Wave 21** *(blocked on Wave 20 completion)*
 
-- [ ] 06-30-PLAN.md — The owner host goes live, and the owner's first session (owner-gated)
+- [x] 06-30-PLAN.md — The owner host goes live, and the owner's first session (owner-gated)
 
 **UI hint**: yes
 
@@ -524,7 +524,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 3. BGG Access Spike, Real Sync & Snapshot | 15/15 | Complete    | 2026-10-07 |
 | 4. Enrichment, Box Images & Shape | 23/23 | Complete    | 2026-10-09 |
 | 5. Game Detail, Accessibility & Language | 16/16 | Complete    | 2026-10-12 |
-| 6. Owner Tools & Persistence | 28/30 | In Progress|  |
+| 6. Owner Tools & Persistence | 30/30 | Complete    | 2026-10-13 |
 | 6.1. Selectable Cabinet Finishes & Lighting (INSERTED) | 0/0 | Not started | - |
 | 7. Game-Night Filters & Location Cabinets | 0/0 | Not started | - |
 | 8. Public Hardening & Go-Public | 0/0 | Not started | - |

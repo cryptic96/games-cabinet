@@ -211,6 +211,26 @@ public sealed class OwnerLocationListTests : CabinetPageTest
     }
 
     [Fact]
+    public async Task A_location_added_by_the_script_carries_the_saved_revision_in_its_own_forms()
+    {
+        var host = await StartHostAsync();
+        await Page.SetViewportSizeAsync(1440, 900);
+        await host.SeedAsync("Shelf B");
+        await GotoLocationsAsync();
+
+        await Page.Locator("#new-location").FillAsync("Crate C");
+        await Page.Locator("#new-location").PressAsync("Enter");
+
+        await Expect(Page.Locator(".loc-item")).ToHaveCountAsync(2);
+        var revision = host.Owner.Revision.ToString(CultureInfo.InvariantCulture);
+        await Expect(Page.Locator(".loc-item").Nth(1).Locator("input[name='revision']").First).ToHaveValueAsync(revision);
+        var stale = await Page.Locator("input[name='revision'][data-page-revision]").EvaluateAllAsync<int>(
+            "inputs => inputs.filter(input => input.value !== '" + revision + "').length");
+        stale.Should().Be(0);
+        AssertCleanConsole();
+    }
+
+    [Fact]
     public async Task A_duplicate_name_is_refused_inline_and_nothing_changes()
     {
         var host = await StartHostAsync();
@@ -250,6 +270,72 @@ public sealed class OwnerLocationListTests : CabinetPageTest
         await Page.Locator("#new-location").PressAsync("Enter");
         await Expect(Page.Locator("#new-location")).ToBeFocusedAsync();
         AssertCleanConsole(allowRefusals: true);
+    }
+
+    [Fact]
+    public async Task Submitting_the_add_form_twice_quickly_adds_one_location_and_shows_no_error()
+    {
+        var host = await StartHostAsync();
+        await Page.SetViewportSizeAsync(1440, 900);
+        await GotoLocationsAsync(open: false);
+        var posts = 0;
+        Page.Request += (_, request) =>
+        {
+            if (request.Method == "POST" && request.Url.Contains("handler=AddLocation", StringComparison.Ordinal))
+            {
+                Interlocked.Increment(ref posts);
+            }
+        };
+        await Page.RouteAsync("**/owner/locations?handler=AddLocation", async route =>
+        {
+            await Task.Delay(500);
+            await route.ContinueAsync();
+        });
+
+        await Page.Locator("#new-location").FillAsync("Cabinet A");
+        await Page.Locator("#new-location").PressAsync("Enter");
+        await Page.Locator("#new-location").PressAsync("Enter");
+
+        await Expect(Page.Locator("#new-location-status")).ToContainTextAsync("Added \"Cabinet A\"");
+        await Expect(Page.Locator("#new-location-error")).ToBeEmptyAsync();
+        await Expect(Page.Locator(".loc-item")).ToHaveCountAsync(1);
+        Volatile.Read(ref posts).Should().Be(1);
+        host.Locations.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Pressing_Undo_twice_quickly_undoes_once_and_keeps_the_Undone_line()
+    {
+        var host = await StartHostAsync();
+        await Page.SetViewportSizeAsync(1440, 900);
+        await host.SeedAsync("Cabinet A");
+        await GotoLocationsAsync();
+        var field = Page.Locator(".loc-item .loc-name");
+        await field.FillAsync("Shelf B");
+        await field.PressAsync("Enter");
+        var status = Page.Locator(".loc-item .row-status");
+        await Expect(status.Locator("button")).ToHaveTextAsync("Undo");
+        var undos = 0;
+        Page.Request += (_, request) =>
+        {
+            if (request.Method == "POST" && request.Url.Contains("handler=Undo", StringComparison.Ordinal))
+            {
+                Interlocked.Increment(ref undos);
+            }
+        };
+        await Page.RouteAsync("**/owner/locations?handler=Undo", async route =>
+        {
+            await Task.Delay(500);
+            await route.ContinueAsync();
+        });
+
+        await status.Locator("button").ClickAsync(new LocatorClickOptions { ClickCount = 2 });
+
+        await Expect(status).ToContainTextAsync("Undone.");
+        await Expect(status).Not.ToHaveAttributeAsync("data-problem", "true");
+        await Expect(field).ToHaveValueAsync("Cabinet A");
+        Volatile.Read(ref undos).Should().Be(1);
+        host.Locations.Select(location => location.Name).Should().Equal("Cabinet A");
     }
 
     [Fact]

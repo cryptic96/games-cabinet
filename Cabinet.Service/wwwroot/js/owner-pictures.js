@@ -21,11 +21,16 @@ import {
 import { initPickers } from './owner-games.js';
 import { initLinkBox } from './owner-link.js';
 import {
+  HEX_COLOUR,
+  KEY_WINDOW_MS,
+  SETTLE_MS,
   announce,
+  checkedValue,
   createFinder,
   initRevision,
   postOwner,
-  reloadButton,
+  setChecked,
+  showProblem,
   showRowProblem,
   showRowStatus,
   sortByCollator,
@@ -38,37 +43,8 @@ const HANDLERS = Object.freeze({
   undo: '?handler=Undo',
 });
 
-/** The shape of a colour the generated cover may be set to. */
-const HEX_COLOUR = /^#[0-9a-fA-F]{6}$/;
-
 /** The colour pair the generated cover falls back to when the page gives none that is valid. */
 const FALLBACK_TONE = Object.freeze({ background: '#8c5d38', text: '#ffffff' });
-
-/** How long stepping through the radios with the keyboard must pause before the choice is saved. */
-const SETTLE_MS = 600;
-
-/** How close after a key press a change has to come to count as made by the keyboard. */
-const KEY_WINDOW_MS = 100;
-
-/**
- * Reads which choice a group of radios has checked.
- * @param {Element} fieldset The group.
- * @returns {string} The value of the checked radio, or an empty string when none is.
- */
-function checkedValue(fieldset) {
-  return fieldset.querySelector('input[type="radio"]:checked')?.value ?? '';
-}
-
-/**
- * Checks the radio with a value and unchecks the others.
- * @param {Element} fieldset The group.
- * @param {string} value The value to check.
- */
-function setChecked(fieldset, value) {
-  for (const radio of fieldset.querySelectorAll('input[type="radio"]')) {
-    radio.checked = radio.value === value;
-  }
-}
 
 /**
  * Reads the title of a row.
@@ -241,23 +217,6 @@ function watchPicture(image) {
 }
 
 /**
- * Tells the owner that a request did not go through, in the region of the row it was about.
- * @param {HTMLElement} region The status region.
- * @param {{ outcome: string }} result What the request came to.
- */
-function showProblem(region, result) {
-  if (result.outcome === 'outOfDate') {
-    reloadButton(region, OWNER_TEXT.outOfDate, OWNER_TEXT.reload);
-  } else if (result.outcome === 'expired') {
-    reloadButton(region, OWNER_TEXT.expired, OWNER_TEXT.reload);
-  } else if (result.outcome === 'unreadable') {
-    showRowProblem(region, OWNER_TEXT.unreadable);
-  } else {
-    showRowProblem(region, OWNER_TEXT.failed);
-  }
-}
-
-/**
  * Makes one row save the choice it settles on. A tap saves at once; keyboard stepping saves after a pause, on Enter or Tab, or
  * when focus leaves the group; a page that goes to the background saves what is waiting with the keepalive flag.
  * @param {HTMLElement} row The row.
@@ -285,11 +244,11 @@ function initRow(row, enqueue, showCounts) {
    * Takes back the latest change on the server and, when that worked, on the page too.
    * @param {string} previous The choice the row had before the change.
    * @param {boolean} [refocus] Whether focus goes to the checked radio afterwards; a button that was pressed keeps its focus instead.
-   * @returns {() => void} The click handler of the Undo button.
+   * @returns {(saved?: number | null) => void} The click handler of the Undo button; it gets the revision the change was saved at.
    */
-  const undoer = (previous, refocus = true) => () =>
+  const undoer = (previous, refocus = true) => (saved) =>
     enqueue(async () => {
-      const result = await postOwner(HANDLERS.undo, { gameId: form.elements.gameId.value });
+      const result = await postOwner(HANDLERS.undo, { gameId: form.elements.gameId.value }, { revision: saved });
 
       if (result.outcome === 'saved') {
         setChecked(fieldset, previous);
@@ -311,12 +270,13 @@ function initRow(row, enqueue, showCounts) {
     });
 
   /**
-   * Saves one choice.
+   * Saves one choice. A save that has to outlive the page is sent at once, not behind earlier saves, because a page that is going
+   * away may never get to the end of the queue.
    * @param {string} value The choice the group settled on.
    * @param {boolean} keepalive Whether the request has to outlive the page.
    */
-  const commit = (value, keepalive) =>
-    enqueue(async () => {
+  const commit = (value, keepalive) => {
+    const task = async () => {
       const previous = fieldset.dataset.saved ?? '';
 
       if (value === previous) {
@@ -340,7 +300,14 @@ function initRow(row, enqueue, showCounts) {
         setChecked(fieldset, previous);
         showProblem(region, result);
       }
-    });
+    };
+
+    if (keepalive) {
+      task();
+    } else {
+      enqueue(task);
+    }
+  };
 
   /**
    * Records that the game's pictures look right. The button stays where it is, keeps focus and turns into the disabled `Checked`;
@@ -506,11 +473,11 @@ function initSingleGame(doc, list, enqueue) {
    * @param {HTMLElement} region The status region the Undo button was in.
    * @param {() => void} apply Takes the change back on the page.
    * @param {() => HTMLElement} focusAfter Gives the element that takes focus once the Undo button is gone.
-   * @returns {() => void} The click handler of the Undo button.
+   * @returns {(saved?: number | null) => void} The click handler of the Undo button; it gets the revision the change was saved at.
    */
-  const undoer = (region, apply, focusAfter) => () =>
+  const undoer = (region, apply, focusAfter) => (saved) =>
     enqueue(async () => {
-      const result = await postOwner(HANDLERS.undo, {});
+      const result = await postOwner(HANDLERS.undo, {}, { revision: saved });
 
       if (result.outcome === 'saved') {
         apply();

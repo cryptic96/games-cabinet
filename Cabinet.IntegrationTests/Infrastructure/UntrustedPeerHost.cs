@@ -57,6 +57,7 @@ internal sealed class UntrustedPeerHost : IAsyncDisposable
             options => ForwardedHeadersSetup.Configure(options, builder.Configuration));
 
         var app = builder.Build();
+        app.UseConnectionPeer();
         app.UseForwardedHeaders();
         app.UseOwnerClientRange();
         app.MapGet("/probe", context => context.Response.WriteAsync(

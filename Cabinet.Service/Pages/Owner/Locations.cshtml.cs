@@ -53,7 +53,6 @@ public class LocationsModel : OwnerPage
     private const string AddAnchor = "new-location";
     private const string NoticeAnchor = "owner-notice";
     private const string RefusedPrefix = "refused-";
-    private const string JsonMediaType = "application/json";
     private const string GamesAnchor = "games-heading";
     private const string LocationTargetPrefix = "location:";
     private const string NotPlacedTarget = "not-placed";
@@ -216,7 +215,7 @@ public class LocationsModel : OwnerPage
     {
         var known = KnownLocationId(id);
 
-        if (!AcceptsJson(Request) && known is not null && HoldsGames(known))
+        if (!OwnerResponses.AsksForJson(Request) && known is not null && HoldsGames(known))
         {
             return RedirectToPage(PagePath, pageHandler: null, routeValues: new { confirm = known }, fragment: $"loc-{known}");
         }
@@ -305,9 +304,6 @@ public class LocationsModel : OwnerPage
 
         return OwnerResponses.For(this, result, PagePath, NoticeAnchor);
     }
-
-    private static bool AcceptsJson(HttpRequest request) =>
-        request.Headers.Accept.Any(value => value is not null && value.Contains(JsonMediaType, StringComparison.OrdinalIgnoreCase));
 
     private static string? NameProblemKey(string? done) =>
         done is not null && done.StartsWith(RefusedPrefix, StringComparison.Ordinal) && OwnerStrings.IsNameProblem(done[RefusedPrefix.Length..])

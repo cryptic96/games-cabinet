@@ -80,6 +80,12 @@ public static class OwnerDataExport
     /// <summary>The deepest nesting of JSON a restored file may have.</summary>
     public const int MaxDepth = 16;
 
+    /// <summary>The highest revision a restored file may carry; a script has to be able to send it back exactly.</summary>
+    public const int MaxRevision = int.MaxValue / 2;
+
+    /// <summary>The most changes since the last download a restored file may report.</summary>
+    public const int MaxChangesSinceDownload = OwnerData.MaxStoredChanges * 1000;
+
     private const int MaxFinishLength = 32;
     private const int MaxChangeTextLength = 1000;
     private const string FileNamePrefix = "cabinet-owner-data-";
@@ -219,7 +225,9 @@ public static class OwnerDataExport
     private static bool WithinLimits(OwnerData data, ArtSourcePolicy policy)
     {
         if (data.Revision < 0
+            || data.Revision > MaxRevision
             || data.ChangesSinceDownload < 0
+            || data.ChangesSinceDownload > MaxChangesSinceDownload
             || data.Finish.Length > MaxFinishLength
             || data.Changes.Count > OwnerData.MaxStoredChanges
             || data.Changes.Any(change => change.Text.Length > MaxChangeTextLength)
@@ -280,6 +288,11 @@ public static class OwnerDataExport
         }
 
         if (picture.SeenOwnedUrl?.Length > ArtUrl.MaxLength || picture.SeenMainUrl?.Length > ArtUrl.MaxLength)
+        {
+            return false;
+        }
+
+        if (picture.Choice == PictureChoice.Link && picture.Link is null)
         {
             return false;
         }

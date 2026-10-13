@@ -20,6 +20,8 @@ public static class ForwardedHeadersSetup
 
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
         options.ForwardLimit = 1;
+        options.KnownIPNetworks.Clear();
+        options.KnownProxies.Clear();
 
         var knownProxies = configuration.GetSection("ReverseProxy:KnownProxies").Get<string[]>() ?? [];
         foreach (var proxy in knownProxies)

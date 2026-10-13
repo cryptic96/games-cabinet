@@ -188,6 +188,42 @@ public class OwnerAccessTests
         options.Allows(IPAddress.IPv6Loopback).Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData("js/owner-locations.js", true)]
+    [InlineData("/js/owner-link.abc123.js", true)]
+    [InlineData("JS/OWNER-SHARED.JS", true)]
+    [InlineData("css/owner.css", true)]
+    [InlineData("css/owner.abc123.css", true)]
+    [InlineData("js/cabinet.js", false)]
+    [InlineData("js/owners.js", false)]
+    [InlineData("css/site.css", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void IsOwnerAsset_names_only_the_owner_scripts_and_stylesheet(string? route, bool expected)
+    {
+        OwnerAccess.IsOwnerAsset(route).Should().Be(expected);
+    }
+
+    [Fact]
+    public void IsKnownProxy_matches_only_a_configured_proxy_in_either_spelling()
+    {
+        var options = OwnerAccess.FromConfiguration(Build(OwnerUrl, ranges: ["192.0.2.0/24"], proxies: ["192.0.2.10"]));
+
+        options.IsKnownProxy(IPAddress.Parse("192.0.2.10")).Should().BeTrue();
+        options.IsKnownProxy(IPAddress.Parse("::ffff:192.0.2.10")).Should().BeTrue();
+        options.IsKnownProxy(IPAddress.Parse("192.0.2.11")).Should().BeFalse();
+        options.IsKnownProxy(IPAddress.Loopback).Should().BeFalse();
+        options.IsKnownProxy(null).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsKnownProxy_is_false_for_every_address_when_no_proxy_is_known()
+    {
+        var options = new OwnerAccessOptions(5082, []);
+
+        options.IsKnownProxy(IPAddress.Loopback).Should().BeFalse();
+    }
+
     private static IConfiguration Build(
         string? ownerUrl,
         string[] ranges,

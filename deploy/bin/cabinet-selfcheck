@@ -144,9 +144,11 @@ http_status() {
 ###
 ### Proves the owner tools' inner walls from the host: the public port must
 ### hide the owner pages with a 404, and, when the owner port listens, a
-### request through loopback that claims an out-of-range client address in
-### X-Forwarded-For must be refused with a 403. Reports status codes only;
-### no address or hostname is ever printed.
+### request from loopback, which is not the known proxy and does not stand
+### behind it, must be refused with a 403 whatever X-Forwarded-For claims.
+### This proves the refusal, not the forwarded path, which the integration
+### tests prove. Reports status codes only; no address or hostname is ever
+### printed.
 ###
 check_owner_wall() {
   local sockets status
@@ -168,9 +170,9 @@ check_owner_wall() {
 
   status="$(http_status "http://127.0.0.1:5082/" -H "X-Forwarded-For: 203.0.113.7")"
   if [[ "$status" == "403" ]]; then
-    pass "the owner port refuses a client address outside the allowed ranges"
+    pass "the owner port refuses a request from loopback"
   else
-    fail "the owner port answers status ${status} to a forged out-of-range client address, expected 403"
+    fail "the owner port answers status ${status} to a request from loopback, expected 403"
   fi
 }
 
@@ -184,6 +186,28 @@ check_firewall() {
     pass "the firewall input chain drops by default"
   else
     fail "the firewall input chain does not default to drop"
+  fi
+
+  check_owner_port_firewall "$ruleset"
+}
+
+###
+### When the owner port listens, the firewall must admit it from one proxy
+### address only: a rule for port 5082 with a source address that is not the
+### whole internet. Without it the owner port, bound to every address, would be
+### open to the whole network and only the client-range wall would be left.
+### Skipped when the owner tools are off or the listeners cannot be listed;
+### the listener check reports both. Prints no address.
+###
+check_owner_port_firewall() {
+  local ruleset="$1" sockets rule='tcp dport 5082 ip saddr ([0-9a-fA-F.:]+(/[0-9]+)?) accept'
+  if ! sockets="$(ss -ltnH 2>&1)" || [[ -z "$(listener_addresses "$sockets" 5082)" ]]; then
+    return
+  fi
+  if [[ "$ruleset" =~ $rule && "${BASH_REMATCH[1]}" != "0.0.0.0/0" ]]; then
+    pass "the firewall admits the owner port 5082 from one source address only"
+  else
+    fail "the firewall has no rule that admits the owner port 5082 from one source address only"
   fi
 }
 

@@ -85,6 +85,30 @@ public sealed class OwnerDataStoreTests : IDisposable
         Listing().Should().Equal(listingBefore);
     }
 
+    [Theory]
+    [InlineData("[null]", false)]
+    [InlineData("[{\"width\":240,\"height\":300,\"name\":\"a.webp\"}]", true)]
+    [InlineData("[]", true)]
+    public void A_missing_entry_in_a_stored_picture_file_list_makes_the_file_unreadable(string files, bool readable)
+    {
+        var content = "{\"kind\":\"games-cabinet-owner-data\",\"schemaVersion\":1,\"revision\":3,\"finish\":\"classic\",\"locations\":[],"
+            + "\"games\":[{\"gameId\":5,\"picture\":{\"choice\":\"link\",\"checked\":false,\"link\":{\"url\":\"https://img.example.org/a.jpg\",\"failedChecks\":0,"
+            + "\"record\":{\"sourceUrl\":\"https://img.example.org/a.jpg\",\"status\":\"ok\",\"attemptedAtUtc\":\"2026-01-01T00:00:00Z\",\"files\":" + files + "}}}}],"
+            + "\"changesSinceDownload\":0,\"changes\":[]}";
+        File.WriteAllBytes(FilePath, Encoding.UTF8.GetBytes(content));
+
+        var state = CreateStore().Load();
+
+        if (readable)
+        {
+            state.Should().BeOfType<OwnerDataState.Ready>();
+        }
+        else
+        {
+            state.Should().BeOfType<OwnerDataState.Unreadable>();
+        }
+    }
+
     [Fact]
     public async Task A_refused_write_over_a_damaged_file_leaves_its_bytes_and_the_directory_as_they_were()
     {

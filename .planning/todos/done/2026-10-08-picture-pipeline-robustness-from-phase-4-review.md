@@ -33,3 +33,7 @@ Still open: domain WR-04, WR-02 and WR-03 above.
 ## Solution
 
 Treat any failure while fetching or decoding one picture as a failed record for that picture (with the usual retry time), and give the body read its own deadline. Record details attempts so a missing game backs off. Add the plausibility check to `FromCover`, and make `Explain` order-independent. Each fix comes with a failing test first. All of these change server behaviour, so they ship in the next release.
+
+## Closed
+
+Closed on 2026-10-13. The two critical and warning fixes were made earlier in the picture work; the details backoff (plan 04) and the plausible cover shapes with an order-independent mapping (plan 05) finished the remaining three items. Shipped in the release that carries the owner tools.

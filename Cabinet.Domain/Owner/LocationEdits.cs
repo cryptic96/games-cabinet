@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using Cabinet.Domain.Collection;
 
 namespace Cabinet.Domain.Owner;
@@ -89,7 +91,7 @@ public static class LocationNames
             return new LocationNameCheck(LocationNameProblem.TooLong, name);
         }
 
-        if (name.Any(IsForbidden))
+        if (name.EnumerateRunes().Any(IsForbidden))
         {
             return new LocationNameCheck(LocationNameProblem.ForbiddenCharacter, name);
         }
@@ -106,10 +108,9 @@ public static class LocationNames
         return new LocationNameCheck(taken ? LocationNameProblem.Taken : LocationNameProblem.None, name);
     }
 
-    private static bool IsForbidden(char character) =>
-        char.IsControl(character)
-        || character is >= '‪' and <= '‮'
-        || character is >= '⁦' and <= '⁩';
+    private static bool IsForbidden(Rune rune) =>
+        Rune.IsControl(rune)
+        || Rune.GetUnicodeCategory(rune) == UnicodeCategory.Format;
 }
 
 /// <summary>Where a move of several games at once puts them.</summary>

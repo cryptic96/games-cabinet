@@ -114,6 +114,18 @@ public sealed class OwnerRestoreParserTests
     }
 
     [Fact]
+    public void A_revision_or_change_count_too_large_to_keep_counting_from_is_over_the_limits()
+    {
+        Check(Text(Json("\"revision\": 3", $"\"revision\": {OwnerDataExport.MaxRevision}"))).IsOk.Should().BeTrue();
+        Check(Text(Json("\"revision\": 3", $"\"revision\": {OwnerDataExport.MaxRevision + 1L}"))).Refusal.Should().Be(RestoreProblem.OverLimits);
+        Check(Text(Json("\"revision\": 3", "\"revision\": 9223372036854775807"))).Refusal.Should().Be(RestoreProblem.OverLimits);
+        Check(Text(Json("\"revision\": 3", "\"revision\": 9007199254740993"))).Refusal.Should().Be(RestoreProblem.OverLimits);
+        OwnerStrings.RestoreProblemText(Check(Text(Json("\"revision\": 3", "\"revision\": 9007199254740993")))).Should().NotBeNullOrWhiteSpace();
+        Check(Text(Json("\"changesSinceDownload\": 0", $"\"changesSinceDownload\": {OwnerDataExport.MaxChangesSinceDownload}"))).IsOk.Should().BeTrue();
+        Check(Text(Json("\"changesSinceDownload\": 0", "\"changesSinceDownload\": 2147483647"))).Refusal.Should().Be(RestoreProblem.OverLimits);
+    }
+
+    [Fact]
     public void The_games_of_an_accepted_file_come_out_sorted_by_identifier()
     {
         var data = Valid() with { Games = [.. Valid().Games.Reverse()] };
@@ -225,6 +237,16 @@ public sealed class OwnerRestoreParserTests
         var data = Valid() with { Games = [new OwnerGame(100, IdA, null, LinkPicture(address))] };
 
         Check(Export(data)).Refusal.Should().Be(RestoreProblem.OverLimits);
+    }
+
+    [Fact]
+    public void A_chosen_link_with_no_link_behind_it_is_over_the_limits_but_another_choice_may_have_none()
+    {
+        var withoutLink = new PictureSetting(PictureChoice.Link, true, null, null, null);
+        var mainPicture = new PictureSetting(PictureChoice.MainPicture, true, null, null, null);
+
+        Check(Export(Valid() with { Games = [new OwnerGame(100, IdA, null, withoutLink)] })).Refusal.Should().Be(RestoreProblem.OverLimits);
+        Check(Export(Valid() with { Games = [new OwnerGame(100, IdA, null, mainPicture)] })).IsOk.Should().BeTrue();
     }
 
     [Fact]

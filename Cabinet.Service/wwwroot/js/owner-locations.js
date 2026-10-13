@@ -20,12 +20,13 @@ import { initGamesToolbar, initPickers } from './owner-games.js';
 import { gameStates, initPlacing } from './owner-placing.js';
 import {
   announce,
+  dismissOnBackdrop,
   getRevision,
   initRevision,
   postOwner,
-  reloadButton,
   setPickerValue,
   setRevision,
+  showProblem,
   showRowProblem,
   showRowStatus,
 } from './owner-shared.js';
@@ -274,33 +275,16 @@ export function initLocationList(doc = globalThis.document) {
   }
 
   /**
-   * Tells the owner that a request did not go through, in the region of the row it was about.
-   * @param {HTMLElement} region The status region.
-   * @param {{ outcome: string, status?: string }} result What the request came to.
-   */
-  function showProblem(region, result) {
-    if (result.outcome === 'outOfDate') {
-      reloadButton(region, OWNER_TEXT.outOfDate, OWNER_TEXT.reload);
-    } else if (result.outcome === 'expired') {
-      reloadButton(region, OWNER_TEXT.expired, OWNER_TEXT.reload);
-    } else if (result.outcome === 'unreadable') {
-      showRowProblem(region, OWNER_TEXT.unreadable);
-    } else {
-      showRowProblem(region, OWNER_TEXT.failed);
-    }
-  }
-
-  /**
    * Takes back the latest change on the server and, when that worked, takes it back on the page too.
    * @param {HTMLElement} region The status region the Undo button was in.
    * @param {() => void} apply Takes the change back on the page.
    * @param {() => HTMLElement} focusAfter Gives the element that takes focus once the Undo button is gone.
-   * @returns {() => void} The click handler of the Undo button.
+   * @returns {(saved?: number | null) => void} The click handler of the Undo button; it gets the revision the change was saved at.
    */
   function undoer(region, apply, focusAfter) {
-    return () =>
+    return (saved) =>
       enqueue(async () => {
-        const result = await postOwner(HANDLERS.undo, {});
+        const result = await postOwner(HANDLERS.undo, {}, { revision: saved });
 
         if (result.outcome === 'saved') {
           apply();
@@ -500,9 +484,9 @@ export function initLocationList(doc = globalThis.document) {
 
   /**
    * Adds a location at the end of the list.
+   * @param {string} entered The name the owner had typed when the form was submitted.
    */
-  async function commitAdd() {
-    const entered = addField.value;
+  async function commitAdd(entered) {
     const result = await postOwner(HANDLERS.add, { name: entered });
 
     if (result.outcome === 'saved' && typeof result.id === 'string') {
@@ -510,6 +494,7 @@ export function initLocationList(doc = globalThis.document) {
       const item = buildItem(result.id, name);
 
       list.append(item);
+      setRevision(getRevision(), doc);
       panel.open = true;
       addField.value = '';
       addField.focus();
@@ -550,7 +535,6 @@ export function initLocationList(doc = globalThis.document) {
     item.querySelector('input[name="id"]').value = id;
     nameField(item).value = name;
     item.querySelector('.field-error').id = 'loc-error-' + id;
-    setRevision(getRevision(), doc);
 
     return item;
   }
@@ -595,24 +579,28 @@ export function initLocationList(doc = globalThis.document) {
     }
   });
 
+  let adding = false;
+
   addForm.addEventListener('submit', (event) => {
     event.preventDefault();
-    enqueue(commitAdd);
-  });
 
-  dialog.addEventListener('click', (event) => {
-    if (event.target !== dialog) {
+    if (adding) {
       return;
     }
 
-    const box = dialog.getBoundingClientRect();
-    const outside =
-      event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom;
+    const entered = addField.value;
 
-    if (outside) {
-      dialog.close();
-    }
+    adding = true;
+    enqueue(async () => {
+      try {
+        await commitAdd(entered);
+      } finally {
+        adding = false;
+      }
+    });
   });
+
+  dismissOnBackdrop(dialog);
 
   dialog.addEventListener('close', () => {
     if (!confirmed) {

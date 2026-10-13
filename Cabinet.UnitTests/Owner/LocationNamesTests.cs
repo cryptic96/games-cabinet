@@ -76,7 +76,17 @@ public sealed class LocationNamesTests
     [InlineData("Shelf\tB")]
     [InlineData("Shelf\nB")]
     [InlineData("Shelf\u0085B")]
-    public void A_name_holding_a_control_or_direction_override_character_is_refused_with_its_own_reason(string candidate)
+    [InlineData("Shelf\u200EB")]
+    [InlineData("Shelf\u200FB")]
+    [InlineData("Shelf\u061CB")]
+    [InlineData("Shelf\u200BB")]
+    [InlineData("Shelf\u200CB")]
+    [InlineData("Shelf\u200DB")]
+    [InlineData("Shelf\u2060B")]
+    [InlineData("Shelf\uFEFFB")]
+    [InlineData("Shelf\u00ADB")]
+    [InlineData("Shelf\U000E0041B")]
+    public void A_name_holding_a_control_or_invisible_format_character_is_refused_with_its_own_reason(string candidate)
     {
         LocationNames.Validate(Existing, candidate).Problem.Should().Be(LocationNameProblem.ForbiddenCharacter);
     }

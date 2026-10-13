@@ -1,8 +1,10 @@
 /**
  * What every owner page script shares: reading the antiforgery token, posting a change and mapping the answer to an outcome the
  * page can act on, the revision of the data the page was built from, the per-row status with its Undo button, and the page's
- * announcer. Nothing here touches the document until a function that needs it is called, so the module imports in a plain Node test.
+ * announcer, and the small helpers more than one owner script needs. Nothing here touches the document until a function that
+ * needs it is called, so the module imports in a plain Node test.
  */
+import { OWNER_TEXT } from './owner-format.js';
 
 /** The name of the header the server reads the antiforgery token from. */
 const TOKEN_HEADER = 'RequestVerificationToken';
@@ -211,7 +213,10 @@ function dropServerNotices(doc) {
  * written as text, never as markup.
  * @param {Element} region The row's status region.
  * @param {string} text What happened.
- * @param {{ onUndo?: () => void, undoLabel?: string }} [options] The action of the Undo button and its label; no button when there is no action.
+ * The Undo button belongs to the change that was just saved: it remembers the revision of that save and hands it to the action, which
+ * sends it with the undo, so the server refuses the undo when another change was saved since. A second press while the first is
+ * still being handled does nothing.
+ * @param {{ onUndo?: (saved: number | null) => void, undoLabel?: string }} [options] The action of the Undo button and its label; no button when there is no action.
  */
 export function showRowStatus(region, text, options = {}) {
   const doc = reset(region);
@@ -234,7 +239,16 @@ export function showRowStatus(region, text, options = {}) {
     button.className = 'owner-btn';
     button.dataset.undo = '';
     button.textContent = options.undoLabel ?? '';
-    button.addEventListener('click', options.onUndo);
+    const saved = currentRevision;
+
+    button.addEventListener('click', () => {
+      if (button.getAttribute('aria-disabled') === 'true') {
+        return;
+      }
+
+      button.setAttribute('aria-disabled', 'true');
+      options.onUndo(saved);
+    });
     region.append(button);
     undoRegion = region;
   }
@@ -276,6 +290,64 @@ export function reloadButton(region, text, label, reload = () => globalThis.loca
 }
 
 /**
+ * Tells the owner that a request did not go through, in the region of the row it was about: a Reload button when the page is out
+ * of date or has expired, the words about unreadable data, or the plain failure text.
+ * @param {Element} region The status region.
+ * @param {{ outcome: string }} result What the request came to.
+ */
+export function showProblem(region, result) {
+  if (result.outcome === 'outOfDate') {
+    reloadButton(region, OWNER_TEXT.outOfDate, OWNER_TEXT.reload);
+  } else if (result.outcome === 'expired') {
+    reloadButton(region, OWNER_TEXT.expired, OWNER_TEXT.reload);
+  } else if (result.outcome === 'unreadable') {
+    showRowProblem(region, OWNER_TEXT.unreadable);
+  } else {
+    showRowProblem(region, OWNER_TEXT.failed);
+  }
+}
+
+/**
+ * Reads which choice a group of radios has checked.
+ * @param {Element} fieldset The group.
+ * @returns {string} The value of the checked radio, or an empty string when none is.
+ */
+export function checkedValue(fieldset) {
+  return fieldset.querySelector('input[type="radio"]:checked')?.value ?? '';
+}
+
+/**
+ * Checks the radio with a value and unchecks the others.
+ * @param {Element} fieldset The group.
+ * @param {string} value The value to check.
+ */
+export function setChecked(fieldset, value) {
+  for (const radio of fieldset.querySelectorAll('input[type="radio"]')) {
+    radio.checked = radio.value === value;
+  }
+}
+
+/**
+ * Closes a modal dialog when the owner presses on its backdrop, which is the dialog element itself drawn around its content.
+ * @param {HTMLDialogElement} dialog The dialog.
+ */
+export function dismissOnBackdrop(dialog) {
+  dialog.addEventListener('click', (event) => {
+    if (event.target !== dialog) {
+      return;
+    }
+
+    const box = dialog.getBoundingClientRect();
+    const outside =
+      event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom;
+
+    if (outside) {
+      dialog.close();
+    }
+  });
+}
+
+/**
  * Writes a text into the page's polite announcer, which every owner page carries as `#owner-status`.
  * @param {string} text What to announce.
  * @param {Document} [doc] The document that holds the announcer; the page's own by default.
@@ -289,7 +361,13 @@ export function announce(text, doc = globalThis.document) {
 }
 
 /** How close after a key press a change has to come to count as made by the keyboard. */
-const KEY_WINDOW_MS = 100;
+export const KEY_WINDOW_MS = 100;
+
+/** How long stepping through a group of choices with the keyboard must pause before the choice is saved. */
+export const SETTLE_MS = 600;
+
+/** The shape of a colour the server may hand to a script to set on an element. */
+export const HEX_COLOUR = /^#[0-9a-fA-F]{6}$/;
 
 /**
  * Sets a picker's value and remembers it as the value that is saved, so a later failed save knows what to go back to.
@@ -311,7 +389,7 @@ export function setPickerValue(select, value) {
  * @param {number} [settleMs] How long keyboard stepping must pause before it saves.
  * @returns {{ flush: () => void }} A way to save what is waiting without delay.
  */
-export function saveSettledValue(select, save, settleMs = 600) {
+export function saveSettledValue(select, save, settleMs = SETTLE_MS) {
   let lastKeyAt = Number.NEGATIVE_INFINITY;
   let timer = null;
   let pending = false;
