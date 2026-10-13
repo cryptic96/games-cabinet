@@ -1,0 +1,32 @@
+@using Cabinet.Service.Owner
+@model Cabinet.Service.Pages.Owner.OwnerPage
+@{
+    var versions = Model.EarlierVersions;
+}
+<h2>@Model.PageName</h2>
+<section class="owner-panel unreadable-panel" id="owner-unreadable" aria-labelledby="owner-unreadable-heading">
+    <h3 id="owner-unreadable-heading">@OwnerStrings.UnreadableHeading</h3>
+    <p>@OwnerStrings.UnreadableBody</p>
+    <p><a class="pic-link" href="~/owner/settings#restore">@OwnerStrings.RestoreHeading</a></p>
+    <h4 id="earlier-versions-heading">@OwnerStrings.EarlierVersionsHeading</h4>
+    @if (versions.Count == 0)
+    {
+        <p class="owner-hint" id="earlier-versions-none">@OwnerStrings.NoEarlierVersions</p>
+    }
+    else
+    {
+        <ul class="version-list" aria-labelledby="earlier-versions-heading">
+            @foreach (var version in versions)
+            {
+                var timeId = $"version-time-{version.Index}";
+                <li class="version-item">
+                    <time id="@timeId" datetime="@OwnerStrings.TimeAttribute(version.SavedAtUtc)" data-owner-when data-capitalise>@OwnerStrings.TimeUtcText(version.SavedAtUtc)</time>
+                    <form method="post" asp-page="/Owner/Settings" asp-page-handler="CheckVersion">
+                        <input type="hidden" name="index" value="@version.Index" />
+                        <button type="submit" class="owner-btn" aria-describedby="@timeId">@OwnerStrings.UseThisVersionButton</button>
+                    </form>
+                </li>
+            }
+        </ul>
+    }
+</section>

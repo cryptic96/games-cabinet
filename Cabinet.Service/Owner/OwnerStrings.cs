@@ -253,6 +253,21 @@ public static class OwnerStrings
     /// <summary>The note shown while the owner data cannot be read.</summary>
     public const string OwnerDataUnreadable = "Your owner data couldn't be read, so nothing can be saved until it is restored.";
 
+    /// <summary>The heading of the panel every owner page shows while the stored owner data cannot be read.</summary>
+    public const string UnreadableHeading = "Your owner data couldn't be read";
+
+    /// <summary>The words under that heading.</summary>
+    public const string UnreadableBody = "Nothing was changed. Restore it from a file you downloaded, or from an earlier version kept on this server.";
+
+    /// <summary>The heading of the list of earlier versions in that panel.</summary>
+    public const string EarlierVersionsHeading = "Earlier versions kept on this server";
+
+    /// <summary>The note shown instead of the list when the server keeps no earlier version.</summary>
+    public const string NoEarlierVersions = "This server keeps no earlier version yet. Restore from a file instead.";
+
+    /// <summary>The button that chooses one earlier version to restore.</summary>
+    public const string UseThisVersionButton = "Use this version";
+
     /// <summary>The line at the top of the list of locations.</summary>
     public const string LocationsHelper = "Locations show in this order. Use the arrows to change it.";
 

@@ -9,6 +9,8 @@
     var page = ViewData["Title"] as string;
     var backup = OwnerData.Backup;
     var requestToken = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+    var ownerPage = ViewContext.ViewData.Model as OwnerPage;
+    var unreadable = ownerPage?.OwnerDataUnreadable is true;
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -41,7 +43,20 @@
     }
     <main id="owner-main" class="owner-main" data-icons="@FileVersions.AddFileVersionToPath(Context.Request.PathBase, "/img/icons.svg")" data-backup-state="@Url.Page("/Owner/Settings", "BackupState")">
         <p id="owner-status" class="visually-hidden" role="status" aria-atomic="true"></p>
-        @RenderBody()
+        @if (unreadable)
+        {
+            IgnoreBody();
+            <partial name="_OwnerUnreadable" model="ownerPage" />
+
+            if (ownerPage is SettingsModel settings)
+            {
+                <partial name="_OwnerRestorePanel" model="settings" />
+            }
+        }
+        else
+        {
+            @RenderBody()
+        }
     </main>
     <partial name="_Footer" model="SiteLanguage.English" />
     @await RenderSectionAsync("Scripts", required: false)

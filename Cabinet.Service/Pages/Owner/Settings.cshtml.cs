@@ -186,6 +186,36 @@ public class SettingsModel : OwnerPage
     }
 
     /// <summary>
+    /// Checks one of the earlier versions the server keeps, whole, and changes nothing. The version is read by its place in the server's own
+    /// list, never by a name from the request, and goes through the same check and staging as a chosen file; the owner then confirms it
+    /// with the same restore. A place that is not in the list, or a copy the check cannot accept, is refused; a copy that is not an owner-data file at all reads as damaged, since the server made it.
+    /// </summary>
+    /// <param name="index">The place of the version in the list the recovery panel shows; anything that is not a whole number reads as no place.</param>
+    public IActionResult OnPostCheckVersion(int? index)
+    {
+        var bytes = index is { } place ? _owner.ReadEarlierVersion(place) : null;
+        var check = bytes is null ? RestoreCheck.Problem(RestoreProblem.Damaged) : OwnerDataExport.Check(bytes, _policy);
+
+        if (check.Refusal == RestoreProblem.NotOwnerData)
+        {
+            check = RestoreCheck.Problem(RestoreProblem.Damaged);
+        }
+
+        if (!check.IsOk)
+        {
+            Populate(done: null);
+            RestoreNotice = OwnerStrings.RestoreProblemText(check);
+            Response.StatusCode = StatusCodes.Status422UnprocessableEntity;
+
+            return Page();
+        }
+
+        var token = _staged.Stage(new RestoreCandidate(check.Data!, check.FormatVersion, RestoreSource.EarlierVersion));
+
+        return RedirectToPage(PagePath, pageHandler: null, routeValues: new { restore = token }, fragment: PreviewAnchor);
+    }
+
+    /// <summary>
     /// Replaces all the owner data with the checked file the token names. The data that is there is kept as an earlier version first.
     /// A token that names nothing held, because the check ran out or never happened, restores nothing.
     /// </summary>
