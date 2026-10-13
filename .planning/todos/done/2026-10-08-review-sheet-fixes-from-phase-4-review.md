@@ -22,3 +22,7 @@ Found in the phase 4 code review (services WR-02, WR-03 and WR-04, plus info ite
 ## Solution
 
 Count verdicts by kind, including the marked kinds. Clip or wrap the verdict column. Load the snapshot read-only in the command. Cover each with a test.
+
+## Closed
+
+Closed on 2026-10-13. Plan 03 counts verdicts by kind, clips the verdict column and loads the snapshot read-only in the review command. Shipped in the release that carries the owner tools.

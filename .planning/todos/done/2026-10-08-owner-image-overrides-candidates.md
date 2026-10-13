@@ -34,3 +34,7 @@ Rows with no owned-version picture at all (10, 12, 16, 22, 23, 24, 31, 39, 47, 5
 ## Solution
 
 When the owner image overrides arrive in the owner-tools phase, work through the rows above, starting with the ones seen showing another edition, language or a generic picture. The detector settings and the "flat covers first" rule stay as they are; no stopgap list is built before then. No titles, addresses or picture data belong in this note.
+
+## Closed
+
+Closed on 2026-10-13. The owner tools (plan 18, the Worth a look worklist on the Pictures page, with the owned-edition, main-picture, link and Looks right choices) finished this note, and the owner confirmed on the deployed site that the first session works (plan 30).
