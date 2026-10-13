@@ -66,6 +66,10 @@ export function checkedPreview(result) {
     return null;
   }
 
+  if (result.token !== result.previewUrl.split('/').pop()) {
+    return null;
+  }
+
   const sizesAreValid = [preview.boxWidthMm, preview.boxHeightMm, preview.spineWidthMm, preview.spineHeightMm].every((value) =>
     isCount(value, 2000)) && isCount(preview.boxDepthMm, 2000) && isCount(preview.artWidth, 4096) && isCount(preview.artHeight, 4096);
   const coloursAreValid = HEX_COLOUR.test(preview.spineBackground ?? '') && TEXT_COLOURS.includes(preview.spineText);

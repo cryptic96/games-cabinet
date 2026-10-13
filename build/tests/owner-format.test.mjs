@@ -234,6 +234,7 @@ test('a stored picture address is shortened to its host and its file name', () =
   assert.equal(shortAddress('https://cf.geekdo-images.com/abc__original/img/x/0x0/pic1.png'), 'cf.geekdo-images.com/.../pic1.png');
   assert.equal(shortAddress('https://example.org/a%20b.png'), 'example.org/.../a b.png');
   assert.equal(shortAddress('https://example.org/'), 'example.org');
+  assert.equal(shortAddress('https://example.org/a%E0%A4%A.png'), 'example.org/.../a%E0%A4%A.png');
   assert.equal(shortAddress('not an address'), '');
   assert.equal(shortAddress(''), '');
 });

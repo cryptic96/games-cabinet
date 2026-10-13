@@ -72,6 +72,18 @@ test('a picture address that is not the site preview route is refused', () => {
   }
 });
 
+test('a token that is missing or is not the one in the preview address is refused', () => {
+  const withoutToken = answer();
+  const otherToken = answer();
+
+  delete withoutToken.token;
+  otherToken.token = '0'.repeat(32);
+
+  assert.equal(checkedPreview(withoutToken), null);
+  assert.equal(checkedPreview(otherToken), null);
+  assert.equal(checkedPreview({ ...answer(), token: undefined }), null);
+});
+
 test('a bad colour, size, fit or missing text is refused', () => {
   assert.equal(checkedPreview(answer({ spineBackground: 'red' })), null);
   assert.equal(checkedPreview(answer({ spineText: '#808080' })), null);

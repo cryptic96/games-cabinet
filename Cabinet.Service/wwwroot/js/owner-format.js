@@ -151,7 +151,14 @@ export function shortAddress(address) {
     return '';
   }
 
-  const file = decodeURIComponent(parsed.pathname.split('/').filter(Boolean).pop() ?? '');
+  const segment = parsed.pathname.split('/').filter(Boolean).pop() ?? '';
+  let file = segment;
+
+  try {
+    file = decodeURIComponent(segment);
+  } catch {
+    file = segment;
+  }
 
   return file === '' ? parsed.hostname : `${parsed.hostname}/.../${file}`;
 }
