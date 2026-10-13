@@ -500,9 +500,9 @@ export function initLocationList(doc = globalThis.document) {
 
   /**
    * Adds a location at the end of the list.
+   * @param {string} entered The name the owner had typed when the form was submitted.
    */
-  async function commitAdd() {
-    const entered = addField.value;
+  async function commitAdd(entered) {
     const result = await postOwner(HANDLERS.add, { name: entered });
 
     if (result.outcome === 'saved' && typeof result.id === 'string') {
@@ -595,9 +595,25 @@ export function initLocationList(doc = globalThis.document) {
     }
   });
 
+  let adding = false;
+
   addForm.addEventListener('submit', (event) => {
     event.preventDefault();
-    enqueue(commitAdd);
+
+    if (adding) {
+      return;
+    }
+
+    const entered = addField.value;
+
+    adding = true;
+    enqueue(async () => {
+      try {
+        await commitAdd(entered);
+      } finally {
+        adding = false;
+      }
+    });
   });
 
   dialog.addEventListener('click', (event) => {

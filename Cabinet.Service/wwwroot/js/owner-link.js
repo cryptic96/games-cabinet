@@ -491,13 +491,17 @@ export function initLinkBox(row, helpers) {
       }
     });
 
-  const use = (section) =>
+  const use = (section) => {
+    const button = section.querySelector('[data-use-preview]');
+
+    if (button.getAttribute('aria-disabled') === 'true') {
+      return;
+    }
+
+    button.setAttribute('aria-disabled', 'true');
+
     helpers.enqueue(async () => {
       const restore = captureRow();
-      const button = section.querySelector('[data-use-preview]');
-
-      button.setAttribute('aria-disabled', 'true');
-
       const result = await postOwner(HANDLERS.use, { gameId, token: section.dataset.token });
 
       button.removeAttribute('aria-disabled');
@@ -529,6 +533,7 @@ export function initLinkBox(row, helpers) {
         helpers.showProblem(region, result);
       }
     });
+  };
 
   const undoRemove = (previousChoice) => (saved) =>
     helpers.enqueue(async () => {
