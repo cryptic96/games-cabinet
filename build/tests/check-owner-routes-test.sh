@@ -89,7 +89,7 @@ export STUB_TABLE="${WORK_DIR}/table.tsv"
 ###
 run_check() {
   RUN_STATUS=0
-  env PATH="${STUB_BIN}:${PATH}" STUB_TABLE="$STUB_TABLE" "$@" bash "$SCRIPT" > "${WORK_DIR}/run.out" 2>&1 || RUN_STATUS=$?
+  env -u CABINET_OWNER_HOST -u CABINET_PUBLIC_HOST PATH="${STUB_BIN}:${PATH}" STUB_TABLE="$STUB_TABLE" "$@" bash "$SCRIPT" > "${WORK_DIR}/run.out" 2>&1 || RUN_STATUS=$?
 }
 
 count_matching() {
