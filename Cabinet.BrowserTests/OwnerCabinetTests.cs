@@ -290,6 +290,122 @@ public sealed class OwnerCabinetTests : CabinetPageTest
         pointerEvents.Should().OnlyContain(events => events == "none");
     }
 
+    [Fact]
+    public async Task Above_forty_rem_the_plate_sits_before_the_toggle_in_one_cell_side_by_side()
+    {
+        await StartHostAsync();
+        await Page.SetViewportSizeAsync(1440, 900);
+
+        await GotoOwnerCabinetAsync();
+
+        var plate = await RectOf("header .header-aside .owner-plate");
+        var toggle = await RectOf("header .header-aside .lang-toggle");
+        plate.Right.Should().BeLessThanOrEqualTo(toggle.Left);
+        Math.Abs((plate.Top + (plate.Height / 2)) - (toggle.Top + (toggle.Height / 2))).Should().BeLessThan(2);
+        await Expect(Page.Locator("header .header-aside > :first-child")).ToHaveClassAsync("owner-plate");
+        await SaveScreenshotAsync("owner-header-1440");
+    }
+
+    [Theory]
+    [InlineData(390, 844)]
+    [InlineData(320, 640)]
+    public async Task Below_forty_rem_the_plate_stacks_above_the_toggle_which_keeps_its_44_pixel_items(int width, int height)
+    {
+        await StartHostAsync();
+        await Page.SetViewportSizeAsync(width, height);
+
+        await GotoOwnerCabinetAsync();
+
+        var plate = await RectOf("header .header-aside .owner-plate");
+        var toggle = await RectOf("header .header-aside .lang-toggle");
+        var title = await RectOf("header > h1");
+        plate.Bottom.Should().BeLessThanOrEqualTo(toggle.Top + 1);
+        plate.Right.Should().BeApproximately(toggle.Right, 1.5);
+        title.Right.Should().BeLessThanOrEqualTo(Math.Min(plate.Left, toggle.Left) + 1);
+        foreach (var item in await Page.Locator("header .lang-toggle a").EvaluateAllAsync<double[]>("items => items.map(item => item.getBoundingClientRect().height)"))
+        {
+            item.Should().BeGreaterThanOrEqualTo(44);
+        }
+
+        (await Page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth <= document.documentElement.clientWidth")).Should().BeTrue();
+        await SaveScreenshotAsync($"owner-header-{width}");
+    }
+
+    [Fact]
+    public async Task The_plate_is_not_in_the_tab_order_and_the_toggle_keeps_its_own_focus_order()
+    {
+        await StartHostAsync();
+        await Page.SetViewportSizeAsync(1440, 900);
+        await GotoOwnerCabinetAsync();
+
+        var focusable = await Page.EvaluateAsync<string[]>(
+            "() => [...document.querySelectorAll('header a[href], header button, header [tabindex]')].filter(element => element.tabIndex >= 0).map(element => element.className || element.textContent.trim())");
+
+        focusable.Should().NotContain("owner-plate");
+        (await Page.Locator("header .owner-plate").GetAttributeAsync("tabindex")).Should().BeNull();
+        await Page.Keyboard.PressAsync("Tab");
+        await Page.Keyboard.PressAsync("Tab");
+        var active = await Page.EvaluateAsync<string>("() => document.activeElement.textContent.trim()");
+        active.Should().Be("EN");
+    }
+
+    [Theory]
+    [InlineData(1440, 900)]
+    [InlineData(390, 844)]
+    [InlineData(320, 640)]
+    public async Task The_strip_names_the_owner_view_counts_the_games_to_place_and_keeps_its_links_44_pixels_tall(int width, int height)
+    {
+        await StartHostAsync();
+        await Page.SetViewportSizeAsync(width, height);
+
+        await GotoOwnerCabinetAsync();
+
+        var strip = Page.Locator("header nav.owner-bar[data-variant=\"strip\"]");
+        await Expect(strip).ToContainTextAsync("Owner view. Changes you make here show for every visitor.");
+        await Expect(strip).ToContainTextAsync("4 games are not placed yet.");
+        await Expect(strip.GetByRole(AriaRole.Link, new() { Name = "Place them" })).ToHaveAttributeAsync("href", "/owner/locations?filter=unplaced");
+        await Expect(strip.GetByRole(AriaRole.Link, new() { Name = "Cabinet", Exact = true })).ToHaveCountAsync(0);
+        await Expect(strip.Locator("[aria-live], [role=status], [role=alert]")).ToHaveCountAsync(0);
+        foreach (var height44 in await strip.Locator("a").EvaluateAllAsync<double[]>("links => links.map(link => link.getBoundingClientRect().height)"))
+        {
+            height44.Should().BeGreaterThanOrEqualTo(44);
+        }
+
+        (await Page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth <= document.documentElement.clientWidth")).Should().BeTrue();
+        await SaveScreenshotAsync($"owner-strip-{width}");
+    }
+
+    [Theory]
+    [InlineData(1440, 900)]
+    [InlineData(390, 844)]
+    public async Task At_the_public_address_the_header_holds_the_toggle_alone_with_no_plate_and_no_strip(int width, int height)
+    {
+        await StartHostAsync();
+        await Page.SetViewportSizeAsync(width, height);
+
+        await GotoCabinetAsync("/");
+
+        await Expect(Page.Locator("header .lang-toggle")).ToBeVisibleAsync();
+        await Expect(Page.Locator(".owner-plate, .header-aside, .owner-bar")).ToHaveCountAsync(0);
+        (await Page.Locator("header").InnerTextAsync()).Should().NotContain("Owner");
+        await SaveScreenshotAsync($"public-header-{width}");
+    }
+
+    private async Task<RectReading> RectOf(string selector)
+    {
+        var edges = await Page.Locator(selector).EvaluateAsync<double[]>(
+            "element => { const rect = element.getBoundingClientRect(); return [rect.left, rect.top, rect.right, rect.bottom]; }");
+
+        return new RectReading(edges[0], edges[1], edges[2], edges[3]);
+    }
+
+    private sealed record RectReading(double Left, double Top, double Right, double Bottom)
+    {
+        public double Width => Right - Left;
+
+        public double Height => Bottom - Top;
+    }
+
     private ILocator Box(CardReading card) => Page.Locator($"{Boxes}[data-game-id=\"{card.GameId}\"]").First;
 
     private async Task GotoOwnerCabinetAsync()

@@ -114,6 +114,26 @@ header > .owner-plate {
   grid-row: 1;
 }
 
+/**
+ * On the cabinet at the owner address the plate and the language toggle share the header's second cell: side by side with the
+ * plate first, and stacked with the plate on top once the screen is narrow. The title wraps before it pushes the cell.
+ */
+header > .header-aside {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+@media (max-width: 40rem) {
+  header > .header-aside {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+}
+
 .owner-plate {
   display: inline-flex;
   align-items: center;
@@ -165,6 +185,44 @@ header > .owner-plate {
 
 .owner-bar-end {
   margin-inline-start: auto;
+}
+
+/**
+ * The strip under the cabinet's header at the owner address: the same wood bar as on the owner pages, as a thin row of its own
+ * that holds a sentence or two before the links. Its text and links keep the bar's 44px rows and wrap on a narrow screen.
+ */
+.owner-bar[data-variant="strip"] {
+  margin: 16px 0 0;
+  border: 1px solid var(--wood-edge);
+  border-radius: 4px;
+}
+
+.owner-strip-links {
+  display: flex;
+  flex-wrap: wrap;
+  margin-inline-start: auto;
+}
+
+@media (max-width: 40rem) {
+  .owner-strip-links {
+    margin-inline-start: 0;
+  }
+}
+
+.owner-bar a.owner-strip-action {
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.owner-strip-note {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 16px;
+  color: var(--wall-text);
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .owner-main {
