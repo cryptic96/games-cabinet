@@ -1,1 +1,1 @@
-No external API integration: this phase adds no new external API, SDK or service; it reuses the existing token-less image-host fetch (the same allowlisted picture host, client, caps and pacer the sync already uses) for owner picture links, and its only BGG API change is that the existing details step asks less often (a one-day backoff for games BGG never describes).
+No external API integration: no new API, SDK or service; owner picture links reuse the sync's token-less image-host fetch, and BGG details are only asked less often.
