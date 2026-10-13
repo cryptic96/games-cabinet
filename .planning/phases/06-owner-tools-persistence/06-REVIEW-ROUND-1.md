@@ -152,7 +152,28 @@ Both shapes keep every fixed rule (no text, no pointer input, no change to a box
 
 ## Your answer
 
-> (not given yet)
+Answered 2026-10-13.
+
+On the review round, verbatim:
+
+> i think approved. Did you have the senior front end skill look at it? please do before continueing
+
+The senior front-end pass was run and its findings are in `06-REVIEW-ROUND-1-FE.md`. On which of its findings to apply, verbatim:
+
+> FE1–FE10
+
+Resolution per label:
+
+| Label | Resolution |
+| --- | --- |
+| L1 to L10 | approved as shown, except where a front-end finding changes them: FE1 touches L5, L7 and L9; FE2 touches L4 and L6; FE3 touches L1 and L12; FE6 touches L9; FE7 touches L2; FE8 touches L3; FE9 touches L4; FE10 touches L1 |
+| L11 | shorten, through FE4: `23 not downloaded` below 22.5rem, and no rounded corners on the full-bleed compact banner button |
+| L12 | tighten, through FE3 |
+| L13 | the two-line dock variant of FE5: the message on line one, `Undo` and `Dismiss` side by side on line two below 40rem |
+| T1 | keep the dog-ear |
+| W1 | keep `Bewerken` and `niet geplaatst` |
+| P1, P2, P3 | acknowledged |
+| FE1 to FE10 | apply all, as written. FE8 is a small copy-contract change (the line under the tiles is hidden while the row shows a note); it is recorded as an owner-approved change |
 
 ## After your answer
 
