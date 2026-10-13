@@ -83,3 +83,28 @@ test('an invalid link field is marked by a border and an inset ring, not by colo
   assert.match(field.body, /border-color:\s*var\(--paper-label\)/);
   assert.match(field.body, /box-shadow:\s*inset 0 0 0 1px var\(--ink\)/);
 });
+
+test('a tile caption keeps its radio and its label on one line, the label wrapping beside the radio', () => {
+  const caption = ruleFor('.pic-caption');
+
+  assert.match(caption.body, /flex-wrap:\s*nowrap/);
+  assert.match(caption.body, /align-items:\s*flex-start/);
+});
+
+test('a heading that only takes focus shows no ring while a real control keeps it', () => {
+  const heading = rules().find((rule) => rule.selector.includes('h3[tabindex="-1"]:focus'));
+
+  assert.ok(heading, 'the heading rule must exist');
+  assert.match(heading.body, /outline:\s*none/);
+  assert.match(stripped, /\.owner-panel button:focus-visible/);
+});
+
+test('the compact banner button is square and the narrowest phones read the shortest reminder', () => {
+  const button = ruleFor('.owner-banner:not([data-full="true"]) .owner-btn-primary');
+  const tiny = rules().filter((rule) => rule.selector === '.owner-banner:not([data-full="true"]) .banner-tiny');
+
+  assert.match(button.body, /border-radius:\s*0/);
+  assert.equal(tiny.length, 1);
+  assert.match(tiny[0].body, /display:\s*inline/);
+  assert.match(stripped, /@media \(max-width: 22\.5rem\)\s*\{\s*\.owner-banner:not/);
+});

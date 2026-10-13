@@ -210,10 +210,14 @@ public sealed partial class OwnerWorthALookTests : CabinetPageTest
         await Expect(broken.Locator("[data-mark='wont-load']")).ToHaveTextAsync("Picture won't load");
         await Expect(broken.Locator(".pic-note")).ToHaveTextAsync("The picture can't be loaded right now. The cabinet shows a generated cover until it can.");
         await Expect(broken.Locator(".pic-why")).ToHaveTextAsync("Automatic has no picture to use, so the cabinet shows a generated cover.");
+        await Expect(broken.Locator(".pic-why")).ToBeHiddenAsync();
+        await Expect(changed.Locator(".pic-why")).ToBeHiddenAsync();
+        await Expect(dead.Locator(".pic-why")).ToBeHiddenAsync();
 
         var skipped = RowOf("Example Game 21");
         await Expect(skipped.Locator("[data-mark='skips-owned']")).ToHaveTextAsync("Automatic skips the owned edition");
         await Expect(skipped.Locator(".pic-why")).ToHaveTextAsync("Automatic picks the main picture because the owned edition reads as a cut-out.");
+        await Expect(skipped.Locator(".pic-why")).ToBeVisibleAsync();
         await Expect(RowOf("Example Game 27").Locator(".pic-why")).ToHaveTextAsync("Automatic picks the main picture because the owned edition reads as a 3D shot.");
 
         var whys = await Rows.Locator(".pic-why").AllTextContentsAsync();
@@ -279,6 +283,7 @@ public sealed partial class OwnerWorthALookTests : CabinetPageTest
 
         await Expect(row.Locator("[data-mark='link-dead']")).ToBeHiddenAsync();
         await Expect(row.Locator(".pic-note")).ToBeHiddenAsync();
+        await Expect(row.Locator(".pic-form .pic-why")).ToBeVisibleAsync();
         await Expect(row.Locator("[data-mark='checked']")).ToBeVisibleAsync();
         await Expect(row.Locator("[data-mark='yours']")).ToBeVisibleAsync();
         await Expect(Counter).ToHaveTextAsync($"{shown - 1} of {shown - 1} to check");
@@ -287,6 +292,7 @@ public sealed partial class OwnerWorthALookTests : CabinetPageTest
 
         await Expect(row.Locator("[data-mark='link-dead']")).ToBeVisibleAsync();
         await Expect(row.Locator(".pic-note")).ToBeVisibleAsync();
+        await Expect(row.Locator(".pic-form .pic-why")).ToBeHiddenAsync();
         await Expect(row.Locator("[data-mark='checked']")).ToBeHiddenAsync();
         await Expect(Counter).ToHaveTextAsync($"{shown} of {shown} to check");
     }

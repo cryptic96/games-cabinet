@@ -109,6 +109,7 @@ export const OWNER_TEXT = Object.freeze({
   oneChangeSince: '1 change since your last download',
   changesNotDownloaded: '{n} changes not downloaded',
   oneChangeNotDownloaded: '1 change not downloaded',
+  countNotDownloaded: '{n} not downloaded',
   changesOnlyHere: '{n} changes are only on this server.',
   oneChangeOnlyHere: '1 change is only on this server.',
   atTime: '{day} at {time}',
@@ -444,6 +445,15 @@ export function compactBanner(count) {
 }
 
 /**
+ * The shortest reminder of the backup banner, for the narrowest phones where the one-line reminder would be cut.
+ * @param {number} count How many changes were made since the last download.
+ * @returns {string} `{n} not downloaded`.
+ */
+export function tinyBanner(count) {
+  return fill(OWNER_TEXT.countNotDownloaded, { n: count });
+}
+
+/**
  * The reminder sentence when nothing was ever downloaded.
  * @param {number} count How many changes were made.
  * @returns {string} For example `You haven't downloaded your owner data yet. 3 changes are only on this server.`
@@ -455,19 +465,21 @@ export function neverDownloaded(count) {
 }
 
 /**
- * What the banner says for a state of the backup: the full sentence and the one for a phone, or nothing when there is no change.
+ * What the banner says for a state of the backup: the full sentence, the one for a phone and the shortest one for the narrowest
+ * phones, or nothing when there is no change.
  * @param {number} count How many changes were made since the last download.
  * @param {boolean} neverDownloadedYet Whether the owner has never downloaded the data.
- * @returns {{ full: string, compact: string }} Both texts; both empty at zero changes.
+ * @returns {{ full: string, compact: string, tiny: string }} The three texts; all empty at zero changes.
  */
 export function bannerTexts(count, neverDownloadedYet) {
   if (!(count > 0)) {
-    return { full: '', compact: '' };
+    return { full: '', compact: '', tiny: '' };
   }
 
   return {
     full: neverDownloadedYet ? neverDownloaded(count) : changesBanner(count),
     compact: compactBanner(count),
+    tiny: tinyBanner(count),
   };
 }
 

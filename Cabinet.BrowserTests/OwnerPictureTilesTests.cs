@@ -159,6 +159,12 @@ public sealed class OwnerPictureTilesTests : CabinetPageTest
         tops[2].Should().Be(tops[3]);
         var heights = await Page.Locator(".pic-tile").EvaluateAllAsync<double[]>("tiles => tiles.map(tile => tile.getBoundingClientRect().height)");
         heights.Should().OnlyContain(height => height >= 44);
+        var captionTops = await Page.Locator(".pic-caption").EvaluateAllAsync<double[][]>(
+            "captions => captions.map(caption => [caption.querySelector('input').getBoundingClientRect().top, caption.querySelector('.pic-label').getBoundingClientRect().top])");
+        captionTops.Should().NotBeEmpty();
+        captionTops.Should().OnlyContain(pair => Math.Abs(pair[0] - pair[1]) <= 4, "each radio and its label share a top edge, so the captions line up");
+        var emptyArt = await Page.Locator(".pic-tile[data-state='none'] > .pic-art").First.EvaluateAsync<string>("art => getComputedStyle(art).borderTopColor");
+        emptyArt.Should().Be("rgba(0, 0, 0, 0)", "the empty link tile has one dashed frame, its own");
         var overflow = await Page.EvaluateAsync<double>("() => document.documentElement.scrollWidth - window.innerWidth");
         overflow.Should().BeLessThanOrEqualTo(0);
         await SaveScreenshotAsync($"owner-pictures-states-{width}");

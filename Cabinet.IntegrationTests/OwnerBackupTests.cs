@@ -63,8 +63,8 @@ public sealed class OwnerBackupTests
 
         var two = await session.GetAsync(LocationsPath);
 
-        one.Body.Should().Contain("1 change since your last download").And.Contain("1 change not downloaded");
-        two.Body.Should().Contain("2 changes since your last download").And.Contain("2 changes not downloaded");
+        one.Body.Should().Contain("1 change since your last download").And.Contain("1 change not downloaded").And.Contain(">1 not downloaded<");
+        two.Body.Should().Contain("2 changes since your last download").And.Contain("2 changes not downloaded").And.Contain(">2 not downloaded<");
     }
 
     [Fact]

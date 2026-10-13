@@ -67,9 +67,10 @@ function applyBanner(doc, state) {
   }
 
   const texts = bannerTexts(state.changes, state.neverDownloaded);
+  const byName = { full: texts.full, short: texts.compact, tiny: texts.tiny };
 
   for (const element of banner.querySelectorAll('.owner-banner-text [data-banner]')) {
-    element.textContent = element.dataset.banner === 'full' ? texts.full : texts.compact;
+    element.textContent = byName[element.dataset.banner] ?? '';
   }
 
   banner.hidden = state.changes === 0;

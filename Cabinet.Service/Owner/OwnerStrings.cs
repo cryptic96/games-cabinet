@@ -611,6 +611,11 @@ public static class OwnerStrings
     public static string ChangesNotDownloaded(int count) =>
         count == 1 ? "1 change not downloaded" : $"{count.ToString(CultureInfo.InvariantCulture)} changes not downloaded";
 
+    /// <summary>The shortest reminder, shown on the narrowest phones where the one-line reminder would be cut.</summary>
+    /// <param name="count">How many changes, at least one.</param>
+    public static string CountNotDownloaded(int count) =>
+        $"{count.ToString(CultureInfo.InvariantCulture)} not downloaded";
+
     /// <summary>The reminder when the owner has never downloaded anything and has changes.</summary>
     /// <param name="count">How many changes, at least one.</param>
     public static string NeverDownloaded(int count) =>
