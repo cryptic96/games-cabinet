@@ -752,7 +752,7 @@ header > .header-aside {
   line-height: 1.5;
 }
 
-.game-where[data-unplaced],
+.game-where[data-unplaced="true"],
 .game-tag,
 .game-follow {
   padding-inline: 6px;
@@ -760,7 +760,7 @@ header > .header-aside {
   border-radius: 2px;
 }
 
-.game-where[data-unplaced] {
+.game-where[data-unplaced="true"] {
   border-style: dashed;
   border-color: var(--paper-label);
 }
@@ -2010,6 +2010,19 @@ header > .header-aside {
   min-height: 44px;
   font: inherit;
   color: var(--ink);
+}
+
+.restore-form input[type="file"]::file-selector-button {
+  min-height: 44px;
+  margin-inline-end: 16px;
+  padding: 8px 16px;
+  border: 1px solid var(--paper-label);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
 }
 
 .restore-done {

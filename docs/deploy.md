@@ -190,6 +190,46 @@ firewall setup, prove the owner host two ways:
   one PASS or FAIL line per check with status codes only; the hostnames are
   never printed and never written into the repository.
 
+## Backing up owner data
+
+Everything the owner enters on the owner pages (picture choices, the list of
+storage locations, where each game is kept, the cabinet finish and the change
+log) lives only on the server, in the state directory (`/var/lib/cabinet` by
+default) as `owner-data.json`. It cannot be rebuilt from BoardGameGeek, so it
+is backed up by hand, by download.
+
+- **Download.** On the owner host's Settings page, "Download owner data"
+  gives a readable JSON file named `cabinet-owner-data-<date>.json`. The same
+  button sits in a banner on every owner page.
+- **The reminder.** The banner appears whenever changes were saved since the
+  last download, and says how many ("23 changes since your last download", or
+  that the data was never downloaded). It disappears after a download, and it
+  never appears on the public site. Download after any session of changes.
+- **Earlier versions on the server.** The site keeps the last ten copies of
+  the owner data in `owner-data-versions/` next to the file, taken before a
+  change once the newest copy is more than an hour old and before every
+  restore. They help after a wrong edit; they live on the same disk, so they
+  are not a backup.
+- **Restoring from a file.** On the Settings page, choose the file and press
+  "Check file". The page shows what the file holds next to what the server
+  holds, and nothing changes until "Restore file" is pressed. The current data
+  is kept as an earlier version first. A file written by a newer release, or
+  one that is not an owner-data file, is refused with a message.
+- **Restoring a fresh container.** After provisioning a new container and
+  installing a release, switch the owner tools on as described above, open the
+  Settings page (it says there is nothing to back up yet) and restore the most
+  recent downloaded file. The pictures the owner linked to are fetched again in
+  the background and show once they arrive; box pictures from BoardGameGeek
+  come back with the next sync.
+- **If the stored file cannot be read.** Every owner page then says so and
+  offers "Restore from a file" and the earlier versions by date. Nothing is
+  overwritten until one is restored.
+
+Releases, rollbacks and re-provisioning leave the state directory untouched:
+the owner data is not part of a release archive and no install step writes to
+it. Include `/var/lib/cabinet/owner-data.json` in any whole-container backup
+as well.
+
 ## Where outcomes appear
 
 - The journal of the poll unit, `journalctl -u cabinet-deploy-poll`, shows
