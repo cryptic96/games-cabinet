@@ -123,6 +123,7 @@ public sealed class OwnerLocationListPostTests
         page.Body.Should().Contain("will become not placed.");
         unconfirmed.Status.Should().Be(HttpStatusCode.UnprocessableEntity);
         unconfirmed.JsonText("status").Should().Be("confirm-needed");
+        unconfirmed.JsonText("message").Should().Be("This location still holds games. Confirm the delete first.");
         confirmed.JsonText("outcome").Should().Be("saved");
         confirmed.JsonText("status").Should().Be("location-deleted");
         Locations(factory).Should().BeEmpty();

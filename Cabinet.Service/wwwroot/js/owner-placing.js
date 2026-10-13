@@ -296,12 +296,12 @@ export function initPlacing(doc, hooks) {
   /**
    * Takes back the move that was just made and puts every game's picker back where it was.
    * @param {Array<{ row: HTMLElement, own: string }>} previous Where each moved game was kept before.
-   * @returns {() => void} The click handler of the Undo button.
+   * @returns {(saved?: number | null) => void} The click handler of the Undo button; it gets the revision the change was saved at.
    */
   function undoMove(previous) {
-    return () =>
+    return (saved) =>
       hooks.enqueue(async () => {
-        const result = await postOwner(HANDLERS.undo, {});
+        const result = await postOwner(HANDLERS.undo, {}, { revision: saved });
 
         if (result.outcome !== 'saved') {
           showFailure(result, true);

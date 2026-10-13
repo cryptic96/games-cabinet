@@ -20,7 +20,9 @@ namespace Cabinet.Service.Owner;
 /// A link that fails to fetch keeps its stored record and its files, so the copy keeps showing; the failure is recorded
 /// through <see cref="LinkHealth"/>, which alone says when a link is dead. A link that has failed is tried again a day later,
 /// so the second failed check can mark it dead, and once it is dead it is tried once a week; a link with no copy is also tried
-/// again when something asks for it. One success clears every failure. It runs only when the background switch the hourly sync
+/// again when something asks for it. A picture that was fetched but could not be stored is not fetched again for a day, unless
+/// something asks for it, so a full disk does not make every pass download it again; that wait is kept in memory, because
+/// recording it would need the disk too. One success clears every failure. It runs only when the background switch the hourly sync
 /// obeys is on, and it logs counts only, never an address or a title.
 /// </summary>
 /// <param name="owner">The single writer of the owner data.</param>
@@ -47,6 +49,7 @@ public sealed class OwnerLinkWorker(
         new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite, SingleReader = true });
 
     private readonly Dictionary<int, DateTimeOffset> _lastChecked = [];
+    private readonly Dictionary<int, (string Url, DateTimeOffset At)> _storeFailed = [];
     private DateTimeOffset _startedAt;
     private int _asked;
 
@@ -176,7 +179,7 @@ public sealed class OwnerLinkWorker(
 
         if (link.FailedChecks == 0)
         {
-            return !usable || now - (lastChecked ?? _startedAt) >= RecheckEvery;
+            return usable ? now - (lastChecked ?? _startedAt) >= RecheckEvery : asked || !WaitingAfterStoreFailure(gameId, link, now);
         }
 
         if (asked && !usable)
@@ -189,6 +192,9 @@ public sealed class OwnerLinkWorker(
 
         return since is not { } moment || now - moment >= wait;
     }
+
+    private bool WaitingAfterStoreFailure(int gameId, PictureLink link, DateTimeOffset now) =>
+        _storeFailed.TryGetValue(gameId, out var failure) && failure.Url == link.Url && now - failure.At < LinkHealth.DeadAfterSpan;
 
     private bool HasUsableCopy(PictureLink link) =>
         link.Record is { Status: ImageStatus.Ok, Files: { Count: > 0 } files, Features: not null } record
@@ -207,6 +213,8 @@ public sealed class OwnerLinkWorker(
             return false;
         }
 
+        _lastChecked[gameId] = attemptedAt;
+
         try
         {
             foreach (var variant in ready.Link.Variants)
@@ -217,6 +225,7 @@ public sealed class OwnerLinkWorker(
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             logger.LogWarning("A linked picture could not be stored: {ExceptionType}", exception.GetType().Name);
+            _storeFailed[gameId] = (link.Url, attemptedAt);
 
             return false;
         }

@@ -295,12 +295,12 @@ export function initLocationList(doc = globalThis.document) {
    * @param {HTMLElement} region The status region the Undo button was in.
    * @param {() => void} apply Takes the change back on the page.
    * @param {() => HTMLElement} focusAfter Gives the element that takes focus once the Undo button is gone.
-   * @returns {() => void} The click handler of the Undo button.
+   * @returns {(saved?: number | null) => void} The click handler of the Undo button; it gets the revision the change was saved at.
    */
   function undoer(region, apply, focusAfter) {
-    return () =>
+    return (saved) =>
       enqueue(async () => {
-        const result = await postOwner(HANDLERS.undo, {});
+        const result = await postOwner(HANDLERS.undo, {}, { revision: saved });
 
         if (result.outcome === 'saved') {
           apply();
@@ -500,9 +500,9 @@ export function initLocationList(doc = globalThis.document) {
 
   /**
    * Adds a location at the end of the list.
+   * @param {string} entered The name the owner had typed when the form was submitted.
    */
-  async function commitAdd() {
-    const entered = addField.value;
+  async function commitAdd(entered) {
     const result = await postOwner(HANDLERS.add, { name: entered });
 
     if (result.outcome === 'saved' && typeof result.id === 'string') {
@@ -595,9 +595,25 @@ export function initLocationList(doc = globalThis.document) {
     }
   });
 
+  let adding = false;
+
   addForm.addEventListener('submit', (event) => {
     event.preventDefault();
-    enqueue(commitAdd);
+
+    if (adding) {
+      return;
+    }
+
+    const entered = addField.value;
+
+    adding = true;
+    enqueue(async () => {
+      try {
+        await commitAdd(entered);
+      } finally {
+        adding = false;
+      }
+    });
   });
 
   dialog.addEventListener('click', (event) => {

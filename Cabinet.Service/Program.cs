@@ -65,6 +65,7 @@ var app = builder.Build();
 var opsPort = OpsEndpoint.FromConfiguration(app.Configuration);
 
 app.UseContentSecurityPolicy();
+app.UseConnectionPeer();
 app.UseForwardedHeaders();
 app.UseOwnerClientRange();
 
@@ -93,7 +94,7 @@ app.UseCabinetArt();
 app.UseRouting();
 app.UseOwnerOnlyRoutes();
 
-app.MapStaticAssets();
+app.MapStaticAssets().MarkOwnerAssets();
 app.MapRazorPages().WithStaticAssets();
 app.MapCabinetLayout();
 app.MapCabinetLanguage();

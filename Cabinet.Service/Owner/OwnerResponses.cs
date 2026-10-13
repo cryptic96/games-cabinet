@@ -33,6 +33,7 @@ public static class OwnerResponses
             "no-link",
             "link-expired",
             "nothing-selected",
+            "confirm-needed",
             "id-clash",
             "unknown-finish",
             "save-failed",

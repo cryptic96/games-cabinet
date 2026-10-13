@@ -38,6 +38,49 @@ public sealed class OwnerExpiryTests
     }
 
     [Fact]
+    public async Task A_collection_read_back_from_disk_neither_stamps_nor_removes_a_game()
+    {
+        var harness = await HarnessWithLeavingGamePlacedAsync();
+        harness.Publisher.Publish(OwnerTestKit.Listing(Kept));
+        harness.Clock.Advance(TimeSpan.FromDays(90));
+        var savesBefore = harness.Store.Saved.Count;
+
+        harness.Publisher.Publish(OwnerTestKit.Listing(Kept), reconcile: false);
+
+        harness.Store.Saved.Should().HaveCount(savesBefore);
+        harness.Data.Games.Should().Contain(game => game.GameId == Leaving);
+
+        harness.Publisher.Publish(OwnerTestKit.Listing(Kept));
+
+        harness.Data.Games.Should().NotContain(game => game.GameId == Leaving);
+    }
+
+    [Fact]
+    public void After_a_restart_a_game_stamped_absent_31_days_ago_survives_until_a_fetched_collection_is_judged()
+    {
+        var picture = new PictureSetting(PictureChoice.MainPicture, true, null, null, null);
+        var store = new InMemoryOwnerDataStore
+        {
+            FileExists = true,
+            State = new OwnerDataState.Ready(OwnerData.Empty with
+            {
+                Revision = 3,
+                Games = [new OwnerGame(Leaving, null, OwnerTestKit.Start.AddDays(-31), picture)],
+            }),
+        };
+        var harness = OwnerTestKit.Harness(store);
+
+        harness.Publisher.Publish(OwnerTestKit.Listing(Kept), reconcile: false);
+
+        harness.Data.Games.Should().ContainSingle(game => game.GameId == Leaving);
+        store.Saved.Should().BeEmpty();
+
+        harness.Publisher.Publish(OwnerTestKit.Listing(Kept));
+
+        harness.Data.Games.Should().NotContain(game => game.GameId == Leaving);
+    }
+
+    [Fact]
     public async Task A_game_that_returns_before_30_days_has_its_stamp_cleared_and_keeps_its_location()
     {
         var harness = await HarnessWithLeavingGamePlacedAsync();

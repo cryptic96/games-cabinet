@@ -792,6 +792,7 @@ public static class OwnerStrings
         "link-removed" => $"{LinkRemoved}.",
         "link-expired" => "This preview expired. Check the link again.",
         "nothing-selected" => "Tick at least one game first.",
+        "confirm-needed" => "This location still holds games. Confirm the delete first.",
         "id-clash" or "save-failed" => "Couldn't save that. Try again.",
         _ when LinkProblemOf(statusKey) is { } problem => LinkError(problem, AnyPictureHost, null, null),
         _ => null,

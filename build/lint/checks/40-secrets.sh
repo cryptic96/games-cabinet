@@ -100,6 +100,40 @@ assert_notes_rejected() {
   return "$ok"
 }
 
+assert_file_rejected() {
+  local file="$1" description="$2" content="$3"
+  local repo
+  repo="$(mktemp -d)"
+  make_throwaway_repo "$repo"
+  printf '%s\n' "$content" >"$repo/$file"
+  git -C "$repo" add "$file" .gitleaks.toml
+  git -C "$repo" commit -q -m "file"
+  local ok=0
+  if gitleaks_git_mode "$repo"; then
+    echo "self-test failed: ${description} in ${file} was not detected" >&2
+    ok=1
+  fi
+  rm -rf "$repo"
+  return "$ok"
+}
+
+assert_file_accepted() {
+  local file="$1" description="$2" content="$3"
+  local repo
+  repo="$(mktemp -d)"
+  make_throwaway_repo "$repo"
+  printf '%s\n' "$content" >"$repo/$file"
+  git -C "$repo" add "$file" .gitleaks.toml
+  git -C "$repo" commit -q -m "file"
+  local ok=0
+  if ! gitleaks_git_mode "$repo"; then
+    echo "self-test failed: ${description} in ${file} was rejected" >&2
+    ok=1
+  fi
+  rm -rf "$repo"
+  return "$ok"
+}
+
 assert_fixture_rejected() {
   local description="$1" content="$2"
   local repo
@@ -213,6 +247,11 @@ self_test() {
     assert_notes_rejected "a generated internal hostname under .${suffix} (end of line)" \
       "host: $(fake_internal_hostname "$suffix")" || failed=1
   done
+  assert_file_accepted "page.cshtml" "a Razor member access glued to a hyphenated class name" \
+    "$(printf '<li id="game-%sgame.GameId" class="picker-%sModel.GameId">' '@' '@')" || failed=1
+  assert_file_accepted "notes.md" "a quoted Razor member access" "$(printf 'class="picker-%sModel.GameId"' '@')" || failed=1
+  assert_file_rejected "notes.md" "a capitalised address in a notes file" "contact: $(printf 'Pat@%s.%s' Gmail Com)" || failed=1
+  assert_file_rejected "page.cshtml" "a capitalised address in a view" "<p>$(printf 'Pat@%s.%s' Provider Nl)</p>" || failed=1
   assert_notes_rejected "a generated internal hostname followed by a port" \
     "url: $(fake_internal_hostname lan):8080" || failed=1
   assert_notes_rejected "a generated internal hostname followed by a slash" \

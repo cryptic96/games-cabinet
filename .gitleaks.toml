@@ -69,12 +69,19 @@ regex = '''\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'''
   ]
 
   [[rules.allowlists]]
-  description = "Razor views (and notes quoting them) write values into markup as text-@Variable.Member, which reads like an address but is a C# member access"
+  description = "Razor views (and notes quoting them) write values into markup as text-@Variable.Member, which reads like an address but is a C# member access; the text before the at sign must end in a hyphen, so an address written with capitals is still flagged"
   condition = "AND"
   paths = ['''\.(cshtml|md)$''']
   regexTarget = "match"
   regexes = [
-    '''@[A-Za-z][A-Za-z0-9]*\.[A-Z][A-Za-z0-9]*[a-z][A-Za-z0-9]*$''',
+    '''^[A-Za-z0-9-]*-@[A-Za-z][A-Za-z0-9]*\.[A-Z][A-Za-z0-9]*[a-z][A-Za-z0-9]*$''',
+  ]
+
+  [[rules.allowlists]]
+  description = "three made-up capitalised addresses that a notes file in the history quotes as examples; no other capitalised address is allowed"
+  regexTarget = "match"
+  regexes = [
+    "^(Firstname@Gmail\\.Com|Name@Provider\\.Nl|x@Corp\\.Eu)$",
   ]
 
 [[rules]]

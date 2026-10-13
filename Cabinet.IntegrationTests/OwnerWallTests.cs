@@ -148,6 +148,40 @@ public class OwnerWallTests
         status.Should().Be(403);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("not-an-address")]
+    public async Task A_request_from_the_known_proxy_without_a_usable_forwarded_address_is_refused_even_when_a_range_holds_the_proxy(string? forwardedFor)
+    {
+        await using var host = await UntrustedPeerHost.StartAsync("198.51.100.1", "198.51.100.0/24");
+
+        var (status, _) = await host.GetProbeAsync("198.51.100.1", UntrustedPeerHost.OwnerPort, forwardedFor);
+
+        status.Should().Be(403);
+    }
+
+    [Fact]
+    public async Task An_in_range_peer_that_is_not_the_configured_proxy_is_refused_with_or_without_a_forwarded_address()
+    {
+        await using var host = await UntrustedPeerHost.StartAsync("198.51.100.1", "192.0.2.0/24");
+
+        var (withoutHeader, _) = await host.GetProbeAsync("192.0.2.50", UntrustedPeerHost.OwnerPort, null);
+        var (withHeader, _) = await host.GetProbeAsync("192.0.2.50", UntrustedPeerHost.OwnerPort, "192.0.2.10");
+
+        withoutHeader.Should().Be(403);
+        withHeader.Should().Be(403);
+    }
+
+    [Fact]
+    public async Task Loopback_is_not_believed_as_a_forwarding_proxy_unless_it_is_configured()
+    {
+        await using var host = await UntrustedPeerHost.StartAsync("198.51.100.1", "192.0.2.0/24");
+
+        var (status, _) = await host.GetProbeAsync("127.0.0.1", UntrustedPeerHost.OwnerPort, "192.0.2.10");
+
+        status.Should().Be(403);
+    }
+
     [Fact]
     public async Task A_forged_forwarded_address_from_an_untrusted_peer_is_ignored_and_the_peer_is_refused()
     {
@@ -254,6 +288,42 @@ public class OwnerWallTests
             "an owner route without the marker would answer on the public port");
     }
 
+    [Fact]
+    public async Task Every_static_asset_that_only_the_owner_pages_use_carries_the_owner_only_marker()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        var endpoints = factory.ServingServices.GetRequiredService<EndpointDataSource>().Endpoints
+            .OfType<RouteEndpoint>()
+            .Where(endpoint => OwnerAccess.IsOwnerAsset(endpoint.RoutePattern.RawText))
+            .ToList();
+
+        endpoints.Should().Contain(endpoint => endpoint.RoutePattern.RawText!.EndsWith("owner-locations.js", StringComparison.Ordinal));
+        endpoints.Should().Contain(endpoint => endpoint.RoutePattern.RawText!.EndsWith("owner.css", StringComparison.Ordinal));
+        endpoints.Should().OnlyContain(
+            endpoint => endpoint.Metadata.GetMetadata<OwnerOnlyAttribute>() != null,
+            "an owner script or stylesheet without the marker would be served on the public port");
+    }
+
+    [Theory]
+    [InlineData("/js/owner-locations.js")]
+    [InlineData("/js/owner-link.js")]
+    [InlineData("/js/owner-settings.js")]
+    [InlineData("/js/owner-cabinet.js")]
+    [InlineData("/css/owner.css")]
+    public async Task The_owner_scripts_and_stylesheet_answer_not_found_on_the_public_port_and_are_served_on_the_owner_port(string path)
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        using var publicClient = factory.CreatePublicClient();
+        using var owner = factory.CreateOwnerClient();
+
+        using var onPublic = await publicClient.GetAsync(path, TestContext.Current.CancellationToken);
+        using var onOwner = await owner.GetAsync(path, TestContext.Current.CancellationToken);
+
+        onPublic.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await onPublic.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).Should().BeEmpty();
+        onOwner.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
     [Theory]
     [InlineData("/")]
     [InlineData("/cabinet/layout?sample=65&profile=desktop")]
@@ -273,19 +343,31 @@ public class OwnerWallTests
     }
 
     [Fact]
-    public async Task Every_shared_page_script_never_mentions_an_owner_path()
+    public async Task Every_script_the_public_port_serves_never_mentions_an_owner_path_and_no_owner_script_is_served_there()
     {
         await using var factory = new CabinetWebApplicationFactory();
-        var scripts = Directory
+        using var publicClient = factory.CreatePublicClient();
+        var names = Directory
             .EnumerateFiles(Path.Combine(factory.ServingServices.GetRequiredService<IHostEnvironment>().ContentRootPath, "wwwroot", "js"), "*.js")
-            .Where(file => !Path.GetFileName(file).StartsWith("owner-", StringComparison.Ordinal))
+            .Select(Path.GetFileName)
             .ToList();
 
-        scripts.Should().NotBeEmpty();
-        foreach (var script in scripts)
+        names.Should().NotBeEmpty();
+        names.Should().Contain(name => name!.StartsWith("owner-", StringComparison.Ordinal));
+        foreach (var name in names)
         {
-            (await File.ReadAllTextAsync(script, TestContext.Current.CancellationToken))
-                .Should().NotContainEquivalentOf("/owner", because: Path.GetFileName(script));
+            using var response = await publicClient.GetAsync($"/js/{name}", TestContext.Current.CancellationToken);
+
+            if (name!.StartsWith("owner-", StringComparison.Ordinal))
+            {
+                response.StatusCode.Should().Be(HttpStatusCode.NotFound, because: name);
+
+                continue;
+            }
+
+            response.StatusCode.Should().Be(HttpStatusCode.OK, because: name);
+            (await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))
+                .Should().NotContainEquivalentOf("/owner", because: name);
         }
     }
 

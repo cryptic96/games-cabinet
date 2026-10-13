@@ -39,13 +39,17 @@ public sealed class CollectionPublisher
 
     /// <summary>Builds the view of a synced collection with the owner data on top and shows it when it differs from the one shown.</summary>
     /// <param name="snapshot">The synced collection, exactly as the sync stored it.</param>
+    /// <param name="reconcile">
+    /// Whether this collection also starts and stops the thirty-day clocks of the owner data. Only a collection BGG just returned
+    /// and the sync accepted may do that; a collection read back from disk may be old, and the time the server was off would
+    /// count against games the owner has since added again.
+    /// </param>
     /// <returns>True when the view changed.</returns>
     /// <remarks>
-    /// Only a collection the sync accepted gets here, so it also starts and stops the thirty-day clocks of the owner data.
-    /// That housekeeping runs after the lock is released, because a save holds the owner data's turn and then asks for this
+    /// The housekeeping runs after the lock is released, because a save holds the owner data's turn and then asks for this
     /// lock, and it waits for its turn, which is at most one small file write.
     /// </remarks>
-    public bool Publish(CollectionSnapshot snapshot)
+    public bool Publish(CollectionSnapshot snapshot, bool reconcile = true)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
 
@@ -57,7 +61,10 @@ public sealed class CollectionPublisher
             changed = Replace(snapshot);
         }
 
-        _owner?.ReconcileAsync(snapshot.Items.Select(item => item.GameId).ToHashSet(), CancellationToken.None).GetAwaiter().GetResult();
+        if (reconcile)
+        {
+            _owner?.ReconcileAsync(snapshot.Items.Select(item => item.GameId).ToHashSet(), CancellationToken.None).GetAwaiter().GetResult();
+        }
 
         return changed;
     }
