@@ -1,0 +1,129 @@
+/**
+ * Page chrome for the mockups only (header, footer, option switcher). Follows the planned page chrome: flat wall,
+ * 24px heading, 16px body text, 8px phone gutter and 24px desktop gutter.
+ */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+}
+
+.room {
+  min-height: 100vh;
+  padding: 24px 24px 64px;
+}
+
+.mock-header {
+  max-width: 82rem;
+  margin: 0 auto 32px;
+}
+
+.mock-header h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.mock-header p {
+  margin: 0;
+  font-size: 16px;
+}
+
+.mock-footer {
+  max-width: 82rem;
+  margin: 48px auto 0;
+  font-size: 14px;
+}
+
+.mock-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  max-width: 82rem;
+  margin: 0 auto 24px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 0.35);
+  color: #f3eee4;
+  font-size: 14px;
+}
+
+.mock-controls[hidden] {
+  display: none;
+}
+
+.mock-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.mock-label {
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.mock-controls button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid rgb(255 255 255 / 0.35);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.mock-controls button[aria-pressed="true"] {
+  background: #d9b98a;
+  color: #2a1a10;
+  font-weight: 600;
+}
+
+@media (max-width: 40rem) {
+  .room {
+    padding: 16px 8px 64px;
+  }
+
+  .mock-header,
+  .mock-footer {
+    padding-inline: 8px;
+  }
+}
+
+/* ---------- Side-by-side comparison sheet ---------- */
+
+.sheet {
+  display: grid;
+  grid-template-columns: repeat(var(--columns, 4), 1fr);
+  gap: 0;
+  min-height: 100vh;
+}
+
+.sheet .room {
+  min-height: 0;
+  padding: 20px 20px 28px;
+}
+
+.sheet-title {
+  margin: 0 0 2px;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.sheet-note {
+  margin: 0 0 16px;
+  font-size: 14px;
+  opacity: 0.85;
+}
+
+.sheet .cabinet {
+  grid-template-columns: 1fr;
+}

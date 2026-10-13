@@ -1,0 +1,130 @@
+/**
+ * Option A, modern birch plywood. A light, crisp cabinet: every front edge shows the plywood layers, the
+ * back is a pale birch sheet in soft shade, corners are slightly rounded, there is no top moulding, and
+ * the cabinet stands on two tapered, splayed legs. Same light as the other options, from above left.
+ */
+.section {
+  --side-mm: 26;
+  --base-mm: 175;
+  --leg-mm: 140;
+  --birch: oklch(0.85 0.052 80);
+  --back: oklch(0.77 0.048 76);
+  --ply-line: rgb(120 80 40 / 0.55);
+  --ply-alt: rgb(150 105 55 / 0.16);
+  --ply: calc(var(--frame) / 3 * var(--u));
+  --glue: max(0.75px, calc(0.45 * var(--u)));
+  --shade: 70 45 20;
+}
+
+/** Side panels and dividers: the plywood layers run top to bottom on their front edges. */
+.carcass {
+  border-radius: calc(5 * var(--u));
+  background-color: var(--birch);
+  background-image:
+    repeating-linear-gradient(to right,
+      transparent 0 calc(var(--ply) / 2 - var(--glue)),
+      var(--ply-line) calc(var(--ply) / 2 - var(--glue)) calc(var(--ply) / 2),
+      var(--ply-alt) calc(var(--ply) / 2) calc(var(--ply) - var(--glue)),
+      var(--ply-line) calc(var(--ply) - var(--glue)) var(--ply)),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.08), transparent 50%, rgb(var(--shade) / 0.08));
+  box-shadow:
+    inset 1px 0 0 rgb(255 255 255 / 0.5),
+    inset -1px 0 0 rgb(var(--shade) / 0.35),
+    calc(3 * var(--u)) calc(8 * var(--u)) calc(16 * var(--u)) calc(-2 * var(--u)) rgb(15 6 2 / 0.55);
+}
+
+/** The top board between the side panels, layers running left to right. */
+.carcass::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--frame) * var(--u));
+  right: calc(var(--frame) * var(--u));
+  top: 0;
+  height: calc(var(--frame) * var(--u));
+  background-color: var(--birch);
+  background-image:
+    linear-gradient(to bottom, rgb(255 255 255 / 0.55) 0 1px, transparent 1px),
+    repeating-linear-gradient(to bottom,
+      transparent 0 calc(var(--ply) / 2 - var(--glue)),
+      var(--ply-line) calc(var(--ply) / 2 - var(--glue)) calc(var(--ply) / 2),
+      var(--ply-alt) calc(var(--ply) / 2) calc(var(--ply) - var(--glue)),
+      var(--ply-line) calc(var(--ply) - var(--glue)) var(--ply));
+  box-shadow: -1px 0 0 rgb(var(--shade) / 0.3), 1px 0 0 rgb(var(--shade) / 0.3);
+}
+
+/** Back: one pale birch sheet behind every cubby, in soft shade with faint grain. */
+.cubby {
+  --off: calc((var(--side-mm) + var(--frame) + var(--x)) * var(--u) * -1);
+  --wide: calc(3000 * var(--u));
+  background-color: var(--back);
+  background-image:
+    linear-gradient(to bottom, rgb(var(--shade) / 0.5), rgb(var(--shade) / 0.18) calc(20 * var(--u)), transparent calc(85 * var(--u))),
+    linear-gradient(to right, rgb(var(--shade) / 0.3), transparent calc(30 * var(--u)), transparent calc(100% - 30 * var(--u)), rgb(var(--shade) / 0.22)),
+    linear-gradient(to top, rgb(var(--shade) / 0.2), transparent calc(12 * var(--u))),
+    repeating-linear-gradient(to right, rgb(130 90 45 / 0.07) 0 calc(0.8 * var(--u)), transparent calc(0.8 * var(--u)) calc(9.3 * var(--u))),
+    repeating-linear-gradient(to right, rgb(130 90 45 / 0.05) 0 calc(1.6 * var(--u)), transparent calc(1.6 * var(--u)) calc(23.7 * var(--u)));
+  background-size: 100% 100%, 100% 100%, 100% 100%, var(--wide) 100%, var(--wide) 100%;
+  background-position: 0 0, 0 0, 0 0, var(--off) 0, var(--off) 0;
+  box-shadow: 1px 0 0 rgb(255 255 255 / 0.45), -1px 0 0 rgb(var(--shade) / 0.3);
+}
+
+/** Soft shade from the shelf above on the boxes. */
+.cubby::before {
+  background-image: linear-gradient(to bottom, rgb(40 25 10 / 0.28), rgb(40 25 10 / 0.08) calc(30 * var(--u)), transparent calc(80 * var(--u)));
+}
+
+/** Shelves: plywood layers left to right, a crisp lit top edge. */
+.cubby::after {
+  background-color: var(--birch);
+  background-image:
+    linear-gradient(to bottom, rgb(255 255 255 / 0.6) 0 1px, transparent 1px calc(100% - 1px), rgb(var(--shade) / 0.35) calc(100% - 1px)),
+    repeating-linear-gradient(to bottom,
+      transparent 0 calc(var(--ply) / 2 - var(--glue)),
+      var(--ply-line) calc(var(--ply) / 2 - var(--glue)) calc(var(--ply) / 2),
+      var(--ply-alt) calc(var(--ply) / 2) calc(var(--ply) - var(--glue)),
+      var(--ply-line) calc(var(--ply) - var(--glue)) var(--ply)),
+    linear-gradient(to right, rgb(var(--shade) / 0.06), transparent 40%, rgb(255 255 255 / 0.06) 65%, rgb(var(--shade) / 0.05));
+  background-size: 100% 100%, 100% 100%, calc(var(--section-w) * var(--u)) 100%;
+  background-position: 0 0, 0 0, calc(var(--x) * var(--u) * -1) 0;
+}
+
+/** Floor shadow under the cabinet, with darker spots where the feet touch. */
+.cabinet-base {
+  background-image:
+    radial-gradient(closest-side, rgb(10 4 1 / 0.7), transparent),
+    radial-gradient(closest-side, rgb(10 4 1 / 0.7), transparent),
+    radial-gradient(closest-side, rgb(10 4 1 / 0.45), rgb(10 4 1 / 0.18) 60%, transparent);
+  background-repeat: no-repeat;
+  background-size:
+    calc(46 * var(--u)) calc(12 * var(--u)),
+    calc(46 * var(--u)) calc(12 * var(--u)),
+    calc((var(--section-w) + 40) * var(--u)) calc(44 * var(--u));
+  background-position:
+    left calc((var(--side-mm) + 47) * var(--u)) top calc((var(--leg-mm) - 6) * var(--u)),
+    right calc((var(--side-mm) + 47) * var(--u)) top calc((var(--leg-mm) - 6) * var(--u)),
+    center top calc((var(--leg-mm) - 22) * var(--u));
+}
+
+/** Tapered, splayed legs, lit on the left. */
+.cabinet-base::before,
+.cabinet-base::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: calc(64 * var(--u));
+  height: calc(var(--leg-mm) * var(--u));
+  background-color: var(--birch);
+  background-image:
+    linear-gradient(to bottom, rgb(var(--shade) / 0.55), transparent calc(14 * var(--u))),
+    linear-gradient(to right, rgb(var(--shade) / 0.25), rgb(255 255 255 / 0.25) 35%, transparent 55%, rgb(var(--shade) / 0.35));
+}
+
+.cabinet-base::before {
+  left: calc((var(--side-mm) + 40) * var(--u));
+  clip-path: polygon(30% 0, 100% 0, 42% 100%, 8% 100%);
+}
+
+.cabinet-base::after {
+  right: calc((var(--side-mm) + 40) * var(--u));
+  clip-path: polygon(0 0, 70% 0, 92% 100%, 58% 100%);
+}

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Games Cabinet - furniture options (mockup)</title>
+  <link rel="stylesheet" href="cabinet-finishes.css" />
+  <link rel="stylesheet" href="mockup-page.css" />
+</head>
+<body>
+  <div class="room" id="room" data-finish="walnut" data-depth="shaded">
+    <nav class="mock-controls" id="controls" aria-label="Mockup options">
+      <div class="mock-group" data-param="finish">
+        <span class="mock-label">Finish</span>
+        <button type="button" data-value="current">Today</button>
+        <button type="button" data-value="walnut">1 Walnut</button>
+        <button type="button" data-value="oak">2 Oak on legs</button>
+        <button type="button" data-value="library">3 Library</button>
+        <button type="button" data-value="plywood">4 Plywood</button>
+      </div>
+      <div class="mock-group" data-param="depth">
+        <span class="mock-label">Cubby depth</span>
+        <button type="button" data-value="flat">Flat</button>
+        <button type="button" data-value="shaded">Shaded</button>
+        <button type="button" data-value="deep">Deep</button>
+      </div>
+      <div class="mock-group" data-param="boxes">
+        <span class="mock-label">Boxes</span>
+        <button type="button" data-value="palette">Planned palette</button>
+        <button type="button" data-value="plain">Today's brown</button>
+      </div>
+      <div class="mock-group" data-param="sample">
+        <span class="mock-label">Sample</span>
+        <button type="button" data-value="0">0</button>
+        <button type="button" data-value="12">12</button>
+        <button type="button" data-value="65">65</button>
+      </div>
+    </nav>
+    <header class="mock-header">
+      <h1>Games Cabinet</h1>
+      <p id="status">Invented collection of 65 items.</p>
+    </header>
+    <main>
+      <div id="cabinet" class="cabinet"></div>
+    </main>
+    <footer class="mock-footer">Version 1.0.0 (mockup)</footer>
+  </div>
+  <script src="layout-data.js"></script>
+  <script src="mock-render.js"></script>
+  <script src="mockup-page.js"></script>
+</body>
+</html>

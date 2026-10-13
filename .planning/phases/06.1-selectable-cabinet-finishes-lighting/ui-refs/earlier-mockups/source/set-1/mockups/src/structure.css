@@ -1,0 +1,138 @@
+/**
+ * Shared page chrome and cabinet geometry. Identical in every option; only the finish stylesheet differs.
+ * Each finish may set four furniture sizes in millimetres on .section:
+ *   --side-mm      room left and right of the carcass (top overhang plus shadow room)
+ *   --overhang-mm  how far the top board sticks out past the side panels
+ *   --top-mm       height of the top board above the carcass
+ *   --base-mm      height below the carcass (plinth or legs plus floor-shadow room)
+ * All four default to 0, which reproduces the current geometry exactly.
+ */
+:root {
+  --wood-dark: #3b2416;
+  --wood-mid: #6b4226;
+  --wood-light: #d9b98a;
+  --ink: #2a1a10;
+  --wood-edge: #8c5d38;
+  --wall-text: #efe3c2;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 24px 24px 64px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--wall-text);
+  background: var(--wood-dark);
+}
+
+.page-header {
+  max-width: calc(80rem + 24px);
+  margin: 0 auto 32px;
+}
+
+.page-header h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.page-header p { margin: 0; }
+
+.mockup-tag {
+  display: inline-block;
+  margin-top: 8px !important;
+  padding: 2px 10px;
+  border: 1px solid var(--wood-edge);
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.cabinet {
+  display: grid;
+  justify-content: center;
+  gap: 24px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 32rem), 40rem));
+  width: 100%;
+}
+
+.section {
+  --side-mm: 0;
+  --overhang-mm: 0;
+  --top-mm: 0;
+  --base-mm: 0;
+  container-type: inline-size;
+  aspect-ratio: calc(var(--section-w) + 2 * var(--side-mm)) / calc(var(--section-h) + var(--top-mm) + var(--base-mm));
+  content-visibility: auto;
+  width: 100%;
+  align-self: start;
+}
+
+.section-body {
+  --u: calc(100cqw / (var(--section-w) + 2 * var(--side-mm)));
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.carcass,
+.cabinet-top,
+.cabinet-base {
+  position: absolute;
+  pointer-events: none;
+}
+
+.carcass {
+  left: calc(var(--side-mm) * var(--u));
+  top: calc(var(--top-mm) * var(--u));
+  width: calc(var(--section-w) * var(--u));
+  height: calc(var(--section-h) * var(--u));
+}
+
+.cabinet-top {
+  left: calc((var(--side-mm) - var(--overhang-mm)) * var(--u));
+  top: 0;
+  width: calc((var(--section-w) + 2 * var(--overhang-mm)) * var(--u));
+  height: calc(var(--top-mm) * var(--u));
+}
+
+.cabinet-base {
+  left: 0;
+  top: calc((var(--top-mm) + var(--section-h)) * var(--u));
+  width: 100%;
+  height: calc(var(--base-mm) * var(--u));
+}
+
+.cubby {
+  position: absolute;
+  left: calc((var(--side-mm) + var(--frame) + var(--x)) * var(--u));
+  top: calc((var(--top-mm) + var(--frame) + var(--y)) * var(--u));
+  width: calc(var(--w) * var(--u));
+  height: calc(var(--h) * var(--u));
+  overflow: visible;
+}
+
+/** The shelf board below the cubby, running on under the divider to its right. */
+.cubby::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 100%;
+  width: calc((var(--w) + var(--frame)) * var(--u));
+  height: calc(var(--frame) * var(--u));
+  pointer-events: none;
+}
+
+.cubby[data-row-end]::after { width: 100%; }
+
+/** Light and shade that falls on the boxes inside the cubby. */
+.cubby::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
