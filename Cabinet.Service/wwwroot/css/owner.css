@@ -1463,6 +1463,16 @@ header > .header-aside {
   cursor: inherit;
 }
 
+@media (max-width: 22.5rem) {
+  .pic-tile {
+    padding: 6px;
+  }
+
+  .pic-caption {
+    gap: 4px;
+  }
+}
+
 .pic-label {
   overflow-wrap: break-word;
   min-width: 0;
@@ -2051,7 +2061,7 @@ header > .header-aside {
  * count and the two words that matter.
  */
 @media (max-width: 22.5rem) {
-  .owner-banner:not([data-full="true"]) .banner-short {
+  .owner-banner:not([data-full="true"]) .owner-banner-text .banner-short {
     display: none;
   }
 

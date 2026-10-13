@@ -83,6 +83,7 @@ public sealed class OwnerSettingsTests : CabinetPageTest
         await Expect(banner.Locator(".owner-banner-text .banner-full")).ToBeHiddenAsync();
         (await banner.GetByRole(AriaRole.Button).EvaluateAsync<string>("button => getComputedStyle(button).borderTopLeftRadius")).Should().Be("0px");
         await Expect(banner.Locator("button .banner-short")).ToHaveTextAsync("Download data");
+        await Expect(banner.Locator("button .banner-short")).ToBeVisibleAsync();
         await Expect(banner.Locator("button .banner-full")).ToBeHiddenAsync();
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = DownloadName })).ToBeVisibleAsync();
 
