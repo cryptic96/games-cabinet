@@ -1,0 +1,40 @@
+---
+status: testing
+phase: 06-owner-tools-persistence
+source: [06-VERIFICATION.md]
+started: 2026-10-13T00:00:00Z
+updated: 2026-10-13T00:00:00Z
+---
+
+## Current Test
+
+number: 1
+name: Download a real backup of the owner data and keep it off the container
+expected: |
+  A readable JSON file saved somewhere off the container (for example on the desktop or in a cloud drive); the banner switches to the downloaded state.
+awaiting: user response
+
+## Tests
+
+### 1. Download a real backup of the owner data and keep it off the container
+expected: A readable JSON file saved off the container; the banner switches to the downloaded state. Until this happens no backup of the real data exists, because the backup is the owner's own download (no scheduled job), by decision.
+result: [pending]
+
+### 2. One real round trip on the live owner host
+expected: Download, then Restore from a file with that download and Check file; the preview shows the same locations, placed games and picture choices as the live data; Keep current data changes nothing.
+result: [pending]
+
+### 3. The proxy-side wall from outside home and the VPN
+expected: From a device on another network with the VPN off, the owner hostname is refused by the proxy's address allow-list (403) and the public hostname answers 404 for every owner path.
+result: [pending]
+
+## Summary
+
+total: 3
+passed: 0
+issues: 0
+pending: 3
+skipped: 0
+blocked: 0
+
+## Gaps
