@@ -89,6 +89,7 @@ const ENGLISH = Object.freeze({
   close: 'Close',
   bggLink: 'View on BoardGameGeek',
   newTabHint: '(opens in a new tab)',
+  editLink: 'Edit',
   noDetails: 'More details arrive after the next sync.',
   detailsFailed: "Couldn't load the details. Reload the page to try again.",
   playTimeLabel: 'play time',
@@ -268,6 +269,15 @@ const ENGLISH = Object.freeze({
   },
 
   /**
+   * Accessible name of a box whose game has no place yet, shown on the cabinet at the owner address only.
+   * @param {string} name The box's full accessible name.
+   * @returns {string}
+   */
+  notPlacedName(name) {
+    return `${name}, not placed`;
+  },
+
+  /**
    * Accessible name of an expansion whose base game is not known.
    * @param {string} title The expansion title.
    * @returns {string}
@@ -316,6 +326,7 @@ const DUTCH = Object.freeze({
   close: 'Sluiten',
   bggLink: 'Bekijk op BoardGameGeek',
   newTabHint: '(opent in een nieuw tabblad)',
+  editLink: 'Bewerken',
   noDetails: 'Meer details volgen na de volgende synchronisatie.',
   detailsFailed: 'De details konden niet worden geladen. Laad de pagina opnieuw om het nog eens te proberen.',
   playTimeLabel: 'speelduur',
@@ -496,6 +507,15 @@ const DUTCH = Object.freeze({
    */
   expansionFor(base) {
     return `Uitbreiding op ${base}`;
+  },
+
+  /**
+   * Accessible name of a box whose game has no place yet, shown on the cabinet at the owner address only.
+   * @param {string} name The box's full accessible name.
+   * @returns {string}
+   */
+  notPlacedName(name) {
+    return `${name}, niet geplaatst`;
   },
 
   /**

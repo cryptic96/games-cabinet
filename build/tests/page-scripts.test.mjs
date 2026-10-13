@@ -1377,6 +1377,8 @@ function createFakeDocument() {
   const page = { visibilityState: 'visible', hidden: false };
 
   page.createElement = (tagName) => new FakeElement(page, tagName);
+  page.createElementNS = (namespace, tagName) => new FakeElement(page, tagName);
+  page.createTextNode = (text) => Object.assign(new FakeElement(page, '#text'), { ownText: String(text) });
   page.body = page.createElement('body');
   page.activeElement = page.body;
 
@@ -1833,6 +1835,7 @@ async function startCabinetPage({ firstLayout, status, cards = [], withList = fa
   const layoutRequests = [];
   const cardRequests = [];
   const replaced = [];
+  const announced = [];
   const fire = (handlers, type) => (handlers[type] ?? []).forEach((handler) => handler());
   const syncElements = { '.sync-exact': page.createElement('p'), '.sync-stale': page.createElement('p'), '.sync-note': note };
   const syncRoot = {
@@ -1869,6 +1872,7 @@ async function startCabinetPage({ firstLayout, status, cards = [], withList = fa
   page.getElementById = (id) => (id === 'cabinet' ? mount : null);
   page.querySelector = (selector) => (selector === '.sync' ? syncRoot : page.body.querySelector(selector));
   page.addEventListener = (type, handler) => (documentHandlers[type] ??= []).push(handler);
+  page.dispatchEvent = (event) => announced.push({ type: event.type, detail: event.detail });
 
   globalThis.window = {
     ...clock.timers,
@@ -1914,6 +1918,7 @@ async function startCabinetPage({ firstLayout, status, cards = [], withList = fa
     filling,
     note,
     replaced,
+    announced,
     layoutRequests,
     cardRequests,
     skipLink,
@@ -2488,4 +2493,80 @@ test('a repeat of the card data request that waits for a layout which is since r
   } finally {
     leaveCabinetPage();
   }
+});
+
+test('the cabinet page announces the card data and each draw on the document, naming nothing about the owner', async () => {
+  const cards = [{ entryId: 1, gameId: 11, title: 'Invented Orchard', location: null }];
+
+  try {
+    const cabinet = await startCabinetPage({ firstLayout: layoutOfEntries([1]), cards });
+
+    assert.deepEqual(cabinet.announced.map((event) => event.type), ['cabinet:drawn', 'cabinet:cards']);
+    assert.deepEqual(cabinet.announced[1].detail.records, cards);
+    assert.equal(readFileSync(new URL('../../Cabinet.Service/wwwroot/js/cabinet.js', import.meta.url), 'utf8').includes('/owner'), false);
+  } finally {
+    leaveCabinetPage();
+  }
+});
+
+const { buildCard } = await import(pathToFileURL(join(PAGE_FOLDER, 'card-view.js')).href);
+
+/**
+ * Builds a card for the record on a fake document and returns the ruled area.
+ * @param {object} record The card record.
+ * @param {object} [options] The card options.
+ * @returns {FakeElement} The element holding the ruled lines.
+ */
+function ruledAreaOf(record, options = {}) {
+  const previous = globalThis.document;
+
+  globalThis.document = createFakeDocument();
+
+  try {
+    return buildCard(record, COPY, { iconsUrl: '/img/icons.svg', ...options }).querySelector('.card-ruled');
+  } finally {
+    globalThis.document = previous;
+  }
+}
+
+test('a card built with an edit path ends with the Edit line under the link to BoardGameGeek, pointing at its own game', () => {
+  const ruled = ruledAreaOf({ gameId: 1234, title: 'Invented Orchard' }, { editHref: '/owner/pictures' });
+  const last = ruled.children[ruled.children.length - 1];
+  const previous = ruled.children[ruled.children.length - 2];
+
+  assert.equal(last.className, 'card-edit');
+  assert.equal(previous.className, 'card-link');
+  assert.equal(ruled.querySelectorAll('.card-edit').length, 1);
+
+  const anchor = last.children[0];
+
+  assert.equal(anchor.getAttribute('href'), '/owner/pictures?game=1234');
+  assert.equal(anchor.children[1].textContent, 'Edit');
+  assert.equal(anchor.children[0].children[0].getAttribute('href'), '/img/icons.svg#i-pencil');
+  assert.equal(anchor.children[0].getAttribute('aria-hidden'), 'true');
+});
+
+test('an expansion card links to the expansion itself', () => {
+  const ruled = ruledAreaOf({ gameId: 5678, title: 'Invented Extra', isExpansion: true }, { editHref: '/owner/pictures' });
+
+  assert.equal(ruled.querySelector('.card-edit').children[0].getAttribute('href'), '/owner/pictures?game=5678');
+});
+
+test('a card built without an edit path, or with one that is not a path on this site, has no Edit line', () => {
+  for (const editHref of [undefined, '', 'https://example.org/owner/pictures', '/' + '/example.org/pictures', 'owner/pictures', '/owner\\pictures', '/owner pictures', 42, null]) {
+    assert.equal(ruledAreaOf({ gameId: 1234, title: 'Invented Orchard' }, { editHref }).querySelector('.card-edit'), null, String(editHref));
+  }
+});
+
+test('the Edit line is left out when the game id is not made of digits only', () => {
+  assert.equal(ruledAreaOf({ gameId: '12x', title: 'Invented Orchard' }, { editHref: '/owner/pictures' }).querySelector('.card-edit'), null);
+});
+
+test('the Edit line reads Bewerken in Dutch and the not-placed name follows the page language', () => {
+  const dutch = copyFor('nl');
+
+  assert.equal(dutch.editLink, 'Bewerken');
+  assert.equal(dutch.notPlacedName('Invented Orchard'), 'Invented Orchard, niet geplaatst');
+  assert.equal(COPY.editLink, 'Edit');
+  assert.equal(COPY.notPlacedName('Invented Orchard'), 'Invented Orchard, not placed');
 });

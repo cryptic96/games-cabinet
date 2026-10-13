@@ -1,4 +1,5 @@
 @inject Cabinet.Service.Owner.SiteFinish Finish
+@inject Cabinet.Service.Owner.OwnerAccessOptions OwnerAccess
 @{
     var language = SiteLanguage.Resolve(Context);
 }
@@ -12,6 +13,10 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/cabinet.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/card.css" asp-append-version="true" />
+    @if (OwnerAccess.IsOwnerPort(Context))
+    {
+        <link rel="stylesheet" href="~/css/owner.css" asp-append-version="true" />
+    }
 </head>
 <body class="@Finish.BodyClass()">
     @RenderBody()
