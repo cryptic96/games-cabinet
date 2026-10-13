@@ -192,6 +192,54 @@ public sealed class OwnerPlacingTests : CabinetPageTest
     }
 
     [Fact]
+    public async Task A_row_the_search_hides_is_unticked_so_a_move_only_acts_on_games_that_are_shown()
+    {
+        var host = await StartHostAsync();
+        await Page.SetViewportSizeAsync(1440, 900);
+        await host.SeedAsync("Cabinet A");
+        await GotoLocationsAsync();
+        var hidden = host.BaseWithoutExpansion;
+        var shown = host.BaseWithExpansion;
+
+        await CheckAsync(hidden);
+        await Expect(Page.Locator("#dock-count")).ToHaveTextAsync("1 selected");
+        await Page.GetByLabel("Find a game").FillAsync(shown.Title);
+        await Expect(Row(hidden)).ToBeHiddenAsync();
+        await Expect(Row(hidden).Locator(".game-check")).Not.ToBeCheckedAsync();
+        await Expect(Page.Locator("#select-dock")).ToBeHiddenAsync();
+
+        await CheckAsync(shown);
+        await Expect(Page.Locator("#dock-count")).ToHaveTextAsync("1 selected");
+        await Page.GetByRole(AriaRole.Button, new() { Name = MoveToName }).ClickAsync();
+        await Page.Locator(MoveDialog).GetByRole(AriaRole.Button, new() { Name = "Cabinet A" }).ClickAsync();
+
+        await Expect(Page.Locator("#dock-status")).ToContainTextAsync("Moved 1 game to Cabinet A");
+        host.Games.Where(game => game.LocationId is not null).Select(game => game.GameId).Should().Equal(shown.GameId);
+        AssertCleanConsole();
+    }
+
+    [Fact]
+    public async Task A_row_the_not_placed_filter_hides_is_unticked_and_the_dock_count_follows()
+    {
+        var host = await StartHostAsync();
+        await Page.SetViewportSizeAsync(1440, 900);
+        var ids = await host.SeedAsync("Cabinet A");
+        await host.PlaceAsync(host.BaseWithExpansion, ids[0]);
+        await GotoLocationsAsync();
+
+        await CheckAsync(host.BaseWithExpansion);
+        await CheckAsync(host.BaseWithoutExpansion);
+        await Expect(Page.Locator("#dock-count")).ToHaveTextAsync("2 selected");
+        await Page.Locator("#unplaced-switch").CheckAsync();
+
+        await Expect(Row(host.BaseWithExpansion)).ToBeHiddenAsync();
+        await Expect(Row(host.BaseWithExpansion).Locator(".game-check")).Not.ToBeCheckedAsync();
+        await Expect(Row(host.BaseWithoutExpansion).Locator(".game-check")).ToBeCheckedAsync();
+        await Expect(Page.Locator("#dock-count")).ToHaveTextAsync("1 selected");
+        AssertCleanConsole();
+    }
+
+    [Fact]
     public async Task A_failed_move_shows_the_save_failed_text_in_the_dock_keeps_the_selection_and_offers_no_Undo()
     {
         var host = await StartHostAsync();

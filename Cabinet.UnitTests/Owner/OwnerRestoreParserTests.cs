@@ -240,6 +240,16 @@ public sealed class OwnerRestoreParserTests
     }
 
     [Fact]
+    public void A_chosen_link_with_no_link_behind_it_is_over_the_limits_but_another_choice_may_have_none()
+    {
+        var withoutLink = new PictureSetting(PictureChoice.Link, true, null, null, null);
+        var mainPicture = new PictureSetting(PictureChoice.MainPicture, true, null, null, null);
+
+        Check(Export(Valid() with { Games = [new OwnerGame(100, IdA, null, withoutLink)] })).Refusal.Should().Be(RestoreProblem.OverLimits);
+        Check(Export(Valid() with { Games = [new OwnerGame(100, IdA, null, mainPicture)] })).IsOk.Should().BeTrue();
+    }
+
+    [Fact]
     public void A_game_that_is_not_a_positive_identifier_is_over_the_limits()
     {
         var data = Valid() with { Games = [new OwnerGame(0, IdA, null, null)] };

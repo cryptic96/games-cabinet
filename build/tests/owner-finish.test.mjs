@@ -14,8 +14,9 @@ import { readFileSync } from 'node:fs';
  */
 async function loadPageScript(name) {
   const read = (file) => readFileSync(new URL('../../Cabinet.Service/wwwroot/js/' + file, import.meta.url), 'utf8');
-  const shared = 'data:text/javascript;base64,' + Buffer.from(read('owner-shared.js')).toString('base64');
   const format = 'data:text/javascript;base64,' + Buffer.from(read('owner-format.js')).toString('base64');
+  const sharedSource = read('owner-shared.js').replace("'./owner-format.js'", `'${format}'`);
+  const shared = 'data:text/javascript;base64,' + Buffer.from(sharedSource).toString('base64');
   const source = read(name).replace("'./owner-shared.js'", `'${shared}'`).replace("'./owner-format.js'", `'${format}'`);
 
   return import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));

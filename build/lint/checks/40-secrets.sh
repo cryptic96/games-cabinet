@@ -27,6 +27,25 @@ fake_private_ipv4() {
   printf '192.168.%d.%d' "$((RANDOM % 256))" "$((1 + RANDOM % 254))"
 }
 
+fake_shared_ipv4() {
+  printf '100.%d.%d.%d' "$((64 + RANDOM % 64))" "$((RANDOM % 256))" "$((1 + RANDOM % 254))"
+}
+
+fake_outside_shared_ipv4() {
+  case "$1" in
+    below) printf '100.%d.%d.%d' "$((RANDOM % 64))" "$((RANDOM % 256))" "$((1 + RANDOM % 254))" ;;
+    above) printf '100.%d.%d.%d' "$((128 + RANDOM % 100))" "$((RANDOM % 256))" "$((1 + RANDOM % 254))" ;;
+  esac
+}
+
+fake_unique_local_ipv6() {
+  printf 'fd%02x:%04x:%04x::%x' "$((RANDOM % 256))" "$((RANDOM % 65536))" "$((RANDOM % 65536))" "$((1 + RANDOM % 15))"
+}
+
+fake_link_local_ipv6() {
+  printf 'fe80::%x' "$((1 + RANDOM % 15))"
+}
+
 fake_private_network() {
   case "$1" in
     ten) printf '10.%d.%d.0/24' "$((RANDOM % 256))" "$((RANDOM % 256))" ;;
@@ -105,6 +124,7 @@ assert_file_rejected() {
   local repo
   repo="$(mktemp -d)"
   make_throwaway_repo "$repo"
+  mkdir -p "$(dirname "$repo/$file")"
   printf '%s\n' "$content" >"$repo/$file"
   git -C "$repo" add "$file" .gitleaks.toml
   git -C "$repo" commit -q -m "file"
@@ -122,6 +142,7 @@ assert_file_accepted() {
   local repo
   repo="$(mktemp -d)"
   make_throwaway_repo "$repo"
+  mkdir -p "$(dirname "$repo/$file")"
   printf '%s\n' "$content" >"$repo/$file"
   git -C "$repo" add "$file" .gitleaks.toml
   git -C "$repo" commit -q -m "file"
@@ -252,6 +273,23 @@ self_test() {
   assert_file_accepted "notes.md" "a quoted Razor member access" "$(printf 'class="picker-%sModel.GameId"' '@')" || failed=1
   assert_file_rejected "notes.md" "a capitalised address in a notes file" "contact: $(printf 'Pat@%s.%s' Gmail Com)" || failed=1
   assert_file_rejected "page.cshtml" "a capitalised address in a view" "<p>$(printf 'Pat@%s.%s' Provider Nl)</p>" || failed=1
+  assert_notes_rejected "a generated shared address space IPv4 address" "server: $(fake_shared_ipv4)" || failed=1
+  assert_notes_rejected "a shared address space network narrower than the whole block" \
+    "allowed from: $(printf '100.%d.0.0/16' 100)" || failed=1
+  assert_notes_accepted "addresses just outside the shared address space and the whole block written out" \
+    "$(printf 'below: %s\nabove: %s\nblock: %s\n' "$(fake_outside_shared_ipv4 below)" "$(fake_outside_shared_ipv4 above)" '100.64.0.0/10')" || failed=1
+  assert_notes_rejected "a generated unique-local IPv6 address" "server: $(fake_unique_local_ipv6)" || failed=1
+  assert_notes_rejected "a generated link-local IPv6 address" "server: $(fake_link_local_ipv6)" || failed=1
+  assert_notes_accepted "an IPv6 documentation address and the unique-local block start written out" \
+    "$(printf 'documentation: 2001:db8::1\nblock: fd00::/8\n')" || failed=1
+  assert_file_accepted "artifacts/notes.txt" "a private address under the top-level build output directory" \
+    "server: $(fake_private_ipv4)" || failed=1
+  assert_file_rejected "docs/artifacts/notes.txt" "a private address in a nested directory named like build output" \
+    "server: $(fake_private_ipv4)" || failed=1
+  assert_file_rejected "tools/Cabinet.Tools/bin/notes.txt" "a private address in a nested directory named like a project's output" \
+    "server: $(fake_private_ipv4)" || failed=1
+  assert_file_accepted "Cabinet.Tools/obj/notes.txt" "a private address under a project's own output directory" \
+    "server: $(fake_private_ipv4)" || failed=1
   assert_notes_rejected "a generated internal hostname followed by a port" \
     "url: $(fake_internal_hostname lan):8080" || failed=1
   assert_notes_rejected "a generated internal hostname followed by a slash" \

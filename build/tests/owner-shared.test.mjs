@@ -1,7 +1,8 @@
 /**
  * Checks the helpers every owner page script shares, with no browser: the post helper against an injected fetch (what it sends and
  * how each kind of answer is mapped), the page revision, the token reader, and the row status with its Undo button against a tiny
- * stand-in for the elements it touches. The script is read from disk and imported through a data URL.
+ * stand-in for the elements it touches. The script is read from disk and imported through a data URL, with its one import pointed
+ * at its own data URL.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,7 +14,9 @@ import { readFileSync } from 'node:fs';
  * @returns {Promise<object>} The module's exports.
  */
 async function loadPageScript(name) {
-  const source = readFileSync(new URL('../../Cabinet.Service/wwwroot/js/' + name, import.meta.url), 'utf8');
+  const read = (file) => readFileSync(new URL('../../Cabinet.Service/wwwroot/js/' + file, import.meta.url), 'utf8');
+  const format = 'data:text/javascript;base64,' + Buffer.from(read('owner-format.js')).toString('base64');
+  const source = read(name).replace("'./owner-format.js'", `'${format}'`);
 
   return import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 }
@@ -26,6 +29,11 @@ const {
   showRowStatus,
   showRowProblem,
   reloadButton,
+  showProblem,
+  checkedValue,
+  setChecked,
+  dismissOnBackdrop,
+  HEX_COLOUR,
   announce,
   saveSettledValue,
   foldForSearch,
@@ -334,6 +342,83 @@ test('a problem does not take Undo away from another row and a reload button rel
   assert.equal(other.children[1].textContent, 'Reload');
   other.children[1].listeners.click();
   assert.equal(reloaded, 1);
+});
+
+test('a problem is told in the words of its kind and an out-of-date page offers Reload', () => {
+  const doc = documentStub();
+  const region = element('div', doc);
+
+  showProblem(region, { outcome: 'outOfDate' });
+  assert.equal(region.children[0].textContent, 'This page is out of date. Reload it and try again.');
+  assert.equal(region.children[1].textContent, 'Reload');
+
+  showProblem(region, { outcome: 'expired' });
+  assert.equal(region.children[0].textContent, 'This page has expired. Reload it and try again.');
+
+  showProblem(region, { outcome: 'unreadable' });
+  assert.equal(region.children[0].textContent.startsWith("Your owner data couldn't be read"), true);
+  assert.equal(region.children.length, 1);
+
+  showProblem(region, { outcome: 'failed' });
+  assert.equal(region.children[0].textContent, "Couldn't save that. Nothing changed. Try again.");
+});
+
+/**
+ * Makes a stand-in for a group of radios.
+ * @param {string[]} values The values of the radios.
+ * @param {string} checkedValueOfGroup The value that starts checked.
+ * @returns {object}
+ */
+function radioGroup(values, checkedValueOfGroup) {
+  const radios = values.map((value) => ({ value, checked: value === checkedValueOfGroup }));
+
+  return {
+    radios,
+    querySelector: () => radios.find((radio) => radio.checked) ?? null,
+    querySelectorAll: () => radios,
+  };
+}
+
+test('the checked radio of a group is read and another one can be checked', () => {
+  const group = radioGroup(['a', 'b', 'c'], 'b');
+
+  assert.equal(checkedValue(group), 'b');
+
+  setChecked(group, 'c');
+
+  assert.equal(checkedValue(group), 'c');
+  assert.deepEqual(group.radios.map((radio) => radio.checked), [false, false, true]);
+  assert.equal(checkedValue(radioGroup(['a'], 'none')), '');
+});
+
+test('a press on the backdrop of a dialog closes it and a press inside does not', () => {
+  const handlers = {};
+  let closed = 0;
+  const dialog = {
+    addEventListener: (type, handler) => {
+      handlers[type] = handler;
+    },
+    getBoundingClientRect: () => ({ left: 10, right: 110, top: 20, bottom: 220 }),
+    close: () => {
+      closed++;
+    },
+  };
+
+  dismissOnBackdrop(dialog);
+  handlers.click({ target: {}, clientX: 0, clientY: 0 });
+  handlers.click({ target: dialog, clientX: 50, clientY: 100 });
+  assert.equal(closed, 0);
+
+  handlers.click({ target: dialog, clientX: 5, clientY: 100 });
+  handlers.click({ target: dialog, clientX: 50, clientY: 230 });
+  assert.equal(closed, 2);
+});
+
+test('only a six-digit hexadecimal colour passes the colour check', () => {
+  assert.equal(HEX_COLOUR.test('#8C5d38'), true);
+  assert.equal(HEX_COLOUR.test('#8c5d3'), false);
+  assert.equal(HEX_COLOUR.test('red'), false);
+  assert.equal(HEX_COLOUR.test('#8c5d38; x'), false);
 });
 
 test('the announcer takes the text and does nothing without one', () => {

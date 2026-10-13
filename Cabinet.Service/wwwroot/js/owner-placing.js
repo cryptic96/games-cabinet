@@ -12,7 +12,7 @@ import {
   moveTitleText,
   selectedText,
 } from './owner-format.js';
-import { announce, postOwner, setPickerValue, showRowProblem, showRowStatus } from './owner-shared.js';
+import { HEX_COLOUR, announce, dismissOnBackdrop, postOwner, setPickerValue, showRowProblem, showRowStatus } from './owner-shared.js';
 
 /** The handler addresses, relative to the page the script runs on. */
 const HANDLERS = Object.freeze({
@@ -22,9 +22,6 @@ const HANDLERS = Object.freeze({
 
 /** How long the count of ticked games waits for a further tick before it is announced. */
 const ANNOUNCE_DELAY_MS = 300;
-
-/** The shape of a colour the page may set on a swatch. */
-const HEX_COLOUR = /^#[0-9a-f]{6}$/i;
 
 /** The prefix of a target that names a location. */
 const LOCATION_TARGET = 'location:';
@@ -437,17 +434,7 @@ export function initPlacing(doc, hooks) {
     heading?.focus();
   });
   move.keep.addEventListener('click', () => move.element.close());
-  move.element.addEventListener('click', (event) => {
-    if (event.target !== move.element) {
-      return;
-    }
-
-    const box = move.element.getBoundingClientRect();
-
-    if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) {
-      move.element.close();
-    }
-  });
+  dismissOnBackdrop(move.element);
   move.element.addEventListener('close', () => {
     if (!chosen) {
       moveButton.focus();

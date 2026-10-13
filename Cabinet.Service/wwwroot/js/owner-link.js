@@ -9,7 +9,7 @@
  * `textContent`.
  */
 import { OWNER_TEXT, fill, leadAndRest, shortAddress } from './owner-format.js';
-import { postOwner, showRowProblem, showRowStatus } from './owner-shared.js';
+import { HEX_COLOUR, checkedValue, postOwner, setChecked, showRowProblem, showRowStatus } from './owner-shared.js';
 
 /** The handler addresses, relative to the page the script runs on. */
 const HANDLERS = Object.freeze({
@@ -25,9 +25,6 @@ const PREVIEW_PATH = /^\/owner\/preview\/[0-9a-f]{32}$/;
 
 /** The only address a stored picture may have: a file of the site's own art directory. */
 const ART_PATH = /^\/art\/[0-9a-f]{16}-[0-9]{1,4}\.webp$/;
-
-/** The shape of a colour the preview may be set to. */
-const HEX_COLOUR = /^#[0-9a-fA-F]{6}$/;
 
 /** The two text colours a spine may carry. */
 const TEXT_COLOURS = ['#ffffff', '#000000'];
@@ -63,6 +60,10 @@ export function checkedPreview(result) {
   const preview = result?.preview;
 
   if (preview === null || typeof preview !== 'object' || !PREVIEW_PATH.test(result.previewUrl ?? '')) {
+    return null;
+  }
+
+  if (result.token !== result.previewUrl.split('/').pop()) {
     return null;
   }
 
@@ -261,15 +262,6 @@ function buildPreview(doc, gameId, preview) {
   return section;
 }
 
-/**
- * Reads which choice a group of radios has checked.
- * @param {Element} fieldset The group.
- * @returns {string} The value of the checked radio, or an empty string when none is.
- */
-function checkedValue(fieldset) {
-  return fieldset.querySelector('input[type="radio"]:checked')?.value ?? '';
-}
-
 /** The states the Your link tile can be drawn in. */
 const TILE_STATES = ['picture', 'fetching', 'none'];
 
@@ -450,9 +442,7 @@ export function initLinkBox(row, helpers) {
     return () => {
       row.querySelector('.pic-tile[data-kind="Link"]').replaceWith(copy);
 
-      for (const radio of fieldset.querySelectorAll('input[type="radio"]')) {
-        radio.checked = radio.value === choice;
-      }
+      setChecked(fieldset, choice);
 
       fieldset.dataset.saved = choice;
 
@@ -542,9 +532,7 @@ export function initLinkBox(row, helpers) {
       if (result.outcome === 'saved') {
         renderLinkTile(linkTile(), result.linkTile ?? {}, helpers.watchPicture);
 
-        for (const radio of fieldset.querySelectorAll('input[type="radio"]')) {
-          radio.checked = radio.value === previousChoice;
-        }
+        setChecked(fieldset, previousChoice);
 
         fieldset.dataset.saved = previousChoice;
         showStoredLink();
@@ -573,9 +561,7 @@ export function initLinkBox(row, helpers) {
         renderLinkTile(linkTile(), { state: 'none' }, helpers.watchPicture);
 
         if (typeof result.choice === 'string') {
-          for (const radio of fieldset.querySelectorAll('input[type="radio"]')) {
-            radio.checked = radio.value === result.choice;
-          }
+          setChecked(fieldset, result.choice);
 
           fieldset.dataset.saved = result.choice;
         }

@@ -5,38 +5,22 @@
  * nothing to undo. A save that fails puts the tile of the stored finish back and says so in the panel's status line. Every text is written with `textContent`, never as markup.
  */
 import { OWNER_TEXT } from './owner-format.js';
-import { initRevision, postOwner, reloadButton, showRowProblem, showRowStatus } from './owner-shared.js';
+import { initRevision, postOwner, setChecked, showProblem as showSharedProblem, showRowProblem, showRowStatus } from './owner-shared.js';
 
 /** The address of the finish handler, relative to the page the script runs on. */
 const FINISH_HANDLER = '?handler=Finish';
 
 /**
- * Tells the owner that a request did not go through, in the panel's status line.
+ * Tells the owner that a request did not go through, in the panel's status line: the server's own words when it refused the
+ * change, otherwise what every owner page says.
  * @param {HTMLElement} region The status region.
- * @param {{ outcome: string }} result What the request came to.
+ * @param {{ outcome: string, message?: string }} result What the request came to.
  */
 function showProblem(region, result) {
-  if (result.outcome === 'outOfDate') {
-    reloadButton(region, OWNER_TEXT.outOfDate, OWNER_TEXT.reload);
-  } else if (result.outcome === 'expired') {
-    reloadButton(region, OWNER_TEXT.expired, OWNER_TEXT.reload);
-  } else if (result.outcome === 'unreadable') {
-    showRowProblem(region, OWNER_TEXT.unreadable);
-  } else if (result.outcome === 'refused' && typeof result.message === 'string' && result.message !== '') {
+  if (result.outcome === 'refused' && typeof result.message === 'string' && result.message !== '') {
     showRowProblem(region, result.message);
   } else {
-    showRowProblem(region, OWNER_TEXT.failed);
-  }
-}
-
-/**
- * Checks the tile that holds a value and unchecks the others, so the panel shows what is stored.
- * @param {Element} fieldset The group of tiles.
- * @param {string} value The finish to show as chosen.
- */
-function setChecked(fieldset, value) {
-  for (const radio of fieldset.querySelectorAll('input[type="radio"]')) {
-    radio.checked = radio.value === value;
+    showSharedProblem(region, result);
   }
 }
 

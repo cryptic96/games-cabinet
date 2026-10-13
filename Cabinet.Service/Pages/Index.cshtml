@@ -2,10 +2,15 @@
 @model Cabinet.Service.Pages.IndexModel
 @inject Microsoft.AspNetCore.Mvc.ViewFeatures.IFileVersionProvider FileVersions
 @using Cabinet.Service.Owner
+@using Microsoft.AspNetCore.Html
 @using Cabinet.Service.Pages.Owner
 @{
     var onOwnerPort = Model.IsOwnerAddress;
     var iconsUrl = FileVersions.AddFileVersionToPath(Request.PathBase, "/img/icons.svg");
+    Func<object?, IHtmlContent> languageToggle = @<nav class="lang-toggle" aria-label="@Model.Language.Text.LanguageLabel">
+        <a href="@Model.LanguageHref("en")" lang="en" hreflang="en" aria-label="@Model.Language.Text.EnglishName" aria-current="@(Model.Language.Code == "en" ? "true" : null)">EN</a>
+        <a href="@Model.LanguageHref("nl")" lang="nl" hreflang="nl" aria-label="@Model.Language.Text.DutchName" aria-current="@(Model.Language.Code == "nl" ? "true" : null)">NL</a>
+    </nav>;
 }
 <a class="skip-link" href="#games-list-start">@Model.Language.Text.SkipLink</a>
 <header>
@@ -14,18 +19,12 @@
     {
         <div class="header-aside">
             <span class="owner-plate">@OwnerStrings.Plate</span>
-            <nav class="lang-toggle" aria-label="@Model.Language.Text.LanguageLabel">
-                <a href="@Model.LanguageHref("en")" lang="en" hreflang="en" aria-label="@Model.Language.Text.EnglishName" aria-current="@(Model.Language.Code == "en" ? "true" : null)">EN</a>
-                <a href="@Model.LanguageHref("nl")" lang="nl" hreflang="nl" aria-label="@Model.Language.Text.DutchName" aria-current="@(Model.Language.Code == "nl" ? "true" : null)">NL</a>
-            </nav>
+            @languageToggle(null)
         </div>
     }
     else
     {
-        <nav class="lang-toggle" aria-label="@Model.Language.Text.LanguageLabel">
-            <a href="@Model.LanguageHref("en")" lang="en" hreflang="en" aria-label="@Model.Language.Text.EnglishName" aria-current="@(Model.Language.Code == "en" ? "true" : null)">EN</a>
-            <a href="@Model.LanguageHref("nl")" lang="nl" hreflang="nl" aria-label="@Model.Language.Text.DutchName" aria-current="@(Model.Language.Code == "nl" ? "true" : null)">NL</a>
-        </nav>
+        @languageToggle(null)
     }
     @if (Model.ShowSyncBlock)
     {

@@ -200,7 +200,8 @@ public sealed class OwnerDataStore : IOwnerDataStore
     private static bool HasNullMember(OwnerData data) =>
         data.Locations.Any(location => location is null)
         || data.Games.Any(game => game is null)
-        || data.Changes.Any(change => change is null);
+        || data.Changes.Any(change => change is null)
+        || data.Games.Any(game => game.Picture?.Link?.Record?.Files?.Any(file => file is null) == true);
 
     private OwnerDataState Unreadable(string reason)
     {

@@ -21,11 +21,16 @@ import {
 import { initPickers } from './owner-games.js';
 import { initLinkBox } from './owner-link.js';
 import {
+  HEX_COLOUR,
+  KEY_WINDOW_MS,
+  SETTLE_MS,
   announce,
+  checkedValue,
   createFinder,
   initRevision,
   postOwner,
-  reloadButton,
+  setChecked,
+  showProblem,
   showRowProblem,
   showRowStatus,
   sortByCollator,
@@ -38,37 +43,8 @@ const HANDLERS = Object.freeze({
   undo: '?handler=Undo',
 });
 
-/** The shape of a colour the generated cover may be set to. */
-const HEX_COLOUR = /^#[0-9a-fA-F]{6}$/;
-
 /** The colour pair the generated cover falls back to when the page gives none that is valid. */
 const FALLBACK_TONE = Object.freeze({ background: '#8c5d38', text: '#ffffff' });
-
-/** How long stepping through the radios with the keyboard must pause before the choice is saved. */
-const SETTLE_MS = 600;
-
-/** How close after a key press a change has to come to count as made by the keyboard. */
-const KEY_WINDOW_MS = 100;
-
-/**
- * Reads which choice a group of radios has checked.
- * @param {Element} fieldset The group.
- * @returns {string} The value of the checked radio, or an empty string when none is.
- */
-function checkedValue(fieldset) {
-  return fieldset.querySelector('input[type="radio"]:checked')?.value ?? '';
-}
-
-/**
- * Checks the radio with a value and unchecks the others.
- * @param {Element} fieldset The group.
- * @param {string} value The value to check.
- */
-function setChecked(fieldset, value) {
-  for (const radio of fieldset.querySelectorAll('input[type="radio"]')) {
-    radio.checked = radio.value === value;
-  }
-}
 
 /**
  * Reads the title of a row.
@@ -237,23 +213,6 @@ function watchPicture(image) {
     swap();
   } else {
     image.addEventListener('error', swap, { once: true });
-  }
-}
-
-/**
- * Tells the owner that a request did not go through, in the region of the row it was about.
- * @param {HTMLElement} region The status region.
- * @param {{ outcome: string }} result What the request came to.
- */
-function showProblem(region, result) {
-  if (result.outcome === 'outOfDate') {
-    reloadButton(region, OWNER_TEXT.outOfDate, OWNER_TEXT.reload);
-  } else if (result.outcome === 'expired') {
-    reloadButton(region, OWNER_TEXT.expired, OWNER_TEXT.reload);
-  } else if (result.outcome === 'unreadable') {
-    showRowProblem(region, OWNER_TEXT.unreadable);
-  } else {
-    showRowProblem(region, OWNER_TEXT.failed);
   }
 }
 

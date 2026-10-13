@@ -123,3 +123,120 @@ None.
 _Fixed: 2026-10-13_
 _Fixer: Claude (gsd-code-fixer)_
 _Iteration: 1_
+
+---
+
+# Iteration 2 (info findings)
+
+**Fixed at:** 2026-10-13
+**Source review:** .planning/phases/06-owner-tools-persistence/06-REVIEW.md
+**Iteration:** 2
+
+**Summary:**
+- Findings in scope: 14 (IN-01 to IN-14)
+- Fixed: 13 (IN-04 was already fixed by the first pass; IN-11 is fixed in part, see below)
+- Skipped: 0 outright; one part of IN-11 left as it is on purpose
+
+Verification ran in the isolated worktree, not the main checkout, so the numbers are not reproducible from the main checkout after the worktree is removed. The history scan needed the main repository's git directory mounted (`LINT_GIT_COMMON_DIR`), otherwise it scans zero commits from a worktree. Results: `dotnet build Cabinet.slnx` clean (0 warnings); unit tests 2421 passed; integration tests 452 passed; browser tests 322 passed with the default fonts and 322 passed with the DejaVu fontconfig mapping; `node --test build/tests/*.test.mjs` 355 passed; `10-repo-rules.sh`, `40-secrets.sh` (727 commits, every ref, and the working tree) and `50-script-tests.sh` pass.
+
+## Fixed Issues
+
+### IN-01: Owner-data loader checks null elements only one level deep
+
+**Files modified:** `Cabinet.Repository/Storage/OwnerDataStore.cs`, `Cabinet.UnitTests/Owner/OwnerDataStoreTests.cs`
+**Commit:** 09118ce
+**Applied fix:** `HasNullMember` also treats a null entry in a stored picture's file list as malformed, so the file is reported unreadable instead of failing later in the link worker or the art clean-up. The test sends a full game with a link picture whose file list holds `null` (unreadable), a real entry and an empty list (both readable), so the readable cases prove the shape itself parses.
+
+### IN-02: Name check does not refuse invisible format characters
+
+**Files modified:** `Cabinet.Domain/Owner/LocationEdits.cs`, `Cabinet.UnitTests/Owner/LocationNamesTests.cs`
+**Commit:** e398c67
+**Applied fix:** A name is refused, with the existing "ForbiddenCharacter" reason and its existing words, when any character is a control character or has the Unicode Format category. The check walks runes, so a format character outside the basic plane (tag characters) is refused too. This also covers the two bidi ranges the old check listed. Tests added for LRM, RLM, ALM, zero-width space, non-joiner and joiner, word joiner, byte order mark, soft hyphen and a tag character; Hebrew and accented names still pass.
+
+### IN-03: Restore accepts internally inconsistent picture settings
+
+**Files modified:** `Cabinet.Repository/Storage/OwnerDataExport.cs`, `Cabinet.UnitTests/Owner/OwnerRestoreParserTests.cs`
+**Commit:** 103a5e7
+**Applied fix:** `PictureIsAcceptable` refuses a `Link` choice that has no link, with the same over-limits refusal the other bad shapes get. A game that chooses another picture with no link is still accepted. Test covers both.
+
+### IN-04: Self-check "forged address" probe depends on a default that is not documented
+
+**Already fixed by d52ff53** (the first pass's WR-01 change). The probe line now reads "the owner port refuses a request from loopback", and its comment says it proves the refusal and not the forwarded path, which the integration tests prove. The framework's default loopback trust is cleared in the forwarded-headers setup, so the comment is true. No change in this pass.
+
+### IN-05: Duplicate JSON-accept helper
+
+**Files modified:** `Cabinet.Service/Pages/Owner/Locations.cshtml.cs`
+**Commit:** a3f57ab
+**Applied fix:** The locations page calls `OwnerResponses.AsksForJson(Request)`; its own copy and the media-type constant only it used are gone. Covered by the existing locations tests.
+
+### IN-06: Gitleaks path allowlists skip content anywhere in the tree
+
+**Files modified:** `.gitleaks.toml`, `build/lint/checks/40-secrets.sh`
+**Commit:** 6853a81
+**Applied fix:**
+- The three build-output path allowlists and the worktree allowlist are anchored: `^Cabinet.X/(bin|obj)/`, `^artifacts/`, `^(Cabinet.X/)?TestResults/` and `^.claude/worktrees/`. A directory with one of those names anywhere else is now scanned. Each pattern also accepts an optional `/repo/` prefix, because a working-tree scan reports absolute paths under the mounted source directory (found by trying the anchored form on a tree that had build output: it stopped skipping `bin` and `obj`).
+- Three rules were added: RFC 6598 shared address space (100.64.0.0/10) as a host address and as a CIDR range, and IPv6 unique-local (fc00::/7) and link-local (fe80::/10) addresses. The whole 100.64.0.0/10 block and the bare block starts `fc00::`, `fd00::` and `fe80::` stay allowed, because the review notes quote them; RFC 5737 and RFC 3849 documentation addresses do not match any rule.
+- Link-local IPv4 (169.254.0.0/16) was not added: nothing in the tree or history uses it, and the owner network setups the review names are covered by the ranges above. It can be added later without any history impact.
+- Before adding the rules the history (718 commits at the time) and the tree were searched for those shapes; only the review report itself matched, through the allowed whole-block spellings. The full history and working-tree scans still pass.
+- Self-tests: generated shared-space and IPv6 addresses are refused; addresses just below and above the shared block, the whole block, an IPv6 documentation address and `fd00::/8` are accepted; a private address under the real top-level `artifacts/` and a project's own `obj/` is skipped, and the same under `docs/artifacts/` and `tools/Cabinet.X/bin/` is refused. All test addresses are built at run time so the script itself holds none.
+
+### IN-07: Bulk move acts on ticked rows that are hidden by the search or the unplaced filter
+
+**Files modified:** `Cabinet.Service/wwwroot/js/owner-games.js`, `Cabinet.BrowserTests/OwnerPlacingTests.cs`
+**Commit:** 5b509c6
+**Applied fix:** The simpler option: every time the search or the not-placed switch is applied, the ticks of the rows it just hid are cleared and one change event tells the dock, so the count, the select-all box and the move all agree with what the owner can see. Ticks on shown rows are kept. Two browser tests: ticking a game, searching for another, ticking that one and moving moves only the shown game; ticking two games and switching on "not placed" unticks the placed one and the dock reads "1 selected". Both tests fail without the change.
+**Status:** fixed: requires human verification (selection behaviour).
+
+### IN-08: A location row added by script keeps the template's stale revision
+
+**Files modified:** `Cabinet.Service/wwwroot/js/owner-locations.js`, `Cabinet.BrowserTests/OwnerLocationListTests.cs`
+**Commit:** 218f49f
+**Applied fix:** `setRevision` now runs after the new row is appended, so the row's own forms carry the revision the add was saved at. Browser test adds a location and checks every revision field of the page equals the server's revision; it fails without the change.
+
+### IN-09: `shortAddress` can throw, and the preview token is not validated
+
+**Files modified:** `Cabinet.Service/wwwroot/js/owner-format.js`, `Cabinet.Service/wwwroot/js/owner-link.js`, `build/tests/owner-format.test.mjs`, `build/tests/owner-link.test.mjs`
+**Commit:** 8c77c38
+**Applied fix:** A malformed percent sequence in the file name falls back to the raw segment instead of throwing. `checkedPreview` refuses an answer whose token is missing or is not the last segment of the preview address. Node tests cover both.
+
+### IN-10: Dead code in `owner-format.js`
+
+**Files modified:** `Cabinet.Service/wwwroot/js/owner-format.js`, `build/tests/owner-format.test.mjs`
+**Commit:** 0555987
+**Applied fix:** Removed `megabytes` and `deleteDialogBody`, the text entries `up`, `down`, `keepIt`, `deleteLocation`, `noLocations`, `removeLink`, `downloadData`, `downloadOwnerData` and `downloadFailed`, and the second `checking` entry; `changesBanner`, `compactBanner` and `tinyBanner` are no longer exported. Each name was searched in the scripts, pages and tests first; only node tests referenced them. Those tests were removed or rewritten: the banner wording is now covered through `bannerTexts` in the singular and the plural at every width, and the assertions on entries that remain were kept. The copy-parity test covers a different file (the public page's table), so no string it requires was touched.
+
+### IN-11: Duplicated logic across the owner scripts
+
+**Files modified:** `Cabinet.Service/wwwroot/js/owner-shared.js`, `owner-finish.js`, `owner-locations.js`, `owner-pictures.js`, `owner-placing.js`, `owner-link.js`, `build/tests/owner-shared.test.mjs`, `build/tests/owner-finish.test.mjs`
+**Commit:** 2ed7970
+**Applied fix:** Moved into `owner-shared.js` and used from there: `showProblem` (the locations and pictures copies were identical; the finish panel keeps its one extra case, a refusal that carries the server's words, and hands the rest to the shared one), `checkedValue`, `setChecked` (also replacing three inline loops in the link script and the finish copy), `dismissOnBackdrop` (locations dialog and the move dialog), the colour pattern `HEX_COLOUR` (three copies) and the key-window and settle times. The shared module now imports the text table from `owner-format.js`, so the two node test loaders that read it alone point that import at its own data URL. New node tests cover the shared problem text, the radio helpers, the backdrop dismiss and the colour pattern.
+**Left as it is, on purpose:** generalising `saveSettledValue` to a group of radios. The picture row's copy also flushes on form submit and when focus leaves the whole group, and its flush is shared with the page's background hook, so it is not the same logic as the picker's and merging them would restructure the module. The two share the timing constants now, which is the identical part.
+**Status:** fixed: requires human verification (shared behaviour across several pages; the whole owner browser suite passes).
+
+### IN-12: Language toggle markup is duplicated in `Index.cshtml`
+
+**Files modified:** `Cabinet.Service/Pages/Index.cshtml`
+**Commit:** 746fb32
+**Applied fix:** The toggle is written once as an inline template and rendered in both places (inside the owner-port wrapper, and alone on the public port). The rendered markup is unchanged; the language, owner shell and cabinet tests pass.
+
+### IN-13: Empty header cell in the restore comparison table
+
+**Files modified:** `Cabinet.Service/Owner/OwnerStrings.cs`, `Cabinet.Service/Pages/Shared/_OwnerRestorePanel.cshtml`, `Cabinet.BrowserTests/OwnerRestoreTests.cs`
+**Commit:** a706d00
+**Applied fix:** The corner cell is now a column header with visually hidden text "What is compared" (new string). The browser test lists three column headers.
+
+### IN-14: The restore check button re-enables while the browser is navigating to the preview
+
+**Files modified:** `Cabinet.Service/wwwroot/js/owner-settings.js`, `Cabinet.BrowserTests/OwnerRestoreTests.cs`
+**Commit:** d18bdb4
+**Applied fix:** The button is only cleared when the check did not lead to the preview. Browser test watches the button's busy attribute through the check and the navigation and requires it never to clear; it fails without the change.
+
+## Skipped Issues
+
+None.
+
+---
+
+_Fixed: 2026-10-13_
+_Fixer: Claude (gsd-code-fixer)_
+_Iteration: 2_

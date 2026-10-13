@@ -9,8 +9,6 @@ export const OWNER_TEXT = Object.freeze({
   undo: 'Undo',
   undone: 'Undone.',
   reload: 'Reload',
-  keepIt: 'Keep it',
-  deleteLocation: 'Delete location',
   added: 'Added "{name}"',
   renamed: 'Renamed to "{name}"',
   moved: 'Moved "{name}" {direction}. Now {k} of {n}.',
@@ -25,14 +23,11 @@ export const OWNER_TEXT = Object.freeze({
   noGames: 'No games',
   oneGame: '1 game',
   manyGames: '{n} games',
-  up: 'Up',
-  down: 'Down',
   moveLabel: 'Move {name} {direction}',
   deleteLabel: 'Delete {name}',
   nameLabel: 'Name of location {position}',
   heading: 'Your locations ({n})',
   headingEmpty: 'Your locations',
-  noLocations: 'No locations yet. Add one to start placing games.',
   nameEmpty: 'Give the location a name.',
   nameTooLong: 'Use 60 characters or fewer.',
   nameTaken: 'You already have a location called "{name}".',
@@ -80,7 +75,6 @@ export const OWNER_TEXT = Object.freeze({
   checking: 'Checking...',
   yours: 'Yours',
   linkFailed: "Couldn't fetch that picture. The link may be wrong or the picture host may be busy. Check the link and try again.",
-  removeLink: 'Remove link',
   linkRemoved: 'Link removed',
   tileNoLinkYet: 'None yet',
   tileFetching: 'Fetching...',
@@ -95,13 +89,9 @@ export const OWNER_TEXT = Object.freeze({
   previewDisclaimer: "The site can't check that this picture belongs to this game.",
   useThis: 'Use this',
   discardPreview: 'Discard preview',
-  downloadOwnerData: 'Download owner data',
-  downloadData: 'Download data',
   preparing: 'Preparing...',
-  checking: 'Checking...',
   checkFailed: "Couldn't check that file. Nothing was changed. Try again.",
   fileTooLarge: 'That file holds more than this site accepts, so nothing was changed.',
-  downloadFailed: "Couldn't prepare the download. Try again.",
   downloaded: 'Downloaded',
   downloadedWhen: 'Downloaded {when}',
   neverDownloaded: "You haven't downloaded your owner data yet.",
@@ -124,15 +114,6 @@ const TIME_LOCALE = 'en-NL';
 const MS_PER_DAY = 86_400_000;
 
 /**
- * Writes a size in bytes as millions of bytes with at most one decimal, the way the owner reads a picture's size.
- * @param {number} bytes The size in bytes.
- * @returns {string} For example `5.4`, and `1` for a million bytes.
- */
-export function megabytes(bytes) {
-  return String(Math.round(bytes / 100_000) / 10);
-}
-
-/**
  * Shortens a picture address to its host and its file name, as the pictures page shows a stored link: the part in between is
  * replaced by `/.../`. An address that is not a web address gives an empty text.
  * @param {string} address The whole address.
@@ -151,7 +132,14 @@ export function shortAddress(address) {
     return '';
   }
 
-  const file = decodeURIComponent(parsed.pathname.split('/').filter(Boolean).pop() ?? '');
+  const segment = parsed.pathname.split('/').filter(Boolean).pop() ?? '';
+  let file = segment;
+
+  try {
+    file = decodeURIComponent(segment);
+  } catch {
+    file = segment;
+  }
 
   return file === '' ? parsed.hostname : `${parsed.hostname}/.../${file}`;
 }
@@ -213,17 +201,6 @@ export function deleteDialogParts(games) {
   }
 
   return { lead: fill(OWNER_TEXT.dialogLead, { n: games }), rest: OWNER_TEXT.dialogRest };
-}
-
-/**
- * The body of the delete dialog as one text.
- * @param {number} games How many games would become not placed.
- * @returns {string}
- */
-export function deleteDialogBody(games) {
-  const { lead, rest } = deleteDialogParts(games);
-
-  return lead + ' ' + rest;
 }
 
 /**
@@ -431,7 +408,7 @@ export function effectiveLocationIds(rows, removedId = '') {
  * @param {number} count How many changes were made since the last download.
  * @returns {string} `1 change since your last download` or `{n} changes since your last download`.
  */
-export function changesBanner(count) {
+function changesBanner(count) {
   return count === 1 ? OWNER_TEXT.oneChangeSince : fill(OWNER_TEXT.changesSince, { n: count });
 }
 
@@ -440,7 +417,7 @@ export function changesBanner(count) {
  * @param {number} count How many changes were made since the last download.
  * @returns {string} `1 change not downloaded` or `{n} changes not downloaded`.
  */
-export function compactBanner(count) {
+function compactBanner(count) {
   return count === 1 ? OWNER_TEXT.oneChangeNotDownloaded : fill(OWNER_TEXT.changesNotDownloaded, { n: count });
 }
 
@@ -449,7 +426,7 @@ export function compactBanner(count) {
  * @param {number} count How many changes were made since the last download.
  * @returns {string} `{n} not downloaded`.
  */
-export function tinyBanner(count) {
+function tinyBanner(count) {
   return fill(OWNER_TEXT.countNotDownloaded, { n: count });
 }
 

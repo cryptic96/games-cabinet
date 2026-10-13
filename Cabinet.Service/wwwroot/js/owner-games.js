@@ -1,7 +1,8 @@
 /**
  * The script side of the games list on the locations page, apart from ticking and moving many games at once: each row's picker,
  * which saves the value it settles on and not every key press, and the toolbar above the list, which finds games as the owner
- * types, shows only the games that are not placed yet, ticks everything that is shown, and puts the rows in collator order.
+ * types, shows only the games that are not placed yet, ticks everything that is shown, unticks what a filter hides, and puts the
+ * rows in collator order.
  * Every title and every query is written with `textContent`, never as markup.
  */
 import { OWNER_TEXT, effectiveLocationIds, resultText, unplacedLabel } from './owner-format.js';
@@ -155,6 +156,23 @@ export function initGamesToolbar(doc) {
   }
 
   /**
+   * Unticks the rows a search or a filter has just hidden, so a move only ever acts on games the owner can see, and tells the
+   * rest of the page that the ticks changed so the dock's count stays true.
+   */
+  function untickHidden() {
+    const checks = gameRows()
+      .filter((row) => row.hidden)
+      .map((row) => row.querySelector('.game-check'))
+      .filter((check) => check?.checked);
+
+    for (const check of checks) {
+      check.checked = false;
+    }
+
+    checks.at(-1)?.dispatchEvent(new doc.defaultView.Event('change', { bubbles: true }));
+  }
+
+  /**
    * Counts the games that are shown in no location and writes the count into the switch's label. The rows that are shown do not
    * change here, so a game the owner just placed stays in the list until the owner searches or switches again.
    */
@@ -188,6 +206,7 @@ export function initGamesToolbar(doc) {
       announce(text, doc);
     }
 
+    untickHidden();
     syncSelectAll();
   }
 
