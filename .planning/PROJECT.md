@@ -33,15 +33,18 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 - ✓ Reduced motion gets the card with a fade and the box outlined in place, no pull-out — Phase 5
 - ✓ Keyboard: the cabinet is one tab stop with arrow, Home and End navigation and Enter to open; screen readers get a skip link and an A to Z list of every game whose entries open the card — Phase 5 (real screen-reader listen and Android Back are open todos)
 - ✓ Site labels in English and Dutch: the page follows the browser language from the first byte, an EN · NL toggle switches in place and is remembered in one cookie, and game titles stay exactly as BGG provides them — Phase 5
+- ✓ Owner tools on their own port and hostname, reachable only from the home network or VPN (proxy allow-list, container firewall, a listener wall and a client-range wall that fails closed unless the request came through the configured proxy); the public site answers 404 for every owner path and asset — Phase 6 (v0.7.0, owner-verified from home and from outside)
+- ✓ The owner chooses each game's picture (owned edition, main picture or a pasted BGG gallery link, previewed on a mini shelf) from a "Worth a look" worklist, and every visitor's cabinet and card follow — Phase 6
+- ✓ The owner keeps an ordered list of storage locations and places games (row picker, bulk move, expansions follow their base); every visitor's card shows the location — Phase 6
+- ✓ Owner data lives in its own file beside the synced collection and survives syncs, restarts and releases (ten earlier versions kept, change log with Undo); backed up by the owner's own download and restorable after a strict check and a side-by-side preview — Phase 6 (live backup and restore round trip done by the owner)
 
 ### Active
 
-- [ ] Each game shows its storage location to every visitor. The access check proved BGG's private field is not readable with the token, so the owner manages locations in home/VPN-only owner tools
 - [ ] Visitors can toggle between one big cabinet and one cabinet per storage location
-- [ ] The owner can override the box image per game from home/VPN (candidate rows from the Phase 4 server review are listed in a todo)
 - [ ] Game-night filters: player count, play time, storage location, search by name (non-matching games dim on the shelf)
 - [ ] Before the site goes public: revoke or downgrade the development admin account (passwordless sudo) on the server, and drop the LAN/VPN allow-list from the route
-- [ ] Site is public and read-only with no accounts, reachable from the internet through the existing Traefik reverse proxy. Owner tools are reachable only from the home network or VPN
+- [ ] Site is public and read-only with no accounts, reachable from the internet through the existing Traefik reverse proxy (the owner tools already stay home/VPN-only)
+- [ ] Before the site goes public: also downgrade or revoke the maintenance key on the reverse-proxy container, added in Phase 6 to switch the owner host on
 
 ### Out of Scope
 
@@ -129,6 +132,10 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 | Dutch site name "Spellenkast"; the punched hole on the card dropped | Owner's review-round answers | ✓ Approved (Phase 5 review round) |
 | A phone rotating across the phone breakpoint closes an open card | The cabinet is redrawn with a different arrangement, so the card would sit over moved boxes | ✓ Accepted by the owner (Phase 5 device check); revisit if it annoys in daily use |
 | Browser tests run in their own CI job and test hosts dispose their file watchers | A full browser run leaked one inotify instance per host and hit the per-user limit | ✓ Good — 133 browser tests stable locally and in CI (Phase 5) |
+| Owner data in its own file, never in the synced snapshot; one writer with revisions, Undo and ten earlier versions | Owner choices must survive syncs, restarts and releases, and a damaged or newer file must never be overwritten silently | ✓ Good — proven across sync, restart, release and a live restore round trip (Phase 6) |
+| Backup by the owner's own download (reminder banner), not a scheduled job | Smallest moving part on a low-power host; the owner keeps the file off the server | ✓ Good — owner made a real backup and restored it in UAT (Phase 6) |
+| Owner tools on a separate port and hostname behind the proxy allow-list, not a login | No accounts on a public site; nothing writable reachable from the internet | ✓ Good — walls proven by self-check, route check and an outside-network test (Phase 6) |
+| Owner picture links only from BGG's own picture host | One fixed host keeps the server-side fetch safe and stays within BGG's gallery and terms | ✓ Confirmed by the owner (Phase 6): no other sources |
 
 ## Evolution
 
@@ -148,4 +155,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-12 after Phase 5 (game detail, accessibility and language; released as v0.6.0)*
+*Last updated: 2026-10-13 after Phase 6 (owner tools and persistence; released as v0.7.0, review and security fixes on the milestone branch for v0.7.1)*
