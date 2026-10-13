@@ -39,3 +39,47 @@ test('a state mark on a row is matched by its value so an empty attribute styles
 test('the dashed place chip is for a game that is not placed only', () => {
   assert.match(stripped, /\.game-where\[data-unplaced="true"\]\s*\{[^}]*border-style:\s*dashed/);
 });
+
+/**
+ * Lists the style rules of the owner style sheet as selector and body pairs, rules inside a media query included.
+ * @returns {{selector: string, body: string}[]}
+ */
+function rules() {
+  return [...stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((match) => ({ selector: match[1].trim(), body: match[2] }));
+}
+
+/**
+ * Finds the rule whose selector is exactly the one given.
+ * @param {string} selector The selector.
+ * @returns {{selector: string, body: string}}
+ */
+function ruleFor(selector) {
+  const found = rules().find((rule) => rule.selector === selector);
+
+  assert.ok(found, `the rule ${selector} must exist`);
+  return found;
+}
+
+test('the danger colour is used only by the destructive buttons and the warning line above them', () => {
+  const users = rules().filter((rule) => rule.body.includes('var(--danger)'));
+
+  assert.ok(users.length > 0, 'the destructive buttons must use the danger colour');
+
+  for (const rule of users) {
+    assert.match(rule.selector, /owner-btn-danger|\.warning-line/, `${rule.selector} must not use the danger colour`);
+  }
+});
+
+test('a link error is drawn with the ordinary treatment at body size', () => {
+  const error = ruleFor('.pic-link-error');
+
+  assert.match(error.body, /border-inline-start:\s*4px solid var\(--paper-label\)/);
+  assert.match(error.body, /font-size:\s*16px/);
+});
+
+test('an invalid link field is marked by a border and an inset ring, not by colour alone', () => {
+  const field = ruleFor('.pic-link-form input[type="url"][aria-invalid="true"]');
+
+  assert.match(field.body, /border-color:\s*var\(--paper-label\)/);
+  assert.match(field.body, /box-shadow:\s*inset 0 0 0 1px var\(--ink\)/);
+});

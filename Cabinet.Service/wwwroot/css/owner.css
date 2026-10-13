@@ -403,7 +403,7 @@ header > .header-aside {
 }
 
 .owner-notice[data-problem="true"] {
-  border-inline-start-color: var(--danger);
+  border-inline-start-color: var(--paper-label);
 }
 
 .owner-notice p {
@@ -621,7 +621,7 @@ header > .header-aside {
 }
 
 .warning-line strong {
-  color: var(--danger);
+  color: var(--ink);
   font-weight: 600;
 }
 
@@ -1688,8 +1688,8 @@ header > .header-aside {
 }
 
 .pic-link-form input[type="url"][aria-invalid="true"] {
-  border-color: var(--danger);
-  box-shadow: inset 0 0 0 1px var(--danger);
+  border-color: var(--paper-label);
+  box-shadow: inset 0 0 0 1px var(--ink);
 }
 
 .pic-link-form .owner-hint {
@@ -1699,9 +1699,9 @@ header > .header-aside {
 .pic-link-error {
   margin: 0;
   padding-inline-start: 12px;
-  border-inline-start: 4px solid var(--danger);
+  border-inline-start: 4px solid var(--paper-label);
   color: var(--ink);
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.5;
 }
 
@@ -1977,7 +1977,7 @@ header > .header-aside {
   margin: 0 0 16px;
   padding: 8px 16px;
   border-radius: 4px;
-  border-inline-start: 4px solid var(--danger);
+  border-inline-start: 4px solid var(--paper-label);
   background: var(--hover-tint);
 }
 
