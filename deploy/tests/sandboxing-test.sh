@@ -395,6 +395,30 @@ STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain input {\n\t\ttype filter 
 run_selfcheck_function check_firewall
 check "firewall fails with a default-accept input chain" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
 
+OWNER_RULE_TABLE=$'table inet cabinet_filter {\n\tchain input {\n\t\ttype filter hook input priority filter; policy drop;\n\t\ttcp dport 5080 ip saddr 192.0.2.10 accept\n\t\ttcp dport 5082 ip saddr 192.0.2.10 accept\n\t}\n}'
+STUB_SS_OUTPUT="$OWNER_LISTENING_SS"
+STUB_NFT_OUTPUT="$OWNER_RULE_TABLE"
+run_selfcheck_function check_firewall
+check "firewall passes both checks when the owner port is admitted from one address" "2 0" "${RUN_PASSED} ${RUN_FAILED}"
+check "firewall never prints the proxy address" "0" "$(file_has_text "${WORK_DIR}/run.out" "192.0.2.10")"
+
+STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain input {\n\t\ttype filter hook input priority filter; policy drop;\n\t\ttcp dport 5080 ip saddr 192.0.2.10 accept\n\t}\n}'
+run_selfcheck_function check_firewall
+check "firewall fails when the owner port listens but no rule admits it" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+
+STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain input {\n\t\ttype filter hook input priority filter; policy drop;\n\t\ttcp dport 5082 accept\n\t}\n}'
+run_selfcheck_function check_firewall
+check "firewall fails when the owner port rule has no source address" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+
+STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain input {\n\t\ttype filter hook input priority filter; policy drop;\n\t\ttcp dport 5082 ip saddr 0.0.0.0/0 accept\n\t}\n}'
+run_selfcheck_function check_firewall
+check "firewall fails when the owner port rule admits every address" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+
+STUB_SS_OUTPUT="$OWNER_OFF_SS"
+STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain input {\n\t\ttype filter hook input priority filter; policy drop;\n\t}\n}'
+run_selfcheck_function check_firewall
+check "firewall asks nothing about the owner port when the owner tools are off" "1 0" "${RUN_PASSED} ${RUN_FAILED}"
+
 STUB_SSHD_OUTPUT=$'port 22\npasswordauthentication no\nkbdinteractiveauthentication no'
 export STUB_SSHD_OUTPUT
 run_selfcheck_function check_ssh

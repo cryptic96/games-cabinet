@@ -185,6 +185,28 @@ check_firewall() {
   else
     fail "the firewall input chain does not default to drop"
   fi
+
+  check_owner_port_firewall "$ruleset"
+}
+
+###
+### When the owner port listens, the firewall must admit it from one proxy
+### address only: a rule for port 5082 with a source address that is not the
+### whole internet. Without it the owner port, bound to every address, would be
+### open to the whole network and only the client-range wall would be left.
+### Skipped when the owner tools are off or the listeners cannot be listed;
+### the listener check reports both. Prints no address.
+###
+check_owner_port_firewall() {
+  local ruleset="$1" sockets rule='tcp dport 5082 ip saddr ([0-9a-fA-F.:]+(/[0-9]+)?) accept'
+  if ! sockets="$(ss -ltnH 2>&1)" || [[ -z "$(listener_addresses "$sockets" 5082)" ]]; then
+    return
+  fi
+  if [[ "$ruleset" =~ $rule && "${BASH_REMATCH[1]}" != "0.0.0.0/0" ]]; then
+    pass "the firewall admits the owner port 5082 from one source address only"
+  else
+    fail "the firewall has no rule that admits the owner port 5082 from one source address only"
+  fi
 }
 
 ops_url() {
