@@ -139,6 +139,41 @@ public sealed class OwnerDataService : IOwnerArtReferences
             ready.Data.LastDownloadAtUtc)
         : new BackupState(Readable: false, HasData: false, 0, null);
 
+    /// <summary>The earlier copies of the owner data the server keeps, newest first; empty when none can be listed.</summary>
+    public IReadOnlyList<EarlierVersion> EarlierVersions()
+    {
+        try
+        {
+            return _store.EarlierVersions();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning("The earlier versions of the owner data could not be listed: {ExceptionType}", exception.GetType().Name);
+
+            return [];
+        }
+    }
+
+    /// <summary>
+    /// Reads an earlier copy by its place in <see cref="EarlierVersions"/>, never by a name. The bytes are whatever was kept, so they
+    /// are untrusted until the restore check accepts them.
+    /// </summary>
+    /// <param name="index">The place of the copy in the list the store itself makes.</param>
+    /// <returns>The bytes, or null when there is no copy at that place or it cannot be read.</returns>
+    public byte[]? ReadEarlierVersion(int index)
+    {
+        try
+        {
+            return _store.ReadEarlierVersion(index);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning("An earlier version of the owner data could not be read: {ExceptionType}", exception.GetType().Name);
+
+            return null;
+        }
+    }
+
     /// <summary>Asks the background work to look for linked pictures that have no usable stored copy now instead of at its next turn.</summary>
     public void RequestLinkWork() => LinkWorkRequested?.Invoke();
 

@@ -127,3 +127,16 @@ test('an answer that is not JSON shows the fixed failure line', async () => {
   assert.equal(result, false);
   assert.equal(line.textContent, OWNER_TEXT.checkFailed);
 });
+
+test('focus goes to the file input only when the page was reached by throwing a check away', async () => {
+  const { focusFileInputAfterKeep } = await import(pathToFileURL(join(FOLDER, 'owner-settings.js')).href);
+  const focused = [];
+  const doc = { getElementById: (id) => (id === 'restore-file' ? { focus: () => focused.push(id) } : null) };
+
+  focusFileInputAfterKeep(doc, '#restore-preview-heading');
+  focusFileInputAfterKeep(doc, '');
+  assert.deepEqual(focused, []);
+
+  focusFileInputAfterKeep(doc, '#restore-file');
+  assert.deepEqual(focused, ['restore-file']);
+});

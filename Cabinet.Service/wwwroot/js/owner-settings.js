@@ -264,6 +264,7 @@ export async function submitRestoreCheck(form, doc, options = {}) {
 function initRestore(doc) {
   doc.getElementById('restore-preview-heading')?.focus();
   doc.getElementById('restore-done-heading')?.focus();
+  focusFileInputAfterKeep(doc);
 
   const form = doc.querySelector('form[data-restore-form]');
   const button = form?.querySelector('button[data-check-button]');
@@ -284,9 +285,22 @@ function initRestore(doc) {
     clearBusy(button);
   });
 
-  doc.querySelector('button[data-keep-current]')?.addEventListener('click', () => {
+}
+
+/** The address fragment the page is sent to after a check is thrown away, which names the file input. */
+const FILE_INPUT_FRAGMENT = '#restore-file';
+
+/**
+ * Puts focus on the file input when the page was reached by throwing a check away. `Keep current data` is a plain post that the
+ * server answers with a redirect to the file input's fragment, so a reader who chose it lands where they can choose another file,
+ * with or without the script.
+ * @param {Document} doc The page.
+ * @param {string} [fragment] The fragment of the address, replaceable in tests.
+ */
+export function focusFileInputAfterKeep(doc, fragment = globalThis.location?.hash ?? '') {
+  if (fragment === FILE_INPUT_FRAGMENT) {
     doc.getElementById('restore-file')?.focus();
-  });
+  }
 }
 
 /**

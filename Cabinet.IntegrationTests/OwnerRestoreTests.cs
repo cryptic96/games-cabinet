@@ -27,6 +27,7 @@ public sealed class OwnerRestoreTests
     private const string DownloadPath = SettingsPath + "?handler=Download";
     private const string CheckPath = SettingsPath + "?handler=CheckFile";
     private const string RestorePath = SettingsPath + "?handler=Restore";
+    private const string CheckVersionPath = SettingsPath + "?handler=CheckVersion";
     private const string FileField = "ownerDataFile";
     private const string CardsPath = "/cabinet/cards?profile=desktop";
     private const string LinkAddress = "https://example.org/owner/linked-picture.png";
@@ -139,6 +140,7 @@ public sealed class OwnerRestoreTests
         var late = await second.Session.PostFormAsync(RestorePath, [new("token", token)]);
 
         kept.Status.Should().Be(HttpStatusCode.Found);
+        kept.Location.Should().Be(SettingsPath + "#restore-file");
         late.Body.Should().Contain("That check has run out. Choose the file again.");
         second.Data.Locations.Should().BeEmpty();
         second.StartedEmpty().Should().BeTrue();
@@ -256,6 +258,126 @@ public sealed class OwnerRestoreTests
         restore.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Every_owner_page_shows_the_recovery_panel_with_the_earlier_versions_and_the_unreadable_file_is_never_touched(bool newerFormat)
+    {
+        var unreadable = newerFormat ? OwnerDataSeed.NewerFormat() : "{ this is not json"u8.ToArray();
+        await using var host = await RestoreHost.StartAsync(seed: Seeded(), damaged: unreadable, keepVersionAt: SyncHarness.StartTime.AddDays(-1));
+        var path = Path.Combine(host.StoragePath, OwnerDataStore.FileName);
+        var kept = new OwnerDataStore(host.StoragePath, NullLogger<OwnerDataStore>.Instance).EarlierVersions().Single();
+
+        foreach (var page in new[] { "/owner/pictures", "/owner/locations", SettingsPath })
+        {
+            var reply = await host.Session.GetAsync(page);
+            var html = WebUtility.HtmlDecode(reply.Body);
+
+            reply.Status.Should().Be(HttpStatusCode.OK, page);
+            html.Should().Contain("Your owner data couldn't be read", page)
+                .And.Contain("Nothing was changed. Restore it from a file you downloaded, or from an earlier version kept on this server.", page)
+                .And.Contain("Restore from a file", page)
+                .And.Contain("Use this version", page)
+                .And.Contain($"datetime=\"{OwnerStrings.TimeAttribute(kept.SavedAtUtc)}\"", page)
+                .And.Contain("owner-plate", page)
+                .And.Contain("owner-bar", page);
+            html.Should().NotContain("owner-banner", page).And.NotContain("change-log", page).And.NotContain("Recent changes", page).And.NotContain("id=\"backup\"", page);
+        }
+
+        (await host.Session.GetAsync("/owner/locations")).Body.Should().NotContain("Check file").And.Contain("/owner/settings#restore");
+        (await host.Session.GetAsync(SettingsPath)).Body.Should().Contain("Check file").And.Contain("restore-file");
+        var write = await host.Session.PostFormAsync("/owner/locations?handler=AddLocation", [new("name", "Shelf Z"), new("revision", "0")]);
+        write.Status.Should().NotBe(HttpStatusCode.OK);
+        (await File.ReadAllBytesAsync(path, TestContext.Current.CancellationToken)).Should().Equal(unreadable);
+        host.Service.State.Should().BeOfType<OwnerDataState.Unreadable>();
+    }
+
+    [Fact]
+    public async Task Use_this_version_goes_through_the_check_and_the_confirm_and_the_unreadable_bytes_are_kept_as_an_earlier_version()
+    {
+        var damaged = "{ this is not json"u8.ToArray();
+        await using var host = await RestoreHost.StartAsync(seed: Seeded(), damaged: damaged, keepVersionAt: SyncHarness.StartTime.AddDays(-1));
+
+        var chosen = await host.Session.PostFormAsync(CheckVersionPath, [new("index", "0")]);
+        var preview = await host.Session.GetAsync(chosen.Location!);
+        var stillUnreadable = host.Service.State is OwnerDataState.Unreadable;
+        var restored = await host.Session.PostFormAsync(RestorePath, [new("token", OwnerSession.FieldValue(preview.Body, "token"))]);
+        var versions = new OwnerDataStore(host.StoragePath, NullLogger<OwnerDataStore>.Instance);
+
+        chosen.Status.Should().Be(HttpStatusCode.Found);
+        chosen.Location.Should().StartWith(SettingsPath + "?restore=").And.EndWith("#restore-preview-heading");
+        preview.Body.Should().Contain(PreviewHeading).And.Contain(Summary).And.Contain("Restore file").And.Contain("Keep current data");
+        stillUnreadable.Should().BeTrue();
+        restored.Status.Should().Be(HttpStatusCode.OK);
+        restored.Body.Should().Contain($"Restored. {Summary}.");
+        host.Service.State.Should().BeOfType<OwnerDataState.Ready>();
+        host.Data.Locations.Select(location => location.Name).Should().Equal(CabinetA, ShelfB);
+        host.Data.Changes.Select(change => change.Text).Should().Contain("Restored an earlier version");
+        versions.EarlierVersions().Should().HaveCount(2);
+        versions.ReadEarlierVersion(0).Should().Equal(damaged);
+        (await host.Session.GetAsync("/owner/locations")).Body.Should().Contain(CabinetA).And.NotContain("couldn&#x27;t be read");
+    }
+
+    [Theory]
+    [InlineData("1")]
+    [InlineData("-1")]
+    [InlineData("99")]
+    [InlineData("../../owner-data.json")]
+    [InlineData("")]
+    public async Task A_version_index_outside_the_servers_own_list_is_refused_with_the_damaged_file_words_and_changes_nothing(string index)
+    {
+        var damaged = "{ this is not json"u8.ToArray();
+        await using var host = await RestoreHost.StartAsync(seed: Seeded(), damaged: damaged, keepVersionAt: SyncHarness.StartTime.AddDays(-1));
+        var path = Path.Combine(host.StoragePath, OwnerDataStore.FileName);
+
+        var refused = await host.Session.PostFormAsync(CheckVersionPath, [new("index", index)]);
+
+        refused.Status.Should().Be(HttpStatusCode.UnprocessableEntity);
+        WebUtility.HtmlDecode(refused.Body).Should().Contain("That file is damaged or incomplete, so nothing was changed.").And.NotContain(PreviewHeading);
+        (await File.ReadAllBytesAsync(path, TestContext.Current.CancellationToken)).Should().Equal(damaged);
+        new OwnerDataStore(host.StoragePath, NullLogger<OwnerDataStore>.Instance).EarlierVersions().Should().ContainSingle();
+        host.Service.State.Should().BeOfType<OwnerDataState.Unreadable>();
+    }
+
+    [Fact]
+    public async Task A_damaged_earlier_version_is_refused_by_the_same_check_and_nothing_is_replaced()
+    {
+        var damaged = "{ this is not json"u8.ToArray();
+        await using var host = await RestoreHost.StartAsync(seed: Seeded(), damaged: damaged, keepVersionAt: SyncHarness.StartTime.AddDays(-1));
+        OwnerDataSeed.KeepEarlierVersion(host.StoragePath, SyncHarness.StartTime.AddHours(-2));
+
+        var refused = await host.Session.PostFormAsync(CheckVersionPath, [new("index", "0")]);
+
+        refused.Status.Should().Be(HttpStatusCode.UnprocessableEntity);
+        WebUtility.HtmlDecode(refused.Body).Should().Contain("That file is damaged or incomplete, so nothing was changed.");
+        host.Service.State.Should().BeOfType<OwnerDataState.Unreadable>();
+        (await File.ReadAllBytesAsync(Path.Combine(host.StoragePath, OwnerDataStore.FileName), TestContext.Current.CancellationToken)).Should().Equal(damaged);
+    }
+
+    [Fact]
+    public async Task A_version_choice_without_the_antiforgery_token_is_refused_and_changes_nothing()
+    {
+        await using var host = await RestoreHost.StartAsync(seed: Seeded(), damaged: "{ nope"u8.ToArray(), keepVersionAt: SyncHarness.StartTime.AddDays(-1));
+
+        var forged = await host.Session.PostFormAsync(CheckVersionPath, [new("index", "0")], withToken: false);
+
+        forged.Status.Should().Be(HttpStatusCode.BadRequest);
+        host.Service.State.Should().BeOfType<OwnerDataState.Unreadable>();
+    }
+
+    [Fact]
+    public async Task While_the_owner_file_is_unreadable_the_public_cards_answer_with_no_locations_and_none_of_the_owners_pictures()
+    {
+        await using var host = await RestoreHost.StartAsync(seed: Seeded(), damaged: "{ this is not json"u8.ToArray(), keepVersionAt: SyncHarness.StartTime.AddDays(-1));
+        await SyncRounds.PressAndWait(host.Client, host.Clock, advance: false);
+
+        using var response = await host.Client.GetAsync(CardsPath, TestContext.Current.CancellationToken);
+        var cards = await host.CardsAsync();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        cards.Should().NotBeEmpty().And.OnlyContain(card => card.Location == null && card.CoverUrl == string.Empty);
+    }
+
     private static OwnerData Existing() => OwnerData.Empty with
     {
         Revision = 2,
@@ -343,7 +465,11 @@ public sealed class OwnerRestoreTests
 
         public OwnerData Data => ((OwnerDataState.Ready)Service.State).Data;
 
-        public static Task<RestoreHost> StartAsync(Func<IReadOnlyList<int>, OwnerData>? seed, bool background = false, byte[]? damaged = null)
+        public static Task<RestoreHost> StartAsync(
+            Func<IReadOnlyList<int>, OwnerData>? seed,
+            bool background = false,
+            byte[]? damaged = null,
+            DateTimeOffset? keepVersionAt = null)
         {
             var storage = new TemporaryDirectory();
             var items = SyntheticBggCollection.Create(5);
@@ -356,9 +482,14 @@ public sealed class OwnerRestoreTests
                 OwnerDataSeed.Write(storage.FullPath, seed(gameIds));
             }
 
+            if (keepVersionAt is { } keptAt)
+            {
+                OwnerDataSeed.KeepEarlierVersion(storage.FullPath, keptAt);
+            }
+
             if (damaged is not null)
             {
-                File.WriteAllBytes(Path.Combine(storage.FullPath, OwnerDataStore.FileName), damaged);
+                OwnerDataSeed.WriteRaw(storage.FullPath, damaged);
             }
 
             var settings = new Dictionary<string, string?>

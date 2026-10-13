@@ -1983,3 +1983,39 @@ header > .owner-plate {
     line-height: 1.5;
   }
 }
+
+.unreadable-panel p {
+  margin: 0 0 12px;
+}
+
+.unreadable-panel h4 {
+  margin: 24px 0 8px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.version-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--paper-rule);
+}
+
+.version-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--paper-rule);
+}
+
+.version-item time {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.version-item form {
+  margin: 0;
+}

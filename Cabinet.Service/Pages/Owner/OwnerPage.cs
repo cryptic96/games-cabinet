@@ -1,3 +1,4 @@
+using Cabinet.Domain.Owner;
 using Cabinet.Service.Owner;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -22,6 +23,17 @@ public abstract class OwnerPage : PageModel
         new(OwnerStrings.Locations, "/owner/locations"),
         new(OwnerStrings.Settings, "/owner/settings"),
     ];
+
+    /// <summary>
+    /// Whether the stored owner data cannot be read, because the file is damaged or was written by a newer format. Every owner page then
+    /// shows the recovery panel in place of its own content.
+    /// </summary>
+    public bool OwnerDataUnreadable => Owner.State is OwnerDataState.Unreadable;
+
+    /// <summary>The earlier copies of the owner data the server keeps, newest first; each is chosen later by its place in this list.</summary>
+    public IReadOnlyList<EarlierVersion> EarlierVersions => OwnerDataUnreadable ? Owner.EarlierVersions() : [];
+
+    private OwnerDataService Owner => HttpContext.RequestServices.GetRequiredService<OwnerDataService>();
 
     /// <summary>Marks the answer as English before any handler runs.</summary>
     /// <param name="context">The handler about to run.</param>
