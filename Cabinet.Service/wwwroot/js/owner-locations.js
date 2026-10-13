@@ -295,12 +295,12 @@ export function initLocationList(doc = globalThis.document) {
    * @param {HTMLElement} region The status region the Undo button was in.
    * @param {() => void} apply Takes the change back on the page.
    * @param {() => HTMLElement} focusAfter Gives the element that takes focus once the Undo button is gone.
-   * @returns {() => void} The click handler of the Undo button.
+   * @returns {(saved?: number | null) => void} The click handler of the Undo button; it gets the revision the change was saved at.
    */
   function undoer(region, apply, focusAfter) {
-    return () =>
+    return (saved) =>
       enqueue(async () => {
-        const result = await postOwner(HANDLERS.undo, {});
+        const result = await postOwner(HANDLERS.undo, {}, { revision: saved });
 
         if (result.outcome === 'saved') {
           apply();

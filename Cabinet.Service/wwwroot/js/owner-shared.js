@@ -211,7 +211,10 @@ function dropServerNotices(doc) {
  * written as text, never as markup.
  * @param {Element} region The row's status region.
  * @param {string} text What happened.
- * @param {{ onUndo?: () => void, undoLabel?: string }} [options] The action of the Undo button and its label; no button when there is no action.
+ * The Undo button belongs to the change that was just saved: it remembers the revision of that save and hands it to the action, which
+ * sends it with the undo, so the server refuses the undo when another change was saved since. A second press while the first is
+ * still being handled does nothing.
+ * @param {{ onUndo?: (saved: number | null) => void, undoLabel?: string }} [options] The action of the Undo button and its label; no button when there is no action.
  */
 export function showRowStatus(region, text, options = {}) {
   const doc = reset(region);
@@ -234,7 +237,16 @@ export function showRowStatus(region, text, options = {}) {
     button.className = 'owner-btn';
     button.dataset.undo = '';
     button.textContent = options.undoLabel ?? '';
-    button.addEventListener('click', options.onUndo);
+    const saved = currentRevision;
+
+    button.addEventListener('click', () => {
+      if (button.getAttribute('aria-disabled') === 'true') {
+        return;
+      }
+
+      button.setAttribute('aria-disabled', 'true');
+      options.onUndo(saved);
+    });
     region.append(button);
     undoRegion = region;
   }

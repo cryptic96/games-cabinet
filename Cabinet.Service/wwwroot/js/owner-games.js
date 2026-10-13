@@ -33,7 +33,7 @@ function drawnValue(select) {
  * @param {{
  *   enqueue: (task: () => Promise<void>) => void,
  *   showProblem: (region: HTMLElement, result: object) => void,
- *   undoer: (region: HTMLElement, apply: () => void, focusAfter: () => HTMLElement) => () => void,
+ *   undoer: (region: HTMLElement, apply: () => void, focusAfter: () => HTMLElement) => (saved?: number | null) => void,
  *   gamesChanged: () => void,
  * }} hooks What the page offers: one request at a time, the wording of a failure, the Undo button and the recount after a change.
  */

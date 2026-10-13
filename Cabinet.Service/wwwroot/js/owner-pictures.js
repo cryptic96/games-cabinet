@@ -285,11 +285,11 @@ function initRow(row, enqueue, showCounts) {
    * Takes back the latest change on the server and, when that worked, on the page too.
    * @param {string} previous The choice the row had before the change.
    * @param {boolean} [refocus] Whether focus goes to the checked radio afterwards; a button that was pressed keeps its focus instead.
-   * @returns {() => void} The click handler of the Undo button.
+   * @returns {(saved?: number | null) => void} The click handler of the Undo button; it gets the revision the change was saved at.
    */
-  const undoer = (previous, refocus = true) => () =>
+  const undoer = (previous, refocus = true) => (saved) =>
     enqueue(async () => {
-      const result = await postOwner(HANDLERS.undo, { gameId: form.elements.gameId.value });
+      const result = await postOwner(HANDLERS.undo, { gameId: form.elements.gameId.value }, { revision: saved });
 
       if (result.outcome === 'saved') {
         setChecked(fieldset, previous);
@@ -506,11 +506,11 @@ function initSingleGame(doc, list, enqueue) {
    * @param {HTMLElement} region The status region the Undo button was in.
    * @param {() => void} apply Takes the change back on the page.
    * @param {() => HTMLElement} focusAfter Gives the element that takes focus once the Undo button is gone.
-   * @returns {() => void} The click handler of the Undo button.
+   * @returns {(saved?: number | null) => void} The click handler of the Undo button; it gets the revision the change was saved at.
    */
-  const undoer = (region, apply, focusAfter) => () =>
+  const undoer = (region, apply, focusAfter) => (saved) =>
     enqueue(async () => {
-      const result = await postOwner(HANDLERS.undo, {});
+      const result = await postOwner(HANDLERS.undo, {}, { revision: saved });
 
       if (result.outcome === 'saved') {
         apply();

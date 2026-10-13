@@ -78,6 +78,13 @@ function element(tag, doc) {
     replaceChildren() {
       node.children = [];
     },
+    attributes: {},
+    getAttribute(name) {
+      return name in node.attributes ? node.attributes[name] : null;
+    },
+    setAttribute(name, value) {
+      node.attributes[name] = value;
+    },
     removeAttribute(name) {
       if (name === 'data-problem') {
         delete node.dataset.problem;
@@ -260,6 +267,41 @@ test('a row status writes its text as text and offers Undo only when asked', () 
   showRowStatus(region, 'Moved', {});
 
   assert.equal(region.children.length, 1);
+});
+
+test('the Undo button hands its action the revision of the change it was shown for, not the latest one', () => {
+  const doc = documentStub();
+  const region = element('div', doc);
+  const received = [];
+
+  setRevision(4, doc);
+  showRowStatus(region, 'Moved', { onUndo: (saved) => received.push(saved), undoLabel: 'Undo' });
+  setRevision(5, doc);
+  region.children[1].listeners.click();
+
+  assert.deepEqual(received, [4]);
+});
+
+test('an Undo that was sent with a revision reaches the server with that revision', async () => {
+  const { fetch, calls } = answering(409, '{"outcome":"outOfDate","status":"cant-undo"}');
+
+  setRevision(7, documentStub());
+  await postOwner('?handler=Undo', {}, { fetch, token: 'token-1', revision: 4 });
+
+  assert.equal(calls[0].init.body.get('revision'), '4');
+});
+
+test('pressing Undo twice runs the action once', () => {
+  const doc = documentStub();
+  const region = element('div', doc);
+  let undone = 0;
+
+  showRowStatus(region, 'Moved', { onUndo: () => undone++, undoLabel: 'Undo' });
+  region.children[1].listeners.click();
+  region.children[1].listeners.click();
+
+  assert.equal(undone, 1);
+  assert.equal(region.children[1].attributes['aria-disabled'], 'true');
 });
 
 test('a new change takes the Undo button away from the row that had it', () => {

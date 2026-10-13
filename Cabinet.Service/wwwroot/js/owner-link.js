@@ -473,9 +473,9 @@ export function initLinkBox(row, helpers) {
     }
   };
 
-  const undoUse = (restore) => () =>
+  const undoUse = (restore) => (saved) =>
     helpers.enqueue(async () => {
-      const result = await postOwner(HANDLERS.undo, { gameId });
+      const result = await postOwner(HANDLERS.undo, { gameId }, { revision: saved });
 
       if (result.outcome === 'saved') {
         restore();
@@ -530,9 +530,9 @@ export function initLinkBox(row, helpers) {
       }
     });
 
-  const undoRemove = (previousChoice) => () =>
+  const undoRemove = (previousChoice) => (saved) =>
     helpers.enqueue(async () => {
-      const result = await postOwner(HANDLERS.undo, { gameId });
+      const result = await postOwner(HANDLERS.undo, { gameId }, { revision: saved });
 
       if (result.outcome === 'saved') {
         renderLinkTile(linkTile(), result.linkTile ?? {}, helpers.watchPicture);
