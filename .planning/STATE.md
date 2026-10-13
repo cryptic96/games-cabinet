@@ -5,8 +5,8 @@ milestone_name: milestone
 current_phase: 06.1
 current_phase_name: Selectable Cabinet Finishes & Lighting
 status: planning
-stopped_at: Phase 06.1 context gathered
-last_updated: "2026-10-13T19:14:19.023Z"
+stopped_at: Phase 6.1 UI-SPEC approved
+last_updated: "2026-10-13T20:09:43.857Z"
 last_activity: 2026-10-13
 last_activity_desc: Phase 06 complete, transitioned to Phase 06.1
 progress:
@@ -128,6 +128,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-13T19:14:19.002Z
-Stopped at: Phase 06.1 context gathered
-Resume file: .planning/phases/06.1-selectable-cabinet-finishes-lighting/06.1-CONTEXT.md
+Last session: 2026-10-13T20:09:43.835Z
+Stopped at: Phase 6.1 UI-SPEC approved
+Resume file: .planning/phases/06.1-selectable-cabinet-finishes-lighting/06.1-UI-SPEC.md
