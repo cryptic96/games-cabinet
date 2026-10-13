@@ -20,7 +20,8 @@ namespace Cabinet.Service.Owner;
 /// A link that fails to fetch keeps its stored record and its files, so the copy keeps showing; the failure is recorded
 /// through <see cref="LinkHealth"/>, which alone says when a link is dead. A link that has failed is tried again a day later,
 /// so the second failed check can mark it dead, and once it is dead it is tried once a week; a link with no copy is also tried
-/// again when something asks for it. One success clears every failure. It runs only when the background switch the hourly sync
+/// again when something asks for it. A picture that was fetched but could not be stored counts as a failed check, so a full disk
+/// does not make every pass fetch it again. One success clears every failure. It runs only when the background switch the hourly sync
 /// obeys is on, and it logs counts only, never an address or a title.
 /// </summary>
 /// <param name="owner">The single writer of the owner data.</param>
@@ -217,6 +218,8 @@ public sealed class OwnerLinkWorker(
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             logger.LogWarning("A linked picture could not be stored: {ExceptionType}", exception.GetType().Name);
+            _lastChecked[gameId] = attemptedAt;
+            await owner.MutateSystemAsync(data => WithLink(data, gameId, link.Url, current => LinkHealth.AfterFailure(current, attemptedAt)), stoppingToken);
 
             return false;
         }
