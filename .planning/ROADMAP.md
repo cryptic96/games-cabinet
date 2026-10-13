@@ -363,7 +363,7 @@ Plans:
   3. Overrides (and locations, if edited in the app) survive syncs, restarts and new releases, and a backup exists from which a fresh container can be restored without losing them.
   4. Conditional on the Phase 3 spike outcome: if BGG cannot supply locations, the owner can define their own list of storage locations (rooms, cabinets, "Lent out") and assign one to each game; if BGG does supply them, this criterion is closed by recording that no location editor is needed.
 
-**Plans:** 25/30 plans executed
+**Plans:** 26/30 plans executed
 
 Plans:
 **Wave 1**
@@ -441,7 +441,7 @@ Plans:
 
 **Wave 17** *(blocked on Wave 16 completion)*
 
-- [ ] 06-26-PLAN.md — Tracer for the owner-address cabinet - the Edit link and the not-placed tag
+- [x] 06-26-PLAN.md — Tracer for the owner-address cabinet - the Edit link and the not-placed tag
 
 **Wave 18** *(blocked on Wave 17 completion)*
 
@@ -524,7 +524,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 3. BGG Access Spike, Real Sync & Snapshot | 15/15 | Complete    | 2026-10-07 |
 | 4. Enrichment, Box Images & Shape | 23/23 | Complete    | 2026-10-09 |
 | 5. Game Detail, Accessibility & Language | 16/16 | Complete    | 2026-10-12 |
-| 6. Owner Tools & Persistence | 25/30 | In Progress|  |
+| 6. Owner Tools & Persistence | 26/30 | In Progress|  |
 | 6.1. Selectable Cabinet Finishes & Lighting (INSERTED) | 0/0 | Not started | - |
 | 7. Game-Night Filters & Location Cabinets | 0/0 | Not started | - |
 | 8. Public Hardening & Go-Public | 0/0 | Not started | - |
