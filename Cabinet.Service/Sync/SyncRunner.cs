@@ -363,7 +363,7 @@ public sealed class SyncRunner
         }
 
         _stored = stored;
-        _publisher.Publish(stored);
+        _publisher.Publish(stored, reconcile: false);
 
         return false;
     }

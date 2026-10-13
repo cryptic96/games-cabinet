@@ -38,6 +38,24 @@ public sealed class OwnerExpiryTests
     }
 
     [Fact]
+    public async Task A_collection_read_back_from_disk_neither_stamps_nor_removes_a_game()
+    {
+        var harness = await HarnessWithLeavingGamePlacedAsync();
+        harness.Publisher.Publish(OwnerTestKit.Listing(Kept));
+        harness.Clock.Advance(TimeSpan.FromDays(90));
+        var savesBefore = harness.Store.Saved.Count;
+
+        harness.Publisher.Publish(OwnerTestKit.Listing(Kept), reconcile: false);
+
+        harness.Store.Saved.Should().HaveCount(savesBefore);
+        harness.Data.Games.Should().Contain(game => game.GameId == Leaving);
+
+        harness.Publisher.Publish(OwnerTestKit.Listing(Kept));
+
+        harness.Data.Games.Should().NotContain(game => game.GameId == Leaving);
+    }
+
+    [Fact]
     public async Task A_game_that_returns_before_30_days_has_its_stamp_cleared_and_keeps_its_location()
     {
         var harness = await HarnessWithLeavingGamePlacedAsync();
