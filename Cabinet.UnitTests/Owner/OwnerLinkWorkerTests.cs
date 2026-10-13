@@ -204,21 +204,23 @@ public sealed class OwnerLinkWorkerTests : IDisposable
     }
 
     [Fact]
-    public async Task A_picture_that_cannot_be_stored_counts_as_a_failed_check_and_is_not_fetched_again_on_every_pass()
+    public async Task A_picture_that_cannot_be_stored_is_not_fetched_again_on_the_next_wake_within_a_day()
     {
         var (owner, cache) = Seed(link: new PictureLink(Address, null, 0, null));
         Directory.Delete(cache.Path, recursive: true);
 
         await StartAsync(owner, cache);
-        await WaitUntilAsync(() => Link(owner).FailedChecks == 1);
-        var requests = _source.Requests;
+        await WaitUntilAsync(() => _source.Requests == 1);
+        await Task.Delay(TimeSpan.FromMilliseconds(300), TestContext.Current.CancellationToken);
 
         _clock.Advance(TimeSpan.FromHours(1));
         await Task.Delay(TimeSpan.FromMilliseconds(300), TestContext.Current.CancellationToken);
 
-        _source.Requests.Should().Be(requests);
-        Link(owner).FailedChecks.Should().Be(1);
+        _source.Requests.Should().Be(1);
         Link(owner).Record.Should().BeNull();
+
+        _clock.Advance(LinkHealth.DeadAfterSpan);
+        await WaitUntilAsync(() => _source.Requests == 2);
     }
 
     private static TimeSpan RecheckEvery => OwnerLinkWorker.RecheckEvery;
