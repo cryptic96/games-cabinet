@@ -47,12 +47,13 @@ export function initPickers(doc, hooks) {
     }
 
     /**
-     * Saves one value for this picker.
+     * Saves one value for this picker. A save that has to outlive the page is sent at once, not behind earlier saves, because a
+     * page that is going away may never get to the end of the queue.
      * @param {string} value The value the picker settled on.
      * @param {{ keepalive?: boolean }} [options] Whether the request has to outlive the page.
      */
-    const commit = (value, options = {}) =>
-      hooks.enqueue(async () => {
+    const commit = (value, options = {}) => {
+      const task = async () => {
         const previous = select.dataset.saved ?? '';
 
         if (value === previous) {
@@ -85,7 +86,14 @@ export function initPickers(doc, hooks) {
           setPickerValue(select, previous);
           hooks.showProblem(region, result);
         }
-      });
+      };
+
+      if (options.keepalive === true) {
+        task();
+      } else {
+        hooks.enqueue(task);
+      }
+    };
 
     setPickerValue(select, drawnValue(select));
     form.querySelector('[data-save]').hidden = true;

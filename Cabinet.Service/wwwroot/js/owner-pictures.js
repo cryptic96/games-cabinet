@@ -311,12 +311,13 @@ function initRow(row, enqueue, showCounts) {
     });
 
   /**
-   * Saves one choice.
+   * Saves one choice. A save that has to outlive the page is sent at once, not behind earlier saves, because a page that is going
+   * away may never get to the end of the queue.
    * @param {string} value The choice the group settled on.
    * @param {boolean} keepalive Whether the request has to outlive the page.
    */
-  const commit = (value, keepalive) =>
-    enqueue(async () => {
+  const commit = (value, keepalive) => {
+    const task = async () => {
       const previous = fieldset.dataset.saved ?? '';
 
       if (value === previous) {
@@ -340,7 +341,14 @@ function initRow(row, enqueue, showCounts) {
         setChecked(fieldset, previous);
         showProblem(region, result);
       }
-    });
+    };
+
+    if (keepalive) {
+      task();
+    } else {
+      enqueue(task);
+    }
+  };
 
   /**
    * Records that the game's pictures look right. The button stays where it is, keeps focus and turns into the disabled `Checked`;
