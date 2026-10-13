@@ -292,6 +292,11 @@ public static class OwnerDataExport
             return false;
         }
 
+        if (picture.Choice == PictureChoice.Link && picture.Link is null)
+        {
+            return false;
+        }
+
         return picture.Link is not { } link
             || (link.FailedChecks >= 0
                 && ArtUrl.Canonical(link.Url) == link.Url
