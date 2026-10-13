@@ -1,5 +1,6 @@
 using System.Net;
 using Microsoft.AspNetCore.Http.Metadata;
+using Microsoft.AspNetCore.Routing;
 using System.Text.RegularExpressions;
 
 namespace Cabinet.Service.Owner;
@@ -199,6 +200,39 @@ public static partial class OwnerAccess
 
             await next(context);
         });
+    }
+
+    /// <summary>
+    /// Marks the owner's own scripts and stylesheet, which sit in the shared static folders, as owner-only, so the owner-only
+    /// wall answers an empty 404 for them on every port but the owner port. Fingerprinted copies are marked too, because the
+    /// mark is set on every endpoint whose route names an owner asset.
+    /// </summary>
+    /// <typeparam name="TBuilder">The kind of endpoint convention builder.</typeparam>
+    /// <param name="builder">The builder of the static asset endpoints.</param>
+    public static TBuilder MarkOwnerAssets<TBuilder>(this TBuilder builder)
+        where TBuilder : IEndpointConventionBuilder
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.Add(endpoint =>
+        {
+            if (endpoint is RouteEndpointBuilder route && IsOwnerAsset(route.RoutePattern.RawText))
+            {
+                route.Metadata.Add(new OwnerOnlyAttribute());
+            }
+        });
+
+        return builder;
+    }
+
+    /// <summary>Whether a route names a script or stylesheet that only the owner pages use.</summary>
+    /// <param name="route">The route text of a static asset, with or without a leading slash.</param>
+    public static bool IsOwnerAsset(string? route)
+    {
+        var trimmed = (route ?? string.Empty).TrimStart('/');
+
+        return trimmed.StartsWith("js/owner-", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("css/owner.", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool StartsWithOwnerSegment(PathString path)

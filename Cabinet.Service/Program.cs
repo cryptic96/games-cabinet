@@ -93,7 +93,7 @@ app.UseCabinetArt();
 app.UseRouting();
 app.UseOwnerOnlyRoutes();
 
-app.MapStaticAssets();
+app.MapStaticAssets().MarkOwnerAssets();
 app.MapRazorPages().WithStaticAssets();
 app.MapCabinetLayout();
 app.MapCabinetLanguage();

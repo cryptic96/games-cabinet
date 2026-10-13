@@ -188,6 +188,22 @@ public class OwnerAccessTests
         options.Allows(IPAddress.IPv6Loopback).Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData("js/owner-locations.js", true)]
+    [InlineData("/js/owner-link.abc123.js", true)]
+    [InlineData("JS/OWNER-SHARED.JS", true)]
+    [InlineData("css/owner.css", true)]
+    [InlineData("css/owner.abc123.css", true)]
+    [InlineData("js/cabinet.js", false)]
+    [InlineData("js/owners.js", false)]
+    [InlineData("css/site.css", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void IsOwnerAsset_names_only_the_owner_scripts_and_stylesheet(string? route, bool expected)
+    {
+        OwnerAccess.IsOwnerAsset(route).Should().Be(expected);
+    }
+
     [Fact]
     public void Allows_refuses_the_address_of_a_known_proxy_even_when_a_range_holds_it()
     {

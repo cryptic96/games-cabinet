@@ -276,6 +276,42 @@ public class OwnerWallTests
             "an owner route without the marker would answer on the public port");
     }
 
+    [Fact]
+    public async Task Every_static_asset_that_only_the_owner_pages_use_carries_the_owner_only_marker()
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        var endpoints = factory.ServingServices.GetRequiredService<EndpointDataSource>().Endpoints
+            .OfType<RouteEndpoint>()
+            .Where(endpoint => OwnerAccess.IsOwnerAsset(endpoint.RoutePattern.RawText))
+            .ToList();
+
+        endpoints.Should().Contain(endpoint => endpoint.RoutePattern.RawText!.EndsWith("owner-locations.js", StringComparison.Ordinal));
+        endpoints.Should().Contain(endpoint => endpoint.RoutePattern.RawText!.EndsWith("owner.css", StringComparison.Ordinal));
+        endpoints.Should().OnlyContain(
+            endpoint => endpoint.Metadata.GetMetadata<OwnerOnlyAttribute>() != null,
+            "an owner script or stylesheet without the marker would be served on the public port");
+    }
+
+    [Theory]
+    [InlineData("/js/owner-locations.js")]
+    [InlineData("/js/owner-link.js")]
+    [InlineData("/js/owner-settings.js")]
+    [InlineData("/js/owner-cabinet.js")]
+    [InlineData("/css/owner.css")]
+    public async Task The_owner_scripts_and_stylesheet_answer_not_found_on_the_public_port_and_are_served_on_the_owner_port(string path)
+    {
+        await using var factory = new CabinetWebApplicationFactory();
+        using var publicClient = factory.CreatePublicClient();
+        using var owner = factory.CreateOwnerClient();
+
+        using var onPublic = await publicClient.GetAsync(path, TestContext.Current.CancellationToken);
+        using var onOwner = await owner.GetAsync(path, TestContext.Current.CancellationToken);
+
+        onPublic.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await onPublic.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).Should().BeEmpty();
+        onOwner.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
     [Theory]
     [InlineData("/")]
     [InlineData("/cabinet/layout?sample=65&profile=desktop")]
