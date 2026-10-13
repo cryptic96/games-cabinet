@@ -367,6 +367,26 @@ public static class OwnerStrings
     /// <param name="count">How many games are not placed.</param>
     public static string UnplacedLabel(int count) => $"Not placed yet ({count})";
 
+    /// <summary>The sentence that opens the strip under the cabinet's header at the owner address.</summary>
+    public const string StripNote = "Owner view. Changes you make here show for every visitor.";
+
+    /// <summary>The strip's sentence while the stored owner data cannot be read.</summary>
+    public const string StripUnreadable = "Owner data couldn't be read.";
+
+    /// <summary>The strip's link to the settings page, where the owner data is restored.</summary>
+    public const string FixIt = "Fix it";
+
+    /// <summary>The strip's link to the games list narrowed to the games that are not placed.</summary>
+    public const string PlaceThem = "Place them";
+
+    /// <summary>The address of the games list narrowed to the games that are not placed, relative to the site root.</summary>
+    public const string UnplacedListPath = "/owner/locations?filter=unplaced";
+
+    /// <summary>The strip's sentence that says how many games still have no place.</summary>
+    /// <param name="count">How many games are not placed; the strip adds the sentence only when it is above zero.</param>
+    public static string StripUnplaced(int count) =>
+        count == 1 ? "1 game is not placed yet." : $"{count.ToString(CultureInfo.InvariantCulture)} games are not placed yet.";
+
     /// <summary>The tag on an expansion's row.</summary>
     public const string ExpansionTag = "Expansion";
 
