@@ -1,9 +1,9 @@
 ---
 phase: 06
 slug: owner-tools-persistence
-status: draft
+status: verified
 # threats_open = count of OPEN threats at or above workflow.security_block_on severity (the blocking gate)
-threats_open: 3
+threats_open: 0
 asvs_level: 2
 created: 2026-10-13
 ---
@@ -33,15 +33,17 @@ created: 2026-10-13
 
 Built from the 30 plans' threat models (116 IDs; repeated threats across plans share a verdict) and verified at ASVS level 2 against the code at commit 7a4971c. Path abbreviations: OA `Cabinet.Service/Owner/OwnerAccess.cs`, OE `Cabinet.Service/Owner/OwnerEndpoints.cs`, FH `Cabinet.Service/Hosting/ForwardedHeadersSetup.cs`, PG `Cabinet.Service/Program.cs`, ODS `Cabinet.Service/Owner/OwnerDataService.cs`, STO `Cabinet.Repository/Storage/OwnerDataStore.cs`, EXP `Cabinet.Repository/Storage/OwnerDataExport.cs`, CP `Cabinet.Service/Owner/CollectionPublisher.cs`, SR `Cabinet.Service/Sync/SyncRunner.cs`, LOC/PIC/SET the Locations, Pictures and Settings page models, RESP `Cabinet.Service/Owner/OwnerResponses.cs`, LE `Cabinet.Domain/Owner/LocationEdits.cs`, LF `Cabinet.Service/Owner/OwnerLinkFetcher.cs`, LW `Cabinet.Service/Owner/OwnerLinkWorker.cs`, DL `Cabinet.Repository/Images/ImageDownloader.cs`, SHJ `Cabinet.Service/wwwroot/js/owner-shared.js`, WT `Cabinet.IntegrationTests/OwnerWallTests.cs`.
 
-### Open threats
+### Threats closed by the review-fix pass
 
-| Threat ID | Category | Component | Severity | Disposition | Gap and smallest fix | Status |
+Open at the first audit (7a4971c); closed by the review-fix pass (06-REVIEW-FIX.md) and confirmed by the re-audit at e87b681.
+
+| Threat ID | Category | Component | Severity | Disposition | Gap found, and the fix | Status |
 |-----------|----------|-----------|----------|-------------|----------------------|--------|
-| T-06-10-01 | Tampering / data loss | 30-day expiry after a held-back or failed sync | high | mitigate | `CollectionPublisher.Publish` always reconciles (CP:48-60); start-up (`SyncStartup.cs`:49-54) and the stored-collection reload (SR:351-366) publish a stale stored collection, so a long outage then a restart can forget a game's owner data before a fresh sync lists it. Fix: reconcile only for a fetched, guard-accepted collection (review WR-03) | open |
-| T-06-24-02 | Tampering | hostile restore-file content | high | mitigate | `Revision` and `ChangesSinceDownload` are only checked for being negative (EXP:221-222); `long.MaxValue` wraps in `Restored` (ODS:482) and values above 2^53 break script equality, locking the owner tools. Fix: cap both in `WithinLimits`, guard the arithmetic (review WR-02) | open |
-| T-06-30-02 | Spoofing | misconfigured known proxy degrading the range wall | high | mitigate | Start-up only refuses a missing known proxy (OA:90-95); the framework's default loopback trust is kept (FH:21-34) so the self-check probe cannot detect a wrong value, and with a wrong value or no usable `X-Forwarded-For` the judged address is the proxy's own, which sits in the home range (OA:113). Fix: record the original peer before forwarded headers, refuse on the owner port unless it is a configured proxy, refuse in Production when no forwarded address was applied, clear the default loopback trust (review WR-01, IN-04) | open |
-| T-06-06-04 | Information disclosure | owner paths in public HTML, scripts or data | medium | mitigate | Public page and data are clean, but `MapStaticAssets` (PG:96) serves `/js/owner-*.js` and `/css/owner.css` on every port; the leak test skips `owner-*.js` (WT:281). Fix: 404 the owner assets on the public port (review WR-11) | open — below high threshold (non-blocking) |
-| T-06-17-04 | Denial of service | re-checks hammering the image host | low | mitigate | When the cache write throws, nothing is recorded (LW:210-222) and `IsDue` ignores `_lastChecked` for a link with no usable copy (LW:177-179), so the link is refetched on every wake. Fix: in-memory backoff respected by `IsDue` (review WR-04) | open — below high threshold (non-blocking) |
+| T-06-10-01 | Tampering / data loss | 30-day expiry after a held-back or failed sync | high | mitigate | `CollectionPublisher.Publish` always reconciles (CP:48-60); start-up (`SyncStartup.cs`:49-54) and the stored-collection reload (SR:351-366) publish a stale stored collection, so a long outage then a restart can forget a game's owner data before a fresh sync lists it. Fix: reconcile only for a fetched, guard-accepted collection (review WR-03) Fixed: `Publish(snapshot, reconcile)` reconciles only from `SyncRunner.Commit`; start-up and the reload pass `reconcile: false` (CP:52,64-67; `SyncStartup.cs`:53; SR:366); `OwnerExpiryTests.cs`:41,59 | closed |
+| T-06-24-02 | Tampering | hostile restore-file content | high | mitigate | `Revision` and `ChangesSinceDownload` are only checked for being negative (EXP:221-222); `long.MaxValue` wraps in `Restored` (ODS:482) and values above 2^53 break script equality, locking the owner tools. Fix: cap both in `WithinLimits`, guard the arithmetic (review WR-02) Fixed: `WithinLimits` caps the revision and change count (EXP:84,87,227-230); `NextRevision` and the counter saturate (ODS:468,502); `OwnerRestoreParserTests.cs`:117 | closed |
+| T-06-30-02 | Spoofing | misconfigured known proxy degrading the range wall | high | mitigate | Start-up only refuses a missing known proxy (OA:90-95); the framework's default loopback trust is kept (FH:21-34) so the self-check probe cannot detect a wrong value, and with a wrong value or no usable `X-Forwarded-For` the judged address is the proxy's own, which sits in the home range (OA:113). Fix: record the original peer before forwarded headers, refuse on the owner port unless it is a configured proxy, refuse in Production when no forwarded address was applied, clear the default loopback trust (review WR-01, IN-04) Fixed: `UseConnectionPeer` records the peer before forwarded headers (PG:68-70; OA:117-127); the wall requires a configured proxy peer and, in Production, an applied forwarded address (OA:162-175); default loopback trust cleared (FH:23-24); self-check reworded; `OwnerWallTests.cs`:154,164,176 | closed |
+| T-06-06-04 | Information disclosure | owner paths in public HTML, scripts or data | medium | mitigate | Public page and data are clean, but `MapStaticAssets` (PG:96) serves `/js/owner-*.js` and `/css/owner.css` on every port; the leak test skips `owner-*.js` (WT:281). Fix: 404 the owner assets on the public port (review WR-11) Fixed: `MapStaticAssets().MarkOwnerAssets()` marks owner scripts and stylesheet (incl. fingerprinted copies) owner-only (PG:97; OA:242-266); `OwnerWallTests.cs`:292,313,346 | closed |
+| T-06-17-04 | Denial of service | re-checks hammering the image host | low | mitigate | When the cache write throws, nothing is recorded (LW:210-222) and `IsDue` ignores `_lastChecked` for a link with no usable copy (LW:177-179), so the link is refetched on every wake. Fix: in-memory backoff respected by `IsDue` (review WR-04) Fixed: in-memory store-failure backoff respected by `IsDue` (LW:182,196-197,216,228); `OwnerLinkWorkerTests.cs`:207 | closed |
 
 ### Closed threats
 
@@ -186,7 +188,9 @@ Repeated across plans with a shared verdict: owner routes on the public port (01
 |------------|---------------|--------|------|--------|
 | 2026-10-13 | 117 | 112 | 5 (3 blocking: T-06-10-01, T-06-24-02, T-06-30-02; 2 non-blocking: T-06-06-04, T-06-17-04) | gsd-security-auditor (ASVS 2, at 7a4971c); T-06-30-05 registered from an unregistered SUMMARY flag and accepted by the owner |
 
-Audit notes: the two level-2 boundaries named for this phase hold (the owner walls key on the local port and the forwarded-headers result, never Host; the image client carries no token, no cookies and follows no redirects, and the token handler attaches only to the BGG API host). The five open threats are each addressed by a code review finding (WR-03, WR-02, WR-01 with IN-04, WR-11, WR-04) being fixed in a parallel pass; a re-audit follows the fix merge.
+| 2026-10-13 | 117 | 117 | 0 | gsd-security-auditor re-audit (ASVS 2, at e87b681, after the review-fix pass); no regression in the ten closed threats sharing code with the fixes |
+
+Audit notes: the two level-2 boundaries named for this phase hold (the owner walls key on the local port and the forwarded-headers result, never Host; the image client carries no token, no cookies and follows no redirects, and the token handler attaches only to the BGG API host). The five open threats are each addressed by a code review finding (WR-03, WR-02, WR-01 with IN-04, WR-11, WR-04) being fixed in a parallel pass; the re-audit at e87b681 confirmed all five closed. Re-audit notes (non-blocking): `Publish`'s `reconcile` defaults to true, so a future caller must choose it deliberately; expiry can now run late (only on a changed commit) but never early; the owner wall's own known-proxy check closes T-06-30-02 even if the framework's loopback default were still present.
 
 ---
 
@@ -194,7 +198,7 @@ Audit notes: the two level-2 boundaries named for this phase hold (the owner wal
 
 - [x] All threats have a disposition (mitigate / accept / transfer)
 - [x] Accepted risks documented in Accepted Risks Log
-- [ ] `threats_open: 0` confirmed
-- [ ] `status: verified` set in frontmatter
+- [x] `threats_open: 0` confirmed
+- [x] `status: verified` set in frontmatter
 
-**Approval:** pending
+**Approval:** verified 2026-10-13
