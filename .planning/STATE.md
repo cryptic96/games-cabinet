@@ -20,10 +20,10 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-06)
+See: .planning/PROJECT.md (updated 2026-10-13)
 
 **Core value:** Anyone with the link sees an up-to-date, good-looking cabinet of exactly the games the owner owns on BGG, with no manual data entry in the app.
-**Current focus:** Phase 06 — owner-tools-persistence
+**Current focus:** Phase 06.1 — selectable-cabinet-finishes-lighting (Phase 06 complete; its review and security fixes await release as v0.7.1)
 
 ## Current Position
 
