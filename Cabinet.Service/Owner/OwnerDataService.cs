@@ -257,7 +257,7 @@ public sealed class OwnerDataService : IOwnerArtReferences
             }
 
             var now = _time.GetUtcNow();
-            var restored = slot.Previous with { Revision = ready.Data.Revision + 1, SavedAtUtc = now };
+            var restored = slot.Previous with { Revision = NextRevision(ready.Data.Revision), SavedAtUtc = now };
 
             try
             {
@@ -465,6 +465,8 @@ public sealed class OwnerDataService : IOwnerArtReferences
         }
     }
 
+    private static long NextRevision(long revision) => revision == long.MaxValue ? long.MaxValue : revision + 1;
+
     private static OwnerData Restored(
         OwnerData document,
         long currentRevision,
@@ -479,7 +481,7 @@ public sealed class OwnerDataService : IOwnerArtReferences
 
         return document with
         {
-            Revision = Math.Max(document.Revision, currentRevision) + 1,
+            Revision = NextRevision(Math.Max(document.Revision, currentRevision)),
             SavedAtUtc = now,
             Games = [.. games],
             Changes = [line, .. document.Changes.Take(OwnerData.MaxStoredChanges - 1)],
@@ -494,10 +496,10 @@ public sealed class OwnerDataService : IOwnerArtReferences
             : (IReadOnlyList<ChangeEntry>)[new ChangeEntry(now, edit.LogText), .. edit.Data.Changes.Take(OwnerData.MaxStoredChanges - 1)];
         var next = edit.Data with
         {
-            Revision = current.Revision + 1,
+            Revision = NextRevision(current.Revision),
             SavedAtUtc = now,
             Changes = changes,
-            ChangesSinceDownload = current.ChangesSinceDownload + 1,
+            ChangesSinceDownload = current.ChangesSinceDownload == int.MaxValue ? int.MaxValue : current.ChangesSinceDownload + 1,
         };
 
         try

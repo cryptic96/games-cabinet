@@ -119,6 +119,8 @@ public sealed class OwnerRestoreParserTests
         Check(Text(Json("\"revision\": 3", $"\"revision\": {OwnerDataExport.MaxRevision}"))).IsOk.Should().BeTrue();
         Check(Text(Json("\"revision\": 3", $"\"revision\": {OwnerDataExport.MaxRevision + 1L}"))).Refusal.Should().Be(RestoreProblem.OverLimits);
         Check(Text(Json("\"revision\": 3", "\"revision\": 9223372036854775807"))).Refusal.Should().Be(RestoreProblem.OverLimits);
+        Check(Text(Json("\"revision\": 3", "\"revision\": 9007199254740993"))).Refusal.Should().Be(RestoreProblem.OverLimits);
+        OwnerStrings.RestoreProblemText(Check(Text(Json("\"revision\": 3", "\"revision\": 9007199254740993")))).Should().NotBeNullOrWhiteSpace();
         Check(Text(Json("\"changesSinceDownload\": 0", $"\"changesSinceDownload\": {OwnerDataExport.MaxChangesSinceDownload}"))).IsOk.Should().BeTrue();
         Check(Text(Json("\"changesSinceDownload\": 0", "\"changesSinceDownload\": 2147483647"))).Refusal.Should().Be(RestoreProblem.OverLimits);
     }
