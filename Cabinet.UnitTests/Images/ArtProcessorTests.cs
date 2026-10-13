@@ -33,6 +33,37 @@ public sealed class ArtProcessorTests
     }
 
     [Fact]
+    public void Inspecting_reports_the_size_of_a_usable_picture_from_its_header()
+    {
+        var inspection = ArtProcessor.Inspect(Png(100, 150), Limits);
+
+        inspection.Should().Be(new ArtInspection(100, 150, true, false, false));
+    }
+
+    [Fact]
+    public void Inspecting_tells_a_picture_with_too_many_pixels_from_one_that_cannot_be_decoded()
+    {
+        var picture = Png(100, 100);
+
+        ArtProcessor.Inspect(picture, new ArtLimits(12_000_000, 9_999, TimeSpan.FromSeconds(30)))
+            .Should().Be(new ArtInspection(100, 100, true, true, false));
+        ArtProcessor.Inspect(picture, new ArtLimits(12_000_000, 10_000, TimeSpan.FromSeconds(30)))
+            .TooManyPixels.Should().BeFalse();
+        ArtProcessor.Inspect(Encoding.ASCII.GetBytes("this is not a picture"), Limits)
+            .Should().Be(new ArtInspection(0, 0, false, false, false));
+        ArtProcessor.Inspect([], Limits).Decodable.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Inspecting_tells_a_very_long_and_thin_picture_from_one_that_cannot_be_decoded()
+    {
+        ArtProcessor.Inspect(Png(1, 12), Limits).Should().Be(new ArtInspection(1, 12, true, false, true));
+        ArtProcessor.Inspect(Png(12, 1), Limits).ExtremeShape.Should().BeTrue();
+        ArtProcessor.Inspect(Png(1, 10), Limits).ExtremeShape.Should().BeFalse();
+        ArtProcessor.Process(Png(1, 12), Limits).Should().BeSameAs(ArtProcessing.Undecodable);
+    }
+
+    [Fact]
     public void A_large_source_gives_a_480_and_a_240_pixel_variant_with_the_aspect_ratio_kept()
     {
         var variants = Variants(Png(1000, 1500));

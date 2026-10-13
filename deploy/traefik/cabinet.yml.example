@@ -5,9 +5,21 @@
 # the real values. The real file lives only on the Traefik host.
 #
 # One router serves the whole site on its own hostname, behind an IP
-# allow-list restricted to the home network and VPN. Nothing else is routed:
-# the operations listener binds to loopback only and is not reachable
-# through the reverse proxy.
+# allow-list restricted to the home network and VPN. A second router serves
+# the owner tools on a hostname of their own, pointing at the owner port.
+# Nothing else is routed: the operations listener binds to loopback only and
+# is not reachable through the reverse proxy.
+#
+# The owner router keeps the cabinet-lan-only allow-list permanently, even
+# when the public router later drops its allow-list to open the site to
+# everyone. The owner tools must never be reachable from outside the home
+# network and VPN, whatever happens to the public router.
+#
+# The entry point must append the client address to X-Forwarded-For, which
+# is Traefik's default. Do not set the notAppendXForwardedFor option on the
+# entry point, and do not list client networks under the trustedIPs setting
+# of its forwardedHeaders: either lets a caller forge the address the
+# application checks.
 #
 # The application trusts forwarded headers (X-Forwarded-For) only from the
 # address configured as ReverseProxy__KnownProxies__0 in the server-side
@@ -52,9 +64,26 @@ http:
       tls:
         certResolver: letsencrypt
 
+    cabinet-owner:
+      rule: "Host(`owner.example.com`)"
+      entryPoints:
+        - websecure
+      middlewares:
+        - cabinet-lan-only
+        - cabinet-security-headers
+      service: cabinet-owner
+      tls:
+        certResolver: letsencrypt
+
   services:
     cabinet:
       loadBalancer:
         servers:
           # Replace with the cabinet host's real address, port 5080.
           - url: "http://192.0.2.20:5080"
+
+    cabinet-owner:
+      loadBalancer:
+        servers:
+          # Replace with the cabinet host's real address, port 5082.
+          - url: "http://192.0.2.20:5082"

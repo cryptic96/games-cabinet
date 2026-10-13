@@ -1,0 +1,125 @@
+using Cabinet.Domain.Owner;
+using Cabinet.Repository.Images;
+using Cabinet.Repository.Storage;
+using Cabinet.Service.Collection;
+using Cabinet.Service.Sync;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace Cabinet.Service.Owner;
+
+/// <summary>
+/// Registers the owner tools: the start-up check of their access settings, the rules every page under the owner folder
+/// shares, and the antiforgery settings their forms rely on. Nothing here adds a login, an account or a session; the network
+/// location, enforced by <see cref="OwnerAccess"/>, is the only lock.
+/// </summary>
+public static class OwnerEndpoints
+{
+    /// <summary>The path of the pictures page.</summary>
+    public const string PicturesPath = "/owner/pictures";
+
+    /// <summary>The path of the locations page.</summary>
+    public const string LocationsPath = "/owner/locations";
+
+    /// <summary>The path of the settings page.</summary>
+    public const string SettingsPath = "/owner/settings";
+
+    /// <summary>The path a previewed picture is served from, followed by its token.</summary>
+    public const string PreviewPath = "/owner/preview";
+
+    private const int DefaultBodyLimitBytes = 64 * 1024;
+    private const string WebpMediaType = "image/webp";
+    private const string NoStore = "no-store";
+    private const string NoSniff = "nosniff";
+
+    /// <summary>
+    /// Validates the owner access settings now, so a half-configured owner endpoint stops the start-up instead of serving, and
+    /// marks every page under the owner folder as owner-only with a small request body limit.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configuration">The application configuration.</param>
+    /// <param name="environment">The hosting environment; the antiforgery cookie is https-only in production.</param>
+    public static IServiceCollection AddCabinetOwner(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        IHostEnvironment environment)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(environment);
+
+        services.AddSingleton(OwnerAccess.FromConfiguration(configuration));
+
+        services.AddSingleton<IOwnerDataStore>(provider => new OwnerDataStore(
+            provider.GetRequiredService<StorageDirectory>().Path,
+            provider.GetRequiredService<ILogger<OwnerDataStore>>()));
+        services.AddSingleton<OwnerDataService>();
+        services.AddSingleton<SiteFinish>();
+        services.AddSingleton<IOwnerArtReferences>(provider => provider.GetRequiredService<OwnerDataService>());
+        services.AddSingleton<CollectionPublisher>();
+        services.AddHostedService<OwnerChangeNotifier>();
+
+        services.AddSingleton(provider => new OwnerLinkFetcher(
+            provider.GetRequiredService<IArtSource>,
+            provider.GetRequiredService<ImageOptions>(),
+            provider.GetRequiredService<TimeProvider>()));
+        services.AddHostedService<OwnerLinkWorker>();
+        services.AddSingleton(provider => new StagedItems<StagedLink>(provider.GetRequiredService<TimeProvider>()));
+        services.AddSingleton(provider => new StagedItems<RestoreCandidate>(provider.GetRequiredService<TimeProvider>()));
+
+        services.Configure<RouteOptions>(options => options.LowercaseUrls = true);
+
+        services.Configure<RazorPagesOptions>(options =>
+            options.Conventions.AddFolderApplicationModelConvention("/Owner", model =>
+            {
+                model.EndpointMetadata.Add(new OwnerOnlyAttribute());
+
+                if (!model.HandlerType.IsDefined(typeof(RequestSizeLimitAttribute), inherit: true))
+                {
+                    model.Filters.Add(new RequestSizeLimitAttribute(DefaultBodyLimitBytes));
+                }
+            }));
+
+        services.AddAntiforgery(options =>
+        {
+            options.Cookie.Name = "cabinet-owner-af";
+            options.Cookie.HttpOnly = true;
+            options.Cookie.SameSite = SameSiteMode.Strict;
+            options.Cookie.SecurePolicy = environment.IsProduction()
+                ? CookieSecurePolicy.Always
+                : CookieSecurePolicy.SameAsRequest;
+            options.HeaderName = "RequestVerificationToken";
+        });
+
+        return services;
+    }
+
+    /// <summary>
+    /// Maps the owner's own endpoints that are not pages: the preview of a linked picture, served from the copy staged in
+    /// memory by its token. The route carries the owner-only marker, so it answers on the owner port only. A token that is not
+    /// the shape of a token, has run out or was never staged is not found, and no file path is ever built from the request.
+    /// </summary>
+    /// <param name="endpoints">The route builder.</param>
+    public static IEndpointRouteBuilder MapCabinetOwner(this IEndpointRouteBuilder endpoints)
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+
+        endpoints.MapGet(
+            PreviewPath + "/{token}",
+            (string token, StagedItems<StagedLink> staged, HttpContext context) =>
+            {
+                if (!staged.TryGet(token, out var item))
+                {
+                    return Results.NotFound();
+                }
+
+                context.Response.Headers.CacheControl = NoStore;
+                context.Response.Headers.XContentTypeOptions = NoSniff;
+
+                return Results.File(item.Preview.Bytes, WebpMediaType);
+            })
+            .WithMetadata(new OwnerOnlyAttribute());
+
+        return endpoints;
+    }
+}

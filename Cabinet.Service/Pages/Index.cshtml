@@ -1,13 +1,32 @@
 @page
 @model Cabinet.Service.Pages.IndexModel
 @inject Microsoft.AspNetCore.Mvc.ViewFeatures.IFileVersionProvider FileVersions
+@using Cabinet.Service.Owner
+@using Cabinet.Service.Pages.Owner
+@{
+    var onOwnerPort = Model.IsOwnerAddress;
+    var iconsUrl = FileVersions.AddFileVersionToPath(Request.PathBase, "/img/icons.svg");
+}
 <a class="skip-link" href="#games-list-start">@Model.Language.Text.SkipLink</a>
 <header>
     <h1>@Model.Language.Text.SiteName</h1>
-    <nav class="lang-toggle" aria-label="@Model.Language.Text.LanguageLabel">
-        <a href="@Model.LanguageHref("en")" lang="en" hreflang="en" aria-label="@Model.Language.Text.EnglishName" aria-current="@(Model.Language.Code == "en" ? "true" : null)">EN</a>
-        <a href="@Model.LanguageHref("nl")" lang="nl" hreflang="nl" aria-label="@Model.Language.Text.DutchName" aria-current="@(Model.Language.Code == "nl" ? "true" : null)">NL</a>
-    </nav>
+    @if (onOwnerPort)
+    {
+        <div class="header-aside">
+            <span class="owner-plate">@OwnerStrings.Plate</span>
+            <nav class="lang-toggle" aria-label="@Model.Language.Text.LanguageLabel">
+                <a href="@Model.LanguageHref("en")" lang="en" hreflang="en" aria-label="@Model.Language.Text.EnglishName" aria-current="@(Model.Language.Code == "en" ? "true" : null)">EN</a>
+                <a href="@Model.LanguageHref("nl")" lang="nl" hreflang="nl" aria-label="@Model.Language.Text.DutchName" aria-current="@(Model.Language.Code == "nl" ? "true" : null)">NL</a>
+            </nav>
+        </div>
+    }
+    else
+    {
+        <nav class="lang-toggle" aria-label="@Model.Language.Text.LanguageLabel">
+            <a href="@Model.LanguageHref("en")" lang="en" hreflang="en" aria-label="@Model.Language.Text.EnglishName" aria-current="@(Model.Language.Code == "en" ? "true" : null)">EN</a>
+            <a href="@Model.LanguageHref("nl")" lang="nl" hreflang="nl" aria-label="@Model.Language.Text.DutchName" aria-current="@(Model.Language.Code == "nl" ? "true" : null)">NL</a>
+        </nav>
+    }
     @if (Model.ShowSyncBlock)
     {
         <div class="sync" data-server-time="@Model.ServerTimeIso" data-last-synced="@Model.LastSyncedIso" data-cooldown-ends="@Model.CooldownEndsIso" data-running="@(Model.Status.Running ? "true" : "false")" data-held-back="@(Model.Status.HeldBack ? "true" : "false")" data-stale-after="@Model.Status.StaleAfterSeconds" data-snapshot-version="@Model.SnapshotVersion">
@@ -24,6 +43,28 @@
         <p id="sync-exact" class="sync-exact" hidden>@(Model.HasSyncTime ? Model.Language.Text.LastSynced(Model.ExactText) : string.Empty)</p>
         <p id="sync-note" class="sync-note" role="status" aria-atomic="true"></p>
         <p class="sync-stale" hidden="@(!Model.StaleNoteVisible)">@Model.StaleNoteText</p>
+    }
+    @if (onOwnerPort)
+    {
+        <nav class="owner-bar" data-variant="strip" aria-label="@OwnerStrings.BarLabel">
+            <p class="owner-strip-note">@OwnerStrings.StripNote</p>
+            @if (Model.OwnerDataUnreadable)
+            {
+                <p class="owner-strip-note">@OwnerStrings.StripUnreadable</p>
+                <a class="owner-strip-action" href="@Url.Content("~/owner/settings")">@OwnerStrings.FixIt</a>
+            }
+            else if (Model.UnplacedCount > 0)
+            {
+                <p class="owner-strip-note">@OwnerStrings.StripUnplaced(Model.UnplacedCount)</p>
+                <a class="owner-strip-action" href="@Url.Content("~" + OwnerStrings.UnplacedListPath)">@OwnerStrings.PlaceThem</a>
+            }
+            <span class="owner-strip-links">
+                @foreach (var item in OwnerPage.BarItems)
+                {
+                    <a href="@Url.Content("~" + item.Href)">@item.Name</a>
+                }
+            </span>
+        </nav>
     }
     @if (Model.ShowingSample)
     {
@@ -75,10 +116,21 @@
         <div id="cabinet" class="cabinet" role="group" aria-label="@Model.Language.Text.CabinetLabel" aria-describedby="cabinet-hint"></div>
     }
     <p id="cabinet-hint" class="visually-hidden">@Model.Language.Text.CabinetHint</p>
-    <dialog class="card-dialog" aria-labelledby="card-title" data-icons="@FileVersions.AddFileVersionToPath(Request.PathBase, "/img/icons.svg")"></dialog>
+    @if (onOwnerPort)
+    {
+        <dialog class="card-dialog" aria-labelledby="card-title" data-icons="@iconsUrl" data-edit-href="@Url.Content("~/owner/pictures")"></dialog>
+    }
+    else
+    {
+        <dialog class="card-dialog" aria-labelledby="card-title" data-icons="@iconsUrl"></dialog>
+    }
     <noscript><p class="cabinet-message">@Model.Language.Text.NoScript</p></noscript>
 </main>
 @section Scripts {
     <script src="~/lib/signalr/signalr.min.js" asp-append-version="true"></script>
     <script type="module" src="~/js/cabinet.js" asp-append-version="true"></script>
+    @if (onOwnerPort)
+    {
+        <script type="module" src="~/js/owner-cabinet.js" asp-append-version="true"></script>
+    }
 }

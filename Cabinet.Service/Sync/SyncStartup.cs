@@ -2,6 +2,7 @@ using Cabinet.Domain.Collection;
 using Cabinet.Repository.Bgg;
 using Cabinet.Repository.Storage;
 using Cabinet.Service.Collection;
+using Cabinet.Service.Owner;
 
 namespace Cabinet.Service.Sync;
 
@@ -13,18 +14,16 @@ namespace Cabinet.Service.Sync;
 /// </summary>
 /// <param name="storage">The directory the stored collection lives in.</param>
 /// <param name="snapshots">The stored collection.</param>
-/// <param name="collection">The store visitors read from.</param>
+/// <param name="publisher">Builds the collection visitors read and puts it in the store.</param>
 /// <param name="options">The BGG settings; only whether they are complete is looked at, never their values.</param>
 /// <param name="images">The picture settings; only whether the development origin was ignored is looked at.</param>
-/// <param name="artRules">The rules that choose each game's picture.</param>
 /// <param name="logger">Receives the start-up warnings.</param>
 public sealed class SyncStartup(
     StorageDirectory storage,
     ISnapshotStore snapshots,
-    CollectionStore collection,
+    CollectionPublisher publisher,
     BggOptions options,
     ImageOptions images,
-    ArtRules artRules,
     ILogger<SyncStartup> logger) : IHostedService
 {
     /// <inheritdoc />
@@ -51,7 +50,7 @@ public sealed class SyncStartup(
 
         if (stored is not null)
         {
-            collection.Replace(CollectionState.FromSnapshot(stored, artRules));
+            publisher.Publish(stored);
         }
 
         return Task.CompletedTask;

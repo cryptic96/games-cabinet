@@ -27,7 +27,7 @@ below the last line.
 | Title | The title on one line, shortened with an ellipsis when it is long |
 | A: owned version | The picture of the edition that is owned, 160 pixels high, or the word `none` |
 | B: main image | The game's main picture, 160 pixels high, or the word `none` |
-| Verdict of A | `flat`, `3D shot` or `unsure` with the detector's score to two decimals, or `no verdict` when there is no usable picture of the owned edition; a picture with a transparent background reads `3D shot, cut-out`, and a box photographed so close that it runs along all four sides reads `3D shot, tight crop` |
+| Verdict of A | `flat`, `3D shot` or `unsure` with the detector's score to two decimals, or `no verdict` when there is no usable picture of the owned edition; a picture with a transparent background reads `3D shot, cut-out`, and a box photographed so close that it runs along all four sides reads `3D shot, tight crop`. The marked verdicts break onto two lines at the comma, and nothing is drawn past the column's right edge; text that is still too wide ends with an ellipsis |
 | Chosen | `chosen: version image`, `chosen: main image` or `generated cover`; a 3 pixel tan outline marks the chosen picture in column A or B |
 | Result | The box front as the cabinet draws it: the chosen picture shown whole in a box of the drawn proportions, on the colours along its four edges, 160 pixels high |
 | Spine | A 40 by 160 pixel strip in the spine colour with the title in its text colour |
@@ -45,6 +45,10 @@ the server's state directory and on a private folder of the workstation until
 they have been looked at, and are then deleted. The command prints counts only
 (pages, games, and how many verdicts and choices of each kind), never a title or
 a picture path, so its output is safe to paste.
+
+The verdict counts in that line put every game under exactly one of six headings:
+`flat`, `3D shot`, `3D shot cut-out`, `3D shot tight crop`, `unsure` and
+`no verdict`, so they always add up to the number of games.
 
 ## Building a sheet on the server
 
@@ -64,14 +68,20 @@ It writes `review-01.png`, `review-02.png` and so on into the output directory,
 creating it when needed, and prints one line of counts. The command has no web
 route; nothing on the site can start it, and it needs no network.
 
+The command only reads the state directory. It never renames, moves or rewrites a
+file there: a stored collection that is damaged or written by a newer version of
+the service stays exactly where it is, under its own name, and the command stops
+with exit code 3 and a one-line reason on the error output. Only the service's own
+sync sets such a file aside.
+
 Options:
 
 | Option | Meaning |
 | --- | --- |
 | `--state <directory>` | The state directory that holds the stored collection and the `art` directory. Required. |
 | `--out <directory>` | Where the pages are written. Required. |
-| `--font <file>` | A TrueType font for the text, instead of the DejaVu fonts. |
-| `--bold-font <file>` | A bold TrueType font; the regular font is used when it is not given. |
+| `--font <file>` | A TrueType font for the text, instead of the DejaVu regular face. |
+| `--bold-font <file>` | A bold TrueType font. It is honoured on its own too: without `--font` it is paired with the installed DejaVu regular face. When it is not given, the installed bold face is used, or the regular font when `--font` is given. |
 
 Exit codes:
 
@@ -79,9 +89,12 @@ Exit codes:
 | --- | --- |
 | 0 | The pages were written |
 | 2 | The arguments or an `Art` setting were not understood |
-| 3 | The state directory holds no stored collection |
-| 4 | No usable font; install `fonts-dejavu-core` or pass `--font` |
-| 5 | The output directory could not be written |
+| 3 | The state directory is missing or holds no usable stored collection (none, damaged or newer than this version reads); the reason is printed and nothing is changed |
+| 4 | No usable font: a font file named on the command line is missing, unreadable or not a font, or no DejaVu face is installed; install `fonts-dejavu-core` or pass `--font` |
+| 5 | The output directory could not be created or written |
+
+Every failure ends with its exit code and a one-line reason on the error output,
+never with an exception.
 
 ## Fonts
 

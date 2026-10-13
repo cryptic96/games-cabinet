@@ -158,8 +158,24 @@ Things worth knowing:
 
 - **Dutch:** open the site with the browser's language set to Dutch, or press `NL` in the header. The choice is stored in the `lang` cookie for a year; delete the cookie to go back to following the browser. Titles, designers, mechanics and storage locations stay as the data has them in both languages.
 - **Reduced motion:** turn on the operating system's reduced-motion setting, or use the browser developer tools' emulation of `prefers-reduced-motion: reduce`. Opening a card then fades instead of pulling the box out, no view transition runs, and the box stays outlined in its slot.
-- **Invented storage locations:** the card shows a "Stored in" row only when the collection carries a location. The fake BGG invents them, but the cabinet only asks for them when started with `Bgg__IncludePrivateInfo=true`, so add that to the Development start described above. Use it only on a development machine against the fake; the committed configuration keeps it off, and the invented collections (`?sample=65`, `?sample=400`, `?sample=edge`) already carry invented locations, including ones in several scripts.
+- **Invented storage locations:** the card shows a "Stored in" row only when the game has a location. For the synced collection, locations come only from the owner pages (see "Running the owner tools locally"): the sync never reads them from BGG, so the fake's invented locations are not used. The invented collections (`?sample=65`, `?sample=400`, `?sample=edge`) keep their own invented locations, including ones in several scripts, so the row can be seen without any owner data.
 - **A walk through the whole thing:** start the fake with 65 games, start the cabinet in Development against it, press sync once, then open a few boxes with the mouse, with Tab and the arrow keys and Enter, and with the skip link, in both languages.
+
+### Running the owner tools locally
+
+The owner tools are a second set of pages on a second port, served by the same host. In the Development environment the committed development settings open that port on `127.0.0.1:5082` and allow only loopback addresses, so nothing else on the network can reach it. Start the fake and the cabinet as described above, then open:
+
+- `http://127.0.0.1:5082/owner/pictures` to choose each game's picture;
+- `http://127.0.0.1:5082/owner/locations` to keep a list of storage locations and place games in them;
+- `http://127.0.0.1:5082/owner/settings` to download, restore and review the owner's data and to see the change log.
+
+The cabinet itself is also served on that port, with a small "Owner tools" plate, a strip with the number of games that are not placed yet, and an "Edit" link on each card; the public port shows none of it, and answers `404` for every owner path.
+
+Use invented names only: "Cabinet A", "Shelf B" and "Lent out" are good locations. The pages list the games of the synced collection, so press sync once first.
+
+Owner data is stored apart from the synced collection, in the state directory (`.cabinet-state` next to the service project unless `Storage__Directory` says otherwise): `owner-data.json` holds the locations, where each game is kept, the picture choices and the change log, and `owner-data-versions/` holds the last ten earlier copies of it, taken before a change whenever the newest copy is more than an hour old, and before every restore. Pictures the owner links to are stored with the other pictures in the `art` folder. A sync never writes any of this, so deleting `snapshot.json` to start over leaves the owner's choices in place; delete `owner-data.json` and `owner-data-versions/` as well to start from nothing.
+
+To try a backup, press "Download owner data" on the settings page, change something, then restore the file on the same page: the page shows what the file holds next to what the server holds before it replaces anything.
 
 ## Using a BGG token locally
 
@@ -211,7 +227,7 @@ The test host serves module scripts without a content type when the browser acce
 ## Running the checks
 
 - Lint and script tests: `build/lint.sh`
-- .NET tests without a browser, exactly as CI runs them: `dotnet test --solution Cabinet.slnx --no-restore --filter-not-trait "Category=Browser" --ignore-exit-code 8` (the browser project then runs zero tests, which the test platform reports as exit code 8)
+- .NET tests without a browser, exactly as CI runs them: `dotnet test --project Cabinet.UnitTests --no-restore` and `dotnet test --project Cabinet.IntegrationTests --no-restore`. Each project is named so that one which finds no tests fails the run; the browser project has its own job.
 - Page script tests: `node --test build/tests/*.test.mjs`
 - Browser tests: `dotnet test --project Cabinet.BrowserTests` (see "Browser tests")
 - Hook tests alone: `bash build/tests/githooks-test.sh`

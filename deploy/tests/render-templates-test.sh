@@ -159,8 +159,10 @@ assert_matches "rendered nftables: admits SSH only from the configured admin ran
   'tcp dport 22 ip saddr \{ 192\.0\.2\.0/24,198\.51\.100\.0/24 \} accept' "$nft_content"
 assert_matches "rendered nftables: admits the app port only from the Traefik address" \
   'tcp dport 5080 ip saddr 192\.0\.2\.10 accept' "$nft_content"
-assert_eq "rendered nftables: exactly two tcp dport rules exist" \
-  "2" "$(grep -c 'tcp dport' <<<"$nft_content")"
+assert_matches "rendered nftables: admits the owner port only from the Traefik address" \
+  'tcp dport 5082 ip saddr 192\.0\.2\.10 accept' "$nft_content"
+assert_eq "rendered nftables: exactly three tcp dport rules exist" \
+  "3" "$(grep -c 'tcp dport' <<<"$nft_content")"
 assert_lacks "rendered nftables: no unreplaced token remains" \
   '@[A-Z][A-Z0-9_]*@' "$nft_content"
 assert_lacks "rendered nftables: no rule mentions the loopback ops port" \
@@ -175,8 +177,30 @@ assert_matches "traefik example: defines the lan-only middleware" \
   '^    cabinet-lan-only:$' "$traefik_example"
 assert_matches "traefik example: defines the security headers middleware" \
   '^    cabinet-security-headers:$' "$traefik_example"
-assert_eq "traefik example: has exactly one router" \
-  "1" "$(grep -cE '^      rule:' <<<"$traefik_example")"
+assert_eq "traefik example: has exactly two routers" \
+  "2" "$(grep -cE '^      rule:' <<<"$traefik_example")"
+assert_eq "traefik example: defines the owner router and the owner service" \
+  "2" "$(grep -cE '^    cabinet-owner:$' <<<"$traefik_example")"
+owner_router="$(sed -n '/^  routers:/,/^  services:/p' <<<"$traefik_example" | sed -n '/^    cabinet-owner:$/,$p')"
+# shellcheck disable=SC2016
+assert_matches "traefik example: the owner router uses its own placeholder hostname" \
+  'Host\(`owner\.example\.com`\)' "$owner_router"
+assert_matches "traefik example: the owner router keeps the lan-only allow-list" \
+  '- cabinet-lan-only' "$owner_router"
+assert_matches "traefik example: the owner router carries the security headers" \
+  '- cabinet-security-headers' "$owner_router"
+assert_matches "traefik example: the owner router points at the owner service" \
+  'service: cabinet-owner' "$owner_router"
+assert_matches "traefik example: the owner router uses the certificate resolver" \
+  'certResolver: letsencrypt' "$owner_router"
+assert_matches "traefik example: the owner service points at port 5082" \
+  'url: "http://192\.0\.2\.20:5082"' "$traefik_example"
+assert_matches "traefik example: says the owner router keeps its allow-list permanently" \
+  'permanently' "$traefik_example"
+assert_matches "traefik example: warns about notAppendXForwardedFor" \
+  'notAppendXForwardedFor' "$traefik_example"
+assert_matches "traefik example: warns about client networks in trustedIPs" \
+  'trustedIPs' "$traefik_example"
 assert_lacks "traefik example: has no path prefix rule" \
   'PathPrefix' "$traefik_example"
 
@@ -194,6 +218,18 @@ assert_eq "traefik example: every hostname is under example.com" \
 # shellcheck disable=SC2016
 assert_matches "traefik example: routes the placeholder hostname" \
   'Host\(`cabinet\.example\.com`\)' "$traefik_example"
+
+env_example="$(cat "${DEPLOY_DIR}/cabinet.env.example")"
+assert_matches "env example: documents the owner endpoint, commented out" \
+  '^# *Kestrel__Endpoints__Owner__Url=http://0\.0\.0\.0:5082$' "$env_example"
+assert_matches "env example: documents the first owner range, commented out" \
+  '^# *Owner__AllowedRanges__0=192\.0\.2\.0/24$' "$env_example"
+assert_matches "env example: documents the second owner range, commented out" \
+  '^# *Owner__AllowedRanges__1=198\.51\.100\.0/24$' "$env_example"
+assert_lacks "env example: no owner setting is active" \
+  '^(Kestrel__Endpoints__Owner|Owner__)' "$env_example"
+assert_matches "env example: says the known proxy must be the Traefik address" \
+  'Traefik address' "$env_example"
 
 dpkg-query() {
   printf '%s\t%s\t%s\n' \

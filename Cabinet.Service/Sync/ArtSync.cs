@@ -225,16 +225,7 @@ public sealed class ArtSync(
 
                 counts.Stored++;
 
-                return new ImageRecord(
-                    address,
-                    ImageStatus.Ok,
-                    attemptedAt,
-                    [.. done.Variants.OrderByDescending(variant => variant.Width).Select(variant => new ArtFile(variant.Width, variant.Height, variant.Name))],
-                    done.Facts.Features,
-                    done.Facts.Main.ToHex(),
-                    SpineColour.PairFor(done.Facts.Main),
-                    new ArtEdges(done.Facts.Top.ToHex(), done.Facts.Right.ToHex(), done.Facts.Bottom.ToHex(), done.Facts.Left.ToHex()),
-                    ArtProcessor.AnalysisVersion);
+                return ArtRecords.FromProcessed(address, attemptedAt, done);
 
             default:
                 counts.Undecodable++;

@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 05
-current_phase_name: game-detail-accessibility-language
+current_phase: 06
+current_phase_name: owner-tools-persistence
 status: executing
-stopped_at: Completed 05-15-PLAN.md
-last_updated: "2026-10-11T18:26:07.721Z"
-last_activity: 2026-10-11
-last_activity_desc: Plan 05-15 complete (review round answered and applied)
+stopped_at: Phase 6 UI-SPEC approved
+last_updated: "2026-10-12T14:28:31.859Z"
+last_activity: 2026-10-12
+last_activity_desc: Plan 05-16 complete (v0.6.0 released and deployed; device check partly open)
 progress:
-  total_phases: 5
-  completed_phases: 4
-  total_plans: 78
-  completed_plans: 77
+  total_phases: 7
+  completed_phases: 5
+  total_plans: 108
+  completed_plans: 78
 ---
 
 # Project State
@@ -23,22 +23,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-06)
 
 **Core value:** Anyone with the link sees an up-to-date, good-looking cabinet of exactly the games the owner owns on BGG, with no manual data entry in the app.
-**Current focus:** Phase 05 — game-detail-accessibility-language
+**Current focus:** Phase 06 — owner-tools-persistence
 
 ## Current Position
 
-Phase: 05 (game-detail-accessibility-language) — EXECUTING
-Plan: 15 of 16 complete (next: 05-16)
-Status: Executing Phase 05
-Last activity: 2026-10-11 — Plan 05-15 complete (review round answered and applied)
+Phase: 06 (owner-tools-persistence) — EXECUTING
+Plan: 1 of 30
+Status: Executing Phase 06
+Last activity: 2026-10-12 — Phase 06 execution started
 
-Progress: [██████████] 99%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 62
+- Total plans completed: 78
 - Average duration: - min
 - Total execution time: 0.0 hours
 
@@ -50,6 +50,7 @@ Progress: [██████████] 99%
 | 2 | 9 | - | - |
 | 03 | 15 | - | - |
 | 04 | 23 | - | - |
+| 05 | 16 | - | - |
 
 **Recent Trend:**
 
@@ -63,6 +64,7 @@ Progress: [██████████] 99%
 |------|----------|-------|-------|
 | Phase 01 P01 | 25min | 3 tasks | 1 files |
 | Phase 05 P05-15 | two sessions | 4 tasks | 14 files |
+| Phase 05 P16 | several sessions | 5 tasks | 0 files |
 
 ## Accumulated Context
 
@@ -111,6 +113,10 @@ Recent decisions affecting current work:
 | 2 | Move CI and release workflows to ubuntu-26.04 (actionlint label config added) | 2026-10-06 | 7d802a1 | — |
 | 3 | Fix flaky port race in integration tests (retry host start on fresh ports) | 2026-10-06 | 3376015 | — |
 
+### Roadmap Evolution
+
+- Phase 06.1 inserted after Phase 6: Selectable cabinet finishes and lighting, split out of the Phase 6 discussion (owner chose its own phase); runs after Phase 6, before Phase 7
+
 ## Deferred Items
 
 Items acknowledged and carried forward from previous milestone close:
@@ -121,6 +127,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-11T18:26:07.704Z
-Stopped at: Completed 05-15-PLAN.md
-Resume file: None
+Last session: 2026-10-12T12:41:37.217Z
+Stopped at: Phase 6 UI-SPEC approved
+Resume file: .planning/phases/06-owner-tools-persistence/06-UI-SPEC.md

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Cabinet.Domain.Layout;
+using Cabinet.Domain.Owner;
 
 namespace Cabinet.Domain.Collection;
 
@@ -15,6 +16,7 @@ namespace Cabinet.Domain.Collection;
 /// <param name="Pick">Which picture the item is drawn from.</param>
 /// <param name="Shape">The box that is drawn, with where its size came from.</param>
 /// <param name="Mapped">The item the layout engine draws.</param>
+/// <param name="PickedByOwner">Whether the picture is the one the owner chose rather than the automatic pick.</param>
 public sealed record MappedItemTrace(
     SnapshotItem Item,
     ImageRecord? VersionImage,
@@ -24,7 +26,8 @@ public sealed record MappedItemTrace(
     ArtVerdict? MainVerdict,
     ArtPick Pick,
     ShapedBox Shape,
-    CabinetItem Mapped);
+    CabinetItem Mapped,
+    bool PickedByOwner = false);
 
 /// <summary>Turns the stored collection into the items the layout engine draws, in an order that does not depend on the source.</summary>
 public static class SnapshotMapper
@@ -54,7 +57,19 @@ public static class SnapshotMapper
     /// <param name="snapshot">The stored collection.</param>
     /// <param name="rules">The rules that turn stored measurements into a choice.</param>
     public static IReadOnlyList<CabinetItem> ToCabinetItems(CollectionSnapshot snapshot, ArtRules rules) =>
-        [.. Explain(snapshot, rules).Select(trace => trace.Mapped)];
+        ToCabinetItems(snapshot, rules, OwnerOverlay.None);
+
+    /// <summary>
+    /// Maps every stored item as <see cref="ToCabinetItems(CollectionSnapshot, ArtRules)"/> does, except that a game the owner
+    /// chose a picture for is drawn from that picture whatever the detector says about it. When the chosen kind has no usable
+    /// picture the automatic pick is drawn instead. The box keeps the same chain either way: BGG's real size, then the chosen
+    /// picture's shape when it reads as a flat cover (an unsure one may only turn the box), then the estimate.
+    /// </summary>
+    /// <param name="snapshot">The stored collection.</param>
+    /// <param name="rules">The rules that turn stored measurements into a choice.</param>
+    /// <param name="overlay">What the owner chose; <see cref="OwnerOverlay.None"/> leaves every game to the automatic pick.</param>
+    public static IReadOnlyList<CabinetItem> ToCabinetItems(CollectionSnapshot snapshot, ArtRules rules, OwnerOverlay overlay) =>
+        [.. Explain(snapshot, rules, overlay).Select(trace => trace.Mapped)];
 
     /// <summary>
     /// Maps every stored item as <see cref="ToCabinetItems(CollectionSnapshot, ArtRules)"/> does and keeps each decision with
@@ -63,10 +78,21 @@ public static class SnapshotMapper
     /// </summary>
     /// <param name="snapshot">The stored collection.</param>
     /// <param name="rules">The rules that turn stored measurements into a choice.</param>
-    public static IReadOnlyList<MappedItemTrace> Explain(CollectionSnapshot snapshot, ArtRules rules)
+    public static IReadOnlyList<MappedItemTrace> Explain(CollectionSnapshot snapshot, ArtRules rules) =>
+        Explain(snapshot, rules, OwnerOverlay.None);
+
+    /// <summary>
+    /// Maps every stored item as <see cref="Explain(CollectionSnapshot, ArtRules)"/> does, with the pictures the owner chose
+    /// forced where they can be drawn; <see cref="MappedItemTrace.PickedByOwner"/> says which items that happened to.
+    /// </summary>
+    /// <param name="snapshot">The stored collection.</param>
+    /// <param name="rules">The rules that turn stored measurements into a choice.</param>
+    /// <param name="overlay">What the owner chose.</param>
+    public static IReadOnlyList<MappedItemTrace> Explain(CollectionSnapshot snapshot, ArtRules rules, OwnerOverlay overlay)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(rules);
+        ArgumentNullException.ThrowIfNull(overlay);
 
         var images = snapshot.Images ?? new Dictionary<string, ImageRecord>();
         var pairing = ExpansionPairing.Pair(snapshot);
@@ -75,12 +101,26 @@ public static class SnapshotMapper
         [
             .. snapshot.Items
                 .GroupBy(item => item.CollectionId)
-                .Select(entry => entry.FirstOrDefault(item => item.Kind == ItemKind.Expansion) ?? entry.First())
+                .Select(entry => InEntryOrder(entry).First())
                 .OrderBy(item => item.CollectionId)
                 .ThenBy(item => item.GameId)
-                .Select(item => Trace(item, snapshot, images, pairing, rules)),
+                .Select(item => Trace(item, snapshot, images, pairing, rules, overlay.PictureOverrideOf(item.GameId))),
         ];
     }
+
+    /// <summary>
+    /// Puts the stored items that share a collection entry in one fixed order: an expansion first, then the lower game
+    /// identifier, then the title compared ordinally, then the year and the location. The first of them is the one the
+    /// cabinet, the version and the cards all use, so the choice never depends on the order the collection was stored in.
+    /// </summary>
+    /// <param name="entry">The stored items of one collection entry.</param>
+    internal static IOrderedEnumerable<SnapshotItem> InEntryOrder(IEnumerable<SnapshotItem> entry) =>
+        entry
+            .OrderBy(item => item.Kind == ItemKind.Expansion ? 0 : 1)
+            .ThenBy(item => item.GameId)
+            .ThenBy(item => item.Title, StringComparer.Ordinal)
+            .ThenBy(item => item.Year)
+            .ThenBy(item => item.Location, StringComparer.Ordinal);
 
     /// <summary>
     /// The address of the picture a game offers besides the one of the owned edition: the main picture its details name,
@@ -132,18 +172,32 @@ public static class SnapshotMapper
     /// <param name="items">The mapped items, in mapped order.</param>
     /// <param name="rules">The rules the items were mapped with.</param>
     /// <param name="snapshot">The stored collection the items were mapped from.</param>
-    public static string Version(IReadOnlyList<CabinetItem> items, ArtRules rules, CollectionSnapshot snapshot)
+    public static string Version(IReadOnlyList<CabinetItem> items, ArtRules rules, CollectionSnapshot snapshot) =>
+        Version(items, rules, snapshot, OwnerOverlay.None);
+
+    /// <summary>
+    /// The identifier of a collection as <see cref="Version(IReadOnlyList{CabinetItem}, ArtRules, CollectionSnapshot)"/> works
+    /// it out, with the picture the owner chose for each game added to that game's line: the kind chosen and the address of the
+    /// owner's own picture. The choice counts even when the picture drawn is the same one the automatic pick gives, so a change
+    /// of choice is always a new collection version; a collection with no choices keeps the identifier it had without them.
+    /// </summary>
+    /// <param name="items">The mapped items, in mapped order.</param>
+    /// <param name="rules">The rules the items were mapped with.</param>
+    /// <param name="snapshot">The stored collection the items were mapped from.</param>
+    /// <param name="overlay">What the owner chose, which the items were mapped with.</param>
+    public static string Version(IReadOnlyList<CabinetItem> items, ArtRules rules, CollectionSnapshot snapshot, OwnerOverlay overlay)
     {
         ArgumentNullException.ThrowIfNull(items);
         ArgumentNullException.ThrowIfNull(rules);
         ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(overlay);
 
         var entries = snapshot.Items
             .GroupBy(entry => (entry.CollectionId, entry.GameId))
-            .ToDictionary(group => group.Key, group => group.First());
+            .ToDictionary(group => group.Key, group => InEntryOrder(group).First());
 
         return HashOf(items
-            .Select(item => $"{DrawnText(item)}|{CardText(item, entries, snapshot.Games)}")
+            .Select(item => $"{DrawnText(item)}|{CardText(item, entries, snapshot.Games)}{PictureText(overlay.PictureOverrideOf(item.BggId))}")
             .Prepend(rules.Fingerprint));
     }
 
@@ -173,6 +227,9 @@ public static class SnapshotMapper
             $"{entry?.Year}{FieldSeparator}{entry?.Location}{FieldSeparator}{details?.MinPlayers}{FieldSeparator}{details?.MaxPlayers}{FieldSeparator}{details?.PlayingTime}{FieldSeparator}{details?.MinPlayTime}{FieldSeparator}{details?.MaxPlayTime}{FieldSeparator}{details?.MinAge}{FieldSeparator}{details?.Weight}{FieldSeparator}{details?.Average}{FieldSeparator}{NamesText(details?.Designers)}{FieldSeparator}{NamesText(details?.Mechanics)}{FieldSeparator}{ExpansionIds(details?.ExpandsGames)}");
     }
 
+    private static string PictureText(PictureOverride? setting) =>
+        setting is null ? string.Empty : $"|{setting.Choice}|{setting.LinkUrl}";
+
     private static string NamesText(IReadOnlyList<string>? names) =>
         names is null ? string.Empty : string.Join(ItemSeparator, names);
 
@@ -184,14 +241,16 @@ public static class SnapshotMapper
         CollectionSnapshot snapshot,
         IReadOnlyDictionary<string, ImageRecord> images,
         IReadOnlyDictionary<long, IReadOnlyList<BaseGameRef>> pairing,
-        ArtRules rules)
+        ArtRules rules,
+        PictureOverride? ownerChoice)
     {
         var version = UsableRecord(item.VersionImageUrl, images);
         var main = UsableRecord(MainPictureUrl(item, snapshot), images);
         var versionVerdict = VerdictOf(version, rules);
         var mainVerdict = VerdictOf(main, rules);
-        var pick = ArtChooser.Choose(versionVerdict, mainVerdict);
-        var chosen = pick switch
+        var forced = ForcedPick(ownerChoice, version, main);
+        var pick = forced?.Pick ?? ArtChooser.Choose(versionVerdict, mainVerdict);
+        var chosen = forced?.Record ?? pick switch
         {
             ArtPick.VersionImage => version,
             ArtPick.MainImage => main,
@@ -228,8 +287,27 @@ public static class SnapshotMapper
             mainVerdict,
             pick,
             shaped,
-            mapped);
+            mapped,
+            forced is not null);
     }
+
+    private static ForcedArt? ForcedPick(PictureOverride? ownerChoice, ImageRecord? version, ImageRecord? main)
+    {
+        if (ownerChoice is null)
+        {
+            return null;
+        }
+
+        return ownerChoice.Choice switch
+        {
+            PictureChoice.OwnedEdition when version is not null => new ForcedArt(ArtPick.VersionImage, version),
+            PictureChoice.MainPicture when main is not null => new ForcedArt(ArtPick.MainImage, main),
+            PictureChoice.Link when Usable(ownerChoice.LinkRecord) is { } link => new ForcedArt(ArtPick.OwnerLink, link),
+            _ => null,
+        };
+    }
+
+    private sealed record ForcedArt(ArtPick Pick, ImageRecord Record);
 
     private static List<int> SeriesFamiliesOf(GameDetails? details) =>
         [.. (details?.Families ?? []).Where(family => SeriesGrouping.IsSeriesFamily(family.Name)).Select(family => family.Id).Distinct()];
@@ -240,13 +318,10 @@ public static class SnapshotMapper
     private static ArtFile WidestFile(ImageRecord chosen) => chosen.Files!.OrderByDescending(file => file.Width).First();
 
     private static ImageRecord? UsableRecord(string? url, IReadOnlyDictionary<string, ImageRecord> images) =>
-        url is not null
-        && images.TryGetValue(url, out var record)
-        && record.Status == ImageStatus.Ok
-        && record.Files is { Count: > 0 }
-        && record.Features is not null
-            ? record
-            : null;
+        url is not null && images.TryGetValue(url, out var record) ? Usable(record) : null;
+
+    private static ImageRecord? Usable(ImageRecord? record) =>
+        record is { Status: ImageStatus.Ok, Files.Count: > 0, Features: not null } ? record : null;
 
     private static ArtVerdict? VerdictOf(ImageRecord? record, ArtRules rules) =>
         record?.Features is { } features ? ArtVerdicts.Classify(features, rules.Thresholds) : null;

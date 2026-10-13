@@ -84,9 +84,11 @@ export function choosePath({ reducedMotion, hasViewTransition, boxOnScreen, swap
  * Builds the least a card can show from one drawn box: identity, title, kind, colours and picture. It is what the card shows when
  * the card data did not arrive or failed, so the card still opens with its cover, title and link.
  * @param {object} placement One placement from the layout.
+ * @param {boolean} [detailsFailed] True when the request for the card data failed, so the card can say the details could not be
+ * loaded instead of saying they are still to come.
  * @returns {object} A card record marked incomplete.
  */
-export function recordFromPlacement(placement) {
+export function recordFromPlacement(placement, detailsFailed = false) {
   const art = placement.art !== null && typeof placement.art === 'object' ? placement.art : undefined;
   const ratio = art !== undefined && art.height > 0 ? art.width / art.height : 1;
 
@@ -101,6 +103,7 @@ export function recordFromPlacement(placement) {
     toneIndex: placement.toneIndex,
     patternIndex: placement.patternIndex,
     incomplete: true,
+    detailsFailed: detailsFailed === true,
     designers: [],
     mechanics: [],
     expansions: [],
@@ -309,6 +312,9 @@ export const DRAG_CLOSE_SHARE = 0.25;
 /** The downward speed, in pixels per millisecond, that closes the sheet whatever the distance. */
 export const DRAG_CLOSE_VELOCITY = 0.6;
 
+/** How far back, in milliseconds, the speed of a drag is measured. */
+export const DRAG_SPEED_WINDOW_MS = 80;
+
 /** How much of an upward drag the sheet follows: one part in this many. */
 const UPWARD_RESISTANCE = 4;
 
@@ -327,6 +333,34 @@ export function dragOutcome({ dy, height, velocity }) {
   const farEnough = height > 0 && dy >= DRAG_CLOSE_SHARE * height;
 
   return farEnough || velocity >= DRAG_CLOSE_VELOCITY ? 'close' : 'spring';
+}
+
+/**
+ * Keeps the samples of a drag that are no older than the measured window at the given moment.
+ * @param {Array<{ at: number, y: number }>} samples The moments of the drag so far: time stamp in milliseconds and vertical position.
+ * @param {number} now The time stamp to measure from, in milliseconds.
+ * @returns {Array<{ at: number, y: number }>}
+ */
+export function recentSamples(samples, now) {
+  return samples.filter((sample) => now - sample.at <= DRAG_SPEED_WINDOW_MS);
+}
+
+/**
+ * Gives how fast the finger was moving down over the last moments before it lifted, in pixels per millisecond: from the oldest
+ * sample inside the measured window to the release. It is zero when every sample is older than the window, so a finger that had
+ * rested before it lifted is not fast, and zero when the release is not later than that sample.
+ * @param {Array<{ at: number, y: number }>} samples The moments of the drag: time stamp in milliseconds and vertical position.
+ * @param {{ at: number, y: number }} release The moment of the release.
+ * @returns {number}
+ */
+export function releaseSpeed(samples, release) {
+  const recent = recentSamples(samples, release.at);
+
+  if (recent.length === 0 || !(release.at > recent[0].at)) {
+    return 0;
+  }
+
+  return (release.y - recent[0].y) / (release.at - recent[0].at);
 }
 
 /**

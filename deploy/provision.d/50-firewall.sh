@@ -38,6 +38,6 @@ if [[ "${CABINET_PROVISION_LIB_ONLY:-0}" != "1" ]]; then
 
   systemctl enable --now nftables.service
 
-  provision_log "Default-drop firewall loaded: SSH is admitted only from ${CABINET_ADMIN_SSH_SOURCES:-<unset>}, the app port only from ${CABINET_TRAEFIK_IP:-<unset>}."
+  provision_log "Default-drop firewall loaded: SSH is admitted only from ${CABINET_ADMIN_SSH_SOURCES:-<unset>}, the app port 5080 and the owner port 5082 only from ${CABINET_TRAEFIK_IP:-<unset>}."
   provision_log "If the SSH sources were set wrongly, 'pct enter <ctid>' from the Proxmox host still works - it never goes through this firewall."
 fi

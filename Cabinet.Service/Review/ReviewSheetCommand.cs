@@ -3,7 +3,6 @@ using Cabinet.Domain.Collection;
 using Cabinet.Repository.Images;
 using Cabinet.Repository.Storage;
 using Cabinet.Service.Layout;
-using Microsoft.Extensions.Logging.Abstractions;
 using SkiaSharp;
 
 namespace Cabinet.Service.Review;
@@ -79,11 +78,11 @@ public static class ReviewSheetCommand
             return Usage;
         }
 
-        var snapshot = new SnapshotStore(options.State, NullLogger<SnapshotStore>.Instance).Load();
+        var loaded = SnapshotStore.LoadReadOnly(options.State);
 
-        if (snapshot is null)
+        if (loaded.Snapshot is not { } snapshot)
         {
-            error.WriteLine("no stored collection in the state directory");
+            error.WriteLine(loaded.Reason);
 
             return NoCollection;
         }
@@ -175,48 +174,71 @@ public static class ReviewSheetCommand
 
     private static bool TryLoadFonts(Options options, out SKTypeface? typeface, out SKTypeface? boldTypeface)
     {
-        if (options.Font is not null)
-        {
-            typeface = LoadFont(options.Font);
-            boldTypeface = options.BoldFont is null ? typeface : LoadFont(options.BoldFont);
+        typeface = null;
+        boldTypeface = null;
 
-            return Complete(ref typeface, ref boldTypeface);
+        if (options.Font is null && options.BoldFont is null)
+        {
+            return TryLoadInstalledPair(out typeface, out boldTypeface);
         }
 
-        foreach (var (regular, bold) in FontSearchPaths)
+        var regular = options.Font is null ? LoadInstalledRegular() : LoadFont(options.Font);
+        var bold = options.BoldFont is null ? regular : LoadFont(options.BoldFont);
+
+        return Complete(regular, bold, out typeface, out boldTypeface);
+    }
+
+    private static bool TryLoadInstalledPair(out SKTypeface? typeface, out SKTypeface? boldTypeface)
+    {
+        foreach (var (regularPath, boldPath) in FontSearchPaths)
         {
-            if (!File.Exists(regular))
+            var regular = LoadFont(regularPath);
+
+            if (regular is null)
             {
                 continue;
             }
 
-            typeface = SKTypeface.FromFile(regular);
-            boldTypeface = File.Exists(bold) ? SKTypeface.FromFile(bold) : typeface;
+            var bold = File.Exists(boldPath) ? LoadFont(boldPath) ?? regular : regular;
 
-            if (Complete(ref typeface, ref boldTypeface))
+            return Complete(regular, bold, out typeface, out boldTypeface);
+        }
+
+        typeface = null;
+        boldTypeface = null;
+
+        return false;
+    }
+
+    private static SKTypeface? LoadInstalledRegular()
+    {
+        foreach (var (regularPath, _) in FontSearchPaths)
+        {
+            if (LoadFont(regularPath) is { } regular)
             {
-                return true;
+                return regular;
             }
         }
 
-        typeface = null;
-        boldTypeface = null;
-
-        return false;
+        return null;
     }
 
-    private static bool Complete(ref SKTypeface? typeface, ref SKTypeface? boldTypeface)
+    private static bool Complete(SKTypeface? regular, SKTypeface? bold, out SKTypeface? typeface, out SKTypeface? boldTypeface)
     {
-        if (typeface is not null && boldTypeface is not null)
+        if (regular is not null && bold is not null)
         {
+            typeface = regular;
+            boldTypeface = bold;
+
             return true;
         }
 
-        if (!ReferenceEquals(typeface, boldTypeface))
+        if (!ReferenceEquals(regular, bold))
         {
-            typeface?.Dispose();
-            boldTypeface?.Dispose();
+            bold?.Dispose();
         }
+
+        regular?.Dispose();
 
         typeface = null;
         boldTypeface = null;
@@ -224,7 +246,17 @@ public static class ReviewSheetCommand
         return false;
     }
 
-    private static SKTypeface? LoadFont(string path) => File.Exists(path) ? SKTypeface.FromFile(path) : null;
+    private static SKTypeface? LoadFont(string path)
+    {
+        try
+        {
+            return File.Exists(path) ? SKTypeface.FromFile(path) : null;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return null;
+        }
+    }
 
     private static bool TryWrite(string directory, IReadOnlyList<byte[]> pages)
     {
@@ -241,18 +273,20 @@ public static class ReviewSheetCommand
 
             return true;
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
             return false;
         }
     }
 
-    private static string Counts(IReadOnlyList<ReviewRow> rows, int pages) =>
-        string.Create(
-            CultureInfo.InvariantCulture,
-            $"review sheet: {pages} pages, {rows.Count} games; verdicts flat {Count(rows, "flat")}, 3D shot {Count(rows, "3D shot")}, unsure {Count(rows, "unsure")}, no verdict {Count(rows, "no verdict")}; chosen version image {rows.Count(row => row.Pick == ArtPick.VersionImage)}, main image {rows.Count(row => row.Pick == ArtPick.MainImage)}, generated cover {rows.Count(row => row.Pick == ArtPick.GeneratedCover)}");
+    private static string Counts(IReadOnlyList<ReviewRow> rows, int pages)
+    {
+        var verdicts = ReviewSheetModel.CountVerdicts(rows);
 
-    private static int Count(IReadOnlyList<ReviewRow> rows, string verdict) => rows.Count(row => row.Verdict == verdict);
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"review sheet: {pages} pages, {rows.Count} games; verdicts flat {verdicts.Flat}, 3D shot {verdicts.ThreeD}, 3D shot cut-out {verdicts.CutOut}, 3D shot tight crop {verdicts.TightCrop}, unsure {verdicts.Unsure}, no verdict {verdicts.NoVerdict}; chosen version image {rows.Count(row => row.Pick == ArtPick.VersionImage)}, main image {rows.Count(row => row.Pick == ArtPick.MainImage)}, generated cover {rows.Count(row => row.Pick == ArtPick.GeneratedCover)}");
+    }
 
     private sealed record Options(string State, string Out, string? Font, string? BoldFont);
 }

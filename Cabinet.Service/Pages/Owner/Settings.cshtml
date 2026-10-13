@@ -1,0 +1,109 @@
+@page
+@using Cabinet.Domain.Owner
+@using Cabinet.Repository.Storage
+@using Cabinet.Service.Owner
+@model Cabinet.Service.Pages.Owner.SettingsModel
+@{
+    ViewData["BannerInPanel"] = true;
+    var backup = Model.Backup;
+}
+<h2>@OwnerStrings.Settings</h2>
+<section class="owner-panel" id="finish" aria-labelledby="finish-heading">
+    <h3 id="finish-heading">@OwnerStrings.FinishHeading</h3>
+    <p class="owner-hint">@OwnerStrings.FinishHelper</p>
+    <form method="post" class="finish-form" asp-page-handler="Finish" data-finish-form>
+        <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
+        <fieldset class="pic-choices finish-choices">
+            <legend class="visually-hidden">@OwnerStrings.FinishHeading</legend>
+            @foreach (var finish in Finishes.Allowed)
+            {
+                <label class="pic-tile finish-tile">
+                    <span class="finish-swatch" aria-hidden="true"></span>
+                    <span class="pic-caption">
+                        <input type="radio" name="finish" value="@finish" checked="@(finish == Model.Finish)" />
+                        <span class="pic-label">@OwnerStrings.FinishName(finish)</span>
+                    </span>
+                    <span class="pic-sub">@OwnerStrings.FinishSubLine(finish)</span>
+                </label>
+            }
+        </fieldset>
+        <p class="owner-hint finish-note">@OwnerStrings.FinishOnlyNote</p>
+        <button type="submit" class="owner-btn" data-save>@OwnerStrings.SaveFinishButton</button>
+    </form>
+    <p class="row-status" id="finish-status" role="status" data-problem="@(Model.FinishNoticeIsProblem ? "true" : null)">
+        @if (Model.FinishNotice is not null)
+        {
+            <span>@Model.FinishNotice</span>
+        }
+    </p>
+</section>
+<section class="owner-panel" id="backup" aria-labelledby="backup-heading">
+    <h3 id="backup-heading">@OwnerStrings.BackupHeading</h3>
+    @if (Model.Notice is not null)
+    {
+        <p class="backup-notice" role="alert">@Model.Notice</p>
+    }
+    @if (!backup.Readable)
+    {
+        <p>@OwnerStrings.OwnerDataUnreadable</p>
+    }
+    else if (!backup.HasData)
+    {
+        <p class="owner-hint">@OwnerStrings.BackupHelper</p>
+        <p id="backup-empty">@OwnerStrings.NothingToBackUp</p>
+    }
+    else
+    {
+        <p class="owner-hint">@OwnerStrings.BackupHelper</p>
+        <partial name="_OwnerBanner" model="backup" />
+        <div class="backup-quiet" id="backup-quiet" hidden="@backup.ShowsBanner">
+            <p class="backup-line" id="backup-line" hidden="@(backup.LastDownloadAtUtc is null)">
+                @OwnerStrings.DownloadedPrefix
+                <time id="backup-time" datetime="@(backup.LastDownloadAtUtc is { } downloaded ? OwnerStrings.TimeAttribute(downloaded) : null)" data-owner-when>@(backup.LastDownloadAtUtc is { } shown ? OwnerStrings.TimeUtcText(shown) : string.Empty)</time>
+            </p>
+            <form method="post" asp-page="/Owner/Settings" asp-page-handler="Download" data-owner-download>
+                <button type="submit" class="owner-btn" data-download-button>@OwnerStrings.DownloadButton</button>
+            </form>
+        </div>
+        <p class="owner-hint backup-footnote">@OwnerStrings.BackupFootnote(OwnerDataStore.KeptVersions)</p>
+    }
+</section>
+<partial name="_OwnerRestorePanel" model="Model" />
+@if (backup.Readable)
+{
+    <section class="owner-panel" id="recent-changes" aria-labelledby="recent-changes-heading">
+        <h3 id="recent-changes-heading">@OwnerStrings.RecentChangesHeading</h3>
+        <p class="owner-hint">@OwnerStrings.RecentChangesHelper</p>
+        @if (Model.VisibleChanges.Count == 0)
+        {
+            <p id="change-log-empty">@OwnerStrings.NoChangesYet</p>
+        }
+        else
+        {
+            <ol class="change-log" id="change-log">
+                @for (var index = 0; index <= Model.VisibleChanges.Count; index++)
+                {
+                    if (Model.DividerAfter == index && backup.LastDownloadAtUtc is { } last)
+                    {
+                        <li class="change-divider" data-divider>
+                            @OwnerStrings.DownloadedPrefix
+                            <time datetime="@OwnerStrings.TimeAttribute(last)" data-owner-when>@OwnerStrings.TimeUtcText(last)</time>
+                        </li>
+                    }
+
+                    if (index < Model.VisibleChanges.Count)
+                    {
+                        var entry = Model.VisibleChanges[index];
+                        <li class="change-entry">
+                            <time datetime="@OwnerStrings.TimeAttribute(entry.AtUtc)" data-owner-when data-capitalise>@OwnerStrings.TimeUtcText(entry.AtUtc)</time>
+                            <span class="change-text" dir="auto">@entry.Text</span>
+                        </li>
+                    }
+                }
+            </ol>
+        }
+    </section>
+}
+@section Scripts {
+    <script type="module" src="~/js/owner-finish.js" asp-append-version="true"></script>
+}

@@ -123,7 +123,7 @@ function coverRatio(record) {
  * @param {string} title The title to put on the plate.
  * @param {number} patternIndex The pattern index of the record.
  */
-function drawGeneratedCover(art, title, patternIndex) {
+export function drawGeneratedCover(art, title, patternIndex) {
   art.dataset.pattern = PATTERN_NAMES[patternIndex] ?? 'plain';
 
   const label = document.createElement('span');
@@ -278,6 +278,47 @@ function buildLink(record, copy, iconsUrl) {
 }
 
 /**
+ * Tells whether an address is a path on this site: it starts with one slash, is not protocol-relative and holds no backslash or
+ * whitespace, so it can never point at another host.
+ * @param {unknown} address The value to check.
+ * @returns {boolean}
+ */
+function isSitePath(address) {
+  return typeof address === 'string'
+    && address.startsWith('/')
+    && !address.startsWith('/' + '/')
+    && !/[\\\s]/.test(address);
+}
+
+/**
+ * Builds the quiet Edit line, or returns null when the card was not given a site path to edit at or the game id is not made of
+ * digits only. The address is the given path with the game id appended as a query, never a string taken from the card data.
+ * @param {object} record The card record.
+ * @param {object} copy The visitor-facing strings.
+ * @param {string} iconsUrl The address of the icon sprite.
+ * @param {string | undefined} editHref The path the Edit link points at, or undefined at the public address.
+ * @returns {HTMLParagraphElement | null}
+ */
+function buildEditLink(record, copy, iconsUrl, editHref) {
+  const id = String(record.gameId);
+
+  if (!isSitePath(editHref) || !GAME_ID.test(id)) {
+    return null;
+  }
+
+  const anchor = document.createElement('a');
+  anchor.setAttribute('href', editHref + '?game=' + id);
+
+  anchor.append(buildIcon(iconsUrl, 'i-pencil'), document.createTextNode(copy.editLink));
+
+  const paragraph = document.createElement('p');
+  paragraph.className = 'card-edit';
+  paragraph.append(anchor);
+
+  return paragraph;
+}
+
+/**
  * Builds one entry of the game-night strip: a decorative icon, the bold value and the quiet label that screen readers read.
  * @param {{ icon: string, value: string, label: string }} fact The entry from the format functions.
  * @param {string} iconsUrl The address of the icon sprite.
@@ -303,14 +344,16 @@ function buildFact(fact, iconsUrl) {
 }
 
 /**
- * Builds the quiet note that stands in the strip's place when no detail is known.
+ * Builds the quiet note that stands in the strip's place when no detail is known: that the details could not be loaded when the
+ * request for them failed, otherwise that they arrive after the next sync.
+ * @param {object} record The card record.
  * @param {object} copy The visitor-facing strings.
  * @returns {HTMLParagraphElement}
  */
-function buildNote(copy) {
+function buildNote(record, copy) {
   const note = document.createElement('p');
   note.className = 'card-note';
-  note.textContent = copy.noDetails;
+  note.textContent = record.detailsFailed === true ? copy.detailsFailed : copy.noDetails;
 
   return note;
 }
@@ -325,7 +368,7 @@ function buildNote(copy) {
  */
 function buildStripOrNote(record, copy, iconsUrl) {
   if (record.incomplete === true || !hasAnyDetail(record)) {
-    return buildNote(copy);
+    return buildNote(record, copy);
   }
 
   const facts = factsFor(record, copy);
@@ -624,8 +667,9 @@ function buildOwnedExpansions(record, copy, iconsUrl, onSwap) {
  * Whatever is missing is left out.
  * @param {object} record The card record, or the least a card can show when the data did not arrive.
  * @param {object} copy The visitor-facing strings.
- * @param {{ iconsUrl?: string, palette?: object[], onSwap?: (entryId: string) => void }} [options] The sprite address, the colour
- * table of the layout on screen and what to call when a row asks to show another game.
+ * @param {{ iconsUrl?: string, palette?: object[], onSwap?: (entryId: string) => void, editHref?: string }} [options] The sprite
+ * address, the colour table of the layout on screen, what to call when a row asks to show another game and, where the page offers
+ * editing, the path of the editor for the Edit line.
  * @returns {HTMLDivElement} The card element.
  */
 export function buildCard(record, copy, options = {}) {
@@ -696,6 +740,12 @@ export function buildCard(record, copy, options = {}) {
 
   if (link !== null) {
     ruled.append(link);
+  }
+
+  const edit = buildEditLink(record, copy, iconsUrl, options.editHref);
+
+  if (edit !== null) {
+    ruled.append(edit);
   }
 
   card.append(grip, closeWrap, head, ruled);

@@ -54,6 +54,11 @@ public static class ReviewSheet
     private const float QuarterTurn = 90f;
     private const string Ellipsis = "…";
     private const string MissingWord = "none";
+    private const string VerdictBreak = ", ";
+    private const int VerdictOneLineOffset = 10;
+    private const int VerdictTwoLineOffset = 26;
+    private const int VerdictLineHeight = 20;
+    private const int VerdictScoreGap = 26;
 
     private static readonly SKColor PageColour = new(0xf2, 0xf0, 0xec);
     private static readonly SKColor RowColour = new(0xff, 0xff, 0xff);
@@ -310,12 +315,7 @@ public static class ReviewSheet
         DrawCandidate(canvas, row.CandidateBPath, x, top, row.Pick == ArtPick.MainImage, fonts);
         x += CandidateWidth;
 
-        canvas.DrawText(row.Verdict, x + CellPadding, baseline - 10, SKTextAlign.Left, fonts.Heading, ink);
-        if (row.ScoreText is not null)
-        {
-            using var muted = Fill(MutedColour);
-            canvas.DrawText($"score {row.ScoreText}", x + CellPadding, baseline + 16, SKTextAlign.Left, fonts.Small, muted);
-        }
+        DrawVerdict(canvas, row, x + CellPadding, baseline, fonts, ink);
 
         x += VerdictWidth;
 
@@ -427,21 +427,79 @@ public static class ReviewSheet
         canvas.Restore();
     }
 
-    private static string Ellipsised(string text, SKFont font, float maxWidth)
+    /// <summary>
+    /// Fits text to a width: text that already fits is returned as it is, otherwise it is cut at a whole character, which for
+    /// a character built from several code units means a whole text element, and ends with an ellipsis. The result is never
+    /// wider than the width unless the ellipsis alone is.
+    /// </summary>
+    /// <param name="text">The text to fit.</param>
+    /// <param name="font">The font the text is drawn with.</param>
+    /// <param name="maxWidth">The widest the result may measure.</param>
+    public static string Ellipsised(string text, SKFont font, float maxWidth)
     {
+        ArgumentNullException.ThrowIfNull(text);
+        ArgumentNullException.ThrowIfNull(font);
+
         if (font.MeasureText(text) <= maxWidth)
         {
             return text;
         }
 
-        var length = text.Length;
+        var starts = StringInfo.ParseCombiningCharacters(text);
 
-        while (length > 0 && font.MeasureText(text[..length].TrimEnd() + Ellipsis) > maxWidth)
+        for (var kept = starts.Length - 1; kept > 0; kept--)
         {
-            length--;
+            var candidate = text[..starts[kept]].TrimEnd() + Ellipsis;
+
+            if (font.MeasureText(candidate) <= maxWidth)
+            {
+                return candidate;
+            }
         }
 
-        return text[..length].TrimEnd() + Ellipsis;
+        return Ellipsis;
+    }
+
+    private static void DrawVerdict(SKCanvas canvas, ReviewRow row, int left, float baseline, Fonts fonts, SKPaint ink)
+    {
+        var maxWidth = VerdictWidth - (2 * CellPadding);
+        var lines = VerdictLines(row.Verdict);
+        var first = baseline - (lines.Count > 1 ? VerdictTwoLineOffset : VerdictOneLineOffset);
+
+        for (var index = 0; index < lines.Count; index++)
+        {
+            canvas.DrawText(
+                Ellipsised(lines[index], fonts.Heading, maxWidth),
+                left,
+                first + (index * VerdictLineHeight),
+                SKTextAlign.Left,
+                fonts.Heading,
+                ink);
+        }
+
+        if (row.ScoreText is null)
+        {
+            return;
+        }
+
+        using var muted = Fill(MutedColour);
+        var scoreBaseline = first + ((lines.Count - 1) * VerdictLineHeight) + VerdictScoreGap;
+        canvas.DrawText(
+            Ellipsised($"score {row.ScoreText}", fonts.Small, maxWidth),
+            left,
+            scoreBaseline,
+            SKTextAlign.Left,
+            fonts.Small,
+            muted);
+    }
+
+    private static IReadOnlyList<string> VerdictLines(string verdict)
+    {
+        var comma = verdict.IndexOf(VerdictBreak, StringComparison.Ordinal);
+
+        return comma < 0
+            ? [verdict]
+            : [verdict[..(comma + 1)], verdict[(comma + VerdictBreak.Length)..]];
     }
 
     private static SKSize FitInside(int width, int height, SKSize available)

@@ -1,6 +1,8 @@
 using System.Globalization;
+using Cabinet.Domain.Owner;
 using Cabinet.Service.Collection;
 using Cabinet.Service.Language;
+using Cabinet.Service.Owner;
 using Cabinet.Service.Prototype;
 using Cabinet.Service.Sync;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -18,6 +20,21 @@ public class IndexModel(SampleCatalog catalog, CollectionStore store, SyncStatus
 {
     /// <summary>The language the page is written in, chosen once for this request.</summary>
     public SiteLanguage Language { get; private set; } = SiteLanguage.English;
+
+    /// <summary>
+    /// Whether the request arrived on the owner port, where the cabinet carries the owner's plate and the strip under the header.
+    /// It is never true on the public port.
+    /// </summary>
+    public bool IsOwnerAddress { get; private set; }
+
+    /// <summary>
+    /// How many synced games have no place, counting an expansion that follows an unplaced base game. It is worked out for the owner
+    /// address only and is zero while a sample is shown, while nothing has synced and while the owner data cannot be read.
+    /// </summary>
+    public int UnplacedCount { get; private set; }
+
+    /// <summary>Whether the stored owner data cannot be read; the strip at the owner address says so instead of counting.</summary>
+    public bool OwnerDataUnreadable { get; private set; }
 
     /// <summary>Whether the invented collections and their switcher are available.</summary>
     public bool PrototypeEnabled => catalog.Enabled;
@@ -103,6 +120,28 @@ public class IndexModel(SampleCatalog catalog, CollectionStore store, SyncStatus
         SampleName = ShowingSample ? name : string.Empty;
         ItemCount = ShowingSample ? catalog.ItemCount(name) : 0;
         Status = statusService.Current();
+        ReadOwnerChrome();
+    }
+
+    private void ReadOwnerChrome()
+    {
+        var services = HttpContext.RequestServices;
+
+        IsOwnerAddress = services?.GetService<OwnerAccessOptions>()?.IsOwnerPort(HttpContext) is true;
+
+        if (!IsOwnerAddress || services?.GetService<OwnerDataService>() is not { } owner)
+        {
+            return;
+        }
+
+        OwnerDataUnreadable = owner.State is OwnerDataState.Unreadable;
+
+        if (owner.State is OwnerDataState.Ready ready && !ShowingSample && store.Current.Snapshot is { } snapshot)
+        {
+            var overlay = OwnerOverlay.From(snapshot, ready.Data);
+
+            UnplacedCount = snapshot.Items.Select(item => item.GameId).Distinct().Count(gameId => overlay.EffectiveLocationId(gameId) is null);
+        }
     }
 
     private static string Iso(DateTimeOffset? moment) =>

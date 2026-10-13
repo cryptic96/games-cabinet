@@ -1,0 +1,64 @@
+@using Cabinet.Service.Owner
+@using Cabinet.Service.Pages.Owner
+@using Microsoft.AspNetCore.Antiforgery
+@inject IAntiforgery Antiforgery
+@inject Microsoft.AspNetCore.Mvc.ViewFeatures.IFileVersionProvider FileVersions
+@inject OwnerDataService OwnerData
+@inject SiteFinish Finish
+@{
+    var page = ViewData["Title"] as string;
+    var backup = OwnerData.Backup;
+    var requestToken = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+    var ownerPage = ViewContext.ViewData.Model as OwnerPage;
+    var unreadable = ownerPage?.OwnerDataUnreadable is true;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="request-verification-token" content="@requestToken" />
+    <title>@(page is null ? OwnerStrings.Plate : OwnerStrings.PageTitle(page))</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/owner.css" asp-append-version="true" />
+    @await RenderSectionAsync("Head", required: false)
+</head>
+<body class="@Finish.BodyClass()">
+    <a class="skip-link" href="#owner-main">@OwnerStrings.SkipLink</a>
+    <header>
+        <h1>@SiteLanguage.English.Text.SiteName</h1>
+        <span class="owner-plate">@OwnerStrings.Plate</span>
+    </header>
+    <nav class="owner-bar" aria-label="@OwnerStrings.BarLabel">
+        @foreach (var item in OwnerPage.BarItems)
+        {
+            <a href="@Url.Content("~" + item.Href)" aria-current="@(item.Name == page ? "page" : null)">@item.Name</a>
+        }
+        <a class="owner-bar-end" href="@Url.Content("~/")">@OwnerStrings.Cabinet</a>
+    </nav>
+    @if (backup.Readable && backup.HasData && ViewData["BannerInPanel"] is not true)
+    {
+        <partial name="_OwnerBanner" model="backup" />
+    }
+    <main id="owner-main" class="owner-main" data-icons="@FileVersions.AddFileVersionToPath(Context.Request.PathBase, "/img/icons.svg")" data-backup-state="@Url.Page("/Owner/Settings", "BackupState")">
+        <p id="owner-status" class="visually-hidden" role="status" aria-atomic="true"></p>
+        @if (unreadable)
+        {
+            IgnoreBody();
+            <partial name="_OwnerUnreadable" model="ownerPage" />
+
+            if (ownerPage is SettingsModel settings)
+            {
+                <partial name="_OwnerRestorePanel" model="settings" />
+            }
+        }
+        else
+        {
+            @RenderBody()
+        }
+    </main>
+    <partial name="_Footer" model="SiteLanguage.English" />
+    @await RenderSectionAsync("Scripts", required: false)
+    <script type="module" src="~/js/owner-settings.js" asp-append-version="true"></script></body>
+</html>

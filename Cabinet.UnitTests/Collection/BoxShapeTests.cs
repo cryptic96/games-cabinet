@@ -252,6 +252,50 @@ public sealed class BoxShapeTests
         BoxFromVersion.TryMap(new VersionDimensions(50 / 25.4, 700 / 25.4, 301 / 25.4)).Should().BeNull();
     }
 
+    [Fact]
+    public void An_extreme_flat_cover_without_dimensions_leaves_the_box_at_its_estimate()
+    {
+        var details = Details();
+        var estimate = SizeEstimate.Dimensions(SizeEstimate.Assign(details, null, null)!.Value, ItemKind.Base);
+        var extreme = new ArtFile(100, 1000, "x-480.webp");
+
+        var estimated = BoxShape.Resolve(Item(null), details, extreme, ArtRules.Default);
+        var nothing = BoxShape.Resolve(Item(null), null, extreme, ArtRules.Default);
+
+        estimated.Box.Should().Be(estimate);
+        estimated.Source.Should().Be(BoxSource.Estimate);
+        nothing.Box.Should().Be(new BoxDimensions(225, 300, 60));
+        nothing.Source.Should().Be(BoxSource.Default);
+        nothing.PoseHeightMm.Should().Be(300);
+    }
+
+    [Fact]
+    public void An_extreme_flat_cover_reaches_the_drawn_item_as_the_estimated_box()
+    {
+        const string address = "https://cf.example.org/extreme.jpg";
+        var item = new SnapshotItem(1, 2, "Invented Game", ItemKind.Base, null, null, null, address, null);
+        var record = new ImageRecord(address, ImageStatus.Ok, Moment, [new ArtFile(100, 1000, "eeeeeeeeeeeeeeee-480.webp")], new ArtFeatures(0.0, 1.0, 0.0, 0.0, 4));
+        var snapshot = new CollectionSnapshot(
+            CollectionSnapshot.CurrentSchemaVersion,
+            Moment,
+            [item],
+            new Dictionary<string, ImageRecord> { [address] = record },
+            null);
+
+        var drawn = SnapshotMapper.ToCabinetItems(snapshot).Single();
+
+        drawn.Box.Should().Be(new BoxDimensions(225, 300, 60));
+    }
+
+    [Fact]
+    public void An_ordinary_flat_cover_still_shapes_the_box()
+    {
+        var shaped = BoxShape.Resolve(Item(null), Details(), new ArtFile(1000, 1400, "o-480.webp"), ArtRules.Default);
+
+        shaped.Source.Should().Be(BoxSource.CoverShape);
+        ((double)shaped.Box.WidthMm / shaped.Box.HeightMm).Should().BeApproximately(1 / 1.4, 0.01);
+    }
+
     private static SnapshotItem Item(VersionDimensions? dimensions, ItemKind kind = ItemKind.Base) =>
         new(1, 2, "Invented Game", kind, null, dimensions, null);
 

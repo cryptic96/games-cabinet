@@ -61,6 +61,22 @@ regex = '''\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'''
     '''(?i)@[A-Za-z0-9.-]+\.(service|timer|socket|target|mount|path|slice|scope)$''',
   ]
 
+  [[rules.allowlists]]
+  description = "BGG's image host receives no mail; a user-info link on it is a refused-link example, not an address"
+  regexTarget = "match"
+  regexes = [
+    '''(?i)@cf\.geekdo-images\.com$''',
+  ]
+
+  [[rules.allowlists]]
+  description = "Razor views (and notes quoting them) write values into markup as text-@Variable.Member, which reads like an address but is a C# member access"
+  condition = "AND"
+  paths = ['''\.(cshtml|md)$''']
+  regexTarget = "match"
+  regexes = [
+    '''@[A-Za-z][A-Za-z0-9]*\.[A-Z][A-Za-z0-9]*[a-z][A-Za-z0-9]*$''',
+  ]
+
 [[rules]]
 id = "internal-hostname"
 description = "Hostname under a suffix that only resolves on a private network"

@@ -1,4 +1,5 @@
-@inject BuildInfo Build
+@inject Cabinet.Service.Owner.SiteFinish Finish
+@inject Cabinet.Service.Owner.OwnerAccessOptions OwnerAccess
 @{
     var language = SiteLanguage.Resolve(Context);
 }
@@ -12,13 +13,14 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/cabinet.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/card.css" asp-append-version="true" />
+    @if (OwnerAccess.IsOwnerPort(Context))
+    {
+        <link rel="stylesheet" href="~/css/owner.css" asp-append-version="true" />
+    }
 </head>
-<body>
+<body class="@Finish.BodyClass()">
     @RenderBody()
-    <footer>
-        <p class="version">@language.Text.Version(Build.Version, Build.ShortCommit)</p>
-        <a class="bgg-credit" href="https://boardgamegeek.com" rel="noopener"><img src="~/img/powered-by-bgg.svg" alt="@language.Text.LogoAlt" width="342" height="76" asp-append-version="true" /></a>
-    </footer>
+    <partial name="_Footer" model="language" />
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

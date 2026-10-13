@@ -1,6 +1,7 @@
 using Cabinet.Domain.Collection;
 using Cabinet.Repository.Images;
 using Cabinet.Service.Collection;
+using Cabinet.Service.Owner;
 
 namespace Cabinet.Service.Sync;
 
@@ -34,7 +35,8 @@ public sealed class SyncRunner
     private readonly ArtCache? _cache;
     private readonly ImageOptions? _images;
     private readonly EnrichmentSync? _enrichment;
-    private readonly ArtRules _artRules;
+    private readonly CollectionPublisher _publisher;
+    private readonly IOwnerArtReferences? _ownerArt;
     private CollectionSnapshot? _stored;
 
     /// <summary>Creates the runner.</summary>
@@ -47,7 +49,9 @@ public sealed class SyncRunner
     /// <param name="cache">The stored pictures, pruned after the run; null leaves them alone.</param>
     /// <param name="images">The picture rules; the picture step needs them.</param>
     /// <param name="enrichment">Fetches the game details; null leaves the run without a details step.</param>
-    /// <param name="artRules">The rules that choose each game's picture; the defaults when null.</param>
+    /// <param name="artRules">The rules that choose each game's picture; the defaults when null. Only used when no publisher is given.</param>
+    /// <param name="publisher">Builds the collection visitors see and shows it; a publisher without owner data when null, which only a test without the owner tools relies on.</param>
+    /// <param name="ownerArt">Names the stored pictures the owner's linked pictures need, which the clean-up never removes; null when there are no owner tools, which only a test relies on.</param>
     public SyncRunner(
         Func<ICollectionSource> sourceFactory,
         ISnapshotStore snapshots,
@@ -58,7 +62,9 @@ public sealed class SyncRunner
         ArtCache? cache = null,
         ImageOptions? images = null,
         EnrichmentSync? enrichment = null,
-        ArtRules? artRules = null)
+        ArtRules? artRules = null,
+        CollectionPublisher? publisher = null,
+        IOwnerArtReferences? ownerArt = null)
     {
         ArgumentNullException.ThrowIfNull(sourceFactory);
         ArgumentNullException.ThrowIfNull(snapshots);
@@ -75,7 +81,8 @@ public sealed class SyncRunner
         _cache = cache;
         _images = images;
         _enrichment = enrichment;
-        _artRules = artRules ?? ArtRules.Default;
+        _publisher = publisher ?? new CollectionPublisher(collection, artRules ?? ArtRules.Default);
+        _ownerArt = ownerArt;
     }
 
     /// <summary>Fetches the collection and applies it when the guard accepts it and it changed, then fetches the box pictures that are due.</summary>
@@ -116,7 +123,8 @@ public sealed class SyncRunner
             _time.GetUtcNow(),
             collection.Items,
             StillNamedImages(baseline, collection.Items, games),
-            games);
+            games,
+            StillOwnedAttempts(baseline, collection.Items, games));
 
         if (ContentChanged(baseline, snapshot))
         {
@@ -166,9 +174,30 @@ public sealed class SyncRunner
         return kept.Count == 0 ? null : kept;
     }
 
+    private static Dictionary<int, DateTimeOffset>? StillOwnedAttempts(
+        CollectionSnapshot? baseline,
+        IReadOnlyList<SnapshotItem> items,
+        IReadOnlyDictionary<int, GameDetails>? games)
+    {
+        if (baseline?.DetailAttempts is not { Count: > 0 } known)
+        {
+            return null;
+        }
+
+        var owned = items.Select(item => item.GameId).ToHashSet();
+        var kept = known
+            .Where(pair => owned.Contains(pair.Key) && games?.ContainsKey(pair.Key) != true)
+            .ToDictionary(pair => pair.Key, pair => pair.Value);
+
+        return kept.Count == 0 ? null : kept;
+    }
+
     private static bool ContentChanged(CollectionSnapshot? baseline, CollectionSnapshot next)
     {
-        if (baseline is null || !baseline.Items.SequenceEqual(next.Items) || !SameGames(baseline.Games, next.Games))
+        if (baseline is null
+            || !baseline.Items.SequenceEqual(next.Items)
+            || !SameGames(baseline.Games, next.Games)
+            || !SameAttempts(baseline.DetailAttempts, next.DetailAttempts))
         {
             return true;
         }
@@ -189,6 +218,15 @@ public sealed class SyncRunner
             && before.All(pair => after.TryGetValue(pair.Key, out var details) && pair.Value.SameAs(details));
     }
 
+    private static bool SameAttempts(IReadOnlyDictionary<int, DateTimeOffset>? left, IReadOnlyDictionary<int, DateTimeOffset>? right)
+    {
+        var before = left ?? new Dictionary<int, DateTimeOffset>();
+        var after = right ?? new Dictionary<int, DateTimeOffset>();
+
+        return before.Count == after.Count
+            && before.All(pair => after.TryGetValue(pair.Key, out var asked) && asked == pair.Value);
+    }
+
     private static bool SameRecord(ImageRecord left, ImageRecord right) =>
         left.SourceUrl == right.SourceUrl
         && left.Status == right.Status
@@ -205,12 +243,7 @@ public sealed class SyncRunner
         _snapshots.Save(snapshot);
         _stored = snapshot;
 
-        var next = CollectionState.FromSnapshot(snapshot, _artRules);
-
-        if (next.Version != _collection.Current.Version)
-        {
-            _collection.Replace(next);
-        }
+        _publisher.Publish(snapshot);
     }
 
     /// <summary>Fetches the game details that are due and returns the collection with every answer applied, or the one it was given when nothing changed.</summary>
@@ -286,6 +319,20 @@ public sealed class SyncRunner
             .Select(file => file.Name)
             .ToHashSet(StringComparer.Ordinal);
 
+        if (_ownerArt is not null)
+        {
+            var kept = _ownerArt.ReferencedArtFiles();
+
+            if (kept is null)
+            {
+                _logger.LogWarning("Box pictures: clean-up skipped, owner data unreadable.");
+
+                return;
+            }
+
+            referenced.UnionWith(kept);
+        }
+
         try
         {
             var deleted = _cache.Prune(referenced, _images.PruneGrace, _time.GetUtcNow());
@@ -316,7 +363,7 @@ public sealed class SyncRunner
         }
 
         _stored = stored;
-        _collection.Replace(CollectionState.FromSnapshot(stored, _artRules));
+        _publisher.Publish(stored);
 
         return false;
     }

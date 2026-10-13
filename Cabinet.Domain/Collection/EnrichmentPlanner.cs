@@ -16,6 +16,9 @@ public static class EnrichmentPlanner
     /// <summary>The most games a single details call may name.</summary>
     public const int MaxIdsPerRequest = 20;
 
+    /// <summary>How long a game the source left out of its answer is left alone before it is asked about again.</summary>
+    public static readonly TimeSpan MissingDetailsRetry = TimeSpan.FromDays(1);
+
     /// <summary>
     /// Plans the calls of one run. Games without details come first, in collection order; then the games whose details were
     /// read when the step read less than it does now (their <see cref="GameDetails.DetailsVersion"/> is not
@@ -33,6 +36,23 @@ public static class EnrichmentPlanner
         IReadOnlyList<SnapshotItem> items,
         IReadOnlyDictionary<int, GameDetails>? games,
         DateTimeOffset now,
+        EnrichmentOptions options) => Plan(items, games, null, now, options);
+
+    /// <summary>
+    /// Plans the calls of one run as <see cref="Plan(IReadOnlyList{SnapshotItem}, IReadOnlyDictionary{int, GameDetails}?, DateTimeOffset, EnrichmentOptions)"/>
+    /// does, except that a game without details which the source left out of an answer less than
+    /// <see cref="MissingDetailsRetry"/> ago is not planned.
+    /// </summary>
+    /// <param name="items">The owned items.</param>
+    /// <param name="games">The details known so far, by game identifier; null when none are known.</param>
+    /// <param name="detailAttempts">When each game the source left out was last asked about, by game identifier; null when none were.</param>
+    /// <param name="now">The current time.</param>
+    /// <param name="options">The limits of a run.</param>
+    public static IReadOnlyList<IReadOnlyList<int>> Plan(
+        IReadOnlyList<SnapshotItem> items,
+        IReadOnlyDictionary<int, GameDetails>? games,
+        IReadOnlyDictionary<int, DateTimeOffset>? detailAttempts,
+        DateTimeOffset now,
         EnrichmentOptions options)
     {
         ArgumentNullException.ThrowIfNull(items);
@@ -46,7 +66,7 @@ public static class EnrichmentPlanner
             .Distinct()
             .ToList();
 
-        var fresh = ids.Where(id => !known.ContainsKey(id));
+        var fresh = ids.Where(id => !known.ContainsKey(id) && !AskedRecently(detailAttempts, id, now));
         var outdated = ids.Where(id => known.TryGetValue(id, out var details) && details.DetailsVersion != GameDetails.CurrentDetailsVersion).ToHashSet();
         var stale = ids
             .Where(id => !outdated.Contains(id) && known.TryGetValue(id, out var details) && now - details.EnrichedAtUtc >= options.RefreshAfter)
@@ -61,4 +81,9 @@ public static class EnrichmentPlanner
 
         return [.. batches.Take(Math.Max(0, options.MaxThingRequestsPerRun))];
     }
+
+    private static bool AskedRecently(IReadOnlyDictionary<int, DateTimeOffset>? detailAttempts, int id, DateTimeOffset now) =>
+        detailAttempts is not null
+        && detailAttempts.TryGetValue(id, out var asked)
+        && now - asked < MissingDetailsRetry;
 }

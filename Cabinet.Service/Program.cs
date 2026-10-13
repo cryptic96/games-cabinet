@@ -1,4 +1,3 @@
-using System.Net;
 using System.Reflection;
 using Cabinet.Domain;
 using Cabinet.Repository.Images;
@@ -7,10 +6,10 @@ using Cabinet.Service.Hosting;
 using Cabinet.Service.Language;
 using Cabinet.Service.Layout;
 using Cabinet.Service.Live;
+using Cabinet.Service.Owner;
 using Cabinet.Service.Review;
 using Cabinet.Service.Sync;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 
 if (args.Length > 0 && args[0] == "image-smoke")
@@ -49,29 +48,15 @@ builder.Services.AddRazorPages();
 builder.Services.AddCabinetLayout(builder.Configuration, builder.Environment);
 builder.Services.AddCabinetSync(builder.Configuration, builder.Environment);
 builder.Services.AddCabinetLive(builder.Configuration);
+builder.Services.AddCabinetOwner(builder.Configuration, builder.Environment);
 builder.Services.AddSingleton<ArtFileAudit>();
 
 var buildInfo = BuildInfo.Parse(
     typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
 builder.Services.AddSingleton(buildInfo);
 
-builder.Services.Configure<ForwardedHeadersOptions>(options =>
-{
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    options.ForwardLimit = 1;
-
-    var knownProxies = builder.Configuration.GetSection("ReverseProxy:KnownProxies").Get<string[]>() ?? [];
-    foreach (var proxy in knownProxies)
-    {
-        if (!IPAddress.TryParse(proxy, out var address))
-        {
-            throw new InvalidOperationException(
-                "ReverseProxy:KnownProxies contains an entry that is not an IP address.");
-        }
-
-        options.KnownProxies.Add(address);
-    }
-});
+builder.Services.Configure<ForwardedHeadersOptions>(
+    options => ForwardedHeadersSetup.Configure(options, builder.Configuration));
 
 SiteLanguage.EnsureAvailable();
 
@@ -81,6 +66,7 @@ var opsPort = OpsEndpoint.FromConfiguration(app.Configuration);
 
 app.UseContentSecurityPolicy();
 app.UseForwardedHeaders();
+app.UseOwnerClientRange();
 
 app.UseHealthChecks("/health", opsPort, new HealthCheckOptions
 {
@@ -100,9 +86,12 @@ app.UseHealthChecks("/health", opsPort, new HealthCheckOptions
     }
 });
 
+app.UseOwnerPathGuard();
+
 app.UseCabinetArt();
 
 app.UseRouting();
+app.UseOwnerOnlyRoutes();
 
 app.MapStaticAssets();
 app.MapRazorPages().WithStaticAssets();
@@ -110,6 +99,7 @@ app.MapCabinetLayout();
 app.MapCabinetLanguage();
 app.MapCabinetSync();
 app.MapCabinetLive();
+app.MapCabinetOwner();
 
 await app.RunAsync();
 

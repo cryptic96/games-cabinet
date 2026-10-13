@@ -1377,6 +1377,8 @@ function createFakeDocument() {
   const page = { visibilityState: 'visible', hidden: false };
 
   page.createElement = (tagName) => new FakeElement(page, tagName);
+  page.createElementNS = (namespace, tagName) => new FakeElement(page, tagName);
+  page.createTextNode = (text) => Object.assign(new FakeElement(page, '#text'), { ownText: String(text) });
   page.body = page.createElement('body');
   page.activeElement = page.body;
 
@@ -1822,7 +1824,7 @@ let cabinetPageCount = 0;
  * @param {{ firstLayout: object, status: () => object }} setup The first layout drawn and the status the server reports.
  * @returns {Promise<object>} The page, its parts and the levers the tests pull.
  */
-async function startCabinetPage({ firstLayout, status, cards = [], withList = false }) {
+async function startCabinetPage({ firstLayout, status, cards = [], withList = false, cardsAnswer = undefined }) {
   const clock = createClock(true);
   const page = createFakeDocument();
   const mount = page.createElement('main');
@@ -1833,6 +1835,7 @@ async function startCabinetPage({ firstLayout, status, cards = [], withList = fa
   const layoutRequests = [];
   const cardRequests = [];
   const replaced = [];
+  const announced = [];
   const fire = (handlers, type) => (handlers[type] ?? []).forEach((handler) => handler());
   const syncElements = { '.sync-exact': page.createElement('p'), '.sync-stale': page.createElement('p'), '.sync-note': note };
   const syncRoot = {
@@ -1869,6 +1872,7 @@ async function startCabinetPage({ firstLayout, status, cards = [], withList = fa
   page.getElementById = (id) => (id === 'cabinet' ? mount : null);
   page.querySelector = (selector) => (selector === '.sync' ? syncRoot : page.body.querySelector(selector));
   page.addEventListener = (type, handler) => (documentHandlers[type] ??= []).push(handler);
+  page.dispatchEvent = (event) => announced.push({ type: event.type, detail: event.detail });
 
   globalThis.window = {
     ...clock.timers,
@@ -1885,7 +1889,7 @@ async function startCabinetPage({ firstLayout, status, cards = [], withList = fa
     if (url.startsWith('/cabinet/cards?')) {
       cardRequests.push({ url, init });
 
-      return Promise.resolve(answer(200, { layout: '', cards }));
+      return cardsAnswer === undefined ? Promise.resolve(answer(200, { layout: '', cards })) : cardsAnswer(cardRequests.length);
     }
 
     assert.equal(url, CABINET_LAYOUT_ROUTE);
@@ -1909,10 +1913,12 @@ async function startCabinetPage({ firstLayout, status, cards = [], withList = fa
 
   return {
     page,
+    clock,
     mount,
     filling,
     note,
     replaced,
+    announced,
     layoutRequests,
     cardRequests,
     skipLink,
@@ -2379,4 +2385,188 @@ test('with nothing drawn the games list has no entries and the skip link lands o
   } finally {
     leaveCabinetPage();
   }
+});
+
+/**
+ * Builds a card data answer from a list of outcomes, one per request in order; the last outcome repeats.
+ * @param {Array<'ok' | 'refused' | 'offline'>} outcomes What each request meets.
+ * @param {object[]} cards The cards an ok answer carries.
+ * @returns {(requestNumber: number) => Promise<object>}
+ */
+function cardsAnswerFrom(outcomes, cards) {
+  return (requestNumber) => {
+    const outcome = outcomes[Math.min(requestNumber, outcomes.length) - 1];
+
+    if (outcome === 'offline') {
+      return Promise.reject(new TypeError('network error'));
+    }
+
+    return Promise.resolve(outcome === 'refused' ? answer(503, {}) : answer(200, { layout: '', cards }));
+  };
+}
+
+const RETRY_CARDS = [{ entryId: 1, title: 'Invented Lighthouse', year: 2019, minPlayers: 2, maxPlayers: 4, expansions: [], bases: [] }];
+
+test('a card data request that fails on the network is repeated after a short wait and the data then arrives', async () => {
+  try {
+    const cabinet = await startCabinetPage({
+      firstLayout: layoutOfEntries([1]),
+      status: () => ({ running: false, snapshotVersion: 'v1' }),
+      cards: RETRY_CARDS,
+      cardsAnswer: cardsAnswerFrom(['offline', 'ok'], RETRY_CARDS),
+      withList: true,
+    });
+
+    assert.equal(cabinet.cardRequests.length, 1);
+    assert.deepEqual(cabinet.listButtons().map((button) => button.textContent), ['Invented Lighthouse']);
+
+    await cabinet.clock.advance(1000);
+    assert.equal(cabinet.cardRequests.length, 1);
+
+    await cabinet.clock.advance(1000);
+    assert.equal(cabinet.cardRequests.length, 2);
+    assert.deepEqual(cabinet.listButtons().map((button) => button.textContent), ['Invented Lighthouse (2019), 2–4 players']);
+  } finally {
+    leaveCabinetPage();
+  }
+});
+
+test('a card data request the server refuses is repeated too', async () => {
+  try {
+    const cabinet = await startCabinetPage({
+      firstLayout: layoutOfEntries([1]),
+      status: () => ({ running: false, snapshotVersion: 'v1' }),
+      cards: RETRY_CARDS,
+      cardsAnswer: cardsAnswerFrom(['refused', 'refused', 'ok'], RETRY_CARDS),
+      withList: true,
+    });
+
+    await cabinet.clock.advance(2000);
+    assert.equal(cabinet.cardRequests.length, 2);
+
+    await cabinet.clock.advance(5000);
+    assert.equal(cabinet.cardRequests.length, 3);
+    assert.deepEqual(cabinet.listButtons().map((button) => button.textContent), ['Invented Lighthouse (2019), 2–4 players']);
+  } finally {
+    leaveCabinetPage();
+  }
+});
+
+test('the card data request gives up after three attempts and then stops asking', async () => {
+  try {
+    const cabinet = await startCabinetPage({
+      firstLayout: layoutOfEntries([1]),
+      status: () => ({ running: false, snapshotVersion: 'v1' }),
+      cardsAnswer: cardsAnswerFrom(['offline'], []),
+      withList: true,
+    });
+
+    await cabinet.clock.advance(60000);
+
+    assert.equal(cabinet.cardRequests.length, 3);
+    assert.deepEqual(cabinet.listButtons().map((button) => button.textContent), ['Invented Lighthouse']);
+  } finally {
+    leaveCabinetPage();
+  }
+});
+
+test('a repeat of the card data request that waits for a layout which is since replaced never fires', async () => {
+  let version = 'v1';
+
+  try {
+    const cabinet = await startCabinetPage({
+      firstLayout: layoutOfEntries([1]),
+      status: () => ({ running: false, snapshotVersion: version }),
+      cardsAnswer: cardsAnswerFrom(['offline', 'ok'], RETRY_CARDS),
+    });
+
+    version = 'v2';
+    await cabinet.comeOnline();
+    cabinet.layoutRequests.shift().resolve(answer(200, layoutOfEntries([2])));
+    await cabinet.settle();
+
+    assert.equal(cabinet.cardRequests.length, 2);
+
+    await cabinet.clock.advance(60000);
+
+    assert.equal(cabinet.cardRequests.length, 2);
+  } finally {
+    leaveCabinetPage();
+  }
+});
+
+test('the cabinet page announces the card data and each draw on the document, naming nothing about the owner', async () => {
+  const cards = [{ entryId: 1, gameId: 11, title: 'Invented Orchard', location: null }];
+
+  try {
+    const cabinet = await startCabinetPage({ firstLayout: layoutOfEntries([1]), cards });
+
+    assert.deepEqual(cabinet.announced.map((event) => event.type), ['cabinet:drawn', 'cabinet:cards']);
+    assert.deepEqual(cabinet.announced[1].detail.records, cards);
+    assert.equal(readFileSync(new URL('../../Cabinet.Service/wwwroot/js/cabinet.js', import.meta.url), 'utf8').includes('/owner'), false);
+  } finally {
+    leaveCabinetPage();
+  }
+});
+
+const { buildCard } = await import(pathToFileURL(join(PAGE_FOLDER, 'card-view.js')).href);
+
+/**
+ * Builds a card for the record on a fake document and returns the ruled area.
+ * @param {object} record The card record.
+ * @param {object} [options] The card options.
+ * @returns {FakeElement} The element holding the ruled lines.
+ */
+function ruledAreaOf(record, options = {}) {
+  const previous = globalThis.document;
+
+  globalThis.document = createFakeDocument();
+
+  try {
+    return buildCard(record, COPY, { iconsUrl: '/img/icons.svg', ...options }).querySelector('.card-ruled');
+  } finally {
+    globalThis.document = previous;
+  }
+}
+
+test('a card built with an edit path ends with the Edit line under the link to BoardGameGeek, pointing at its own game', () => {
+  const ruled = ruledAreaOf({ gameId: 1234, title: 'Invented Orchard' }, { editHref: '/owner/pictures' });
+  const last = ruled.children[ruled.children.length - 1];
+  const previous = ruled.children[ruled.children.length - 2];
+
+  assert.equal(last.className, 'card-edit');
+  assert.equal(previous.className, 'card-link');
+  assert.equal(ruled.querySelectorAll('.card-edit').length, 1);
+
+  const anchor = last.children[0];
+
+  assert.equal(anchor.getAttribute('href'), '/owner/pictures?game=1234');
+  assert.equal(anchor.children[1].textContent, 'Edit');
+  assert.equal(anchor.children[0].children[0].getAttribute('href'), '/img/icons.svg#i-pencil');
+  assert.equal(anchor.children[0].getAttribute('aria-hidden'), 'true');
+});
+
+test('an expansion card links to the expansion itself', () => {
+  const ruled = ruledAreaOf({ gameId: 5678, title: 'Invented Extra', isExpansion: true }, { editHref: '/owner/pictures' });
+
+  assert.equal(ruled.querySelector('.card-edit').children[0].getAttribute('href'), '/owner/pictures?game=5678');
+});
+
+test('a card built without an edit path, or with one that is not a path on this site, has no Edit line', () => {
+  for (const editHref of [undefined, '', 'https://example.org/owner/pictures', '/' + '/example.org/pictures', 'owner/pictures', '/owner\\pictures', '/owner pictures', 42, null]) {
+    assert.equal(ruledAreaOf({ gameId: 1234, title: 'Invented Orchard' }, { editHref }).querySelector('.card-edit'), null, String(editHref));
+  }
+});
+
+test('the Edit line is left out when the game id is not made of digits only', () => {
+  assert.equal(ruledAreaOf({ gameId: '12x', title: 'Invented Orchard' }, { editHref: '/owner/pictures' }).querySelector('.card-edit'), null);
+});
+
+test('the Edit line reads Bewerken in Dutch and the not-placed name follows the page language', () => {
+  const dutch = copyFor('nl');
+
+  assert.equal(dutch.editLink, 'Bewerken');
+  assert.equal(dutch.notPlacedName('Invented Orchard'), 'Invented Orchard, niet geplaatst');
+  assert.equal(COPY.editLink, 'Edit');
+  assert.equal(COPY.notPlacedName('Invented Orchard'), 'Invented Orchard, not placed');
 });

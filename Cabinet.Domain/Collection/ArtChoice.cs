@@ -129,6 +129,9 @@ public enum ArtPick
 
     /// <summary>No usable picture: the generated cover is drawn.</summary>
     GeneratedCover,
+
+    /// <summary>The picture at the address the owner entered, drawn because the owner chose it.</summary>
+    OwnerLink,
 }
 
 /// <summary>Chooses between the owned edition's picture and the game's main picture.</summary>

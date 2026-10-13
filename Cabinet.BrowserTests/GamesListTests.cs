@@ -140,13 +140,13 @@ public sealed class GamesListTests : CabinetPageTest
     }
 
     [Fact]
-    public async Task Without_card_data_the_entries_carry_titles_only_and_still_open_a_card_with_the_quiet_note()
+    public async Task Without_card_data_the_entries_carry_titles_only_and_still_open_a_card_that_says_the_details_could_not_be_loaded()
     {
         await Page.SetViewportSizeAsync(1440, 900);
         await StartAsync(PrototypeOn);
-        await Page.RouteAsync("**/cabinet/cards**", route => route.AbortAsync());
+        var requestCount = await FailCardDataRequestsAsync();
         await GotoCabinetAsync("/?sample=65");
-        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await WaitForCardDataRequestsAsync(requestCount, 3);
 
         var entries = Page.Locator(Entries);
         (await entries.CountAsync()).Should().BeGreaterThan(10);
@@ -157,7 +157,7 @@ public sealed class GamesListTests : CabinetPageTest
         await Page.Keyboard.PressAsync("Enter");
 
         await Expect(Page.Locator(OpenCard)).ToBeVisibleAsync();
-        await Expect(Page.Locator(".card-note")).ToHaveTextAsync("More details arrive after the next sync.");
+        await Expect(Page.Locator(".card-note")).ToHaveTextAsync("Couldn't load the details. Reload the page to try again.");
     }
 
     [Fact]

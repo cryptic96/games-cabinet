@@ -207,6 +207,52 @@ public sealed class EnrichmentTests
         StoredGameIds(storage).Should().HaveCount(40).And.Contain(afterFirst);
     }
 
+    [Fact]
+    public async Task A_game_the_details_source_never_describes_is_asked_for_again_only_after_a_day()
+    {
+        using var storage = new TemporaryDirectory();
+        var items = SyntheticBggCollection.Create(5);
+        var undescribed = SyntheticBggCollection.FirstObjectId + 1;
+        var handler = new ScriptedBggHandler(request => LeaveOut(request, items, undescribed));
+        var clock = SyncHarness.NewClock();
+        await using var factory = SyncHarness.CreateFactory(handler, clock, StorageSettings(storage));
+        using var client = factory.CreatePublicClient();
+
+        await SyncRounds.PressAndWait(client, clock, advance: false);
+        var askedAfterFirst = AskedCount(handler, undescribed);
+
+        clock.Advance(TimeSpan.FromHours(1) - SyncRounds.Cooldown);
+        await SyncRounds.PressAndWait(client, clock);
+        var askedAfterSecond = AskedCount(handler, undescribed);
+
+        clock.Advance(TimeSpan.FromDays(1));
+        await SyncRounds.PressAndWait(client, clock);
+        var askedAfterThird = AskedCount(handler, undescribed);
+
+        askedAfterFirst.Should().Be(1);
+        askedAfterSecond.Should().Be(1, "an hour later the undescribed game is left alone");
+        askedAfterThird.Should().Be(2, "a day after it was first asked it is asked again");
+        StoredGameIds(storage).Should().NotContain(undescribed);
+    }
+
+    private static int AskedCount(ScriptedBggHandler handler, int gameId) =>
+        handler.ThingRequests().Count(request => GameIdsOf(request).Contains(gameId));
+
+    private static ScriptedResponse LeaveOut(HttpRequestMessage request, IReadOnlyList<FakeBggItem> items, int leftOut)
+    {
+        if (!request.RequestUri!.AbsolutePath.EndsWith("/thing", StringComparison.Ordinal))
+        {
+            return SyncRounds.Healthy(request, items);
+        }
+
+        var query = HttpUtility.ParseQueryString(request.RequestUri.Query);
+        var ids = query["id"]!.Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(id => int.Parse(id, CultureInfo.InvariantCulture))
+            .Where(id => id != leftOut);
+
+        return ScriptedResponse.Xml(BggXml.Things(ids, items, query["stats"] == "1"));
+    }
+
     private static Dictionary<string, string?> StorageSettings(TemporaryDirectory storage) =>
         new() { ["Storage:Directory"] = storage.FullPath };
 

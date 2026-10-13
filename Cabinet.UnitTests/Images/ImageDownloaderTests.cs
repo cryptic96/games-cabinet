@@ -99,7 +99,8 @@ public sealed class ImageDownloaderTests
 
         var result = await Downloader(handler).DownloadAsync(Uri("a.png"), TestContext.Current.CancellationToken);
 
-        result.Should().Be(ArtDownload.Refused("size"));
+        result.Should().Be(ArtDownload.Refused("size", MaxBytes + 1));
+        result.Should().BeOfType<ArtDownload.Turned>().Which.AnnouncedBytes.Should().Be(MaxBytes + 1);
     }
 
     [Fact]
@@ -113,6 +114,7 @@ public sealed class ImageDownloaderTests
 
         kept.Should().BeOfType<ArtDownload.Fetched>().Which.Bytes.Should().HaveCount((int)MaxBytes);
         refused.Should().Be(ArtDownload.Refused("size"));
+        refused.Should().BeOfType<ArtDownload.Turned>().Which.AnnouncedBytes.Should().BeNull("a streamed body announced nothing");
     }
 
     [Fact]
@@ -137,13 +139,14 @@ public sealed class ImageDownloaderTests
     [Theory]
     [InlineData(HttpStatusCode.NotFound)]
     [InlineData(HttpStatusCode.InternalServerError)]
-    public async Task An_error_status_is_a_failure_by_status(HttpStatusCode status)
+    public async Task An_error_status_is_a_failure_by_status_that_carries_the_status(HttpStatusCode status)
     {
         var handler = new StubHandler(_ => new HttpResponseMessage(status));
 
         var result = await Downloader(handler).DownloadAsync(Uri("a.png"), TestContext.Current.CancellationToken);
 
-        result.Should().Be(ArtDownload.Failed("status"));
+        result.Should().Be(ArtDownload.Failed("status", (int)status));
+        result.Should().BeOfType<ArtDownload.Missed>().Which.StatusCode.Should().Be((int)status);
     }
 
     [Fact]
