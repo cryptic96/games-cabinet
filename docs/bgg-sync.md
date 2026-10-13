@@ -588,6 +588,20 @@ number, or an `Art:OrientFromCover` that is not `true` or `false` stops the app
 at start-up with a message naming the key. This includes
 `Art:UnsureLandscapeMarginPercent`.
 
+## Storage locations
+
+Storage locations are not read from BGG. The collection call can ask for
+private inventory information, but BGG does not return it to an API token alone
+(see `Bgg__IncludePrivateInfo` above), and the cabinet does not use a location
+that arrives that way. Locations come only from the owner tools: the owner keeps
+a list of locations on the owner pages and places games in it, and the card's
+"Stored in" line is written from that list. A sync never writes owner data and
+never changes a location or a picture choice the owner made; it only reads them
+to draw the cabinet. A game that leaves the collection keeps its owner choices
+for thirty days of accepted collections, in case it was only a hiccup, and is
+forgotten after that. Where the owner data is stored and how it is backed up is
+described in [the deploy guide](deploy.md#backing-up-owner-data).
+
 ## Where the data lives
 
 The synced collection is stored as `snapshot.json` in the service's state
