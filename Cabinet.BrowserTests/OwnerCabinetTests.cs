@@ -382,9 +382,18 @@ public sealed class OwnerCabinetTests : CabinetPageTest
             var place = (await strip.GetByRole(AriaRole.Link, new() { Name = "Place them" }).BoundingBoxAsync())!;
             var tops = await strip.Locator(".owner-strip-links a").EvaluateAllAsync<double[]>("links => links.map(link => Math.round(link.getBoundingClientRect().top))");
 
-            box.Height.Should().BeLessThanOrEqualTo(170, "the strip stays quiet so the cabinet is the first read");
+            var sentence = await RectOf("header nav.owner-bar .owner-strip-note:nth-of-type(1)");
+            var links = (await strip.Locator(".owner-strip-links").BoundingBoxAsync())!;
+            var lineHeight = await strip.Locator(".owner-strip-note").First.EvaluateAsync<double>("note => parseFloat(getComputedStyle(note).lineHeight)");
+            var sameLine = Math.Abs((count.Top + (count.Height / 2)) - (place.Y + (place.Height / 2))) < 2;
+            var justBelow = place.Y >= count.Bottom - 1 && place.Y - count.Bottom <= 8;
+            var content = (links.Y + links.Height) - sentence.Top;
+
+            Math.Round(sentence.Height / lineHeight).Should().BeLessThanOrEqualTo(3, "the owner-view sentence stays short even in a wide font");
+            (sameLine || justBelow).Should().BeTrue("Place them follows the count on its line, or wraps straight under it when a wide font leaves no room");
+            ((double)box.Height).Should().BeLessThanOrEqualTo(content + 19, "the strip adds only its 8px padding and border around its rows");
+            ((double)box.Height).Should().BeLessThanOrEqualTo(200, "the strip stays quiet so the cabinet is the first read");
             tops.Distinct().Should().HaveCount(1, "the three links share one row");
-            Math.Abs((count.Top + (count.Height / 2)) - (place.Y + (place.Height / 2))).Should().BeLessThan(2, "Place them follows the count on its line");
         }
 
         await SaveScreenshotAsync($"owner-strip-{width}");

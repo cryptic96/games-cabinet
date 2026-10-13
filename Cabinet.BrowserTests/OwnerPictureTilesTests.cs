@@ -37,7 +37,7 @@ public sealed class OwnerPictureTilesTests : CabinetPageTest
         await GotoOwnerAsync("/owner/pictures?view=all");
         var row = RowOf(RowTitle);
         await Expect(row.Locator("fieldset.pic-choices label.pic-tile")).ToHaveCountAsync(4);
-        (await row.Locator("label.pic-tile .pic-label").AllInnerTextsAsync()).Should().Equal("Automatic", "Owned edition", "Main picture", "Your link");
+        await Expect(row.Locator("label.pic-tile .pic-label")).ToHaveTextAsync(["Automatic", "Owned edition", "Main picture", "Your link"]);
         await Expect(row.Locator("fieldset legend")).ToHaveTextAsync($"Picture for {RowTitle}");
         await Expect(row.Locator("label.pic-tile img[src^='/art/']")).ToHaveCountAsync(3);
         await Expect(row.Locator("img[src^='/art/']").First).ToHaveJSPropertyAsync("complete", true);
