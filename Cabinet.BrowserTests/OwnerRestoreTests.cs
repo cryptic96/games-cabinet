@@ -41,7 +41,7 @@ public sealed class OwnerRestoreTests : CabinetPageTest
         await Expect(heading).ToBeFocusedAsync();
         (await heading.EvaluateAsync<string>("element => getComputedStyle(element).outlineStyle")).Should().Be("none", "a heading that only takes focus shows no ring");
         await Expect(Page.Locator("#restore-preview p").First).ToHaveTextAsync(Summary + ".");
-        await Expect(Page.Locator(".restore-table th[scope=col]")).ToHaveTextAsync(["In the file", "On this server now"]);
+        await Expect(Page.Locator(".restore-table th[scope=col]")).ToHaveTextAsync(["What is compared", "In the file", "On this server now"]);
         await Expect(Page.Locator(".restore-table th[scope=row]")).ToHaveCountAsync(4);
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Restore file" })).ToBeVisibleAsync();
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Keep current data" })).ToBeVisibleAsync();
