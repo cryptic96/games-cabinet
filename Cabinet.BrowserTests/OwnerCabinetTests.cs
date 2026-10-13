@@ -1,0 +1,389 @@
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using Cabinet.BrowserTests.Infrastructure;
+using Cabinet.Domain.Owner;
+using Cabinet.FakeBgg;
+using Cabinet.FakeBgg.Testing;
+using Cabinet.IntegrationTests.Infrastructure;
+using Cabinet.Service.Owner;
+using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Playwright;
+
+namespace Cabinet.BrowserTests;
+
+/// <summary>
+/// Proves in a real browser that the cabinet at the owner address leads into the tools: every card ends with an Edit link to that
+/// game's single-game view, and every box whose game has no place carries a small corner tag and a longer accessible name. It also
+/// proves that none of it reaches the public address, that the tags re-appear after the cabinet is redrawn, and that the quiet
+/// states (every game placed, the card data failing, forced colours, an open card) behave.
+/// </summary>
+[Trait("Category", "Browser")]
+public sealed class OwnerCabinetTests : CabinetPageTest
+{
+    private const string PicturesPath = "/owner/pictures";
+    private const string QuarryBase = "Quarry Lights";
+    private const string CafeBase = "Café Quarter";
+    private const string CafeExpansion = "Café Quarter: Extra Pack";
+    private const string LongTitle = "Cartographers of the Endless Amber Hills and Wandering Tides";
+    private const string OpenCard = "dialog.card-dialog[open]";
+    private const string Boxes = "#cabinet .placement:not([data-kind=\"moreMarker\"])";
+    private const string FailedToLoad = "Failed to load resource";
+    private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
+
+    private HttpClient? _publicClient;
+
+    [Fact]
+    public async Task At_the_owner_address_an_unplaced_box_carries_the_tag_and_its_card_ends_with_an_Edit_link_to_its_pictures_view()
+    {
+        var host = await StartHostAsync();
+        var ids = await host.SeedAsync("Cabinet A", "Shelf B");
+        var placed = host.Card(QuarryBase);
+        await host.PlaceAsync(placed, ids[0]);
+        await Page.SetViewportSizeAsync(1440, 900);
+
+        await GotoOwnerCabinetAsync();
+
+        await Expect(Box(host.Card(CafeBase))).ToHaveAttributeAsync("data-unplaced", string.Empty);
+        await Expect(Box(placed)).Not.ToHaveAttributeAsync("data-unplaced", string.Empty);
+        foreach (var card in host.Cards.Where(card => card.GameId != placed.GameId))
+        {
+            var box = Box(card);
+            await Expect(box).ToHaveAttributeAsync("data-unplaced", string.Empty);
+            (await box.GetAttributeAsync("aria-label")).Should().EndWith(", not placed");
+            (await box.GetAttributeAsync("title")).Should().NotContain("not placed");
+        }
+
+        (await Box(placed).GetAttributeAsync("aria-label")).Should().Be(QuarryBase);
+        await SaveScreenshotAsync("owner-cabinet-1440");
+
+        var target = host.Card(CafeBase);
+        await Box(target).ClickAsync();
+
+        await Expect(Page.Locator(OpenCard)).ToBeVisibleAsync();
+        var last = Page.Locator($"{OpenCard} .card-ruled > :last-child");
+        await Expect(last).ToHaveClassAsync("card-edit");
+        await Expect(Page.Locator($"{OpenCard} .card-link + .card-edit")).ToHaveCountAsync(1);
+        await Expect(Page.Locator($"{OpenCard} .card-edit")).ToHaveCountAsync(1);
+        var link = last.Locator("a");
+        await Expect(link).ToHaveAttributeAsync("href", $"{PicturesPath}?game={target.GameId}");
+        await Expect(link).ToHaveTextAsync("Edit");
+        await Expect(link.Locator("svg use")).ToHaveAttributeAsync("href", new Regex("#i-pencil$"));
+        await Expect(Page.Locator("html[data-pull-kind]")).ToHaveCountAsync(0);
+        await SaveScreenshotAsync("owner-cabinet-card-1440");
+
+        await link.ClickAsync();
+
+        await Expect(Page).ToHaveURLAsync(new Regex($@"{PicturesPath}\?game={target.GameId}$"));
+        await Expect(Page.Locator(".pic-row")).ToHaveCountAsync(1);
+        await Expect(Page.Locator(".pic-row .game-title")).ToHaveTextAsync(CafeBase);
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task An_expansion_card_links_to_the_expansion_and_follows_an_unplaced_base_with_the_tag()
+    {
+        var host = await StartHostAsync();
+        var expansion = host.Card(CafeExpansion);
+        await Page.SetViewportSizeAsync(1440, 900);
+
+        await GotoOwnerCabinetAsync();
+
+        await Expect(Box(expansion)).ToHaveAttributeAsync("data-unplaced", string.Empty);
+        await Box(expansion).ClickAsync();
+        await Expect(Page.Locator(OpenCard)).ToBeVisibleAsync();
+        await Expect(Page.Locator($"{OpenCard} .card-edit")).ToHaveCountAsync(1);
+        await Expect(Page.Locator($"{OpenCard} .card-edit a")).ToHaveAttributeAsync("href", $"{PicturesPath}?game={expansion.GameId}");
+    }
+
+    [Fact]
+    public async Task With_the_Dutch_cookie_the_link_reads_Bewerken_and_the_name_ends_niet_geplaatst()
+    {
+        var host = await StartHostAsync();
+        await Context.AddCookiesAsync([new Cookie { Name = "lang", Value = "nl", Url = $"http://127.0.0.1:{OwnerPort}" }]);
+        await Page.SetViewportSizeAsync(390, 844);
+        var target = host.Card(QuarryBase);
+
+        await GotoOwnerCabinetAsync();
+
+        await Expect(Box(target)).ToHaveAttributeAsync("data-unplaced", string.Empty);
+        (await Box(target).GetAttributeAsync("aria-label")).Should().Be($"{QuarryBase}, niet geplaatst");
+        await Box(target).ClickAsync();
+        await Expect(Page.Locator($"{OpenCard} .card-edit a")).ToHaveTextAsync("Bewerken");
+        await Expect(Page.Locator("html[data-pull-kind]")).ToHaveCountAsync(0);
+        await SaveScreenshotAsync("owner-cabinet-card-nl-390");
+    }
+
+    [Theory]
+    [InlineData(1440, 900)]
+    [InlineData(390, 844)]
+    public async Task At_the_public_address_there_is_no_tag_no_Edit_link_no_owner_stylesheet_and_no_owner_script(int width, int height)
+    {
+        var host = await StartHostAsync();
+        await host.SeedAsync("Cabinet A");
+        await Page.SetViewportSizeAsync(width, height);
+        var target = host.Card(QuarryBase);
+
+        await GotoCabinetAsync("/");
+
+        await Expect(Page.Locator("#cabinet .placement").First).ToBeAttachedAsync();
+        await Expect(Page.Locator("[data-unplaced]")).ToHaveCountAsync(0);
+        (await Page.Locator("dialog.card-dialog").GetAttributeAsync("data-edit-href")).Should().BeNull();
+        await Expect(Page.Locator("[data-edit-href]")).ToHaveCountAsync(0);
+        await Expect(Page.Locator("link[href*=\"owner.css\"]")).ToHaveCountAsync(0);
+        await Expect(Page.Locator("script[src*=\"owner-cabinet\"]")).ToHaveCountAsync(0);
+        (await Box(target).GetAttributeAsync("aria-label")).Should().Be(QuarryBase);
+        await Box(target).ClickAsync();
+        await Expect(Page.Locator(OpenCard)).ToBeVisibleAsync();
+        await Expect(Page.Locator($"{OpenCard} .card-edit")).ToHaveCountAsync(0);
+        await Expect(Page.Locator($"{OpenCard} .card-ruled > :last-child")).ToHaveClassAsync("card-link");
+        await Expect(Page.Locator("html[data-pull-kind]")).ToHaveCountAsync(0);
+        await SaveScreenshotAsync($"public-card-{width}");
+
+        (await Page.ContentAsync()).Should().NotContain("/owner");
+        foreach (var script in new[] { "cabinet.js", "card-view.js", "detail.js", "copy.js", "render.js", "card-flow.js" })
+        {
+            var source = await Page.EvaluateAsync<string>("name => fetch('/js/' + name).then(response => response.text())", script);
+            source.Should().NotContain("/owner");
+        }
+
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_cabinet_where_every_game_is_placed_shows_no_tags_and_an_expansion_following_its_base_is_placed_too()
+    {
+        var host = await StartHostAsync();
+        var ids = await host.SeedAsync("Cabinet A");
+        await host.PlaceAsync(host.Card(QuarryBase), ids[0]);
+        await host.PlaceAsync(host.Card(CafeBase), ids[0]);
+        await host.PlaceAsync(host.Card(LongTitle), ids[0]);
+        await Page.SetViewportSizeAsync(1440, 900);
+
+        var requests = await FailCardDataRequestsAsync(0);
+
+        await GotoOwnerCabinetAsync();
+        await WaitForCardDataRequestsAsync(requests, 1);
+
+        await Expect(Page.Locator(Boxes)).ToHaveCountAsync(host.Cards.Count);
+        await Expect(Page.Locator("[data-unplaced]")).ToHaveCountAsync(0);
+        foreach (var label in await Page.Locator(Boxes).EvaluateAllAsync<string[]>("boxes => boxes.map(box => box.getAttribute('aria-label'))"))
+        {
+            label.Should().NotContain("not placed");
+        }
+
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task When_the_card_data_fails_no_tags_show_and_the_cabinet_still_draws()
+    {
+        var host = await StartHostAsync();
+        var requests = await FailCardDataRequestsAsync();
+        await Page.SetViewportSizeAsync(1440, 900);
+
+        await GotoOwnerCabinetAsync();
+        await WaitForCardDataRequestsAsync(requests, 3);
+
+        await Expect(Page.Locator(Boxes)).ToHaveCountAsync(host.Cards.Count);
+        await Expect(Page.Locator("[data-unplaced]")).ToHaveCountAsync(0);
+        (await Page.Locator(Boxes).First.GetAttributeAsync("aria-label")).Should().NotContain("not placed");
+        ConsoleErrors.Where(error => !error.Contains(FailedToLoad, StringComparison.Ordinal)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Under_forced_colours_the_page_loads_cleanly_and_the_tag_is_a_two_pixel_corner_border()
+    {
+        var host = await StartHostAsync();
+        await Page.EmulateMediaAsync(new PageEmulateMediaOptions { ForcedColors = ForcedColors.Active });
+        await Page.SetViewportSizeAsync(1440, 900);
+
+        await GotoOwnerCabinetAsync();
+
+        var box = Box(host.Card(QuarryBase));
+        await Expect(box).ToHaveAttributeAsync("data-unplaced", string.Empty);
+        var border = await box.Locator(".placement-tag").EvaluateAsync<string[]>("element => { const style = getComputedStyle(element); return [style.borderTopWidth, style.borderLeftWidth, style.borderTopStyle]; }");
+        border.Should().Equal("2px", "2px", "solid");
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task An_open_card_hides_its_source_box_with_its_tag()
+    {
+        var host = await StartHostAsync();
+        await Page.SetViewportSizeAsync(1440, 900);
+        var target = host.Card(QuarryBase);
+
+        await GotoOwnerCabinetAsync();
+        await Expect(Box(target)).ToHaveAttributeAsync("data-unplaced", string.Empty);
+        await Box(target).ClickAsync();
+
+        await Expect(Page.Locator(OpenCard)).ToBeVisibleAsync();
+        var visibility = await Box(target).EvaluateAsync<string>("element => getComputedStyle(element).visibility");
+        visibility.Should().Be("hidden");
+
+        await Page.Keyboard.PressAsync("Escape");
+
+        await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(0);
+        (await Box(target).EvaluateAsync<string>("element => getComputedStyle(element).visibility")).Should().Be("visible");
+        await Expect(Box(target)).ToHaveAttributeAsync("data-unplaced", string.Empty);
+    }
+
+    [Fact]
+    public async Task After_a_sync_redraws_the_cabinet_the_tags_are_applied_again()
+    {
+        var bgg = new SyncRounds.SwitchableBgg(SyntheticBggCollection.Create(5));
+        var clock = SyncHarness.NewClock();
+        var factory = SyncHarness.CreateFactory(bgg.Handler, clock);
+        await StartAsync(factory);
+        using var client = factory.CreatePublicClient();
+        await SyncRounds.PressAndWait(client, clock, advance: false);
+        await Page.SetViewportSizeAsync(1440, 900);
+        await GotoOwnerCabinetAsync();
+        await Expect(Page.Locator("[data-unplaced]").First).ToBeAttachedAsync();
+        var boxesBefore = await Page.Locator(Boxes).CountAsync();
+
+        bgg.Serve([.. SyntheticBggCollection.Create(5).Take(3)]);
+        await SyncRounds.PressAndWait(client, clock);
+
+        await Expect(Page.Locator(Boxes)).Not.ToHaveCountAsync(boxesBefore);
+        var boxesAfter = await Page.Locator(Boxes).CountAsync();
+        boxesAfter.Should().BeLessThan(boxesBefore);
+        await Expect(Page.Locator("[data-unplaced]")).ToHaveCountAsync(boxesAfter);
+        foreach (var label in await Page.Locator(Boxes).EvaluateAllAsync<string[]>("boxes => boxes.map(box => box.getAttribute('aria-label'))"))
+        {
+            label.Should().EndWith(", not placed");
+        }
+    }
+
+    [Theory]
+    [InlineData("65", 1440, 900)]
+    [InlineData("65", 390, 844)]
+    [InlineData("400", 1440, 900)]
+    [InlineData("400", 390, 844)]
+    public async Task The_tag_never_sits_over_a_label_and_takes_no_pointer_input(string sample, int width, int height)
+    {
+        await StartAsync(PrototypeOn);
+        await Page.SetViewportSizeAsync(width, height);
+        await Page.GotoAsync($"http://127.0.0.1:{OwnerPort}/?sample={sample}");
+        await Page.WaitForSelectorAsync("#cabinet .placement", new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached });
+        await Expect(Page.Locator("[data-unplaced]").First).ToBeAttachedAsync();
+        await SaveScreenshotAsync($"owner-cabinet-sample-{sample}-{width}");
+
+        var overlaps = await Page.EvaluateAsync<string[]>(
+            """
+            () => [...document.querySelectorAll('#cabinet .placement[data-unplaced]')].flatMap(box => {
+              const tag = box.querySelector('.placement-tag').getBoundingClientRect();
+              return [...box.querySelectorAll('.placement-label, .placement-sub')].flatMap(label => {
+                const range = document.createRange();
+                range.selectNodeContents(label);
+                return [...range.getClientRects()]
+                  .filter(line => line.width > 0 && (line.left - tag.left) + (line.top - tag.top) < tag.width - 2 && line.left < tag.right && line.top < tag.bottom)
+                  .map(line => box.dataset.kind + ' ' + box.dataset.entryId + ' tag ' + [tag.left, tag.top, tag.width].map(Math.round).join(',') + ' text ' + [line.left, line.top, line.right, line.bottom].map(Math.round).join(','));
+              });
+            })
+            """);
+
+        overlaps.Should().BeEmpty();
+        var pointerEvents = await Page.Locator("#cabinet .placement[data-unplaced]").EvaluateAllAsync<string[]>(
+            "boxes => boxes.map(box => getComputedStyle(box.querySelector('.placement-tag')).pointerEvents)");
+        pointerEvents.Should().OnlyContain(events => events == "none");
+    }
+
+    private ILocator Box(CardReading card) => Page.Locator($"{Boxes}[data-game-id=\"{card.GameId}\"]").First;
+
+    private async Task GotoOwnerCabinetAsync()
+    {
+        await Page.GotoAsync($"http://127.0.0.1:{OwnerPort}/");
+        await Page.WaitForSelectorAsync("#cabinet .placement", new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached });
+    }
+
+    private async Task<OwnerHost> StartHostAsync()
+    {
+        var clock = SyncHarness.NewClock();
+        var factory = SyncHarness.CreateFactory(ScriptedBggHandler.ForCollection(Collection()), clock);
+
+        await StartAsync(factory);
+        _publicClient = factory.CreatePublicClient();
+        await SyncRounds.PressAndWait(_publicClient, clock, advance: false);
+
+        return new OwnerHost(factory.ServingServices.GetRequiredService<OwnerDataService>(), await ReadCardsAsync());
+    }
+
+    private static IReadOnlyList<FakeBggItem> Collection()
+    {
+        var first = SyntheticBggCollection.FirstObjectId;
+
+        return
+        [
+            Entry(0, QuarryBase, false, null),
+            Entry(1, CafeBase, false, null),
+            Entry(2, CafeExpansion, true, first + 1),
+            Entry(3, LongTitle, false, null),
+        ];
+    }
+
+    private static FakeBggItem Entry(int index, string title, bool isExpansion, int? baseObjectId) =>
+        new(
+            SyntheticBggCollection.FirstObjectId + index,
+            SyntheticBggCollection.FirstCollId + index,
+            title,
+            isExpansion,
+            true,
+            2000 + index,
+            null,
+            null,
+            baseObjectId);
+
+    private async Task<IReadOnlyList<CardReading>> ReadCardsAsync()
+    {
+        using var response = await _publicClient!.GetAsync("/cabinet/cards?profile=desktop", TestContext.Current.CancellationToken);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+
+        return
+        [
+            .. document.RootElement.GetProperty("cards").EnumerateArray().Select(card => new CardReading(
+                card.GetProperty("gameId").GetInt32(),
+                card.GetProperty("title").GetString()!)),
+        ];
+    }
+
+    private sealed record CardReading(int GameId, string Title);
+
+    private sealed class OwnerHost(OwnerDataService owner, IReadOnlyList<CardReading> cards)
+    {
+        public OwnerDataService Owner { get; } = owner;
+
+        public IReadOnlyList<CardReading> Cards { get; } = cards;
+
+        public CardReading Card(string title) => Cards.First(card => string.Equals(card.Title, title, StringComparison.Ordinal));
+
+        public async Task PlaceAsync(CardReading card, string locationId)
+        {
+            var result = await Owner.MutateAsync(
+                Owner.Revision,
+                data => LocationEdits.Assign(data, card.GameId, locationId, card.Title),
+                TestContext.Current.CancellationToken);
+
+            result.Outcome.Should().Be(OwnerOutcome.Saved);
+        }
+
+        public async Task<IReadOnlyList<string>> SeedAsync(params string[] names)
+        {
+            var ids = new List<string>();
+
+            foreach (var name in names)
+            {
+                var result = await Owner.MutateAsync(
+                    Owner.Revision,
+                    data => LocationEdits.Add(data, name, OwnerDataService.NewId),
+                    TestContext.Current.CancellationToken);
+
+                result.Outcome.Should().Be(OwnerOutcome.Saved);
+                ids.Add(result.Data!.Locations[^1].Id);
+            }
+
+            return ids;
+        }
+    }
+}

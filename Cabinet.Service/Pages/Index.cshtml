@@ -1,6 +1,11 @@
 @page
 @model Cabinet.Service.Pages.IndexModel
 @inject Microsoft.AspNetCore.Mvc.ViewFeatures.IFileVersionProvider FileVersions
+@inject Cabinet.Service.Owner.OwnerAccessOptions OwnerAccess
+@{
+    var onOwnerPort = OwnerAccess.IsOwnerPort(HttpContext);
+    var iconsUrl = FileVersions.AddFileVersionToPath(Request.PathBase, "/img/icons.svg");
+}
 <a class="skip-link" href="#games-list-start">@Model.Language.Text.SkipLink</a>
 <header>
     <h1>@Model.Language.Text.SiteName</h1>
@@ -75,10 +80,21 @@
         <div id="cabinet" class="cabinet" role="group" aria-label="@Model.Language.Text.CabinetLabel" aria-describedby="cabinet-hint"></div>
     }
     <p id="cabinet-hint" class="visually-hidden">@Model.Language.Text.CabinetHint</p>
-    <dialog class="card-dialog" aria-labelledby="card-title" data-icons="@FileVersions.AddFileVersionToPath(Request.PathBase, "/img/icons.svg")"></dialog>
+    @if (onOwnerPort)
+    {
+        <dialog class="card-dialog" aria-labelledby="card-title" data-icons="@iconsUrl" data-edit-href="@Url.Content("~/owner/pictures")"></dialog>
+    }
+    else
+    {
+        <dialog class="card-dialog" aria-labelledby="card-title" data-icons="@iconsUrl"></dialog>
+    }
     <noscript><p class="cabinet-message">@Model.Language.Text.NoScript</p></noscript>
 </main>
 @section Scripts {
     <script src="~/lib/signalr/signalr.min.js" asp-append-version="true"></script>
     <script type="module" src="~/js/cabinet.js" asp-append-version="true"></script>
+    @if (onOwnerPort)
+    {
+        <script type="module" src="~/js/owner-cabinet.js" asp-append-version="true"></script>
+    }
 }

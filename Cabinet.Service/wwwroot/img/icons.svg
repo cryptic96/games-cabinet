@@ -28,4 +28,8 @@
   <symbol id="i-out" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M6 3H3v10h10v-3M9 3h4v4M13 3L7 9"/>
   </symbol>
+  <symbol id="i-pencil" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 13l.7-3L11 2.7a1.4 1.4 0 0 1 2 0l.3.3a1.4 1.4 0 0 1 0 2L6 12.3z"/>
+    <path d="M9.5 4.2l2.3 2.3"/>
+  </symbol>
 </svg>

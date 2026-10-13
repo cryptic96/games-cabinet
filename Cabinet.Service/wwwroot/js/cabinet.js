@@ -42,6 +42,16 @@ const CARD_RETRY_DELAYS_MS = [1500, 4000];
 const CARD_ATTEMPTS = CARD_RETRY_DELAYS_MS.length + 1;
 
 /**
+ * Tells the rest of the page something about the cabinet through a document event, so a script that only some pages load can react
+ * without this one knowing about it.
+ * @param {string} name The event name.
+ * @param {object} [detail] What the event carries.
+ */
+function announce(name, detail = {}) {
+  document.dispatchEvent(new CustomEvent(name, { detail }));
+}
+
+/**
  * Returns the profile name the layout endpoint expects for the current viewport.
  * @returns {string}
  */
@@ -127,6 +137,7 @@ async function requestCards(epoch, etag) {
 
     cardRecords = new Map(body.cards.map((record) => [String(record.entryId), record]));
     gamesList?.showCards(body.cards);
+    announce('cabinet:cards', { records: body.cards });
 
     return 'loaded';
   } catch {
@@ -248,6 +259,7 @@ async function load() {
 
     renderCabinet(mount, layout, COPY);
     roving.refresh();
+    announce('cabinet:drawn');
     afterDraw(layout, response.headers.get('ETag'));
   } catch {
     if (thisLoad === latestLoad) {
@@ -311,6 +323,7 @@ async function redraw() {
 
     renderCabinet(mount, layout, COPY);
     roving.refresh();
+    announce('cabinet:drawn');
     afterDraw(layout, etag);
 
     const filling = document.querySelector('.cabinet-filling');

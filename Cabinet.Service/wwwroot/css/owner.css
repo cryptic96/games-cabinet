@@ -20,6 +20,91 @@
   --tag-size: clamp(8px, calc(20 * var(--u)), 12px);
 }
 
+/**
+ * The mark on a box whose game has no place: a small two-tone dog-ear in the top-left corner, paper-coloured with an ink fold, so
+ * it reads on a cream box and on a navy one alike. It is one element placed over the corner; it takes no space, no pointer input
+ * and no text, and it leaves the box's geometry, order and focus ring as they are.
+ */
+.placement-tag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  width: var(--tag-size);
+  height: var(--tag-size);
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom right,
+    var(--paper) 0 calc(50% - 1px),
+    var(--ink) calc(50% - 1px) 50%,
+    transparent 50%
+  );
+}
+
+/**
+ * A spine, a lying box, an expansion layer and an orphan expansion all start their title right under the box's top-left corner, so
+ * on those boxes the tag takes its smallest size instead of sitting over the first letters. A generated or picture cover keeps
+ * the larger one.
+ */
+.placement:is(
+  [data-kind="spine"],
+  [data-kind="expansionSpine"],
+  [data-kind="flatBox"],
+  [data-kind="expansionLayer"],
+  [data-kind="orphanExpansion"]
+) {
+  --tag-size: 8px;
+}
+
+@media (forced-colors: active) {
+  .placement-tag {
+    background: none;
+    border-top: 2px solid CanvasText;
+    border-left: 2px solid CanvasText;
+  }
+}
+
+/**
+ * The quiet Edit line at the foot of a card, under the link to BoardGameGeek and following the same tap-row rule, so the card's
+ * rhythm holds: no blank ruled line between the two links, one ruling tall on a fine pointer and two on a phone.
+ */
+.card-ruled > .card-link + .card-edit {
+  margin-block-start: 0;
+}
+
+.card-edit {
+  min-height: calc(var(--hit-rows) * var(--ruling));
+}
+
+.card-edit a {
+  display: block;
+  min-height: calc(var(--hit-rows) * var(--ruling));
+  color: var(--paper-label);
+  font-size: 14px;
+  font-weight: 400;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.card-edit svg {
+  display: inline;
+  width: 14px;
+  height: 14px;
+  margin-inline-end: 4px;
+  vertical-align: -2px;
+}
+
+@media (hover: hover) {
+  .card-edit a:hover {
+    background: var(--hover-tint);
+  }
+}
+
+.card-edit a:active {
+  background: var(--hover-tint);
+}
+
 header:has(+ .owner-bar) {
   margin-bottom: 16px;
 }

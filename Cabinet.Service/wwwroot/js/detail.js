@@ -78,11 +78,12 @@ export function initCardDialog({ dialog, mount, getRecord, getCopy, getPalette =
   }
 
   /**
-   * Gives what a card is built with: the sprite, the colour table on screen and the swap a row asks for.
-   * @returns {{ iconsUrl: string, palette: object[], onSwap: Function }}
+   * Gives what a card is built with: the sprite, the colour table on screen, the swap a row asks for and, when the page names one,
+   * the path the Edit line points at.
+   * @returns {{ iconsUrl: string, palette: object[], onSwap: Function, editHref: string | undefined }}
    */
   function cardOptions() {
-    return { iconsUrl, palette: getPalette(), onSwap: swapTo };
+    return { iconsUrl, palette: getPalette(), onSwap: swapTo, editHref: dialog.dataset.editHref };
   }
 
   /**
