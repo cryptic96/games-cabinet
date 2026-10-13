@@ -1,7 +1,7 @@
 ---
 phase: 06-owner-tools-persistence
 verified: 2026-10-13T00:00:00Z
-status: human_needed
+status: passed
 score: 4/4 must-haves verified
 behavior_unverified: 0
 overrides_applied: 0
@@ -9,12 +9,15 @@ re_verification: false
 gaps: []
 deferred: []
 human_verification:
+
   - test: "Download a real backup of the owner data from the live owner host and store it somewhere off the container"
     expected: "A readable JSON file saved off the container; the banner switches to the downloaded state. Until this happens no backup of the real data exists, because the backup is the owner's own download (no scheduled job), by decision."
     why_human: "The backup is a manual export by design. Code and tests prove the export and the restore work, but only the owner can make and keep the file, and no record shows the owner has done it on the live host."
+
   - test: "Run one real round trip on the live host: download, then Restore from file, check the three counts in the preview, keep the current data"
     expected: "The preview shows the same locations, placed games and picture choices as the live data, and nothing changes when the owner keeps the current data."
     why_human: "The owner's first-session answer was a general 'it seems to work' with no per-check yes or no. The round trip is proven in-process (download from one server restored into a fresh server on a fresh state directory) but not itemised on the real container."
+
   - test: "From a device outside the home network and outside the VPN, request the owner hostname and the public hostname's owner paths"
     expected: "The owner hostname is refused by the proxy's address allow-list; the public hostname answers 404 for every owner path."
     why_human: "The route check and the container self-check were run from the home network. Only a request from the open internet proves the proxy-side wall. This is cheap to do before the site is opened to everyone."

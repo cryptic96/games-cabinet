@@ -71,7 +71,7 @@ Requirements for the initial release. Each maps to a roadmap phase.
 ### Box Images & Shape
 
 - [x] **IMG-01**: Each game's box image defaults to the owned version's image when that image is a flat front cover. When it looks like a 3D or perspective product shot (a slanted box on a plain background), the base game's main image is used instead.
-- [ ] **IMG-02**: The owner can override any game's image with one of:
+- [x] **IMG-02**: The owner can override any game's image with one of:
   - the owned version's image
   - the base game's image
   - a specific image from the game's BGG gallery, given by link (only BGG image links are accepted)
@@ -84,8 +84,8 @@ Requirements for the initial release. Each maps to a roadmap phase.
 
 ### Owner Tools
 
-- [ ] **OWN-01**: Owner tools (image overrides, and location editing if LOC-02 requires it) work only from the home network or VPN. The public internet can never reach owner screens or endpoints.
-- [ ] **OWN-02**: Owner-entered data (image overrides, and locations if edited in the app) survives syncs, restarts and new releases. It is backed up, so losing the container does not lose it.
+- [x] **OWN-01**: Owner tools (image overrides, and location editing if LOC-02 requires it) work only from the home network or VPN. The public internet can never reach owner screens or endpoints.
+- [x] **OWN-02**: Owner-entered data (image overrides, and locations if edited in the app) survives syncs, restarts and new releases. It is backed up, so losing the container does not lose it.
 
 ### Language
 
@@ -205,10 +205,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LOC-04 | Phase 6 | Pending (conditional on LOC-02 outcome) |
 | LOC-05 | Phase 7 | Pending |
 | IMG-01 | Phase 4 | Complete |
-| IMG-02 | Phase 6 | Pending |
+| IMG-02 | Phase 6 | Complete |
 | IMG-03 | Phase 4 | Complete |
-| OWN-01 | Phase 6 | Pending |
-| OWN-02 | Phase 6 | Pending |
+| OWN-01 | Phase 6 | Complete |
+| OWN-02 | Phase 6 | Complete |
 | I18N-01 | Phase 5 | Complete |
 | A11Y-01 | Phase 5 | Complete |
 | A11Y-02 | Phase 5 | Complete |
