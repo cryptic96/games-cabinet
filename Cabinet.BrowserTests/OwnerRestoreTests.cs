@@ -55,6 +55,28 @@ public sealed class OwnerRestoreTests : CabinetPageTest
     }
 
     [Fact]
+    public async Task The_check_button_stays_busy_until_the_browser_has_left_for_the_preview()
+    {
+        await Page.SetViewportSizeAsync(1440, 900);
+        await StartAsync();
+        await GotoOwnerAsync(SettingsPath);
+        await Page.EvaluateAsync(
+            "() => { const check = document.querySelector('button[data-check-button]'); const seen = []; sessionStorage.setItem('check-button-states', '[]'); "
+            + "new MutationObserver(() => { seen.push(check.getAttribute('aria-disabled')); sessionStorage.setItem('check-button-states', JSON.stringify(seen)); })"
+            + ".observe(check, { attributes: true, childList: true, subtree: true }); }");
+        await ChooseAsync(FileBytes());
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Check file" }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "This file contains" })).ToBeVisibleAsync();
+
+        var states = await Page.EvaluateAsync<string?[]>("() => JSON.parse(sessionStorage.getItem('check-button-states') ?? '[]')");
+
+        states.Should().NotBeEmpty();
+        states.Should().OnlyContain(state => state == "true");
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Restoring_replaces_the_data_and_says_what_came_back_and_that_the_previous_data_is_kept()
     {
         await Page.SetViewportSizeAsync(1440, 900);
