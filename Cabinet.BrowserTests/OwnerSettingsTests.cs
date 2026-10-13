@@ -97,6 +97,7 @@ public sealed class OwnerSettingsTests : CabinetPageTest
         button.Height.Should().BeGreaterThanOrEqualTo(44).And.BeLessThanOrEqualTo(box.Height);
         text.Height.Should().BeLessThan(28, "the sentence stays on one line");
         (button.X + button.Width).Should().BeLessThanOrEqualTo(width, "the button is never cut off");
+        (button.X + button.Width).Should().BeApproximately(box.X + box.Width, 1, "the square button is the strip's end cap, with no paper after it");
         overflow.Should().BeLessThanOrEqualTo(0);
 
         truncated.Should().BeFalse("two digits of changes still read in full beside the button, at the narrowest width too");
