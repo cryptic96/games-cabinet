@@ -144,9 +144,11 @@ http_status() {
 ###
 ### Proves the owner tools' inner walls from the host: the public port must
 ### hide the owner pages with a 404, and, when the owner port listens, a
-### request through loopback that claims an out-of-range client address in
-### X-Forwarded-For must be refused with a 403. Reports status codes only;
-### no address or hostname is ever printed.
+### request from loopback, which is not the known proxy and does not stand
+### behind it, must be refused with a 403 whatever X-Forwarded-For claims.
+### This proves the refusal, not the forwarded path, which the integration
+### tests prove. Reports status codes only; no address or hostname is ever
+### printed.
 ###
 check_owner_wall() {
   local sockets status
@@ -168,9 +170,9 @@ check_owner_wall() {
 
   status="$(http_status "http://127.0.0.1:5082/" -H "X-Forwarded-For: 203.0.113.7")"
   if [[ "$status" == "403" ]]; then
-    pass "the owner port refuses a client address outside the allowed ranges"
+    pass "the owner port refuses a request from loopback"
   else
-    fail "the owner port answers status ${status} to a forged out-of-range client address, expected 403"
+    fail "the owner port answers status ${status} to a request from loopback, expected 403"
   fi
 }
 

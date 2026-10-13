@@ -205,21 +205,23 @@ public class OwnerAccessTests
     }
 
     [Fact]
-    public void Allows_refuses_the_address_of_a_known_proxy_even_when_a_range_holds_it()
+    public void IsKnownProxy_matches_only_a_configured_proxy_in_either_spelling()
     {
         var options = OwnerAccess.FromConfiguration(Build(OwnerUrl, ranges: ["192.0.2.0/24"], proxies: ["192.0.2.10"]));
 
-        options.Allows(IPAddress.Parse("192.0.2.10")).Should().BeFalse();
-        options.Allows(IPAddress.Parse("::ffff:192.0.2.10")).Should().BeFalse();
-        options.Allows(IPAddress.Parse("192.0.2.11")).Should().BeTrue();
+        options.IsKnownProxy(IPAddress.Parse("192.0.2.10")).Should().BeTrue();
+        options.IsKnownProxy(IPAddress.Parse("::ffff:192.0.2.10")).Should().BeTrue();
+        options.IsKnownProxy(IPAddress.Parse("192.0.2.11")).Should().BeFalse();
+        options.IsKnownProxy(IPAddress.Loopback).Should().BeFalse();
+        options.IsKnownProxy(null).Should().BeFalse();
     }
 
     [Fact]
-    public void Allows_lets_a_loopback_proxy_through_so_a_single_machine_can_play_both_parts()
+    public void IsKnownProxy_is_false_for_every_address_when_no_proxy_is_known()
     {
-        var options = OwnerAccess.FromConfiguration(Build(OwnerUrl, ranges: ["127.0.0.0/8"], proxies: ["127.0.0.1"]));
+        var options = new OwnerAccessOptions(5082, []);
 
-        options.Allows(IPAddress.Loopback).Should().BeTrue();
+        options.IsKnownProxy(IPAddress.Loopback).Should().BeFalse();
     }
 
     private static IConfiguration Build(

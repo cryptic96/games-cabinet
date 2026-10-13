@@ -342,8 +342,10 @@ STUB_CURL_STATUS_APP=404
 STUB_CURL_STATUS_OWNER=403
 export STUB_CURL_STATUS_APP STUB_CURL_STATUS_OWNER
 run_selfcheck_function check_owner_wall
-check "owner wall passes when the public port hides the owner pages and the owner port refuses a forged address" \
+check "owner wall passes when the public port hides the owner pages and the owner port refuses a request from loopback" \
   "2 0" "${RUN_PASSED} ${RUN_FAILED}"
+check "owner wall says the owner port refuses a request from loopback" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "the owner port refuses a request from loopback")"
 check "owner wall sends the forged forwarded address to the owner port" "1" \
   "$(file_has_text "$STUB_ARGS_LOG" "X-Forwarded-For: 203.0.113.7")"
 check "owner wall never prints the forged address" "0" \
@@ -351,7 +353,7 @@ check "owner wall never prints the forged address" "0" \
 
 STUB_CURL_STATUS_OWNER=200
 run_selfcheck_function check_owner_wall
-check "owner wall fails when the owner port serves a forged out-of-range address" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "owner wall fails when the owner port serves a request from loopback" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
 check "owner wall reports the status code of the failed probe" "1" \
   "$(file_has_text "${WORK_DIR}/run.out" "status 200")"
 
