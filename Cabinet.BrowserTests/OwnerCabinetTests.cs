@@ -391,6 +391,48 @@ public sealed class OwnerCabinetTests : CabinetPageTest
         await SaveScreenshotAsync($"public-header-{width}");
     }
 
+    [Theory]
+    [InlineData(65, 1440, 900)]
+    [InlineData(65, 390, 844)]
+    [InlineData(400, 1440, 900)]
+    [InlineData(400, 390, 844)]
+    public async Task With_a_synced_collection_and_no_owner_data_no_tag_is_painted_over_its_boxs_label_text(int games, int width, int height)
+    {
+        var clock = SyncHarness.NewClock();
+        var factory = SyncHarness.CreateFactory(ScriptedBggHandler.ForCollection(SyntheticBggCollection.Create(games)), clock);
+        await StartAsync(factory);
+        using var client = factory.CreatePublicClient();
+        await SyncRounds.PressAndWait(client, clock, advance: false);
+        await Page.SetViewportSizeAsync(width, height);
+
+        await GotoOwnerCabinetAsync();
+
+        var boxes = await Page.Locator(Boxes).CountAsync();
+        boxes.Should().BeGreaterThan(games / 2);
+        await Expect(Page.Locator("[data-unplaced]")).ToHaveCountAsync(boxes);
+        var overlaps = await Page.EvaluateAsync<string[]>(
+            """
+            () => [...document.querySelectorAll('#cabinet .placement[data-unplaced]')].flatMap(box => {
+              const tag = box.querySelector('.placement-tag').getBoundingClientRect();
+              const label = box.querySelector('.placement-label');
+              if (!label) {
+                return [];
+              }
+              const range = document.createRange();
+              range.selectNodeContents(label);
+              return [...range.getClientRects()]
+                .filter(line => line.width > 0 && line.height > 0 && line.right > tag.left && line.bottom > tag.top
+                  && Math.max(0, line.left - tag.left) + Math.max(0, line.top - tag.top) < tag.width - 1)
+                .map(line => box.dataset.kind + ' ' + box.dataset.entryId + ' tag ' + [tag.left, tag.top, tag.width].map(Math.round).join(',') + ' text ' + [line.left, line.top, line.right, line.bottom].map(Math.round).join(','));
+            })
+            """);
+
+        overlaps.Should().BeEmpty();
+        var sizes = await Page.Locator("[data-unplaced] .placement-tag").EvaluateAllAsync<double[]>("tags => tags.map(tag => tag.getBoundingClientRect().width)");
+        sizes.Should().OnlyContain(size => size >= 8 && size <= 12);
+        await SaveScreenshotAsync($"owner-cabinet-synced-{games}-{width}");
+    }
+
     private async Task<RectReading> RectOf(string selector)
     {
         var edges = await Page.Locator(selector).EvaluateAsync<double[]>(
