@@ -69,6 +69,7 @@ public sealed class OwnerCabinetTests : CabinetPageTest
         await Expect(link).ToHaveAttributeAsync("href", $"{PicturesPath}?game={target.GameId}");
         await Expect(link).ToHaveTextAsync("Edit");
         await Expect(link.Locator("svg use")).ToHaveAttributeAsync("href", new Regex("#i-pencil$"));
+        (await last.EvaluateAsync<string>("line => getComputedStyle(line).paddingBottom")).Should().Be("28px", "the card ends on a blank ruled line below Edit");
         await Expect(Page.Locator("html[data-pull-kind]")).ToHaveCountAsync(0);
         await SaveScreenshotAsync("owner-cabinet-card-1440");
 
@@ -322,6 +323,7 @@ public sealed class OwnerCabinetTests : CabinetPageTest
         plate.Bottom.Should().BeLessThanOrEqualTo(toggle.Top + 1);
         plate.Right.Should().BeApproximately(toggle.Right, 1.5);
         title.Right.Should().BeLessThanOrEqualTo(Math.Min(plate.Left, toggle.Left) + 1);
+        title.Bottom.Should().BeApproximately(toggle.Bottom, 1.5, "the title shares its line with the toggle and the plate sits above both");
         foreach (var item in await Page.Locator("header .lang-toggle a").EvaluateAllAsync<double[]>("items => items.map(item => item.getBoundingClientRect().height)"))
         {
             item.Should().BeGreaterThanOrEqualTo(44);
@@ -372,6 +374,19 @@ public sealed class OwnerCabinetTests : CabinetPageTest
         }
 
         (await Page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth <= document.documentElement.clientWidth")).Should().BeTrue();
+
+        if (width <= 640)
+        {
+            var box = (await strip.BoundingBoxAsync())!;
+            var count = await RectOf("header nav.owner-bar .owner-strip-note:nth-of-type(2)");
+            var place = (await strip.GetByRole(AriaRole.Link, new() { Name = "Place them" }).BoundingBoxAsync())!;
+            var tops = await strip.Locator(".owner-strip-links a").EvaluateAllAsync<double[]>("links => links.map(link => Math.round(link.getBoundingClientRect().top))");
+
+            box.Height.Should().BeLessThanOrEqualTo(170, "the strip stays quiet so the cabinet is the first read");
+            tops.Distinct().Should().HaveCount(1, "the three links share one row");
+            Math.Abs((count.Top + (count.Height / 2)) - (place.Y + (place.Height / 2))).Should().BeLessThan(2, "Place them follows the count on its line");
+        }
+
         await SaveScreenshotAsync($"owner-strip-{width}");
     }
 

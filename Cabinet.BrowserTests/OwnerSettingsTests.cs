@@ -54,6 +54,7 @@ public sealed class OwnerSettingsTests : CabinetPageTest
         await Expect(banner.Locator(".owner-banner-text .banner-full")).ToBeVisibleAsync();
         await Expect(banner.Locator(".owner-banner-text .banner-full")).ToHaveTextAsync(FullSentenceThree);
         await Expect(banner.Locator(".owner-banner-text .banner-short")).ToBeHiddenAsync();
+        await Expect(banner.Locator(".owner-banner-text .banner-tiny")).ToBeHiddenAsync();
         await Expect(banner.Locator("button .banner-full")).ToHaveTextAsync(DownloadName);
         await Expect(banner.Locator("button .banner-short")).ToBeHiddenAsync();
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = DownloadName })).ToBeVisibleAsync();
@@ -66,19 +67,23 @@ public sealed class OwnerSettingsTests : CabinetPageTest
     }
 
     [Theory]
-    [InlineData(390, 844)]
-    [InlineData(320, 640)]
-    public async Task On_a_phone_the_banner_is_one_line_of_at_most_44_pixels_with_a_compact_button_and_nothing_wraps_or_overflows(int width, int height)
+    [InlineData(390, 844, "short", "23 changes not downloaded", "tiny")]
+    [InlineData(320, 640, "tiny", "23 not downloaded", "short")]
+    public async Task On_a_phone_the_banner_is_one_line_of_at_most_44_pixels_with_a_square_compact_button_and_nothing_wraps_or_overflows(
+        int width, int height, string shown, string expectedText, string hidden)
     {
         await Page.SetViewportSizeAsync(width, height);
         await StartWithDataAsync(Data(23, PageNow.AddDays(-1)));
         await OpenAsync(LocationsPath);
 
         var banner = Page.Locator(".owner-banner");
-        await Expect(banner.Locator(".owner-banner-text .banner-short")).ToBeVisibleAsync();
-        await Expect(banner.Locator(".owner-banner-text .banner-short")).ToHaveTextAsync("23 changes not downloaded");
+        await Expect(banner.Locator($".owner-banner-text .banner-{shown}")).ToBeVisibleAsync();
+        await Expect(banner.Locator($".owner-banner-text .banner-{shown}")).ToHaveTextAsync(expectedText);
+        await Expect(banner.Locator($".owner-banner-text .banner-{hidden}")).ToBeHiddenAsync();
         await Expect(banner.Locator(".owner-banner-text .banner-full")).ToBeHiddenAsync();
+        (await banner.GetByRole(AriaRole.Button).EvaluateAsync<string>("button => getComputedStyle(button).borderTopLeftRadius")).Should().Be("0px");
         await Expect(banner.Locator("button .banner-short")).ToHaveTextAsync("Download data");
+        await Expect(banner.Locator("button .banner-short")).ToBeVisibleAsync();
         await Expect(banner.Locator("button .banner-full")).ToBeHiddenAsync();
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = DownloadName })).ToBeVisibleAsync();
 
@@ -94,10 +99,7 @@ public sealed class OwnerSettingsTests : CabinetPageTest
         (button.X + button.Width).Should().BeLessThanOrEqualTo(width, "the button is never cut off");
         overflow.Should().BeLessThanOrEqualTo(0);
 
-        if (width >= 390)
-        {
-            truncated.Should().BeFalse("two digits of changes still fit beside the button");
-        }
+        truncated.Should().BeFalse("two digits of changes still read in full beside the button, at the narrowest width too");
 
         box.X.Should().BeGreaterThanOrEqualTo(0);
         box.X.Should().BeLessThanOrEqualTo(0, "the strip runs to the screen edge on a phone");

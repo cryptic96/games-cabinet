@@ -340,6 +340,36 @@ public sealed class OwnerPlacingTests : CabinetPageTest
         AssertCleanConsole();
     }
 
+    [Theory]
+    [InlineData(390)]
+    [InlineData(320)]
+    public async Task On_a_phone_the_done_line_is_the_message_then_Undo_and_Dismiss_side_by_side_below_it(int width)
+    {
+        var host = await StartHostAsync();
+        await Page.SetViewportSizeAsync(width, 844);
+        await host.SeedAsync("Cabinet A", "Shelf B");
+        await GotoLocationsAsync();
+        await CheckAsync(host.BaseWithoutExpansion);
+        await CheckAsync(host.BaseWithExpansion);
+        await Page.GetByRole(AriaRole.Button, new() { Name = MoveToName }).ClickAsync();
+        await Page.Locator(MoveDialog).GetByRole(AriaRole.Button, new() { Name = "Shelf B" }).ClickAsync();
+        var status = Page.Locator("#dock-status");
+        await Expect(status).ToContainTextAsync("Moved 2 games to Shelf B");
+
+        var message = (await status.Locator("span").First.BoundingBoxAsync())!;
+        var undo = (await status.GetByRole(AriaRole.Button, new() { Name = "Undo" }).BoundingBoxAsync())!;
+        var dismiss = (await status.GetByRole(AriaRole.Button, new() { Name = "Dismiss" }).BoundingBoxAsync())!;
+        var dock = (await Page.Locator("#select-dock").BoundingBoxAsync())!;
+
+        undo.Y.Should().BeGreaterThanOrEqualTo(message.Y + message.Height, "the buttons sit on the line below the message");
+        Math.Abs(undo.Y - dismiss.Y).Should().BeLessThanOrEqualTo(1, "Undo and Dismiss share one line");
+        dismiss.X.Should().BeGreaterThan(undo.X + undo.Width - 1, "Dismiss follows Undo on the same line");
+        dock.Height.Should().BeLessThanOrEqualTo(110);
+        (await Page.EvaluateAsync<double>("() => document.documentElement.scrollWidth - window.innerWidth")).Should().BeLessThanOrEqualTo(0);
+        await SaveScreenshotAsync($"owner-placing-done-two-lines-{width}");
+        AssertCleanConsole();
+    }
+
     private async Task ScrollToBottomAsync()
     {
         var previous = -1.0;

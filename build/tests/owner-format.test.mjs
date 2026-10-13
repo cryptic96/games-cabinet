@@ -45,6 +45,7 @@ const {
   leadAndRest,
   changesBanner,
   compactBanner,
+  tinyBanner,
   neverDownloaded,
   bannerTexts,
   whenText,
@@ -272,13 +273,23 @@ test('the banner of data that was never downloaded says the changes are only on 
   assert.equal(neverDownloaded(3), "You haven't downloaded your owner data yet. 3 changes are only on this server.");
 });
 
+test('the narrowest phone banner is the count and two words', () => {
+  assert.equal(tinyBanner(1), '1 not downloaded');
+  assert.equal(tinyBanner(23), '23 not downloaded');
+});
+
 test('the banner texts follow the state of the backup and are empty at zero changes', () => {
-  assert.deepEqual(bannerTexts(0, false), { full: '', compact: '' });
-  assert.deepEqual(bannerTexts(0, true), { full: '', compact: '' });
-  assert.deepEqual(bannerTexts(2, false), { full: '2 changes since your last download', compact: '2 changes not downloaded' });
+  assert.deepEqual(bannerTexts(0, false), { full: '', compact: '', tiny: '' });
+  assert.deepEqual(bannerTexts(0, true), { full: '', compact: '', tiny: '' });
+  assert.deepEqual(bannerTexts(2, false), {
+    full: '2 changes since your last download',
+    compact: '2 changes not downloaded',
+    tiny: '2 not downloaded',
+  });
   assert.deepEqual(bannerTexts(1, true), {
     full: "You haven't downloaded your owner data yet. 1 change is only on this server.",
     compact: '1 change not downloaded',
+    tiny: '1 not downloaded',
   });
 });
 

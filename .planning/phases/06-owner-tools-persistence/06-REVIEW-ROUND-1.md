@@ -152,8 +152,60 @@ Both shapes keep every fixed rule (no text, no pointer input, no change to a box
 
 ## Your answer
 
-> (not given yet)
+Answered 2026-10-13.
+
+On the review round, verbatim:
+
+> i think approved. Did you have the senior front end skill look at it? please do before continueing
+
+The senior front-end pass was run and its findings are in `06-REVIEW-ROUND-1-FE.md`. On which of its findings to apply, verbatim:
+
+> FE1–FE10
+
+Resolution per label:
+
+| Label | Resolution |
+| --- | --- |
+| L1 to L10 | approved as shown, except where a front-end finding changes them: FE1 touches L5, L7 and L9; FE2 touches L4 and L6; FE3 touches L1 and L12; FE6 touches L9; FE7 touches L2; FE8 touches L3; FE9 touches L4; FE10 touches L1 |
+| L11 | shorten, through FE4: `23 not downloaded` below 22.5rem, and no rounded corners on the full-bleed compact banner button |
+| L12 | tighten, through FE3 |
+| L13 | the two-line dock variant of FE5: the message on line one, `Undo` and `Dismiss` side by side on line two below 40rem |
+| T1 | keep the dog-ear |
+| W1 | keep `Bewerken` and `niet geplaatst` |
+| P1, P2, P3 | acknowledged |
+| FE1 to FE10 | apply all, as written. FE8 is a small copy-contract change (the line under the tiles is hidden while the row shows a note); it is recorded as an owner-approved change |
 
 ## After your answer
 
-(filled in when the chosen changes are applied: one line per label with the commit that did it, and the re-shot frames in `ui-refs/round-1/` starting with `after-`)
+Every change below is done. The re-shot frames are in `ui-refs/round-1/`, all starting with `after-`, made on the same synthetic data as the first round (fake BGG, invented titles, `Cabinet A`, `Shelf B`, `Lent out`). Commit `20bf776` holds FE2 to FE10 and L11 to L13 together; `b2c9cea` holds FE1; `e5466a4` fixed two things found while looking at the re-shot frames (below). The owner's answer itself is commit `50a87dd`.
+
+| Label | What changed | Commit |
+| --- | --- | --- |
+| L1 to L10 | approved, nothing of their own changed beyond the FE items | |
+| FE1 (touches L5, L7, L9) | the danger colour is now used only by the destructive buttons and the warning line above them; link errors, the invalid link field, refused-save notices and the backup and restore notices use the ordinary paper-label treatment (the invalid field also gets a 1px ink inset ring), the warning lead is ink again, link errors are 16px; a stylesheet test keeps `--danger` to those rules | `b2c9cea` |
+| FE2 (L4, L6) | tile captions never wrap under the radio; a long label wraps beside it; browser test at 390 and 320 | `20bf776`, `e5466a4` |
+| FE3 (L1, L12) | strip below 40rem: 8px 16px padding, sentences 4px apart, `Place them` after the count, links in one row with a 16px gap, 44px targets by min-height; 156px at 390 (was about 270); browser test caps it at 170 | `20bf776` |
+| FE4 (L11 shorten) | below 22.5rem the banner reads `23 not downloaded`; the full-bleed compact banner's button is square. The copy is in `OwnerStrings.CountNotDownloaded` and `owner-format.js` (`tinyBanner`), with node, integration and browser tests | `20bf776`, `e5466a4` |
+| FE5 (L13 two-line dock) | below 40rem the done line is the message, then `Undo` and `Dismiss` side by side; the dock is 89px (was about 108); browser test at 390 and 320 | `20bf776` |
+| FE6 (L9) | a heading that only takes focus shows no ring; the browser test checks the outline of the restore preview heading | `20bf776` |
+| FE7 (L2) | on a fine pointer the card ends on a blank ruled line below `Edit` | `20bf776` |
+| FE8 (L3, copy; owner-approved change) | the line under the tiles is hidden while the row shows a note; it comes back when `Looks right` clears the note | `20bf776` |
+| FE9 (L4) | the empty `Your link` tile keeps only its own dashed frame | `20bf776` |
+| FE10 (L1) | below 40rem the title shares its line with the toggle and the plate sits above both (the header already centred its cells, so the fix aligns the title to the toggle's row) | `20bf776` |
+| L11, L12, L13 | see FE4, FE3 and FE5 | |
+| T1, W1 | kept as they were; P1 to P3 acknowledged | |
+
+Found while looking at the re-shot frames, both fixed in `e5466a4`: the narrowest-phone banner rule also hid the button's own short label (the button was an empty dark block at 320 px), and at 320 px the word `Automatic` broke in the middle once its caption no longer wrapped under the radio (the tile padding and caption gap are tighter below 22.5rem). The browser tests now check both.
+
+One product quirk found during the round is recorded as a todo, not fixed here: `.planning/todos/pending/2026-10-13-check-link-while-link-worker-is-busy.md`.
+
+Re-shot frames:
+
+- FE1 (link errors in the ordinary treatment, invalid field with its ring): ![Link errors after](ui-refs/round-1/after-06-link-errors-sheet.png)
+- FE2, FE8 (captions beside their radios, the line under the tiles hidden while a note shows): ![A won't-load row at 1440 px](ui-refs/round-1/after-03-row-wont-load-1440.png) ![A won't-load row at 390 px](ui-refs/round-1/after-03-row-wont-load-390.png) ![A won't-load row at 320 px](ui-refs/round-1/after-03-row-wont-load-320.png) ![A changed-picture row at 1440 px](ui-refs/round-1/after-03-row-changed-1440.png) ![The single-game view at 390 px](ui-refs/round-1/after-07-single-game-390.png)
+- FE9 (one dashed frame on the empty link tile): ![A row at 1440 px](ui-refs/round-1/after-04-row-100007-1440.png) ![The same row at 390 px](ui-refs/round-1/after-04-row-100007-390.png) ![A row with a link being fetched](ui-refs/round-1/after-04-row-fetching-link-1440.png)
+- FE3, FE10 (the quiet strip, the title on the toggle's line): ![The owner cabinet at 390 px](ui-refs/round-1/after-01-cabinet-owner-390.png) ![The header at 390 px](ui-refs/round-1/after-01-header-390.png) ![The header at 320 px](ui-refs/round-1/after-01-header-320.png)
+- FE7 (the card ends on a blank ruled line): ![The card at 1440 px](ui-refs/round-1/after-02-card-en-1440.png)
+- FE4 (the banner at 1440, 390 and 320 px): ![The banner after](ui-refs/round-1/after-14-banner-sheet.png)
+- FE5 (the two-line done dock): ![The done dock at 390 px](ui-refs/round-1/after-09-done-with-undo-390.png)
+- FE6, FE1 (the restore preview with a ringless heading, the newer-format refusal in the ordinary treatment): ![The restore sheet after](ui-refs/round-1/after-11-restore-sheet.png)

@@ -74,6 +74,7 @@
 
 .card-edit {
   min-height: calc(var(--hit-rows) * var(--ruling));
+  padding-block-end: calc((2 - var(--hit-rows)) * var(--ruling));
 }
 
 .card-edit a {
@@ -131,6 +132,11 @@ header > .header-aside {
     flex-direction: column;
     align-items: flex-end;
     gap: 4px;
+  }
+
+  header:has(> .header-aside) > h1 {
+    align-self: end;
+    margin-bottom: 0;
   }
 }
 
@@ -203,9 +209,39 @@ header > .header-aside {
   margin-inline-start: auto;
 }
 
+/**
+ * On a phone the strip stays quiet so the cabinet is the first read: the sentences sit on consecutive lines with a small gap,
+ * the link to place the unplaced games follows its count on the same line, and the three links share one row. The links keep
+ * their 44px tap height through min-height, not through padding around the row.
+ */
 @media (max-width: 40rem) {
+  .owner-bar[data-variant="strip"] {
+    align-items: center;
+    gap: 4px 8px;
+    padding: 8px 16px;
+  }
+
+  .owner-bar[data-variant="strip"] > .owner-strip-note:first-child {
+    flex: 1 0 100%;
+  }
+
+  .owner-bar[data-variant="strip"] .owner-strip-note {
+    min-height: 0;
+    padding-inline: 0;
+  }
+
+  .owner-bar[data-variant="strip"] > a {
+    padding-inline: 0;
+  }
+
   .owner-strip-links {
+    flex: 1 0 100%;
+    gap: 0 16px;
     margin-inline-start: 0;
+  }
+
+  .owner-strip-links a {
+    padding-inline: 0;
   }
 }
 
@@ -268,6 +304,19 @@ header > .header-aside {
 .owner-dialog button:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
+}
+
+/**
+ * A heading that only takes focus so a screen reader announces it shows no ring: keyboard users still land there, and the ring
+ * stays on every real control.
+ */
+.owner-panel h2[tabindex="-1"]:focus,
+.owner-panel h2[tabindex="-1"]:focus-visible,
+.owner-panel h3[tabindex="-1"]:focus,
+.owner-panel h3[tabindex="-1"]:focus-visible,
+.owner-panel h4[tabindex="-1"]:focus,
+.owner-panel h4[tabindex="-1"]:focus-visible {
+  outline: none;
 }
 
 .owner-btn,
@@ -403,7 +452,7 @@ header > .header-aside {
 }
 
 .owner-notice[data-problem="true"] {
-  border-inline-start-color: var(--danger);
+  border-inline-start-color: var(--paper-label);
 }
 
 .owner-notice p {
@@ -621,7 +670,7 @@ header > .header-aside {
 }
 
 .warning-line strong {
-  color: var(--danger);
+  color: var(--ink);
   font-weight: 600;
 }
 
@@ -1003,6 +1052,19 @@ header > .header-aside {
   }
 }
 
+/**
+ * On a phone the done line is two deliberate lines: the message first, then Undo and Dismiss side by side.
+ */
+@media (max-width: 40rem) {
+  .dock-status {
+    flex-basis: 100%;
+  }
+
+  .dock-status > span {
+    flex: 1 0 100%;
+  }
+}
+
 @media (max-width: 22.5rem) {
   .select-dock {
     padding-inline: 12px;
@@ -1179,6 +1241,10 @@ header > .header-aside {
   color: var(--paper-label);
   font-size: 14px;
   line-height: 1.5;
+}
+
+.pic-row:has(> .pic-notes > .pic-note:not([hidden])) .pic-form .pic-why {
+  display: none;
 }
 
 .pic-toolbar {
@@ -1374,10 +1440,16 @@ header > .header-aside {
   box-shadow: none;
 }
 
+.pic-tile[data-state="missing"] > .pic-art,
+.pic-tile[data-state="none"] > .pic-art,
+.pic-tile[data-state="fetching"] > .pic-art {
+  border-color: transparent;
+}
+
 .pic-caption {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   min-height: 28px;
 }
@@ -1386,9 +1458,19 @@ header > .header-aside {
   flex: none;
   width: 24px;
   height: 24px;
-  margin: 0;
+  margin: 2px 0 0;
   accent-color: var(--ink);
   cursor: inherit;
+}
+
+@media (max-width: 22.5rem) {
+  .pic-tile {
+    padding: 6px;
+  }
+
+  .pic-caption {
+    gap: 4px;
+  }
 }
 
 .pic-label {
@@ -1688,8 +1770,8 @@ header > .header-aside {
 }
 
 .pic-link-form input[type="url"][aria-invalid="true"] {
-  border-color: var(--danger);
-  box-shadow: inset 0 0 0 1px var(--danger);
+  border-color: var(--paper-label);
+  box-shadow: inset 0 0 0 1px var(--ink);
 }
 
 .pic-link-form .owner-hint {
@@ -1699,9 +1781,9 @@ header > .header-aside {
 .pic-link-error {
   margin: 0;
   padding-inline-start: 12px;
-  border-inline-start: 4px solid var(--danger);
+  border-inline-start: 4px solid var(--paper-label);
   color: var(--ink);
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.5;
 }
 
@@ -1920,7 +2002,8 @@ header > .header-aside {
   margin: 0;
 }
 
-.owner-banner .banner-short {
+.owner-banner .banner-short,
+.owner-banner .banner-tiny {
   display: none;
 }
 
@@ -1968,7 +2051,22 @@ header > .header-aside {
 
   .owner-banner:not([data-full="true"]) .owner-btn-primary {
     padding-inline: 8px;
+    border-radius: 0;
     white-space: nowrap;
+  }
+}
+
+/**
+ * Below 22.5rem even the one-line reminder is cut, losing the words that carry the meaning, so the narrowest phones read the
+ * count and the two words that matter.
+ */
+@media (max-width: 22.5rem) {
+  .owner-banner:not([data-full="true"]) .owner-banner-text .banner-short {
+    display: none;
+  }
+
+  .owner-banner:not([data-full="true"]) .banner-tiny {
+    display: inline;
   }
 }
 
@@ -1977,7 +2075,7 @@ header > .header-aside {
   margin: 0 0 16px;
   padding: 8px 16px;
   border-radius: 4px;
-  border-inline-start: 4px solid var(--danger);
+  border-inline-start: 4px solid var(--paper-label);
   background: var(--hover-tint);
 }
 

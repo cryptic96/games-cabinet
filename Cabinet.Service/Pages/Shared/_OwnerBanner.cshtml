@@ -5,12 +5,14 @@
     var shows = Model.ShowsBanner;
     var fullText = !shows ? string.Empty : Model.LastDownloadAtUtc is null ? OwnerStrings.NeverDownloaded(count) : OwnerStrings.ChangesSinceDownload(count);
     var shortText = shows ? OwnerStrings.ChangesNotDownloaded(count) : string.Empty;
+    var tinyText = shows ? OwnerStrings.CountNotDownloaded(count) : string.Empty;
     var inPanel = ViewData["BannerInPanel"] is true;
 }
 <div class="owner-banner" id="owner-banner" data-full="@(inPanel ? "true" : null)" hidden="@(!shows)">
     <p class="owner-banner-text">
         <span class="banner-full" data-banner="full">@fullText</span>
         <span class="banner-short" data-banner="short">@shortText</span>
+        <span class="banner-tiny" data-banner="tiny">@tinyText</span>
     </p>
     <form method="post" asp-page="/Owner/Settings" asp-page-handler="Download" data-owner-download>
         <button type="submit" class="owner-btn-primary" aria-label="@OwnerStrings.DownloadButton">
