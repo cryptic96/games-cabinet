@@ -572,6 +572,21 @@ public static class OwnerStrings
     /// <summary>The hint under the depth choices.</summary>
     public const string DepthHint = "Flat has no shading. Shaded is today's look. Deep draws the inside walls and floor of every cubby.";
 
+    /// <summary>The legend of the group that sets the time of day the preview shows.</summary>
+    public const string PreviewTimeLegend = "Preview time";
+
+    /// <summary>The choice that shows the preview by day.</summary>
+    public const string PreviewDay = "Day";
+
+    /// <summary>The choice that shows the preview in the evening.</summary>
+    public const string PreviewEvening = "Evening";
+
+    /// <summary>The hint under the preview time choices while they can be used.</summary>
+    public const string PreviewTimeHint = "Only changes this preview.";
+
+    /// <summary>The hint under the preview time choices while lights are not set to evenings only, which replaces <see cref="PreviewTimeHint"/>.</summary>
+    public const string PreviewTimeHintDisabled = "Only matters with Evenings only.";
+
     /// <summary>The button that publishes the chosen look to every visitor.</summary>
     public const string UseForEveryoneButton = "Use for everyone";
 

@@ -3,10 +3,13 @@
  * section drawn by the cabinet's own renderer from a fixed sample layout inside a wrapper that carries the five look attributes.
  * Every choice changes only the trial, which is the wrapper's attributes, the summary line and the buttons. Nothing reaches
  * visitors until `Use for everyone`, which posts the five values of the trial in one request, and `Back to current` drops the
- * trial. Every text is written with `textContent`, and the values written as attributes come from the panel's own radios.
+ * trial. The design and wood tiles draw themselves in the trial: a design tile in the trial wood, a wood tile on the trial design.
+ * `Preview time` only moves the preview's evening marker, and the preview's lamp follows the trial. Every text is written with
+ * `textContent`, and the values written as attributes come from the panel's own radios.
  */
 import { COPY_BY_LANGUAGE } from './copy.js';
 import { LOOK_FIELDS, OWNER_TEXT, fill, lookSummary } from './owner-format.js';
+import { refreshLamp } from './look.js';
 import { announce, initRevision, postOwner, showProblem, showRowProblem, showRowStatus } from './owner-shared.js';
 import { renderCabinet } from './render.js';
 
@@ -24,6 +27,21 @@ const PAINTED = 'painted';
 
 /** The value stored for backs that show the wood. */
 const WOOD_BACKS = 'wood';
+
+/** The name of the radios that set the time of day of the preview; the field is not part of a look and is never posted. */
+const PREVIEW_TIME_FIELD = 'preview-time';
+
+/** The value of the preview time radio that shows the evening. */
+const EVENING = 'evening';
+
+/** The choice of lights that follows the visitor's clock. */
+const EVENINGS_ONLY = 'evenings';
+
+/** The fields of a look a design tile takes from the trial; its own design stays its own. */
+const DESIGN_TILE_FIELDS = Object.freeze(['wood', 'backs', 'depth']);
+
+/** The fields of a look a wood tile takes from the trial; its own wood stays its own. */
+const WOOD_TILE_FIELDS = Object.freeze(['design', 'backs', 'depth']);
 
 /**
  * Reads which look the panel's controls show.
@@ -95,6 +113,26 @@ export function readLookAttributes(element) {
 }
 
 /**
+ * Writes the trial on the swatches of the tiles: every design tile takes the trial's wood, backs and depth, and every wood tile
+ * takes the trial's design, backs and depth. A swatch keeps its own design or wood and never takes the lights.
+ * @param {ParentNode} root The part of the page that holds the tiles.
+ * @param {Record<string, string>} look The trial.
+ */
+export function applySwatchAttributes(root, look) {
+  for (const swatch of root.querySelectorAll('.look-swatch-design')) {
+    for (const field of DESIGN_TILE_FIELDS) {
+      swatch.setAttribute(`data-${field}`, look[field]);
+    }
+  }
+
+  for (const swatch of root.querySelectorAll('.look-swatch-wood')) {
+    for (const field of WOOD_TILE_FIELDS) {
+      swatch.setAttribute(`data-${field}`, look[field]);
+    }
+  }
+}
+
+/**
  * Fetches the sample layout the preview draws.
  * @param {string} address The address of the sample, on the page's own origin.
  * @param {Function} [send] The browser's fetch, replaceable in tests.
@@ -131,16 +169,18 @@ function findParts(doc) {
     publish: doc.getElementById('look-publish'),
     discard: doc.getElementById('look-discard'),
     status: doc.getElementById('finish-status'),
+    evening: doc.getElementById('look-evening'),
+    eveningHint: doc.getElementById('look-evening-hint'),
   };
 
   return Object.values(parts).every(Boolean) ? parts : null;
 }
 
 /**
- * Wires the look panel: the preview, the trial, publish, discard and Undo.
+ * Wires the look panel: the preview, the trial, the tiles, Preview time, publish, discard and Undo.
  * @param {Document} [doc] The page; the browser's own by default.
- * @param {{ post?: Function, load?: Function, render?: Function }} [deps] How a change is posted, how the sample is loaded and how it
- * is drawn, each replaceable in tests.
+ * @param {{ post?: Function, load?: Function, render?: Function, lamp?: Function }} [deps] How a change is posted, how the sample is
+ * loaded, how it is drawn and how the preview's lamp is brought in line with its attributes, each replaceable in tests.
  * @returns {{ trial: () => Record<string, string>, current: () => Record<string, string>, ready: Promise<void> } | null} What a test can
  * look at, or null when the page has no look panel.
  */
@@ -151,10 +191,11 @@ export function initLookPanel(doc = globalThis.document, deps = {}) {
     return null;
   }
 
-  const { preview, mount, current: currentLine, trying, form, publish, discard, status } = parts;
+  const { preview, mount, current: currentLine, trying, form, publish, discard, status, evening, eveningHint } = parts;
   const post = deps.post ?? postOwner;
   const load = deps.load ?? loadSampleLayout;
   const render = deps.render ?? renderCabinet;
+  const lamp = deps.lamp ?? refreshLamp;
   let current = readLookAttributes(preview);
   let trial = readLook(form);
   let earlier = null;
@@ -162,14 +203,48 @@ export function initLookPanel(doc = globalThis.document, deps = {}) {
 
   initRevision(doc);
   discard.hidden = false;
+  const noScriptNote = doc.getElementById('look-no-script');
+
+  if (noScriptNote) {
+    noScriptNote.hidden = true;
+  }
 
   /**
-   * Brings the preview, the summary lines and the buttons up to date with the trial.
+   * Tells whether the Evening choice of Preview time is checked.
+   * @returns {boolean}
+   */
+  function eveningChosen() {
+    return [...form.querySelectorAll(`input[name="${PREVIEW_TIME_FIELD}"]`)].some((input) => input.checked && input.value === EVENING);
+  }
+
+  /**
+   * Brings Preview time and the preview's lamp in line with the trial. The group only matters with Evenings only, so it is
+   * disabled otherwise and its hint says so; the evening marker goes on the preview wrapper and nowhere else.
+   */
+  function refreshPreviewTime() {
+    const matters = trial.lights === EVENINGS_ONLY;
+
+    evening.disabled = !matters;
+    eveningHint.textContent = matters ? OWNER_TEXT.previewTimeHint : OWNER_TEXT.previewTimeHintDisabled;
+
+    if (eveningChosen()) {
+      preview.setAttribute('data-evening', '');
+    } else {
+      preview.removeAttribute('data-evening');
+    }
+
+    lamp(preview);
+  }
+
+  /**
+   * Brings the preview, the tiles, the summary lines and the buttons up to date with the trial.
    */
   function refresh() {
     const differs = !sameLook(trial, current);
 
     applyLookAttributes(preview, trial);
+    applySwatchAttributes(doc, trial);
+    refreshPreviewTime();
     currentLine.textContent = fill(OWNER_TEXT.visitorsSee, { summary: lookSummary(current) });
     trying.textContent = differs ? fill(OWNER_TEXT.trying, { summary: lookSummary(trial) }) : '';
     trying.hidden = !differs;
@@ -276,7 +351,13 @@ export function initLookPanel(doc = globalThis.document, deps = {}) {
     [...form.querySelectorAll('input[name="design"]')].find((input) => input.checked)?.focus();
   }
 
-  form.addEventListener('change', () => {
+  form.addEventListener('change', (event) => {
+    if (event?.target?.name === PREVIEW_TIME_FIELD) {
+      refreshPreviewTime();
+
+      return;
+    }
+
     trial = readLook(form);
     dropServerUndo();
     refresh();
@@ -296,6 +377,8 @@ export function initLookPanel(doc = globalThis.document, deps = {}) {
 
   const ready = (async () => {
     const layout = await load(preview.dataset.sample ?? '');
+
+    preview.setAttribute('data-settled', '');
 
     if (layout === null) {
       const problem = doc.createElement('p');

@@ -1597,7 +1597,8 @@ header > .header-aside {
   background-size: 100% 100%;
   box-shadow:
     0 1px 2px rgb(var(--shade-rgb) / 0.35),
-    0 0 0 16px var(--paper);
+    0 0 0 16px var(--paper),
+    0 1px 0 16px var(--paper-edge);
   color: var(--room-text);
 }
 
@@ -1652,7 +1653,8 @@ header > .header-aside {
   border: 0;
 }
 
-.look-group > legend {
+.look-group > legend,
+.look-choices > legend {
   margin-bottom: 8px;
   padding: 0;
   font-size: 16px;
@@ -1717,6 +1719,156 @@ header > .header-aside {
 
 .look-choice input:focus-visible {
   outline: none;
+}
+
+/**
+ * The design and wood tiles. Each tile's picture is a miniature cabinet built from the real hook classes and carrying its own
+ * five attributes, so the cabinet layers draw it: a design tile is the whole piece in the chosen wood, a wood tile is the top-left
+ * corner of a piece on the chosen design. The miniature's numbers are declared here on its own classes, in the cabinet's
+ * millimetres, because a page with a strict policy cannot carry them inline. Below 40rem each group is one row that scrolls
+ * sideways; from 40rem it is a grid.
+ */
+.look-choices {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.look-tiles {
+  display: flex;
+  gap: 8px;
+  padding: 4px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 16px;
+}
+
+.look-tiles > .look-tile {
+  flex: 0 0 7rem;
+  scroll-snap-align: start;
+}
+
+@media (min-width: 40rem) {
+  .look-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+    gap: 24px;
+    overflow-x: visible;
+    scroll-snap-type: none;
+    padding: 0;
+  }
+
+  .look-tiles > .look-tile {
+    flex: none;
+  }
+}
+
+/**
+ * A tile is too narrow for a radio and a whole word side by side in every font, so the radio sits above the name and the name
+ * has the tile's full width. Beside the preview the controls column is narrow, so the tiles shrink to let the five woods share
+ * one row and take the 14px name.
+ */
+.look-tile .pic-caption {
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+}
+
+@media (min-width: 64rem) {
+  .look-tiles {
+    grid-template-columns: repeat(auto-fill, minmax(5rem, 1fr));
+    gap: 8px;
+  }
+
+  .look-tile {
+    padding: 6px;
+  }
+
+  .look-tile .pic-label {
+    font-size: 14px;
+  }
+}
+
+.look-swatch {
+  container-type: inline-size;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-height: var(--tile-h);
+  aspect-ratio: 150 / 128;
+  overflow: hidden;
+  background-color: var(--room);
+  background-image: var(--room-falloff);
+  background-repeat: no-repeat;
+  background-position: top;
+  background-size: 100% 100%;
+  box-shadow: 0 1px 2px rgb(var(--shade-rgb) / 0.35);
+  color: var(--room-text);
+  user-select: none;
+}
+
+.look-swatch .cabinet {
+  display: block;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+.look-swatch .section {
+  --section-w: 400;
+  --section-h: 240;
+  --frame: 20;
+  display: block;
+  content-visibility: visible;
+}
+
+.look-swatch .cubby {
+  --x: 0;
+  --y: 0;
+  --w: 360;
+  --h: 200;
+}
+
+.look-swatch .placement {
+  --x: 30;
+  --y: 0;
+  --w: 150;
+  --h: 150;
+  --bg: #b8481a;
+  --fg: #ffffff;
+  transition: none;
+}
+
+.look-swatch .placement:hover {
+  transform: none;
+}
+
+.look-swatch-design {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+
+.look-swatch-design .section {
+  flex: none;
+  width: min(100%, calc((var(--tile-h) - 8px) * var(--section-ratio)));
+  margin-inline: auto;
+}
+
+.look-swatch-wood .cabinet {
+  margin-left: 8cqw;
+}
+
+.look-swatch-wood .section {
+  flex: none;
+  width: calc(min(100cqw, 150px) * 2.7);
+}
+
+.look-swatch-wood .placement {
+  --bg: #17766f;
 }
 
 .look-actions {

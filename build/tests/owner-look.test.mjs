@@ -30,13 +30,15 @@ const format = dataUrl(readService('wwwroot/js/owner-format.js'));
 const shared = dataUrl(readService('wwwroot/js/owner-shared.js').replace("'./owner-format.js'", `'${format}'`));
 const copy = dataUrl(readService('wwwroot/js/copy.js'));
 const render = dataUrl(readService('wwwroot/js/render.js'));
+const lamp = dataUrl(readService('wwwroot/js/look.js'));
 const lookSource = readService('wwwroot/js/owner-look.js')
   .replace("'./owner-format.js'", `'${format}'`)
   .replace("'./owner-shared.js'", `'${shared}'`)
   .replace("'./copy.js'", `'${copy}'`)
-  .replace("'./render.js'", `'${render}'`);
+  .replace("'./render.js'", `'${render}'`)
+  .replace("'./look.js'", `'${lamp}'`);
 
-const { initLookPanel, readLook, writeLook, sameLook, applyLookAttributes, loadSampleLayout } = await import(dataUrl(lookSource));
+const { initLookPanel, readLook, writeLook, sameLook, applyLookAttributes, applySwatchAttributes, loadSampleLayout } = await import(dataUrl(lookSource));
 const { OWNER_TEXT, LOOK_NAMES, lookSummary } = await import(format);
 
 const DEFAULT_LOOK = { design: 'classic', wood: 'brown', backs: 'wood', lights: 'off', depth: 'shaded' };
@@ -69,6 +71,7 @@ function element(doc, tag, attributes = {}) {
       node.children = nodes;
     },
     getAttribute: (name) => (name in node.attributes ? node.attributes[name] : null),
+    hasAttribute: (name) => name in node.attributes,
     setAttribute(name, value) {
       node.attributes[name] = String(value);
     },
@@ -84,7 +87,7 @@ function element(doc, tag, attributes = {}) {
     },
     querySelector: (selector) => (selector === 'button[data-undo]' ? (node.children.find((child) => 'undo' in child.dataset) ?? null) : null),
     querySelectorAll(selector) {
-      const match = /^input\[name="(\w+)"\]$/.exec(selector);
+      const match = /^input\[name="([\w-]+)"\]$/.exec(selector);
 
       return match ? node.inputs.filter((input) => input.name === match[1]) : [];
     },
@@ -113,12 +116,13 @@ function textOf(node) {
  */
 function panelPage(look = DEFAULT_LOOK) {
   const ids = {};
+  const swatches = { '.look-swatch-design': [], '.look-swatch-wood': [] };
   const doc = {
     activeElement: null,
     createElement: (tag) => element(doc, tag),
     getElementById: (id) => ids[id] ?? null,
     querySelector: () => null,
-    querySelectorAll: () => [],
+    querySelectorAll: (selector) => swatches[selector] ?? [],
   };
   const make = (id, tag = 'div', attributes = {}) => {
     ids[id] = element(doc, tag, attributes);
@@ -159,7 +163,34 @@ function panelPage(look = DEFAULT_LOOK) {
   preview.dataset.sample = '/js/owner-look-sample.json';
   make('owner-status');
 
+  const evening = make('look-evening', 'fieldset');
+  const eveningHint = make('look-evening-hint', 'p');
+  const previewTime = ['day', 'evening'].map((value) => {
+    const input = element(doc, 'input');
+
+    input.name = 'preview-time';
+    input.value = value;
+    input.checked = value === 'day';
+    form.inputs.push(input);
+
+    return input;
+  });
+
+  for (const [selector, field, values] of [
+    ['.look-swatch-design', 'design', Object.keys(LOOK_NAMES.design)],
+    ['.look-swatch-wood', 'wood', Object.keys(LOOK_NAMES.wood)],
+  ]) {
+    for (const value of values) {
+      swatches[selector].push(element(doc, 'span', { [`data-${field}`]: value, 'data-lights': 'off' }));
+    }
+  }
+
   return {
+    evening,
+    eveningHint,
+    previewTime,
+    designSwatches: swatches['.look-swatch-design'],
+    woodSwatches: swatches['.look-swatch-wood'],
     doc,
     preview,
     form,
@@ -183,11 +214,14 @@ function panelPage(look = DEFAULT_LOOK) {
 function dependencies(answers, sample = { sections: [{}] }) {
   const posts = [];
   const drawn = [];
+  const lamps = [];
 
   return {
     posts,
     drawn,
+    lamps,
     deps: {
+      lamp: (root) => lamps.push(root),
       post: async (url, fields, options) => {
         posts.push({ url, fields, options });
 
@@ -501,4 +535,169 @@ test('the preview is sized by the height limit and the column width through the 
   assert.match(stylesheet, /--preview-h: min\(46dvh, 28rem\);/);
   assert.match(stylesheet, /--preview-h: min\(70dvh, 36rem\);/);
   assert.equal(stylesheet.includes('finish-tile'), false);
+});
+
+test('a design tile takes the trial wood, backs and depth and a wood tile takes the trial design, backs and depth, and neither takes the lights', async () => {
+  const page = panelPage();
+  const { deps } = dependencies([]);
+
+  await initLookPanel(page.doc, deps).ready;
+  choose(page, 'wood', 'oak');
+  choose(page, 'design', 'library');
+  choose(page, 'depth', 'deep');
+  choose(page, 'lights', 'on');
+  page.backs.checked = true;
+  page.form.listeners.change();
+
+  for (const swatch of page.designSwatches) {
+    assert.equal(swatch.getAttribute('data-wood'), 'oak');
+    assert.equal(swatch.getAttribute('data-backs'), 'painted');
+    assert.equal(swatch.getAttribute('data-depth'), 'deep');
+    assert.equal(swatch.getAttribute('data-lights'), 'off');
+  }
+
+  assert.deepEqual(
+    page.designSwatches.map((swatch) => swatch.getAttribute('data-design')),
+    Object.keys(LOOK_NAMES.design),
+  );
+
+  for (const swatch of page.woodSwatches) {
+    assert.equal(swatch.getAttribute('data-design'), 'library');
+    assert.equal(swatch.getAttribute('data-backs'), 'painted');
+    assert.equal(swatch.getAttribute('data-depth'), 'deep');
+    assert.equal(swatch.getAttribute('data-lights'), 'off');
+  }
+
+  assert.deepEqual(
+    page.woodSwatches.map((swatch) => swatch.getAttribute('data-wood')),
+    Object.keys(LOOK_NAMES.wood),
+  );
+});
+
+test('swatches are written with attributes only', () => {
+  const swatch = element({}, 'span', { 'data-design': 'modern' });
+  const root = { querySelectorAll: (selector) => (selector === '.look-swatch-design' ? [swatch] : []) };
+
+  applySwatchAttributes(root, ELEVEN);
+
+  assert.deepEqual(swatch.attributes, { 'data-design': 'modern', 'data-wood': 'mahogany', 'data-backs': 'painted', 'data-depth': 'deep' });
+});
+
+test('Preview time is disabled with a hint while the lights are off or always on, and enabled when they follow the evening', async () => {
+  const page = panelPage();
+  const { deps } = dependencies([]);
+
+  await initLookPanel(page.doc, deps).ready;
+
+  assert.equal(page.evening.disabled, true);
+  assert.equal(page.eveningHint.textContent, 'Only matters with Evenings only.');
+
+  choose(page, 'lights', 'on');
+  assert.equal(page.evening.disabled, true);
+  assert.equal(page.eveningHint.textContent, 'Only matters with Evenings only.');
+
+  choose(page, 'lights', 'evenings');
+  assert.equal(page.evening.disabled, false);
+  assert.equal(page.eveningHint.textContent, 'Only changes this preview.');
+
+  choose(page, 'lights', 'off');
+  assert.equal(page.evening.disabled, true);
+});
+
+test('choosing Evening marks the preview wrapper only, Day takes the mark away and the lamp is refreshed after every change', async () => {
+  const page = panelPage({ ...DEFAULT_LOOK, lights: 'evenings' });
+  const { deps, lamps } = dependencies([]);
+
+  await initLookPanel(page.doc, deps).ready;
+  const afterStart = lamps.length;
+
+  assert.equal(page.preview.hasAttribute('data-evening'), false);
+
+  page.previewTime[0].checked = false;
+  page.previewTime[1].checked = true;
+  page.form.listeners.change({ target: page.previewTime[1] });
+
+  assert.equal(page.preview.hasAttribute('data-evening'), true);
+  assert.equal(lamps.at(-1), page.preview);
+  assert.equal(lamps.length > afterStart, true);
+
+  page.previewTime[1].checked = false;
+  page.previewTime[0].checked = true;
+  page.form.listeners.change({ target: page.previewTime[0] });
+
+  assert.equal(page.preview.hasAttribute('data-evening'), false);
+
+  const before = lamps.length;
+  choose(page, 'wood', 'oak');
+
+  assert.equal(lamps.length > before, true);
+});
+
+test('changing Preview time starts no trial, clears no status and posts nothing', async () => {
+  const page = panelPage({ ...DEFAULT_LOOK, lights: 'evenings' });
+  const { deps, posts } = dependencies([]);
+
+  await initLookPanel(page.doc, deps).ready;
+  page.status.textContent = 'Back to the current look.';
+  page.previewTime[0].checked = false;
+  page.previewTime[1].checked = true;
+  page.form.listeners.change({ target: page.previewTime[1] });
+
+  assert.equal(page.trying.hidden, true);
+  assert.equal(page.publish.getAttribute('aria-disabled'), 'true');
+  assert.equal(page.status.textContent, 'Back to the current look.');
+  assert.equal(posts.length, 0);
+});
+
+test('the preview is marked settled once its first draw is done so that only later changes animate', async () => {
+  const page = panelPage();
+  const { deps } = dependencies([]);
+
+  assert.equal(page.preview.hasAttribute('data-settled'), false);
+  await initLookPanel(page.doc, deps).ready;
+
+  assert.equal(page.preview.hasAttribute('data-settled'), true);
+});
+
+test('the Preview time wording equals the copy contract and the server file', () => {
+  const server = readService('Owner/OwnerStrings.cs');
+
+  assert.equal(OWNER_TEXT.previewTimeHint, 'Only changes this preview.');
+  assert.equal(OWNER_TEXT.previewTimeHintDisabled, 'Only matters with Evenings only.');
+
+  for (const text of [OWNER_TEXT.previewTimeHint, OWNER_TEXT.previewTimeHintDisabled, 'Preview time', '"Day"', '"Evening"']) {
+    assert.equal(server.includes(text), true, text);
+  }
+});
+
+test('the tile groups are a grid from 40rem and one sideways row below it, and the swatch numbers live in the stylesheet', () => {
+  const stylesheet = readService('wwwroot/css/owner.css');
+  const markup = readService('Pages/Owner/Settings.cshtml');
+
+  assert.match(stylesheet, /\.look-tiles \{[^}]*display: flex;[^}]*scroll-snap-type: x proximity;[^}]*scroll-padding-inline: 16px;/);
+  assert.match(stylesheet, /\.look-tiles > \.look-tile \{[^}]*flex: 0 0 7rem;[^}]*scroll-snap-align: start;/);
+  assert.match(stylesheet, /@media \(min-width: 40rem\) \{\s*\.look-tiles \{[^}]*grid-template-columns: repeat\(auto-fill, minmax\(7rem, 1fr\)\);[^}]*gap: 24px;/);
+  assert.match(stylesheet, /\.look-swatch \.section \{[^}]*--section-w: 400;[^}]*--section-h: 240;[^}]*--frame: 20;/);
+  assert.match(stylesheet, /\.look-swatch \.cubby \{[^}]*--w: 360;[^}]*--h: 200;/);
+  assert.equal(markup.includes('style='), false);
+  assert.equal(markup.includes('look-swatch-design'), false);
+  assert.match(markup, /look-swatch-@item\.Kind/);
+  assert.match(markup, /aria-hidden="true"/);
+});
+
+test('the preview is sticky below 64rem with a paper edge, and not sticky in a short landscape window', () => {
+  const stylesheet = readService('wwwroot/css/owner.css');
+
+  assert.match(stylesheet, /\.look-preview \{[^}]*position: sticky;[^}]*top: 0;/);
+  assert.match(stylesheet, /0 1px 0 16px var\(--paper-edge\)/);
+  assert.match(stylesheet, /@media \(max-height: 36rem\) \{\s*\.look-stage,\s*\.look-preview \{\s*position: static;/);
+});
+
+test('the script never reaches the page root and writes no inline style or markup', () => {
+  const script = readService('wwwroot/js/owner-look.js');
+
+  assert.equal(script.includes('documentElement'), false);
+  assert.equal(script.includes('.style'), false);
+  assert.equal(script.includes('cssText'), false);
+  assert.equal(script.includes('innerHTML'), false);
 });

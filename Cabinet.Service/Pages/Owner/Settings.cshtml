@@ -2,6 +2,7 @@
 @using Cabinet.Domain.Owner
 @using Cabinet.Repository.Storage
 @using Cabinet.Service.Owner
+@using Microsoft.AspNetCore.Html
 @model Cabinet.Service.Pages.Owner.SettingsModel
 @section Head {
     <link rel="stylesheet" href="~/css/cabinet.css" asp-append-version="true" />
@@ -12,6 +13,8 @@
 @{
     ViewData["BannerInPanel"] = true;
     var backup = Model.Backup;
+    Func<(string Kind, string Design, string Wood), IHtmlContent> swatch =
+        @<span class="look-swatch look-swatch-@item.Kind" aria-hidden="true" data-design="@item.Design" data-wood="@item.Wood" data-backs="@Model.Look.Backs" data-lights="off" data-depth="@Model.Look.Depth"><span class="cabinet"><span class="section"><span class="section-floor"></span><span class="section-body"><span class="cubby" data-board="0" data-row-end="true"><span class="placement" data-kind="cover" data-pattern="plain"></span></span></span><span class="section-top"></span><span class="section-trim"></span><span class="section-base"></span></span></span></span>;
 }
 <h2>@OwnerStrings.Settings</h2>
 <section class="owner-panel" id="finish" aria-labelledby="finish-heading">
@@ -28,36 +31,42 @@
             </figure>
             <p class="owner-hint look-line" id="look-current">@OwnerStrings.VisitorsSee(CabinetLooks.Summary(Model.Look))</p>
             <p class="owner-hint look-line" id="look-trying" hidden></p>
-            <noscript><p class="owner-hint">@OwnerStrings.LookNoScript</p></noscript>
+            <p class="owner-hint look-line" id="look-no-script">@OwnerStrings.LookNoScript</p>
         </div>
         <div class="look-controls">
             <form method="post" class="look-form" id="look-form" autocomplete="off" asp-page-handler="Look">
                 <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
-                <fieldset class="look-group">
+                <fieldset class="pic-choices look-choices">
                     <legend>@OwnerStrings.DesignLegend</legend>
-                    @foreach (var design in CabinetLook.Designs)
-                    {
-                        <label class="look-choice">
-                            <input type="radio" name="design" value="@design" checked="@(design == Model.Look.Design)" />
-                            <span class="look-choice-text">
-                                <span class="look-choice-name">@CabinetLook.DesignName(design)</span>
+                    <div class="look-tiles">
+                        @foreach (var design in CabinetLook.Designs)
+                        {
+                            <label class="pic-tile look-tile">
+                                @swatch(("design", design, Model.Look.Wood))
+                                <span class="pic-caption">
+                                    <input type="radio" name="design" value="@design" checked="@(design == Model.Look.Design)" />
+                                    <span class="pic-label">@CabinetLook.DesignName(design)</span>
+                                </span>
                                 <span class="pic-sub">@OwnerStrings.DesignSubLine(design)</span>
-                            </span>
-                        </label>
-                    }
+                            </label>
+                        }
+                    </div>
                 </fieldset>
-                <fieldset class="look-group">
+                <fieldset class="pic-choices look-choices">
                     <legend>@OwnerStrings.WoodLegend</legend>
-                    @foreach (var wood in CabinetLook.Woods)
-                    {
-                        <label class="look-choice">
-                            <input type="radio" name="wood" value="@wood" checked="@(wood == Model.Look.Wood)" />
-                            <span class="look-choice-text">
-                                <span class="look-choice-name">@CabinetLook.WoodName(wood)</span>
+                    <div class="look-tiles">
+                        @foreach (var wood in CabinetLook.Woods)
+                        {
+                            <label class="pic-tile look-tile">
+                                @swatch(("wood", Model.Look.Design, wood))
+                                <span class="pic-caption">
+                                    <input type="radio" name="wood" value="@wood" checked="@(wood == Model.Look.Wood)" />
+                                    <span class="pic-label">@CabinetLook.WoodName(wood)</span>
+                                </span>
                                 <span class="pic-sub">@OwnerStrings.WoodSubLine(wood)</span>
-                            </span>
-                        </label>
-                    }
+                            </label>
+                        }
+                    </div>
                 </fieldset>
                 <div class="look-group">
                     <label class="look-choice">
@@ -93,6 +102,22 @@
                         </label>
                     }
                     <p class="owner-hint" id="look-depth-hint">@OwnerStrings.DepthHint</p>
+                </fieldset>
+                <fieldset class="look-group" id="look-evening" aria-describedby="look-evening-hint" disabled="@(Model.Look.Lights != "evenings")">
+                    <legend>@OwnerStrings.PreviewTimeLegend</legend>
+                    <label class="look-choice">
+                        <input type="radio" name="preview-time" value="day" checked />
+                        <span class="look-choice-text">
+                            <span class="look-choice-name">@OwnerStrings.PreviewDay</span>
+                        </span>
+                    </label>
+                    <label class="look-choice">
+                        <input type="radio" name="preview-time" value="evening" />
+                        <span class="look-choice-text">
+                            <span class="look-choice-name">@OwnerStrings.PreviewEvening</span>
+                        </span>
+                    </label>
+                    <p class="owner-hint" id="look-evening-hint">@(Model.Look.Lights == "evenings" ? OwnerStrings.PreviewTimeHint : OwnerStrings.PreviewTimeHintDisabled)</p>
                 </fieldset>
                 <div class="look-actions">
                     <button type="submit" class="owner-btn owner-btn-primary" id="look-publish">@OwnerStrings.UseForEveryoneButton</button>
