@@ -41,19 +41,16 @@ public sealed class LookContainmentTests : CabinetPageTest, IDisposable
 
     private readonly TemporaryDirectory _storage = new();
 
+    /// <summary>Every design with the lights off and with the lights on.</summary>
+    public static TheoryData<string, string> DesignsAndLights { get; } = BuildDesignsAndLights();
+
     [Theory]
-    [InlineData("classic")]
-    [InlineData("modern")]
-    [InlineData("display")]
-    [InlineData("legs")]
-    [InlineData("library")]
-    [InlineData("plywood")]
-    [InlineData("plywood-legs")]
-    public async Task Every_section_ends_inside_its_own_box_with_the_wall_at_its_edge(string design)
+    [MemberData(nameof(DesignsAndLights))]
+    public async Task Every_section_ends_inside_its_own_box_with_the_wall_at_its_edge(string design, string lights)
     {
         OwnerDataSeed.Write(
             _storage.FullPath,
-            OwnerData.Empty with { Revision = 1, Look = new CabinetLook(design, "brown", "wood", "off", "shaded") });
+            OwnerData.Empty with { Revision = 1, Look = new CabinetLook(design, "brown", "wood", lights, "shaded") });
         await StartAsync(new Dictionary<string, string?>(PrototypeOn) { ["Storage:Directory"] = _storage.FullPath });
 
         foreach (var (width, path) in Views)
@@ -67,7 +64,7 @@ public sealed class LookContainmentTests : CabinetPageTest, IDisposable
 
             for (var index = 0; index < count; index++)
             {
-                var where = $"{design}, section {index + 1} of {count}, {width} px, {path}";
+                var where = $"{design} with the lights {lights}, section {index + 1} of {count}, {width} px, {path}";
                 var reading = await ReadSectionAsync(index);
 
                 foreach (var part in reading.Parts)
@@ -86,7 +83,7 @@ public sealed class LookContainmentTests : CabinetPageTest, IDisposable
 
             if (path.EndsWith("65", StringComparison.Ordinal))
             {
-                await SaveScreenshotAsync($"design-{design}-{width}");
+                await SaveScreenshotAsync($"design-{design}-{lights}-{width}");
             }
         }
 
@@ -98,6 +95,19 @@ public sealed class LookContainmentTests : CabinetPageTest, IDisposable
     {
         _storage.Dispose();
         GC.SuppressFinalize(this);
+    }
+
+    private static TheoryData<string, string> BuildDesignsAndLights()
+    {
+        var data = new TheoryData<string, string>();
+
+        foreach (var design in CabinetLook.Designs)
+        {
+            data.Add(design, "off");
+            data.Add(design, "on");
+        }
+
+        return data;
     }
 
     private static bool InsideTheBox(PartReading part, BoxReading box) =>
@@ -187,7 +197,7 @@ public sealed class LookContainmentTests : CabinetPageTest, IDisposable
             keep(selector, element.getBoundingClientRect());
             for (const pseudo of ['::before', '::after']) {
               const style = getComputedStyle(element, pseudo);
-              if (style.content !== 'none' && style.content !== 'normal') {
+              if (getComputedStyle(element).display !== 'none' && style.content !== 'none' && style.content !== 'normal') {
                 const owner = element.getBoundingClientRect();
                 keep(selector + pseudo, {
                   left: owner.left + parseFloat(style.left),
