@@ -473,6 +473,33 @@ test('deep is four gradient layers on the cubby and one on each shelf board, wit
   assert.equal(/clip-path|cubby-deco/.test(sheets.modifiers), false);
 });
 
+test('every design rule that writes the background of a cubby or its shelf board keeps the deep slot as the first layer', () => {
+  const first = (value) => value.split(/,(?![^(]*\))/)[0].trim();
+  const slots = [
+    { member: /\.cubby(\[[^\]]*\])?$/, image: 'var(--deep-img)', size: 'var(--deep-size)', position: 'var(--deep-pos)' },
+    { member: /\.cubby(\[[^\]]*\])?::before$/, image: 'var(--top-face-img)', size: 'var(--top-face-size)', position: '0 0' },
+  ];
+  let checked = 0;
+
+  for (const rule of allRules.design) {
+    const value = (name) => rule.declarations.find((declaration) => declaration.name === name)?.value;
+    const image = value('background-image');
+
+    if (image === undefined) {
+      continue;
+    }
+
+    for (const slot of slots.filter(({ member }) => selectorsOf(rule.selector).some((selector) => member.test(selector)))) {
+      assert.equal(first(image), slot.image, `${rule.selector}: background-image`);
+      assert.equal(first(value('background-size') ?? ''), slot.size, `${rule.selector}: background-size`);
+      assert.equal(first(value('background-position') ?? ''), slot.position, `${rule.selector}: background-position`);
+      checked += 1;
+    }
+  }
+
+  assert.ok(checked >= 3, `only ${checked} cubby and shelf board backgrounds were found`);
+});
+
 test('the modifiers layer sets no size, position, margin, padding or display outside the light layer', () => {
   const forbidden = ['width', 'height', 'inset', 'top', 'left', 'right', 'bottom', 'aspect-ratio', 'margin', 'padding', 'display'];
   const light = /section-light|light-pool/;

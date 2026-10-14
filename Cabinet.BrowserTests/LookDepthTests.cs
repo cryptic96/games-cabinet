@@ -12,7 +12,7 @@ namespace Cabinet.BrowserTests;
 /// Proves the depth choice and the painted-back choice with a real browser. Every design, at both widths, is drawn with each
 /// depth and each kind of back and nothing moves and nothing paints outside its section box; Flat draws no shading but keeps the
 /// back's construction; a painted back is one flat colour that still carries the shade of the shelf above; and Deep draws the
-/// inner walls of a cubby.
+/// inner walls of a cubby and lights the top face of every shelf board on every design.
 /// </summary>
 [Trait("Category", "Browser")]
 public sealed class LookDepthTests : CabinetPageTest
@@ -26,6 +26,8 @@ public sealed class LookDepthTests : CabinetPageTest
     private const int GradientDither = 2;
 
     private const int SeamContrast = 12;
+
+    private const double TopFaceLift = 6;
 
     private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
 
@@ -86,6 +88,24 @@ public sealed class LookDepthTests : CabinetPageTest
                 (await EdgeDifferencesAsync()).Should().OnlyContain(difference => difference <= EdgeTolerance, label);
             }
         }
+    }
+
+    [Theory]
+    [MemberData(nameof(DesignsAtWidths))]
+    public async Task Deep_lights_the_top_face_of_every_shelf_board_on_every_design(string design, int width)
+    {
+        await StartAsync(PrototypeOn);
+        await OpenBareAsync(width);
+        await SetLookAsync(("design", design), ("depth", "shaded"), ("backs", "wood"));
+        var shaded = await BoardTopBrightnessAsync();
+
+        await SetLookAsync(("depth", "deep"));
+        var deep = await BoardTopBrightnessAsync();
+
+        deep.Should().HaveSameCount(shaded);
+        deep.Zip(shaded, (lit, plain) => lit - plain).Should().OnlyContain(
+            lift => lift >= TopFaceLift,
+            $"{design} at {width}: every shelf board shows its lit top face in Deep");
     }
 
     [Fact]
@@ -278,6 +298,37 @@ public sealed class LookDepthTests : CabinetPageTest
     private Task<double[][]> SectionRectsAsync() =>
         Page.EvaluateAsync<double[][]>(
             "() => [...document.querySelectorAll('#cabinet .section')].map((element) => { const r = element.getBoundingClientRect(); return [r.x + scrollX, r.y + scrollY, r.width, r.height]; })");
+
+    /// <summary>
+    /// Reads, for every shelf board under a cubby, the mean brightness (the sum of the three channels) of the band its top face
+    /// covers, across the middle half of the board so neither upright's edge counts.
+    /// </summary>
+    private async Task<List<double>> BoardTopBrightnessAsync()
+    {
+        using var frame = await FrameAsync();
+        var sizes = await Page.EvaluateAsync<double[]>(
+            "() => { const style = getComputedStyle(document.querySelector('#cabinet .cubby')); return [parseFloat(style.getPropertyValue('--u')), parseFloat(style.getPropertyValue('--top-face'))]; }");
+        var faceHeight = Math.Max(1, (int)Math.Floor(sizes[0] * sizes[1]));
+        var brightness = new List<double>();
+
+        foreach (var cubby in await CubbyRectsAsync())
+        {
+            var top = (int)Math.Ceiling(cubby[1] + cubby[3]);
+            var sums = new List<int>();
+
+            foreach (var x in Columns(cubby, from: 0.25, to: 0.75))
+            {
+                for (var y = top; y < top + faceHeight; y++)
+                {
+                    sums.Add(Sum(frame.Pixel(x, y)));
+                }
+            }
+
+            brightness.Add(sums.Average());
+        }
+
+        return brightness;
+    }
 
     private async Task<byte[]> CubbyShotAsync()
     {

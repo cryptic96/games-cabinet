@@ -567,6 +567,10 @@
   box-shadow: 1px 0 0 var(--edge-up-6), -1px 0 0 rgb(var(--arris-dark-rgb) / 0.55);
 }
 
+/**
+ * The shelf board of these designs is the lit front edge over the design's face. Its first layer is the top-face slot the
+ * classic board also starts with, so the deep look lights the top of every shelf on every design.
+ */
 :is(
   [data-design="modern"],
   [data-design="display"],
@@ -577,10 +581,11 @@
 ) .cubby::before {
   background-color: var(--board-tone);
   background-image:
+    var(--top-face-img),
     linear-gradient(to bottom, var(--wood-lit) 0 1px, transparent 1px, rgb(var(--shade-rgb) / 0.30) 100%),
     var(--h-face);
-  background-size: auto, auto, auto, var(--span) 100%, var(--span) 100%;
-  background-position: 0 0, 0 0, 0 0, var(--ox) 0, var(--ox) 0;
+  background-size: var(--top-face-size), auto, auto, auto, var(--span) 100%, var(--span) 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, var(--ox) 0, var(--ox) 0;
   background-repeat: no-repeat;
 }
 
