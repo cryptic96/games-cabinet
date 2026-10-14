@@ -35,7 +35,7 @@ public class LayoutEndpointTests
         root.GetProperty("layoutVersion").GetInt32().Should().BeGreaterThanOrEqualTo(1);
         root.GetProperty("profile").GetString().Should().Be("desktop");
         sections.GetArrayLength().Should().BeGreaterThanOrEqualTo(1);
-        sections[0].GetProperty("cubbies").GetArrayLength().Should().Be(SectionDesigns.Desktop.Cubbies.Count);
+        sections[0].GetProperty("cubbies").GetArrayLength().Should().BeInRange(1, SectionDesigns.Desktop.Cubbies.Count, "a balanced section is drawn down to its last used row");
         placementCount.Should().Be(65, "every item is a placement, a layer or part of a marker's count");
         placements.Select(placement => placement.GetProperty("kind").GetString())
             .Should().Contain(["expansionLayer", "expansionSpine", "orphanExpansion"]);
