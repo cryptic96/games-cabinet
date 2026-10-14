@@ -76,7 +76,8 @@ test('one-line titles step to their larger size inside size queries', () => {
 });
 
 test('the plinth lip is an outer edge at least one pixel thick, brighter in a narrow section', () => {
-  assert.match(stripped, /calc\(-1 \* var\(--lw\)\) calc\(-1 \* var\(--lw\)\) 0 0 rgb\(255 235 210 \/ var\(--arch-lit\)\)/);
+  assert.match(stripped, /calc\(-1 \* var\(--lw\)\) calc\(-1 \* var\(--lw\)\) 0 0 rgb\(var\(--plank-lift-rgb\) \/ var\(--arch-lit\)\)/);
+  assert.match(stripped, /--plank-lift-rgb:\s*255 235 210;/);
   assert.match(stripped, /--lw:\s*max\(1px, calc\(0\.8 \* var\(--u\)\)\)/);
   assert.match(containerQueries('max-width: 400px').join('\n'), /--arch-lit:\s*0\.22/);
 });

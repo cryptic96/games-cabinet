@@ -2,7 +2,15 @@
 
 /**
  * Modifiers only add overlays and set their strengths. They never move or resize anything and never touch a box face
- * except through the shade alpha. Shaded is the default depth: the shelf above casts its shade across the boxes.
+ * except through the shade alpha. The strengths below are the defaults of an element that carries none of the choices.
+ */
+:root {
+  --depth-k: 1;
+  --seam-k: 1;
+}
+
+/**
+ * Depth. Shaded is the default: the shelf above casts its shade across the boxes and onto the back of every cubby.
  */
 .cabinet {
   --shade-alpha: 0.20;

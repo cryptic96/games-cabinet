@@ -54,8 +54,12 @@ body {
   font-size: 16px;
   font-weight: 400;
   line-height: 1.5;
-  color: var(--wall-text);
-  background: var(--wood-dark);
+  color: var(--room-text, var(--wall-text));
+  background-color: var(--room, var(--wood-dark));
+  background-image: var(--room-falloff, none);
+  background-repeat: no-repeat;
+  background-position: top;
+  background-size: 100% 100lvh;
 }
 
 header {
@@ -114,7 +118,7 @@ p {
   border: 1px solid var(--wood-edge);
   border-radius: 4px;
   font-size: 14px;
-  color: var(--wall-text);
+  color: var(--room-text, var(--wall-text));
   text-align: center;
   text-decoration: none;
 }
@@ -124,8 +128,8 @@ p {
 }
 
 .sample-switcher a[aria-current="page"] {
-  background: var(--wood-light);
-  color: var(--ink);
+  background: var(--room-accent, var(--wood-light));
+  color: var(--room-on-accent, var(--ink));
   font-weight: 600;
 }
 
@@ -142,13 +146,13 @@ p {
   min-height: 44px;
   font-size: 14px;
   font-weight: 400;
-  color: var(--chrome-muted);
+  color: var(--room-muted, var(--chrome-muted));
   text-decoration: none;
 }
 
 .lang-toggle a[aria-current="true"] {
   font-weight: 600;
-  color: var(--wall-text);
+  color: var(--room-text, var(--wall-text));
   text-decoration: underline 2px;
   text-underline-offset: 4px;
 }
@@ -162,7 +166,7 @@ p {
   position: absolute;
   inset-inline-start: 0;
   translate: -50% 0;
-  color: var(--chrome-muted);
+  color: var(--room-muted, var(--chrome-muted));
   font-weight: 400;
 }
 
@@ -197,7 +201,7 @@ footer {
 
 main .cabinet-message {
   font-size: 16px;
-  color: var(--wall-text);
+  color: var(--room-text, var(--wall-text));
 }
 
 .cabinet-message-heading {
@@ -223,7 +227,7 @@ main .cabinet-message {
 .sync-time-text {
   font: inherit;
   font-size: 16px;
-  color: var(--wall-text);
+  color: var(--room-text, var(--wall-text));
   white-space: nowrap;
 }
 
@@ -245,10 +249,10 @@ main .cabinet-message {
 .sync-button {
   min-height: 44px;
   padding: 8px 16px;
-  border: 1px solid var(--chrome-line);
+  border: 1px solid var(--room-line, var(--chrome-line));
   border-radius: 4px;
   background: transparent;
-  color: var(--wall-text);
+  color: var(--room-text, var(--wall-text));
   font: inherit;
   font-size: 14px;
   font-weight: 400;
@@ -264,7 +268,7 @@ main .cabinet-message {
 
 .sync-button[aria-disabled="true"] {
   border-style: dashed;
-  color: var(--chrome-muted);
+  color: var(--room-muted, var(--chrome-muted));
   cursor: default;
   text-decoration: none;
 }
@@ -284,7 +288,7 @@ main .cabinet-message {
 
 .sync-stale {
   padding-inline-start: 8px;
-  border-inline-start: 4px solid var(--chrome-line);
+  border-inline-start: 4px solid var(--room-line, var(--chrome-line));
 }
 
 .sync-note:empty {
@@ -329,9 +333,9 @@ main .cabinet-message {
   clip-path: none;
   white-space: normal;
   font-size: 14px;
-  color: var(--wall-text);
-  background: var(--wood-dark);
-  border: 1px solid var(--chrome-line);
+  color: var(--room-text, var(--wall-text));
+  background: var(--room, var(--wood-dark));
+  border: 1px solid var(--room-line, var(--chrome-line));
   border-radius: 4px;
 }
 
@@ -354,8 +358,8 @@ main .cabinet-message {
   width: min(24rem, 100vw - 32px);
   padding: 8px;
   overflow-y: auto;
-  background: var(--wood-dark);
-  border: 1px solid var(--chrome-line);
+  background: var(--room, var(--wood-dark));
+  border: 1px solid var(--room-line, var(--chrome-line));
   border-radius: 4px;
 }
 
@@ -384,7 +388,7 @@ main .cabinet-message {
   padding: 8px;
   border: 0;
   background: none;
-  color: var(--wall-text);
+  color: var(--room-text, var(--wall-text));
   font: inherit;
   font-size: 16px;
   text-align: start;
@@ -394,7 +398,7 @@ main .cabinet-message {
 
 a:focus-visible,
 button:where(:not(.placement)):focus-visible {
-  outline: 2px solid var(--wood-light);
+  outline: 2px solid var(--room-ring, var(--wood-light));
   outline-offset: 2px;
 }
 

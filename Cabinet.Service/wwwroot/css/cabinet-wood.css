@@ -3,11 +3,91 @@
 /**
  * Every wood is a block of colours and unitless strengths and nothing else: no length, no size, no layout. The base
  * block is the warm brown of the default look and holds every shared token, so another wood only writes what makes it
- * different. Tokens are declared on the root and on any element that carries a wood, never on a pair of choices.
+ * different. Tokens are declared on the root and on any element that carries a wood, never on a pair of choices, so the
+ * colour mixes derived from the board recompute against the board of the element they sit on. A name that the
+ * unlayered site, card or owner sheets declare on the root is never reused here, because an unlayered declaration
+ * would beat this layer.
  */
 :root,
 [data-wood] {
+  --wood: #6b4226;
+  --wood-lit: #8c5d38;
+  --back: #2a1a10;
+  --back-painted: #0f2025;
+  --recess: color-mix(in oklch, var(--wood), black 55%);
+  --recess-low: color-mix(in oklch, var(--wood), black 55%);
+  --ply-a: color-mix(in oklch, var(--wood), white 16%);
+  --ply-b: color-mix(in oklch, var(--wood), black 14%);
+  --ply-glue: color-mix(in oklch, var(--wood), black 60%);
+  --inlay: #c4a15a;
+  --cubby-top: #170d07;
+  --cubby-left: #4a2e1b;
+  --cubby-right: #2f1c10;
+  --cubby-floor-back: #2a1a10;
+  --cubby-floor-front: color-mix(in oklch, var(--wood), black 20%);
+  --edge-up-6: color-mix(in oklch, var(--wood-lit), white 6%);
+  --edge-up-12: color-mix(in oklch, var(--wood-lit), white 12%);
+  --wood-up-2: color-mix(in oklch, var(--wood), white 2%);
+  --wood-up-4: color-mix(in oklch, var(--wood), white 4%);
+  --wood-up-6: color-mix(in oklch, var(--wood), white 6%);
+  --wood-dn-4: color-mix(in oklch, var(--wood), black 4%);
+  --wood-dn-6: color-mix(in oklch, var(--wood), black 6%);
+  --wood-dn-22: color-mix(in oklch, var(--wood), black 22%);
   --shade-rgb: 20 10 4;
+  --shade-deep-rgb: 10 5 2;
+  --box-shade-rgb: 20 10 4;
+  --room-shade-rgb: var(--shade-rgb);
+  --room-shade-deep-rgb: var(--shade-deep-rgb);
+  --sheen-rgb: 255 245 230;
+  --plank-lift-rgb: 255 235 210;
+  --highlight-rgb: 255 236 205;
+  --neutral-dark-rgb: 0 0 0;
+  --neutral-light-rgb: 255 255 255;
+  --arch-top-rgb: 8 4 2;
+  --arch-bottom-rgb: 30 16 8;
+  --arch-alpha-top: 0.92;
+  --arch-alpha-bottom: 0.72;
+  --arris-light-rgb: 255 240 220;
+  --arris-dark-rgb: 18 8 2;
+  --grain-dark-rgb: 40 20 8;
+  --grain-light-rgb: 255 240 220;
+  --grain-strength: 1;
+  --back-shade-k: 1;
+  --keyline: 0;
+  --ring-halo: transparent;
+  --wall-shadow: 0;
+  --lamp-rgb: 255 212 150;
+  --lamp-hot-rgb: 255 236 205;
+  --falloff-rgb: 255 244 228;
+  --lamp-k: 1;
+  --pool-k: var(--lamp-k);
+  --fill-k: 0;
+  --room: #3b2416;
+  --room-text: #efe3c2;
+  --room-accent: #d9b98a;
+  --room-ring: var(--room-accent);
+  --room-on-accent: var(--ink);
+  --room-muted: color-mix(in srgb, var(--room-text) 70%, var(--room));
+  --room-line: color-mix(in srgb, var(--room-text) 60%, var(--room));
+  --room-lit-alpha: 0;
+  --room-falloff: none;
+  --room-k: 0;
+  --floor: transparent;
+  --skirting: transparent;
+}
+
+/**
+ * The grain strength of a board is the wood's own, halved in a section too narrow to show fine grain. It is a unitless
+ * strength, so it belongs to the wood even though the member it lands on is set by the design.
+ */
+.section > * {
+  --grain-k: var(--grain-strength);
+}
+
+@container (max-width: 400px) {
+  .section > * {
+    --grain-k: calc(var(--grain-strength) * 0.5);
+  }
 }
 
 }

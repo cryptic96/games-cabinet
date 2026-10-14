@@ -41,17 +41,30 @@
 /**
  * A section is a size container whose box includes the furniture's reserved space: a side allowance on each side, the
  * moulded top above, and the plinth and floor margin below. Its aspect ratio reserves that full height before anything
- * renders. The section itself paints nothing; the design layer draws the furniture.
+ * renders. The box size and its ratio are kept as unitless millimetre numbers, so a wrapper that sizes a section by
+ * height can use the same ratio. The design layer draws the furniture; the only thing the section itself paints is the
+ * soft shadow the piece casts on the wall beside it, as a background that ends inside the side allowance, whose
+ * strength comes from the wood and is nothing at all on a wall that shows none.
  */
 .section {
+  --bw: calc(var(--section-w) + 2 * var(--side-allowance));
+  --bh: calc(var(--top-height) + var(--section-h) + var(--base-height) + var(--floor-margin));
+  --section-ratio: calc(var(--bw) / var(--bh));
+  --ws-w: calc(28 - var(--side-trim));
+  --ws-y: calc(var(--top-height) * 0.5);
+  --ws-h: calc(var(--bh) - var(--floor-margin) - var(--ws-y));
   container-type: inline-size;
   position: relative;
-  aspect-ratio:
-    calc(var(--section-w) + 2 * var(--side-allowance))
-    / calc(var(--top-height) + var(--section-h) + var(--base-height) + var(--floor-margin));
+  aspect-ratio: var(--section-ratio);
   content-visibility: auto;
   flex: 0 0 var(--section-basis);
   align-self: flex-start;
+  background-image: radial-gradient(ellipse 100% 50% at 0% 50%, rgb(var(--room-shade-rgb) / var(--wall-shadow)), transparent);
+  background-repeat: no-repeat;
+  background-size: calc(var(--ws-w) / var(--bw) * 100%) calc(var(--ws-h) / var(--bh) * 100%);
+  background-position:
+    calc((var(--side-allowance) + var(--section-w) + var(--side-trim)) / (var(--bw) - var(--ws-w)) * 100%)
+    calc(var(--ws-y) / (var(--bh) - var(--ws-h)) * 100%);
 }
 
 /**
@@ -94,9 +107,9 @@
 }
 
 .section-base {
-  left: calc((var(--side-allowance) - var(--side-trim)) * var(--u));
+  left: calc((var(--side-allowance) - var(--side-trim) - var(--base-overhang)) * var(--u));
   top: calc((var(--top-height) + var(--section-h)) * var(--u));
-  width: calc((var(--section-w) + 2 * var(--side-trim)) * var(--u));
+  width: calc((var(--section-w) + 2 * (var(--side-trim) + var(--base-overhang))) * var(--u));
   height: calc(var(--base-height) * var(--u));
 }
 
@@ -132,8 +145,8 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 1;
-  background: linear-gradient(to bottom, rgb(var(--shade-rgb) / var(--shade-alpha)), transparent var(--shade-depth));
+  z-index: 3;
+  background: linear-gradient(to bottom, rgb(var(--box-shade-rgb) / var(--shade-alpha)), transparent var(--shade-depth));
 }
 
 /**
@@ -145,6 +158,7 @@
   --rule-inset: max(6px, calc(16 * var(--u)));
   --rule: color-mix(in srgb, var(--fg) 35%, transparent);
   position: absolute;
+  z-index: 2;
   left: calc(var(--x) * var(--u));
   bottom: calc(var(--y) * var(--u));
   width: calc(var(--w) * var(--u));
@@ -163,7 +177,8 @@
   scroll-margin: 16px;
   box-shadow:
     inset 1px 1px 0 rgb(255 255 255 / 0.2),
-    0 1px 2px rgb(0 0 0 / 0.5);
+    0 1px 2px rgb(0 0 0 / 0.5),
+    0 0 0 1px rgb(var(--box-shade-rgb) / var(--keyline, 0));
   transition: transform 120ms ease-out;
 }
 
@@ -374,7 +389,9 @@
  */
 .placement[data-art="true"] {
   background: var(--edge-t, var(--bg));
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.5);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.5),
+    0 0 0 1px rgb(var(--box-shade-rgb) / var(--keyline, 0));
 }
 
 .placement[data-art="true"][data-fit="width"] {
@@ -564,26 +581,46 @@
   white-space: nowrap;
 }
 
+/**
+ * A focused box wears the accent ring on every wood, whatever the wall's own ring colour is, because the ring has to
+ * read against the furniture and not against the wall. Its geometry is fixed here; a wood whose frame is light also
+ * draws an ink halo outside it, and only the halo's colour comes from the wood.
+ */
 .placement:focus-visible {
-  z-index: 2;
+  z-index: 4;
   outline: 2px solid var(--wood-light);
   outline-offset: 2px;
 }
 
 /**
  * The box of the card that is open, for a visitor who prefers less motion: it stays in its slot and is marked with a plain light
- * outline instead of flying out. The colour is the wall text colour, not the accent.
+ * outline instead of flying out. The colour is the room's text colour, not the accent.
  */
 .placement[data-open] {
-  z-index: 2;
-  outline: 2px solid var(--wall-text);
+  z-index: 4;
+  outline: 2px solid var(--room-text, var(--wall-text));
   outline-offset: 2px;
+}
+
+.placement:focus-visible,
+.placement[data-open] {
+  box-shadow:
+    inset 1px 1px 0 rgb(255 255 255 / 0.2),
+    0 1px 2px rgb(0 0 0 / 0.5),
+    0 0 0 6px var(--ring-halo);
+}
+
+.placement[data-art="true"]:focus-visible,
+.placement[data-art="true"][data-open] {
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.5),
+    0 0 0 6px var(--ring-halo);
 }
 
 .cabinet-message {
   margin: 0 0 0.5rem;
   text-align: center;
-  color: var(--wood-light);
+  color: var(--room-accent, var(--wood-light));
 }
 
 .cabinet-retry {
@@ -596,13 +633,53 @@
   font: inherit;
   font-weight: 600;
   cursor: pointer;
-  background: var(--wood-light);
-  color: var(--ink);
+  background: var(--room-accent, var(--wood-light));
+  color: var(--room-on-accent, var(--ink));
 }
 
 .cabinet-retry:focus-visible {
-  outline: 2px solid var(--wood-light);
+  outline: 2px solid var(--room-ring, var(--wood-light));
   outline-offset: 2px;
+}
+
+/**
+ * The light of the section, positioned exactly like the body. It holds every pool and the glow on the floor in front of
+ * the base, and only its opacity ever changes. It is hidden outright while the lights are off, and it sits under every
+ * box, so it lights the back, the shelves and the uprights and never a box face.
+ */
+.section > .section-light {
+  left: calc(var(--side-allowance) * var(--u));
+  top: calc(var(--top-height) * var(--u));
+  width: calc(var(--section-w) * var(--u));
+  height: calc(var(--section-h) * var(--u));
+  z-index: 1;
+  display: none;
+  opacity: 0;
+}
+
+.light-pool {
+  position: absolute;
+  left: calc((var(--frame) + var(--x)) * var(--u));
+  top: calc((var(--frame) + var(--y)) * var(--u));
+  width: calc(var(--w) * var(--u));
+  height: calc(var(--h) * var(--u));
+}
+
+/**
+ * The floor patch of a section sits behind the body and ends inside the section box. It draws nothing until a wood
+ * gives it a floor.
+ */
+.section > .section-floor {
+  inset: 0;
+  z-index: -1;
+}
+
+/**
+ * The furniture that stands in front of the back shares the boxes' level and, by tree order, stays above them exactly as
+ * it always has: the side boards, the top and the base. Only the back, the shelves and the uprights are lit.
+ */
+.section > :is(.section-top, .section-trim, .section-base) {
+  z-index: 2;
 }
 
 }
