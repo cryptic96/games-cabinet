@@ -16,17 +16,24 @@ public sealed class DefaultLookIdentityTests : CabinetPageTest
 {
     private const string FrozenFolder = "LegacyStyles";
 
+    private const string StepChange = ":root { --wood-mid: #6b4227; }";
+
+    private const string LinkedLayerSheets = """
+        () => [...document.querySelectorAll('link[rel="stylesheet"]')]
+          .filter((link) => /\/css\/cabinet-[^/]*$/.test(new URL(link.href).pathname)).length
+        """;
+
     private static readonly Regex StylesheetRequest = new(@"/css/[^?#]*\.css(\?|#|$)");
 
     private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
 
-    [Fact]
-    public async Task The_default_look_matches_the_released_stylesheets_pixel_for_pixel()
+    [Theory]
+    [InlineData(1440, 900, "/?sample=65")]
+    [InlineData(1440, 900, "/?sample=400")]
+    [InlineData(390, 800, "/?sample=65")]
+    [InlineData(390, 800, "/?sample=400")]
+    public async Task The_default_look_matches_the_released_stylesheets_pixel_for_pixel(int width, int height, string path)
     {
-        const int width = 1440;
-        const int height = 900;
-        const string path = "/?sample=65";
-
         await StartAsync(PrototypeOn);
 
         var current = await RenderAsync(Page, width, height, path);
@@ -44,7 +51,21 @@ public sealed class DefaultLookIdentityTests : CabinetPageTest
         difference.SecondSize.Should().Be(difference.FirstSize);
         difference.DifferingPixels.Should().Be(0);
         legacy.FrozenSheetsServed.Should().Be(2);
-        legacy.LayerRequestsAnsweredEmpty.Should().BeGreaterThanOrEqualTo(0);
+        legacy.LayerRequestsAnsweredEmpty.Should().Be(legacy.LayerSheetsLinked);
+    }
+
+    [Fact]
+    public async Task A_one_step_colour_change_is_reported_as_differing_pixels()
+    {
+        await StartAsync(PrototypeOn);
+
+        var current = await RenderAsync(Page, 1440, 900, "/?sample=65");
+        var changed = await RenderWithFrozenStylesAsync(1440, 900, "/?sample=65", StepChange);
+        var difference = PixelComparison.Compare(current, changed.Png);
+
+        PixelComparison.WriteDiffImage(current, changed.Png, "default-look-teeth-diff");
+
+        difference.DifferingPixels.Should().BeGreaterThan(0);
     }
 
     private async Task<FrozenRender> RenderWithFrozenStylesAsync(int width, int height, string path, string? cabinetAddition)
@@ -60,7 +81,8 @@ public sealed class DefaultLookIdentityTests : CabinetPageTest
         try
         {
             var png = await RenderAsync(page, width, height, path);
-            return new FrozenRender(png, Volatile.Read(ref frozen), Volatile.Read(ref emptied));
+            var linked = await page.EvaluateAsync<int>(LinkedLayerSheets);
+            return new FrozenRender(png, Volatile.Read(ref frozen), Volatile.Read(ref emptied), linked);
         }
         finally
         {
@@ -140,5 +162,5 @@ public sealed class DefaultLookIdentityTests : CabinetPageTest
         await File.WriteAllBytesAsync(Path.Combine(directory, name + ".png"), png, TestContext.Current.CancellationToken);
     }
 
-    private sealed record FrozenRender(byte[] Png, int FrozenSheetsServed, int LayerRequestsAnsweredEmpty);
+    private sealed record FrozenRender(byte[] Png, int FrozenSheetsServed, int LayerRequestsAnsweredEmpty, int LayerSheetsLinked);
 }
