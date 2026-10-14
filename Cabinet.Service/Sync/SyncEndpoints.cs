@@ -23,7 +23,9 @@ public static class SyncEndpoints
     public const string StatusRoute = "/cabinet/status";
 
     private const int ResponseBufferLimitBytes = 20_000_000;
-    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(60);
+
+    /// <summary>The longest one outbound request may take, which every client of the sync and of the owner's own check is given.</summary>
+    internal static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(60);
 
     /// <summary>
     /// Validates the BGG and storage settings now, so a bad value stops the app at startup, and registers the BGG client and
