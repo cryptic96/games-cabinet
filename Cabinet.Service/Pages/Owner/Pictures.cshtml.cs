@@ -37,7 +37,7 @@ public class PicturesModel : OwnerPage
     private readonly CollectionStore _collection;
     private readonly ArtRules _rules;
     private readonly TimeProvider _time;
-    private readonly OwnerLinkFetcher _fetcher;
+    private readonly OwnerCheckFetcher _fetcher;
     private readonly StagedItems<StagedLink> _staged;
     private readonly ArtCache _cache;
 
@@ -46,7 +46,7 @@ public class PicturesModel : OwnerPage
     /// <param name="collection">The collection visitors see, which lists the games.</param>
     /// <param name="rules">The rules that decide what the automatic pick draws.</param>
     /// <param name="time">The clock that decides whether a linked picture counts as dead.</param>
-    /// <param name="fetcher">Fetches and processes the picture at an address the owner pasted.</param>
+    /// <param name="fetcher">Fetches and processes the picture at an address the owner pasted, on a fetch slot of its own that the background work never holds.</param>
     /// <param name="staged">Holds a previewed picture until the owner uses or discards it.</param>
     /// <param name="cache">The directory of stored pictures, which a used picture is written to.</param>
     public PicturesModel(
@@ -54,7 +54,7 @@ public class PicturesModel : OwnerPage
         CollectionStore collection,
         ArtRules rules,
         TimeProvider time,
-        OwnerLinkFetcher fetcher,
+        OwnerCheckFetcher fetcher,
         StagedItems<StagedLink> staged,
         ArtCache cache)
     {

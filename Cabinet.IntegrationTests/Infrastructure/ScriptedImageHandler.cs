@@ -13,16 +13,36 @@ namespace Cabinet.IntegrationTests.Infrastructure;
 /// <param name="HasCookie">Whether the request carried a Cookie header.</param>
 public sealed record RecordedImageRequest(Uri Uri, string? AuthorizationScheme, string? AuthorizationParameter, string? UserAgent, bool HasCookie = false);
 
+/// <summary>A request to one address that the handler keeps unanswered until the test lets it go.</summary>
+public sealed class HeldRequest
+{
+    private readonly TaskCompletionSource _reached = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _released = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>Completes once a request to the held address has arrived and is waiting.</summary>
+    public Task Reached => _reached.Task;
+
+    /// <summary>Lets the waiting request, and every later one to the address, be answered.</summary>
+    public void Release() => _released.TrySetResult();
+
+    internal async Task WaitAsync(CancellationToken cancellationToken)
+    {
+        _reached.TrySetResult();
+        await _released.Task.WaitAsync(cancellationToken);
+    }
+}
+
 /// <summary>
 /// A transport for tests that answers picture requests from a dictionary of invented bodies, by absolute address, with
 /// not found for every other address, and remembers every request it was given. An address can also be made to send a
-/// body that breaks off part way or one that stalls until the request is cancelled.
+/// body that breaks off part way, one that stalls until the request is cancelled, or one that waits until the test lets it go.
 /// </summary>
 public sealed class ScriptedImageHandler : HttpMessageHandler
 {
     private readonly Dictionary<string, (byte[] Bytes, string ContentType)> _bodies = new(StringComparer.Ordinal);
     private readonly HashSet<string> _broken = new(StringComparer.Ordinal);
     private readonly HashSet<string> _stalled = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, HeldRequest> _held = new(StringComparer.Ordinal);
     private readonly List<RecordedImageRequest> _requests = [];
     private readonly TaskCompletionSource _stallReached = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly object _gate = new();
@@ -95,6 +115,20 @@ public sealed class ScriptedImageHandler : HttpMessageHandler
         return this;
     }
 
+    /// <summary>Makes every request to an address wait, unanswered, until the returned handle is released; the answer is then the one the address is scripted with.</summary>
+    /// <param name="address">The absolute address.</param>
+    public HeldRequest Hold(string address)
+    {
+        var held = new HeldRequest();
+
+        lock (_gate)
+        {
+            _held[address] = held;
+        }
+
+        return held;
+    }
+
     /// <summary>Makes an address answer with a plain solid-colour PNG of the given size.</summary>
     /// <param name="address">The absolute address.</param>
     /// <param name="width">The width in pixels.</param>
@@ -121,7 +155,7 @@ public sealed class ScriptedImageHandler : HttpMessageHandler
     }
 
     /// <inheritdoc />
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var uri = request.RequestUri ?? throw new InvalidOperationException("The request has no address.");
         var userAgent = request.Headers.UserAgent.ToString();
@@ -129,6 +163,7 @@ public sealed class ScriptedImageHandler : HttpMessageHandler
         bool found;
         bool broken;
         bool stalled;
+        HeldRequest? held;
 
         lock (_gate)
         {
@@ -141,23 +176,29 @@ public sealed class ScriptedImageHandler : HttpMessageHandler
             found = _bodies.TryGetValue(uri.AbsoluteUri, out body);
             broken = _broken.Contains(uri.AbsoluteUri);
             stalled = _stalled.Contains(uri.AbsoluteUri);
+            _held.TryGetValue(uri.AbsoluteUri, out held);
         }
 
         OnRequest?.Invoke(uri);
+
+        if (held is not null)
+        {
+            await held.WaitAsync(cancellationToken);
+        }
 
         if (broken || stalled)
         {
             Stream troubled = broken ? BreakingBodyStream.DroppedConnection() : new StallingBodyStream(() => _stallReached.TrySetResult());
 
-            return Task.FromResult(Answer(request, new StreamContent(troubled), "image/png"));
+            return Answer(request, new StreamContent(troubled), "image/png");
         }
 
         if (!found)
         {
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound) { RequestMessage = request });
+            return new HttpResponseMessage(HttpStatusCode.NotFound) { RequestMessage = request };
         }
 
-        return Task.FromResult(Answer(request, new ByteArrayContent(body.Bytes), body.ContentType));
+        return Answer(request, new ByteArrayContent(body.Bytes), body.ContentType);
     }
 
     private static HttpResponseMessage Answer(HttpRequestMessage request, HttpContent content, string contentType)
