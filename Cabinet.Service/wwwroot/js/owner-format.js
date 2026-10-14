@@ -112,6 +112,8 @@ export const OWNER_TEXT = Object.freeze({
   lookSaved: 'Saved for everyone. Open pages follow within a few seconds.',
   lookUndone: 'Put back the earlier look.',
   previewFailed: "The preview couldn't load. You can still choose a look and press Use for everyone.",
+  previewTimeHint: 'Only changes this preview.',
+  previewTimeHintDisabled: 'Only matters with Evenings only.',
 });
 
 /** The display names of every look choice, by field and stored value, as the owner's controls and the change log word them. */

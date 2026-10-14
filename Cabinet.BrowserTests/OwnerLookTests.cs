@@ -69,6 +69,7 @@ public sealed class OwnerLookTests : CabinetPageTest
         await Expect(publish).ToHaveAttributeAsync("aria-disabled", "true");
         await Expect(discard).ToHaveAttributeAsync("aria-disabled", "true");
         await Expect(Page.Locator("#look-trying")).ToBeHiddenAsync();
+        await Expect(Page.Locator("#look-no-script")).ToBeHiddenAsync();
         await Expect(Page.Locator("input[name=design][value=classic]")).ToBeCheckedAsync();
         await Expect(Page.Locator("input[name=wood][value=brown]")).ToBeCheckedAsync();
         await Expect(Page.Locator("input[name=lights][value=off]")).ToBeCheckedAsync();
@@ -227,6 +228,108 @@ public sealed class OwnerLookTests : CabinetPageTest
         await Expect(Page.Locator("#look-current")).ToContainTextAsync("Warm brown");
         (await PublicAttributeAsync("data-wood")).Should().Be("brown");
         ExpectCleanPage();
+    }
+
+    [Fact]
+    public async Task The_design_and_wood_groups_are_tiles_that_each_carry_a_swatch_of_their_own_choice_in_the_trial_look()
+    {
+        await Page.SetViewportSizeAsync(1440, 900);
+        await StartWithDataAsync(null);
+        await GotoOwnerAsync(SettingsPath);
+
+        var designs = Page.Locator("fieldset.look-choices", new() { Has = Page.Locator("legend", new() { HasTextString = "Design" }) });
+        var woods = Page.Locator("fieldset.look-choices", new() { Has = Page.Locator("legend", new() { HasTextString = "Wood" }) });
+        (await designs.Locator(".pic-label").AllTextContentsAsync()).Should().Equal("Classic", "Modern", "Display", "On legs", "Library", "Plywood", "Plywood on legs");
+        (await woods.Locator(".pic-label").AllTextContentsAsync()).Should().Equal("Warm brown", "Walnut", "Oak", "Birch", "Mahogany");
+        (await designs.Locator(".pic-sub").AllTextContentsAsync()).Should().Equal(
+            "Moulded top, arched plinth on feet.",
+            "Slab top, straight recessed base.",
+            "Thick slab top, dark base that seems to float.",
+            "Apron with splayed, tapered legs.",
+            "Crown moulding, brass line on every shelf.",
+            "Striped ply edges, rounded corners.",
+            "Ply edges on two splayed legs.");
+        (await woods.Locator(".pic-sub").AllTextContentsAsync()).Should().Equal(
+            "Today's wood and wall.",
+            "Dark and rich.",
+            "Pale gold, open grain.",
+            "Pale and clean, light wall.",
+            "Deep red-brown.");
+
+        var designValues = await designs.Locator(".look-swatch").EvaluateAllAsync<string[]>("swatches => swatches.map(swatch => swatch.dataset.design + '/' + swatch.dataset.wood)");
+        designValues.Should().Equal("classic/brown", "modern/brown", "display/brown", "legs/brown", "library/brown", "plywood/brown", "plywood-legs/brown");
+        var woodValues = await woods.Locator(".look-swatch").EvaluateAllAsync<string[]>("swatches => swatches.map(swatch => swatch.dataset.wood + '/' + swatch.dataset.design)");
+        woodValues.Should().Equal("brown/classic", "walnut/classic", "oak/classic", "birch/classic", "mahogany/classic");
+        (await Page.Locator(".look-swatch").EvaluateAllAsync<bool>("swatches => swatches.every(swatch => swatch.getAttribute('aria-hidden') === 'true' && swatch.dataset.lights === 'off')")).Should().BeTrue();
+        await ExpectEverySwatchDrawnAsync();
+        await SaveScreenshotAsync("owner-look-tiles-1440");
+    }
+
+    [Fact]
+    public async Task Without_script_the_tiles_still_draw_and_the_note_about_the_preview_shows()
+    {
+        await StartWithDataAsync(null);
+        await using var plain = await Browser.NewContextAsync(new()
+        {
+            JavaScriptEnabled = false,
+            ExtraHTTPHeaders = new Dictionary<string, string> { ["Accept-Encoding"] = "identity" },
+        });
+        var page = await plain.NewPageAsync();
+        await page.SetViewportSizeAsync(1440, 900);
+
+        await page.GotoAsync($"http://127.0.0.1:{OwnerPort}{SettingsPath}");
+
+        await Expect(page.Locator(".look-tile")).ToHaveCountAsync(12);
+        await Expect(page.GetByText("The preview needs scripts. You can still choose a look and press Use for everyone.")).ToBeVisibleAsync();
+        await Expect(page.GetByRole(AriaRole.Button, new() { Name = "Use for everyone" })).ToBeVisibleAsync();
+        var drawn = await page.Locator(".look-swatch .placement").EvaluateAllAsync<string[]>(
+            "boxes => boxes.map(box => { const r = box.getBoundingClientRect(); return `${Math.round(r.width)}x${Math.round(r.height)} ${getComputedStyle(box).backgroundColor}`; })");
+        drawn.Should().OnlyContain(box => !box.StartsWith("0x", StringComparison.Ordinal) && !box.Contains("rgba(0, 0, 0, 0)", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Checking_a_wood_redraws_every_design_tile_in_it_and_checking_a_design_redraws_every_wood_tile_on_it()
+    {
+        await Page.SetViewportSizeAsync(1440, 900);
+        await StartWithDataAsync(null);
+        var posts = CountLookPosts();
+        await GotoOwnerAsync(SettingsPath);
+
+        await Page.Locator("input[name=wood][value=oak]").CheckAsync();
+
+        (await Page.Locator(".look-swatch-design").EvaluateAllAsync<string[]>("swatches => swatches.map(swatch => swatch.dataset.wood)")).Should().OnlyContain(wood => wood == "oak");
+        await Expect(Page.Locator(Preview)).ToHaveAttributeAsync("data-wood", "oak");
+        (await Page.Locator(".look-swatch-wood").EvaluateAllAsync<string[]>("swatches => swatches.map(swatch => swatch.dataset.wood)")).Should().Equal("brown", "walnut", "oak", "birch", "mahogany");
+
+        await Page.Locator("input[name=design][value=library]").CheckAsync();
+
+        (await Page.Locator(".look-swatch-wood").EvaluateAllAsync<string[]>("swatches => swatches.map(swatch => swatch.dataset.design)")).Should().OnlyContain(design => design == "library");
+        await Expect(Page.Locator(Preview)).ToHaveAttributeAsync("data-design", "library");
+        (await Page.Locator(".look-swatch-design").EvaluateAllAsync<string[]>("swatches => swatches.map(swatch => swatch.dataset.design)"))
+            .Should().Equal("classic", "modern", "display", "legs", "library", "plywood", "plywood-legs");
+
+        await Page.Locator("input[name=backs]").CheckAsync();
+        await Page.Locator("input[name=depth][value=deep]").CheckAsync();
+
+        (await Page.Locator(".look-swatch").EvaluateAllAsync<string[]>("swatches => swatches.map(swatch => swatch.dataset.backs + '/' + swatch.dataset.depth)")).Should().OnlyContain(pair => pair == "painted/deep");
+        (await Page.Locator(".look-swatch").EvaluateAllAsync<string[]>("swatches => swatches.map(swatch => swatch.dataset.lights)")).Should().OnlyContain(lights => lights == "off");
+        posts().Should().Be(0);
+        await SaveScreenshotAsync("owner-look-tiles-library-oak");
+    }
+
+    private async Task ExpectEverySwatchDrawnAsync()
+    {
+        var drawn = await Page.Locator(".look-swatch").EvaluateAllAsync<bool>(
+            """
+            swatches => swatches.every(swatch => {
+              const box = swatch.querySelector('.placement').getBoundingClientRect();
+              const area = swatch.getBoundingClientRect();
+              return area.width > 40 && area.height > 40 && box.width > 4 && box.height > 4
+                && getComputedStyle(swatch).backgroundColor !== 'rgba(0, 0, 0, 0)';
+            })
+            """);
+
+        drawn.Should().BeTrue();
     }
 
     /// <inheritdoc />
