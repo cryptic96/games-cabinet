@@ -1,0 +1,726 @@
+@layer structure {
+/**
+ * Sections sit in rows that wrap: one column, two from 80rem and three from 118rem, each section at most 40rem wide and
+ * never under 37rem, the narrowest a desktop section is ever drawn. Every row is centred, so a lone section and a last
+ * row with fewer sections than columns sit in the middle, and the column count is the only thing that sets a section's
+ * width, so the last section is as wide as the others. The row stops growing at three full columns, so a very wide
+ * screen gets margins instead of a fourth column. Sections start at the top of their row, so a shorter last section
+ * lines up with its neighbours.
+ */
+.cabinet {
+  --column-gap: 24px;
+  --section-basis: min(40rem, 100%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: var(--column-gap);
+  justify-self: stretch;
+  width: 100%;
+  max-width: 123rem;
+  margin-inline: auto;
+}
+
+.cabinet > .cabinet-message {
+  flex: 1 1 100%;
+}
+
+@media (min-width: 80rem) {
+  .cabinet {
+    --section-basis: min(40rem, calc((100% - var(--column-gap)) / 2));
+  }
+}
+
+@media (min-width: 118rem) {
+  .cabinet {
+    --section-basis: min(40rem, calc((100% - 2 * var(--column-gap)) / 3));
+  }
+}
+
+/**
+ * A section is a size container whose box includes the furniture's reserved space: a side allowance on each side, the
+ * moulded top above, and the plinth and floor margin below. Its aspect ratio reserves that full height before anything
+ * renders. The section itself paints nothing; the finish block at the end of the file draws the furniture.
+ */
+.section {
+  container-type: inline-size;
+  position: relative;
+  aspect-ratio:
+    calc(var(--section-w) + 2 * var(--side-allowance))
+    / calc(var(--top-height) + var(--section-h) + var(--base-height) + var(--floor-margin));
+  content-visibility: auto;
+  flex: 0 0 var(--section-basis);
+  align-self: flex-start;
+}
+
+/**
+ * Registering the unit as a length makes the browser work it out where it is declared, against the section, instead of
+ * passing the formula down to be worked out again against whatever container sits below. Size containers inside a
+ * section, such as the face-out covers, therefore cannot change what a millimetre is.
+ */
+@property --u {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}
+
+.section > * {
+  --u: calc(100cqw / (var(--section-w) + 2 * var(--side-allowance)));
+  position: absolute;
+  pointer-events: none;
+}
+
+.section > .section-body {
+  pointer-events: auto;
+  left: calc(var(--side-allowance) * var(--u));
+  top: calc(var(--top-height) * var(--u));
+  width: calc(var(--section-w) * var(--u));
+  height: calc(var(--section-h) * var(--u));
+}
+
+.section-top {
+  left: calc((var(--side-allowance) - var(--side-trim) - var(--overhang)) * var(--u));
+  top: 0;
+  width: calc((var(--section-w) + 2 * (var(--side-trim) + var(--overhang))) * var(--u));
+  height: calc(var(--top-height) * var(--u));
+}
+
+.section-trim {
+  left: calc((var(--side-allowance) - var(--side-trim)) * var(--u));
+  top: calc(var(--top-height) * var(--u));
+  width: calc((var(--section-w) + 2 * var(--side-trim)) * var(--u));
+  height: calc(var(--section-h) * var(--u));
+}
+
+.section-base {
+  left: calc((var(--side-allowance) - var(--side-trim) - var(--base-overhang)) * var(--u));
+  top: calc((var(--top-height) + var(--section-h)) * var(--u));
+  width: calc((var(--section-w) + 2 * (var(--side-trim) + var(--base-overhang))) * var(--u));
+  height: calc(var(--base-height) * var(--u));
+}
+
+/**
+ * A cubby is one compartment. Its ::before is the board that lies under it, reaching one frame width to the right to
+ * cover the divider's foot, or ending at the cubby on the last cubby of a row where the side board takes over. Its
+ * ::after is the shade the shelf above casts across the boxes, the only layer allowed above them.
+ */
+.cubby {
+  position: absolute;
+  left: calc((var(--frame) + var(--x)) * var(--u));
+  top: calc((var(--frame) + var(--y)) * var(--u));
+  width: calc(var(--w) * var(--u));
+  height: calc(var(--h) * var(--u));
+  overflow: visible;
+}
+
+.cubby::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 100%;
+  width: calc(100% + var(--frame) * var(--u));
+  height: calc(var(--frame) * var(--u));
+}
+
+.cubby[data-row-end]::before {
+  width: 100%;
+}
+
+.cubby::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  background: linear-gradient(to bottom, rgb(var(--box-shade-rgb) / var(--shade-alpha)), transparent var(--shade-depth));
+}
+
+/**
+ * Every box is a button standing on the cubby floor. Its colours come from the palette entry the renderer sets as --bg
+ * and --fg. The light inset edge and the contact shadow keep dark tones visible against the dark cubby back.
+ */
+.placement {
+  --tile: calc(24 * var(--u));
+  --rule-inset: max(6px, calc(16 * var(--u)));
+  --rule: color-mix(in srgb, var(--fg) 35%, transparent);
+  position: absolute;
+  z-index: 2;
+  left: calc(var(--x) * var(--u));
+  bottom: calc(var(--y) * var(--u));
+  width: calc(var(--w) * var(--u));
+  height: calc(var(--h) * var(--u));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+  background: var(--bg, var(--box-fallback-bg));
+  color: var(--fg, var(--box-fallback-fg));
+  overflow: hidden;
+  scroll-margin: 16px;
+  box-shadow:
+    inset 1px 1px 0 rgb(255 255 255 / 0.2),
+    0 1px 2px rgb(0 0 0 / 0.5),
+    0 0 0 1px rgb(var(--box-shade-rgb) / var(--keyline, 0));
+  transition: transform 120ms ease-out;
+}
+
+@media (hover: hover) {
+  .placement:hover {
+    transform: translateY(calc(-6 * var(--u)));
+  }
+}
+
+/**
+ * A box that is out of the shelf while its card is open. It is hidden with visibility, never opacity or display, so its slot keeps
+ * its size and the empty cubby shows behind the dim.
+ */
+.placement[data-out] {
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .placement {
+    transition: none;
+  }
+
+  .placement:hover {
+    transform: none;
+  }
+}
+
+.placement .placement-label {
+  unicode-bidi: plaintext;
+}
+
+.placement:is([data-kind="spine"], [data-kind="expansionSpine"])::before,
+.placement:is([data-kind="spine"], [data-kind="expansionSpine"])::after {
+  content: "";
+  position: absolute;
+  left: 15%;
+  right: 15%;
+  height: 1px;
+  background: var(--rule);
+}
+
+.placement:is([data-kind="spine"], [data-kind="expansionSpine"])::before {
+  top: calc(var(--rule-inset) / 2);
+}
+
+.placement:is([data-kind="spine"], [data-kind="expansionSpine"])::after {
+  bottom: calc(var(--rule-inset) / 2);
+}
+
+.placement:is([data-kind="spine"], [data-kind="expansionSpine"]) .placement-label {
+  display: block;
+  writing-mode: vertical-rl;
+  font-weight: 600;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: calc(100% - 2 * var(--rule-inset));
+}
+
+/**
+ * Every box that is not a generated cover is a size container, so its title can step to a larger size by the width or
+ * height the box is actually drawn at. One-line titles use only two sizes, which keeps a shelf of thin spines even:
+ * spines and upright expansion titles are 12px under 26px wide and 16px from there; flat boxes, layers and orphan
+ * expansion titles are 12px under 28px tall and 14px from there. A two-line upright expansion keeps its own rule.
+ */
+.placement:is(
+  [data-kind="spine"],
+  [data-kind="expansionSpine"],
+  [data-kind="flatBox"],
+  [data-kind="expansionLayer"],
+  [data-kind="orphanExpansion"]
+) {
+  container-type: size;
+}
+
+@container (min-width: 26px) {
+  .placement[data-kind="spine"] .placement-label {
+    font-size: 16px;
+  }
+}
+
+.placement[data-kind="cover"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  --pattern: color-mix(in srgb, var(--fg) 14%, transparent);
+  background-size: var(--tile) var(--tile);
+}
+
+.placement[data-kind="cover"][data-pattern="stripes"]::before {
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--pattern) 0 calc(6 * var(--u)),
+    transparent calc(6 * var(--u)) var(--tile)
+  );
+  background-size: auto;
+}
+
+.placement[data-kind="cover"][data-pattern="chevrons"]::before {
+  background-image:
+    linear-gradient(135deg, var(--pattern) 25%, transparent 25%),
+    linear-gradient(225deg, var(--pattern) 25%, transparent 25%),
+    linear-gradient(315deg, var(--pattern) 25%, transparent 25%),
+    linear-gradient(45deg, var(--pattern) 25%, transparent 25%);
+  background-position:
+    calc(var(--tile) / -2) 0,
+    calc(var(--tile) / -2) 0,
+    0 0,
+    0 0;
+}
+
+.placement[data-kind="cover"][data-pattern="dots"]::before {
+  background-image: radial-gradient(circle at 50% 50%, var(--pattern) 0 22%, transparent 24%);
+}
+
+.placement[data-kind="cover"][data-pattern="rings"]::before {
+  background-image: radial-gradient(circle at 50% 50%, transparent 0 28%, var(--pattern) 30% 40%, transparent 42%);
+}
+
+.placement[data-kind="cover"][data-pattern="diagonal"]::before {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--pattern) 0 calc(3 * var(--u)),
+    transparent calc(3 * var(--u)) calc(10 * var(--u))
+  );
+  background-size: auto;
+}
+
+.placement[data-kind="cover"][data-pattern="plain"]::before {
+  background-image: none;
+}
+
+.placement[data-kind="cover"] .cover-plate {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  min-height: 40%;
+  max-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 3px 4px;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.placement[data-kind="cover"] {
+  container-type: size;
+}
+
+.placement[data-kind="cover"] .placement-label {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  min-width: 0;
+  max-width: 100%;
+  text-align: center;
+  font-weight: 600;
+  line-height: 1.2;
+  font-size: clamp(12px, calc(var(--w) * var(--u) * 0.10), 22px);
+  overflow: hidden;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: manual;
+  text-overflow: ellipsis;
+}
+
+/**
+ * A generated cover shows as many whole title lines as its own height has room for, and the last line shown carries the
+ * ellipsis, so no line is ever cut through the middle: four lines from 64 pixels tall, three from 50, two from 36 and one
+ * below.
+ */
+@container (min-height: 64px) {
+  .placement[data-kind="cover"] .placement-label {
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
+  }
+}
+
+@container (min-height: 50px) and (max-height: 63.99px) {
+  .placement[data-kind="cover"] .placement-label {
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+  }
+}
+
+@container (min-height: 36px) and (max-height: 49.99px) {
+  .placement[data-kind="cover"] .placement-label {
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+}
+
+@container (max-height: 35.99px) {
+  .placement[data-kind="cover"] .placement-label {
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+  }
+}
+
+/**
+ * A cover that shows a box picture holds one image and nothing else. The picture is shown whole and centred, never
+ * cropped, stretched or drawn over, and the box fills what it leaves with the colours along the picture's edges, falling
+ * back to the box colour when those are not known. The light inset edge is not drawn, only the outer contact shadow.
+ */
+.placement[data-art="true"] {
+  background: var(--edge-t, var(--bg));
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 0 0 1px rgb(var(--box-shade-rgb) / var(--keyline, 0));
+}
+
+.placement[data-art="true"][data-fit="width"] {
+  background: linear-gradient(to bottom, var(--edge-t, var(--bg)) 50%, var(--edge-b, var(--bg)) 50%);
+}
+
+.placement[data-art="true"][data-fit="height"] {
+  background: linear-gradient(to right, var(--edge-l, var(--bg)) 50%, var(--edge-r, var(--bg)) 50%);
+}
+
+.placement[data-kind="cover"][data-art="true"]::before {
+  content: none;
+}
+
+.cover-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+
+.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"], [data-kind="orphanExpansion"]) {
+  justify-content: flex-start;
+}
+
+.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"], [data-kind="orphanExpansion"])::before,
+.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"], [data-kind="orphanExpansion"])::after {
+  content: "";
+  position: absolute;
+  top: 20%;
+  bottom: 20%;
+  width: 1px;
+  background: var(--rule);
+}
+
+.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"], [data-kind="orphanExpansion"])::before {
+  left: calc(var(--rule-inset) / 2);
+}
+
+.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"], [data-kind="orphanExpansion"])::after {
+  right: calc(var(--rule-inset) / 2);
+}
+
+.placement:is([data-kind="flatBox"], [data-kind="expansionLayer"], [data-kind="orphanExpansion"]) .placement-label {
+  display: block;
+  min-width: 0;
+  padding: 0 var(--rule-inset);
+  font-weight: 600;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/**
+ * An expansion whose base game is not owned stands alone as a flat box with two lines: its title, which keeps priority
+ * when the room is short, and the game it expands. Each line stays on one row and ends in an ellipsis.
+ */
+.placement[data-kind="orphanExpansion"] {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: safe center;
+}
+
+.placement[data-kind="orphanExpansion"] .placement-label {
+  flex: 0 0 auto;
+  max-width: 100%;
+  font-size: clamp(12px, calc(var(--h) * var(--u) * 0.5), 14px);
+  line-height: 1.2;
+}
+
+.placement .placement-sub {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  unicode-bidi: plaintext;
+}
+
+.placement[data-kind="orphanExpansion"] .placement-sub {
+  flex: 0 1 auto;
+  padding: 0 var(--rule-inset);
+}
+
+.placement[data-kind="cover"] .cover-plate:has(.placement-sub) {
+  flex-direction: column;
+}
+
+.placement[data-kind="cover"] .cover-plate:has(> * + *) {
+  gap: 4px;
+}
+
+.placement[data-kind="cover"] .placement-sub {
+  flex: 0 0 auto;
+  text-align: center;
+}
+
+/**
+ * An expansion standing upright beside its base game reads like a spine with a second line: the title is the right-hand
+ * vertical line and the line naming the base game stands to its left, both reading top to bottom on one row each and
+ * ending in an ellipsis when the spine is short. The box has no light or shade layer and no stacking order of its own.
+ */
+.placement[data-kind="expansionSpine"] {
+  flex-direction: row-reverse;
+}
+
+.placement[data-kind="expansionSpine"] .placement-label {
+  font-size: clamp(12px, calc(var(--w) * var(--u) * 0.25), 14px);
+  line-height: 1.2;
+}
+
+.placement[data-kind="expansionSpine"] .placement-sub {
+  flex: 0 0 auto;
+  writing-mode: vertical-rl;
+  max-width: none;
+  max-height: calc(100% - 2 * var(--rule-inset));
+}
+
+/**
+ * An upright expansion too thin for a second line shows its title alone in the spine title style: the same weight and
+ * size as a spine, one vertical line that ends in an ellipsis when the box is short.
+ */
+.placement[data-kind="expansionSpine"][data-lines="1"] {
+  flex-direction: row;
+}
+
+.placement[data-kind="expansionSpine"][data-lines="1"] .placement-label {
+  font-size: 12px;
+  line-height: 1;
+  text-overflow: ellipsis;
+}
+
+@container (min-width: 26px) {
+  .placement[data-kind="expansionSpine"][data-lines="1"] .placement-label {
+    font-size: 16px;
+  }
+}
+
+/**
+ * An expansion box without an owned base game that is too thin for a second line shows its title alone in the flat box
+ * title style: one row that ends in an ellipsis.
+ */
+.placement[data-kind="orphanExpansion"][data-lines="1"] {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.placement[data-kind="orphanExpansion"][data-lines="1"] .placement-label {
+  flex: 1 1 auto;
+  font-size: 12px;
+  line-height: 1;
+}
+
+@container (min-height: 28px) {
+  .placement:is([data-kind="flatBox"], [data-kind="expansionLayer"]) .placement-label,
+  .placement[data-kind="orphanExpansion"][data-lines="1"] .placement-label {
+    font-size: 14px;
+  }
+}
+
+/**
+ * The marker on top of a full stack is a chip in the accent colour and the only element inside the cabinet that uses
+ * it, so it reads at a glance as a count and not as another box.
+ */
+.placement[data-kind="moreMarker"] {
+  background: var(--wood-light);
+  color: var(--ink);
+  border-radius: 3px;
+}
+
+.placement[data-kind="moreMarker"] .placement-label {
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.placement:focus-visible {
+  z-index: 4;
+  outline: 2px solid var(--wood-light);
+  outline-offset: 2px;
+}
+
+/**
+ * The box of the card that is open, for a visitor who prefers less motion: it stays in its slot and is marked with a plain light
+ * outline instead of flying out. The colour is the wall text colour, not the accent.
+ */
+.placement[data-open] {
+  z-index: 4;
+  outline: 2px solid var(--wall-text);
+  outline-offset: 2px;
+}
+
+.cabinet-message {
+  margin: 0 0 0.5rem;
+  text-align: center;
+  color: var(--wood-light);
+}
+
+.cabinet-retry {
+  display: block;
+  margin: 0 auto;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 4px;
+  font: inherit;
+  font-weight: 600;
+  background: var(--wood-light);
+  color: var(--ink);
+}
+
+.cabinet-retry:focus-visible {
+  outline: 2px solid var(--wood-light);
+  outline-offset: 2px;
+}
+
+
+/**
+ * Added by the look layers. The base unit, the section ratio and the wall shadow need the box size in millimetres, so
+ * the two lengths are kept as unitless numbers here.
+ */
+.section {
+  --bw: calc(var(--section-w) + 2 * var(--side-allowance));
+  --bh: calc(var(--top-height) + var(--section-h) + var(--base-height) + var(--floor-margin));
+  --section-ratio: calc(var(--bw) / var(--bh));
+  --ws-w: calc(28 - var(--side-trim));
+  --ws-y: calc(var(--top-height) * 0.5);
+  --ws-h: calc(var(--bh) - var(--floor-margin) - var(--ws-y));
+  background-image: radial-gradient(ellipse 100% 50% at 0% 50%, rgb(var(--room-shade-rgb) / var(--wall-shadow)), transparent);
+  background-repeat: no-repeat;
+  background-size: calc(var(--ws-w) / var(--bw) * 100%) calc(var(--ws-h) / var(--bh) * 100%);
+  background-position:
+    calc((var(--side-allowance) + var(--section-w) + var(--side-trim)) / (var(--bw) - var(--ws-w)) * 100%)
+    calc(var(--ws-y) / (var(--bh) - var(--ws-h)) * 100%);
+}
+
+/**
+ * The light of the section, positioned exactly like the body. It holds every pool and the floor glow, and only its
+ * opacity ever changes. It is hidden outright when the lights are off.
+ */
+.section > .section-light {
+  left: calc(var(--side-allowance) * var(--u));
+  top: calc(var(--top-height) * var(--u));
+  width: calc(var(--section-w) * var(--u));
+  height: calc(var(--section-h) * var(--u));
+  z-index: 1;
+  display: none;
+  opacity: 0;
+}
+
+.light-pool {
+  position: absolute;
+  left: calc((var(--frame) + var(--x)) * var(--u));
+  top: calc((var(--frame) + var(--y)) * var(--u));
+  width: calc(var(--w) * var(--u));
+  height: calc(var(--h) * var(--u));
+}
+
+/**
+ * The floor patch of a section sits behind the body and ends inside the section box. It draws nothing until the
+ * wood layer gives it a floor.
+ */
+.section > .section-floor {
+  inset: 0;
+  z-index: -1;
+}
+
+/**
+ * The ring of a focused or open box on a wood whose frame is light also carries an ink halo outside the accent ring.
+ * The spread is a length, so it is written here and only its colour comes from the wood.
+ */
+.placement:focus-visible,
+.placement[data-open] {
+  box-shadow:
+    inset 1px 1px 0 rgb(255 255 255 / 0.2),
+    0 1px 2px rgb(0 0 0 / 0.5),
+    0 0 0 6px var(--ring-halo);
+}
+
+.placement[data-art="true"]:focus-visible,
+.placement[data-art="true"][data-open] {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 0 0 6px var(--ring-halo);
+}
+
+/**
+ * Lamp fade. The transition exists only once the page is settled, so the first frame is exactly the server's markup.
+ */
+[data-settled] .section > .section-light {
+  transition: opacity var(--lamp-fade, 2000ms) ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-settled] .section > .section-light {
+    transition: none;
+  }
+}
+
+/**
+ * The optional decoration of a cubby, used only by the deep depth for the inner walls. It fills the cubby, sits under
+ * the boxes and is hidden unless the look draws something in it.
+ */
+.cubby > .cubby-deco {
+  position: absolute;
+  inset: 0;
+  display: none;
+  pointer-events: none;
+}
+
+/**
+ * The furniture that stands in front of the back sits above the light and, in tree order, above the boxes exactly as it
+ * does today: the side boards, the top and the base. Only the back, the shelves and the uprights are lit.
+ */
+.section > :is(.section-top, .section-trim, .section-base) {
+  z-index: 2;
+}
+
+/**
+ * The fixed full-viewport falloff layer of the first round, kept only as the comparison for the second round. It exists
+ * only when the page is switched to "fixed"; the body then paints no falloff of its own.
+ */
+[data-falloff="fixed"] {
+  --page-falloff: none;
+}
+
+[data-falloff="fixed"]:not([data-wood="brown"])::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 100lvh;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--room-falloff);
+}
+
+}

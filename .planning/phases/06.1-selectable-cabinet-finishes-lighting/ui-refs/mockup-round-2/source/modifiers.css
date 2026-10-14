@@ -1,0 +1,188 @@
+@layer modifiers {
+/**
+ * Modifiers only add overlays and set their strengths. They never move or resize anything and never touch a box face
+ * except through the shade alpha caps. Depth, lights, painted backs and the evening dusk live here.
+ */
+
+:root {
+  --depth-k: 1;
+  --seam-k: 1;
+  --lamp-fade: 2000ms;
+}
+
+/**
+ * Depth. Flat draws no shading at all; shaded is today's look; deep adds the inner walls and floor of every cubby and
+ * a thin lit top face on every shelf board.
+ */
+.cabinet {
+  --shade-alpha: 0.20;
+  --shade-depth: 20%;
+}
+
+[data-depth="flat"] {
+  --depth-k: 0;
+}
+
+[data-depth="flat"] .cabinet {
+  --shade-alpha: 0;
+}
+
+[data-depth="deep"] .cabinet {
+  --shade-alpha: 0.12;
+}
+
+[data-depth="deep"] .cubby {
+  --dw: calc(var(--depth-inset) * var(--u));
+  --dt: calc(var(--depth-ceil) * var(--u));
+  --df: calc(var(--depth-floor) * var(--u));
+}
+
+[data-depth="deep"] .cubby::before {
+  --top-face-img: linear-gradient(
+    to bottom,
+    rgb(var(--highlight-rgb) / 0.55) 0 1px,
+    rgb(var(--highlight-rgb) / 0.20) 1px,
+    transparent 100%
+  );
+  --top-face-size: 100% calc(var(--top-face) * var(--u));
+}
+
+/**
+ * Deep, merged construction: the inner walls, ceiling and floor are four layers on the one decoration element, with no
+ * clip-path and no layer on the cubby itself. The viewer sits above, so the floor is the largest and lightest face, the
+ * ceiling the thinnest and darkest, and each side wall darkens toward the back.
+ */
+[data-depth="deep"] .cubby > .cubby-deco {
+  display: block;
+  background-image:
+    linear-gradient(180deg, var(--cubby-top), color-mix(in srgb, var(--cubby-top) 70%, rgb(0 0 0))),
+    linear-gradient(90deg, var(--cubby-left), color-mix(in srgb, var(--cubby-left) 70%, rgb(0 0 0))),
+    linear-gradient(270deg, var(--cubby-right), color-mix(in srgb, var(--cubby-right) 70%, rgb(0 0 0))),
+    linear-gradient(180deg, var(--cubby-floor-back), var(--cubby-floor-front));
+  background-size: 100% var(--dt), var(--dw) calc(100% - var(--df)), var(--dw) calc(100% - var(--df)), 100% var(--df);
+  background-position: 0 0, 0 0, 100% 0, 0 100%;
+  background-repeat: no-repeat;
+}
+
+/**
+ * Deep, mitred construction (the comparison in the round, mock only): the floor stays a layer of the cubby itself and
+ * the inner walls keep their two mitred corners, which makes six layers per cubby.
+ */
+[data-deepvar="mitre"][data-depth="deep"] .cubby {
+  --deep-img: linear-gradient(180deg, var(--cubby-floor-back), var(--cubby-floor-front));
+  --deep-size: 100% var(--df);
+  --deep-pos: 0 100%;
+}
+
+[data-deepvar="mitre"][data-depth="deep"] .cubby > .cubby-deco {
+  clip-path: polygon(
+    0 100%,
+    0 0,
+    100% 0,
+    100% 100%,
+    calc(100% - var(--dw)) calc(100% - var(--df)),
+    calc(100% - var(--dw)) var(--dt),
+    var(--dw) var(--dt),
+    var(--dw) calc(100% - var(--df))
+  );
+  background-image:
+    linear-gradient(to top right, var(--cubby-left) 50%, var(--cubby-top) 50%),
+    linear-gradient(to top left, var(--cubby-right) 50%, var(--cubby-top) 50%),
+    linear-gradient(180deg, var(--cubby-top), color-mix(in srgb, var(--cubby-top) 70%, rgb(0 0 0))),
+    linear-gradient(90deg, var(--cubby-left), color-mix(in srgb, var(--cubby-left) 70%, rgb(0 0 0))),
+    linear-gradient(270deg, var(--cubby-right), color-mix(in srgb, var(--cubby-right) 70%, rgb(0 0 0)));
+  background-size: var(--dw) var(--dt), var(--dw) var(--dt), 100% var(--dt), var(--dw) 100%, var(--dw) 100%;
+  background-position: 0 0, 100% 0, 0 0, 0 0, 100% 0;
+}
+
+/**
+ * Painted backs. A flat matte paint on the back panel only: no planks, no grain, no seams. The shade from the shelf
+ * above stays, because it is depth.
+ */
+[data-backs="painted"] {
+  --seam-k: 0;
+  --back: var(--back-paint);
+  --pool-k: var(--pool-k-painted, 1);
+  --back-shade-k: 1;
+  --fill-k: 0;
+  --keyline-lit: 0.4;
+}
+
+/**
+ * Lights. One layer per section holds everything lit and fades by opacity alone. It sits under the boxes, so it lights
+ * the back, the shelves and the uprights and never a box face.
+ */
+[data-lights="on"] .section > .section-light,
+[data-lights="evenings"] .section > .section-light {
+  display: block;
+}
+
+[data-lit] .section > .section-light {
+  opacity: 1;
+}
+
+/**
+ * The dark outer keyline of every box switches on only while the lights are on, where a soft light can bring the back
+ * to the lightness of a dark box. It is an outer ring of the box shadow, never on the face.
+ */
+[data-lit] {
+  --keyline: var(--keyline-lit, 0.4);
+}
+
+.light-pool {
+  background-image:
+    linear-gradient(
+      to bottom,
+      rgb(var(--lamp-hot-rgb) / 0.8) 0 max(2px, calc(2.5 * var(--u))),
+      rgb(var(--lamp-rgb) / calc(0.25 * var(--fill-k) * var(--depth-k))) max(2px, calc(2.5 * var(--u))),
+      transparent 14%
+    ),
+    radial-gradient(
+      ellipse 200% 50% at 50% 0%,
+      rgb(var(--lamp-rgb) / calc(0.55 * var(--pool-k))) 0,
+      rgb(var(--lamp-rgb) / calc(0.55 * var(--pool-k))) 18%,
+      rgb(var(--lamp-rgb) / calc(0.30 * var(--pool-k))) 34%,
+      rgb(var(--lamp-rgb) / calc(0.12 * var(--pool-k))) 50%,
+      rgb(var(--lamp-rgb) / calc(0.05 * var(--pool-k))) 70%,
+      transparent 100%
+    );
+}
+
+.light-pool::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 calc(-1 * var(--frame) * var(--u)) calc(-1 * var(--frame) * var(--u));
+  box-sizing: border-box;
+  border-style: solid;
+  border-color: rgb(var(--lamp-rgb) / calc(0.08 * var(--lamp-k)));
+  border-width: 0 0 calc(var(--frame) * var(--u)) calc(var(--frame) * var(--u));
+}
+
+[data-depth="deep"] .light-pool::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 100%;
+  width: calc(100% + var(--frame) * var(--u));
+  height: calc(var(--frame) * var(--u));
+  background-image:
+    linear-gradient(to bottom, rgb(var(--highlight-rgb) / 0.55) 0 max(1px, calc(1 * var(--u))), transparent max(1px, calc(1 * var(--u)))),
+    linear-gradient(to bottom, rgb(var(--lamp-rgb) / calc(0.32 * var(--lamp-k))) 0 32%, transparent 32%);
+}
+
+.section-light::before {
+  content: "";
+  position: absolute;
+  left: calc(-30 * var(--u));
+  width: calc(100% + 60 * var(--u));
+  top: calc(100% + var(--base-height) * var(--u));
+  height: calc(var(--floor-margin) * var(--u));
+  background-image: radial-gradient(
+    ellipse 50% 100% at 50% 0%,
+    rgb(var(--lamp-rgb) / calc(0.14 * var(--lamp-k) * var(--room-k))),
+    transparent
+  );
+}
+
+
+}

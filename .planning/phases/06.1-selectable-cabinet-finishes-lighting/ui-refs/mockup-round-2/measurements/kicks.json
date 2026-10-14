@@ -1,0 +1,57 @@
+{
+  "brown": {
+    "wood": "rgb(107, 66, 38)",
+    "recess": "rgb(31, 15, 6)",
+    "recessLow": "rgb(31, 15, 6)",
+    "wallLuminance": 0.022,
+    "recessLuminance": 0.0065,
+    "recessLowLuminance": 0.0065,
+    "kickAgainstWall": 1.28,
+    "woodOverKick": 2.15,
+    "woodLuminance": 0.072
+  },
+  "walnut": {
+    "wood": "rgb(89, 58, 41)",
+    "recess": "rgb(46, 28, 18)",
+    "recessLow": "rgb(58, 36, 24)",
+    "wallLuminance": 0.607,
+    "recessLuminance": 0.0146,
+    "recessLowLuminance": 0.0223,
+    "kickAgainstWall": 10.18,
+    "woodOverKick": 1.6,
+    "woodLuminance": 0.053
+  },
+  "oak": {
+    "wood": "rgb(201, 164, 109)",
+    "recess": "rgb(42, 34, 24)",
+    "recessLow": "rgb(42, 34, 24)",
+    "wallLuminance": 0.03,
+    "recessLuminance": 0.017,
+    "recessLowLuminance": 0.017,
+    "kickAgainstWall": 1.2,
+    "woodOverKick": 6.72,
+    "woodLuminance": 0.401
+  },
+  "birch": {
+    "wood": "rgb(223, 199, 154)",
+    "recess": "rgb(74, 67, 55)",
+    "recessLow": "rgb(95, 87, 74)",
+    "wallLuminance": 0.677,
+    "recessLuminance": 0.0575,
+    "recessLowLuminance": 0.0974,
+    "kickAgainstWall": 6.77,
+    "woodOverKick": 5.94,
+    "woodLuminance": 0.589
+  },
+  "mahogany": {
+    "wood": "rgb(94, 43, 28)",
+    "recess": "rgb(10, 2, 1)",
+    "recessLow": "rgb(10, 2, 1)",
+    "wallLuminance": 0.02,
+    "recessLuminance": 0.0011,
+    "recessLowLuminance": 0.0011,
+    "kickAgainstWall": 1.37,
+    "woodOverKick": 1.8,
+    "woodLuminance": 0.042
+  }
+}

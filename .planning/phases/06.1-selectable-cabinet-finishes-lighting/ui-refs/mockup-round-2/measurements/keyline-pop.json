@@ -1,0 +1,37 @@
+{
+  "brown/wood": {
+    "max": 118,
+    "changedPercent": 1.22,
+    "over24": 7730
+  },
+  "walnut/wood": {
+    "max": 118,
+    "changedPercent": 1.22,
+    "over24": 7729
+  },
+  "oak/wood": {
+    "max": 118,
+    "changedPercent": 1.22,
+    "over24": 9439
+  },
+  "birch/wood": {
+    "max": 0,
+    "changedPercent": 0,
+    "over24": 0
+  },
+  "mahogany/wood": {
+    "max": 118,
+    "changedPercent": 1.21,
+    "over24": 7729
+  },
+  "brown/painted": {
+    "max": 118,
+    "changedPercent": 1.22,
+    "over24": 7730
+  },
+  "birch/painted": {
+    "max": 118,
+    "changedPercent": 1.22,
+    "over24": 9439
+  }
+}
