@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 current_phase: 06.1
-current_phase_name: Selectable Cabinet Finishes & Lighting
+current_phase_name: selectable-cabinet-finishes-lighting
 status: executing
 stopped_at: Phase 6.1 UI-SPEC approved
-last_updated: "2026-10-14T06:39:18.094Z"
-last_activity: 2026-10-13
-last_activity_desc: Phase 06 complete, transitioned to Phase 06.1
+last_updated: "2026-10-14T11:19:52.746Z"
+last_activity: 2026-10-14
+last_activity_desc: Phase 06.1 execution started
 progress:
   total_phases: 7
   completed_phases: 6
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-13)
 
 **Core value:** Anyone with the link sees an up-to-date, good-looking cabinet of exactly the games the owner owns on BGG, with no manual data entry in the app.
-**Current focus:** Phase 06.1 — selectable-cabinet-finishes-lighting (Phase 06 complete; its review and security fixes released as v0.7.1 on 2026-10-13, self-check 25/25 after provisioning)
+**Current focus:** Phase 06.1 — selectable-cabinet-finishes-lighting
 
 ## Current Position
 
-Phase: 06.1 — Selectable Cabinet Finishes & Lighting
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-10-13 — Phase 06 complete, transitioned to Phase 06.1
+Phase: 06.1 (selectable-cabinet-finishes-lighting) — EXECUTING
+Plan: 1 of 21
+Status: Executing Phase 06.1
+Last activity: 2026-10-14 — Phase 06.1 execution started
 
 Progress: [██████████] 100%
 
