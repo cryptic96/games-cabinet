@@ -216,11 +216,18 @@ public sealed class LookDepthTests : CabinetPageTest
         await Page.EvaluateAsync(
             "(css) => { const sheet = new CSSStyleSheet(); sheet.replaceSync(css); document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet]; }",
             BoxesHidden);
-        await GrowAsync(width);
+        await FitViewportToPageAsync();
     }
 
-    private async Task GrowAsync(int width)
+    /// <summary>
+    /// Makes the viewport as tall as the page, at its current width, until the height stops changing. A full-page screenshot of a
+    /// page taller than its viewport makes the browser shrink the page to one pixel and back while it captures; on a desktop width
+    /// that switches the cabinet to the phone profile and back, so it reloads and the picture can catch its loading line instead of
+    /// the cabinet. A look change can make the page taller, so every look change and every picture fits the viewport first.
+    /// </summary>
+    private async Task FitViewportToPageAsync()
     {
+        var width = (Page.ViewportSize ?? throw new InvalidOperationException("The page has no fixed viewport.")).Width;
         var settled = 0;
         var last = -1;
 
@@ -242,7 +249,7 @@ public sealed class LookDepthTests : CabinetPageTest
             await Page.EvaluateAsync("([name, value]) => { document.documentElement.dataset[name] = value; }", new[] { name, value });
         }
 
-        await NextFramesAsync();
+        await FitViewportToPageAsync();
     }
 
     private Task NextFramesAsync() =>
@@ -274,6 +281,7 @@ public sealed class LookDepthTests : CabinetPageTest
 
     private async Task<byte[]> CubbyShotAsync()
     {
+        await FitViewportToPageAsync();
         var cubby = (await CubbyRectsAsync())[0];
 
         return await Page.ScreenshotAsync(new PageScreenshotOptions
@@ -284,7 +292,12 @@ public sealed class LookDepthTests : CabinetPageTest
         });
     }
 
-    private async Task<Frame> FrameAsync() => new(await Page.ScreenshotAsync(new PageScreenshotOptions { FullPage = true, Animations = ScreenshotAnimations.Disabled }));
+    private async Task<Frame> FrameAsync()
+    {
+        await FitViewportToPageAsync();
+
+        return new(await Page.ScreenshotAsync(new PageScreenshotOptions { FullPage = true, Animations = ScreenshotAnimations.Disabled }));
+    }
 
     /// <summary>
     /// Reads, for every section, how far the pixels on its left, right and bottom edge are from the pixels three pixels outside
