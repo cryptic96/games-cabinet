@@ -3,6 +3,7 @@
 @{
     var language = SiteLanguage.Resolve(Context);
     var look = Look.Current;
+    ViewData["LightWall"] = Cabinet.Domain.Owner.CabinetLook.HasLightWall(look.Wood);
 }
 <!DOCTYPE html>
 <html lang="@language.Code" data-design="@look.Design" data-wood="@look.Wood" data-backs="@look.Backs" data-lights="@look.Lights" data-depth="@look.Depth">
