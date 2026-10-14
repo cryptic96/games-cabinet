@@ -666,12 +666,33 @@
 }
 
 /**
- * The floor patch of a section sits behind the body and ends inside the section box. It draws nothing until a wood
- * gives it a floor.
+ * The floor patch of one piece sits behind the body and ends inside the section box. It is a skirting board 36 mm tall
+ * behind the base, whose lower edge stays 14 mm above the line where the feet or the base meet the floor, with a lit top
+ * line and a soft shadow line under it, and a floor tone that fades out towards the bottom of the box. Both fade to the
+ * wall towards the sides. It draws nothing until the wood gives it a floor and a skirting, so warm brown keeps its flat
+ * wall, and the strength of the two lines is nothing on such a wood.
  */
 .section > .section-floor {
+  --floor-y: calc((var(--bh) - var(--floor-margin) - 14) * var(--u));
+  --skirting-y: calc((var(--bh) - var(--floor-margin) - 50) * var(--u));
   inset: 0;
   z-index: -1;
+  background-image:
+    linear-gradient(to right, transparent, rgb(var(--room-shade-rgb) / calc(0.16 * var(--room-k))) 22%, rgb(var(--room-shade-rgb) / calc(0.16 * var(--room-k))) 78%, transparent),
+    linear-gradient(to right, transparent, rgb(var(--highlight-rgb) / calc(0.12 * var(--room-k))) 22%, rgb(var(--highlight-rgb) / calc(0.12 * var(--room-k))) 78%, transparent),
+    linear-gradient(to right, transparent, var(--skirting) 22%, var(--skirting) 78%, transparent),
+    radial-gradient(ellipse 52% 100% at 50% 0%, var(--floor) 0, var(--floor) 30%, transparent 96%);
+  background-repeat: no-repeat;
+  background-size:
+    100% max(1px, calc(2 * var(--u))),
+    100% max(1px, calc(1 * var(--u))),
+    100% calc(36 * var(--u)),
+    100% calc((var(--floor-margin) + 14) * var(--u));
+  background-position:
+    0 var(--floor-y),
+    0 var(--skirting-y),
+    0 var(--skirting-y),
+    0 var(--floor-y);
 }
 
 /**

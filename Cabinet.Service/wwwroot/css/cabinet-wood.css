@@ -77,6 +77,42 @@
 }
 
 /**
+ * Oak is pale gold furniture with an open grain on a dark slate-blue wall. Its backs are dark so the boxes stand out
+ * from them, and its focused boxes get an ink halo because the pale frame would swallow the accent ring.
+ */
+[data-wood="oak"] {
+  --wood: #c9a46d;
+  --wood-lit: #f2e3bd;
+  --back: #221a12;
+  --recess: #2a2218;
+  --recess-low: #2a2218;
+  --inlay: #7d5a1e;
+  --cubby-top: #2c2418;
+  --cubby-left: #8b714b;
+  --cubby-right: #584830;
+  --cubby-floor-back: #221a12;
+  --cubby-floor-front: #8d734c;
+  --shade-rgb: 40 22 6;
+  --shade-deep-rgb: 24 12 3;
+  --room-shade-rgb: var(--shade-rgb);
+  --room-shade-deep-rgb: var(--shade-deep-rgb);
+  --grain-dark-rgb: 130 88 38;
+  --grain-strength: 1.5;
+  --arris-light-rgb: 255 250 235;
+  --arris-dark-rgb: 95 62 25;
+  --arch-alpha-top: 0.60;
+  --arch-alpha-bottom: 0.45;
+  --ring-halo: var(--ink);
+  --room-k: 1;
+  --room: #27323b;
+  --room-text: #e9eef1;
+  --room-lit-alpha: 0.06;
+  --room-falloff: radial-gradient(ellipse 120% 70% at 50% 0%, rgb(var(--falloff-rgb) / var(--room-lit-alpha)), transparent);
+  --floor: #1f2124;
+  --skirting: #323c44;
+}
+
+/**
  * The grain strength of a board is the wood's own, halved in a section too narrow to show fine grain. It is a unitless
  * strength, so it belongs to the wood even though the member it lands on is set by the design.
  */
