@@ -1,0 +1,5 @@
+checked: sample 65 at 1440 px wide, differing pixels 0, largest channel difference 0
+checked: sample 65 at 390 px wide, differing pixels 0, largest channel difference 0
+checked: sample 400 at 1440 px wide, differing pixels 0, largest channel difference 0
+checked: sample 400 at 390 px wide, differing pixels 0, largest channel difference 0
+what is compared: the cabinet element drawn by the second-round layered stylesheets against the release screenshots saved in the first round (same markup, same browser, same font setup, page header hidden)

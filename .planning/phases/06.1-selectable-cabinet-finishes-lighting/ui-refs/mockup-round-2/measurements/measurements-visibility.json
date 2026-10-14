@@ -1,0 +1,355 @@
+{
+  "generated": "scratch measurement of the round",
+  "spine": {
+    "brown": {
+      "flat 0": {
+        "worst": 5.28,
+        "tone": "Rust"
+      },
+      "deep 0.12": {
+        "worst": 4.84,
+        "tone": "Rust"
+      },
+      "shaded 0.20": {
+        "worst": 4.51,
+        "tone": "Rust"
+      }
+    },
+    "walnut": {
+      "flat 0": {
+        "worst": 5.28,
+        "tone": "Rust"
+      },
+      "deep 0.12": {
+        "worst": 4.84,
+        "tone": "Rust"
+      },
+      "shaded 0.20": {
+        "worst": 4.51,
+        "tone": "Rust"
+      }
+    },
+    "oak": {
+      "flat 0": {
+        "worst": 5.28,
+        "tone": "Rust"
+      },
+      "deep 0.12": {
+        "worst": 4.84,
+        "tone": "Rust"
+      },
+      "shaded 0.20": {
+        "worst": 4.51,
+        "tone": "Rust"
+      }
+    },
+    "birch": {
+      "flat 0": {
+        "worst": 5.28,
+        "tone": "Rust"
+      },
+      "deep 0.12": {
+        "worst": 4.84,
+        "tone": "Rust"
+      },
+      "shaded 0.20": {
+        "worst": 4.51,
+        "tone": "Rust"
+      }
+    },
+    "mahogany": {
+      "flat 0": {
+        "worst": 5.28,
+        "tone": "Rust"
+      },
+      "deep 0.12": {
+        "worst": 4.84,
+        "tone": "Rust"
+      },
+      "shaded 0.20": {
+        "worst": 4.51,
+        "tone": "Rust"
+      }
+    }
+  },
+  "chrome": {
+    "brown": {
+      "wallLuminance": 0.02,
+      "textDay": 11.34,
+      "mutedDay": 6.33,
+      "lineDay": 5.06,
+      "textEvening": 11.34,
+      "mutedEvening": 6.33,
+      "lineEvening": 5.06,
+      "logoDay": 14.48,
+      "logoEvening": 14.48,
+      "logoRule": "white",
+      "logoUsed": "white"
+    },
+    "walnut": {
+      "wallLuminance": 0.61,
+      "textDay": 11.63,
+      "mutedDay": 5.12,
+      "lineDay": 3.86,
+      "textEvening": 11.63,
+      "mutedEvening": 5.12,
+      "lineEvening": 3.86,
+      "logoDay": 7.47,
+      "logoEvening": 7.47,
+      "logoRule": "dark",
+      "logoUsed": "dark"
+    },
+    "oak": {
+      "wallLuminance": 0.03,
+      "textDay": 9.39,
+      "mutedDay": 5.54,
+      "lineDay": 4.53,
+      "textEvening": 9.39,
+      "mutedEvening": 5.54,
+      "lineEvening": 4.53,
+      "logoDay": 10.98,
+      "logoEvening": 10.98,
+      "logoRule": "white",
+      "logoUsed": "white"
+    },
+    "birch": {
+      "wallLuminance": 0.68,
+      "textDay": 12.31,
+      "mutedDay": 5.25,
+      "lineDay": 3.93,
+      "textEvening": 12.31,
+      "mutedEvening": 5.25,
+      "lineEvening": 3.93,
+      "logoDay": 8,
+      "logoEvening": 8,
+      "logoRule": "dark",
+      "logoUsed": "dark"
+    },
+    "mahogany": {
+      "wallLuminance": 0.02,
+      "textDay": 9.9,
+      "mutedDay": 5.73,
+      "lineDay": 4.65,
+      "textEvening": 9.9,
+      "mutedEvening": 5.73,
+      "lineEvening": 4.65,
+      "logoDay": 12.6,
+      "logoEvening": 12.6,
+      "logoRule": "white",
+      "logoUsed": "white"
+    }
+  },
+  "visibility": {
+    "Warm brown back": {
+      "bare": {
+        "value": 1.51,
+        "tone": "Navy"
+      },
+      "peak": {
+        "value": 1.52,
+        "tone": "Rust"
+      },
+      "tail": {
+        "value": 1.34,
+        "tone": "Navy"
+      },
+      "cornerPeak": {
+        "value": 1.03,
+        "tone": "Rust"
+      },
+      "ringMin": {
+        "value": 1,
+        "tone": "Slate"
+      },
+      "modelPeak": {
+        "value": 1.51,
+        "tone": "Rust"
+      },
+      "modelTail": {
+        "value": 1.33,
+        "tone": "Navy"
+      }
+    },
+    "Walnut back": {
+      "bare": {
+        "value": 1.55,
+        "tone": "Navy"
+      },
+      "peak": {
+        "value": 1.49,
+        "tone": "Rust"
+      },
+      "tail": {
+        "value": 1.38,
+        "tone": "Navy"
+      },
+      "cornerPeak": {
+        "value": 1.01,
+        "tone": "Rust"
+      },
+      "ringMin": {
+        "value": 1.02,
+        "tone": "Slate"
+      },
+      "modelPeak": {
+        "value": 1.49,
+        "tone": "Rust"
+      },
+      "modelTail": {
+        "value": 1.37,
+        "tone": "Navy"
+      }
+    },
+    "Oak back": {
+      "bare": {
+        "value": 1.55,
+        "tone": "Navy"
+      },
+      "peak": {
+        "value": 1.5,
+        "tone": "Rust"
+      },
+      "tail": {
+        "value": 1.37,
+        "tone": "Navy"
+      },
+      "cornerPeak": {
+        "value": 1.02,
+        "tone": "Rust"
+      },
+      "ringMin": {
+        "value": 1.02,
+        "tone": "Slate"
+      },
+      "modelPeak": {
+        "value": 1.5,
+        "tone": "Rust"
+      },
+      "modelTail": {
+        "value": 1.37,
+        "tone": "Navy"
+      }
+    },
+    "Birch back": {
+      "bare": {
+        "value": 1.42,
+        "tone": "Rose"
+      },
+      "peak": {
+        "value": 1.33,
+        "tone": "Rose"
+      },
+      "tail": {
+        "value": 1.41,
+        "tone": "Rose"
+      },
+      "cornerPeak": {
+        "value": 1.42,
+        "tone": "Rose"
+      },
+      "ringMin": {
+        "value": 1.33,
+        "tone": "Rose"
+      },
+      "modelPeak": {
+        "value": 1.33,
+        "tone": "Rose"
+      },
+      "modelTail": {
+        "value": 1.41,
+        "tone": "Rose"
+      }
+    },
+    "Mahogany back": {
+      "bare": {
+        "value": 1.71,
+        "tone": "Navy"
+      },
+      "peak": {
+        "value": 1.44,
+        "tone": "Rose"
+      },
+      "tail": {
+        "value": 1.52,
+        "tone": "Navy"
+      },
+      "cornerPeak": {
+        "value": 1.11,
+        "tone": "Rust"
+      },
+      "ringMin": {
+        "value": 1.01,
+        "tone": "Oxblood"
+      },
+      "modelPeak": {
+        "value": 1.44,
+        "tone": "Rose"
+      },
+      "modelTail": {
+        "value": 1.51,
+        "tone": "Navy"
+      }
+    },
+    "Painted back on brown": {
+      "bare": {
+        "value": 1.66,
+        "tone": "Navy"
+      },
+      "peak": {
+        "value": 1.42,
+        "tone": "Rust"
+      },
+      "tail": {
+        "value": 1.5,
+        "tone": "Navy"
+      },
+      "cornerPeak": {
+        "value": 1.06,
+        "tone": "Rust"
+      },
+      "ringMin": {
+        "value": 1.02,
+        "tone": "Plum"
+      },
+      "modelPeak": {
+        "value": 1.42,
+        "tone": "Rust"
+      },
+      "modelTail": {
+        "value": 1.49,
+        "tone": "Navy"
+      }
+    },
+    "Painted back on birch": {
+      "bare": {
+        "value": 1.66,
+        "tone": "Navy"
+      },
+      "peak": {
+        "value": 1.42,
+        "tone": "Rust"
+      },
+      "tail": {
+        "value": 1.5,
+        "tone": "Navy"
+      },
+      "cornerPeak": {
+        "value": 1.06,
+        "tone": "Rust"
+      },
+      "ringMin": {
+        "value": 1.02,
+        "tone": "Plum"
+      },
+      "modelPeak": {
+        "value": 1.42,
+        "tone": "Rust"
+      },
+      "modelTail": {
+        "value": 1.49,
+        "tone": "Navy"
+      }
+    }
+  },
+  "cost": {}
+}

@@ -1,0 +1,74 @@
+/**
+ * Chrome of the stage pages only: a plain dark sheet, a grid of cells, and each cell's wrapper painting its own room.
+ */
+body.sheet {
+  margin: 0;
+  padding: 20px;
+  background: #1b1b1f;
+  color: #eeeeee;
+  font: 13px/1.3 system-ui, sans-serif;
+}
+
+.sheet-title {
+  margin: 0 0 14px;
+  font-size: 22px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), max-content);
+  gap: 16px;
+}
+
+.cell {
+  margin: 0;
+}
+
+.cell figcaption {
+  display: flex;
+  flex-direction: column;
+  padding-top: 5px;
+}
+
+.cell figcaption span {
+  color: #b5b5bd;
+}
+
+.stage {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  padding: 12px 12px 0;
+  min-width: var(--cellw, 0px);
+  background-color: var(--room);
+  background-image: var(--room-falloff);
+  color: var(--room-text);
+}
+
+.stage .cabinet {
+  display: block;
+  width: auto;
+  max-width: none;
+  margin: 0;
+}
+
+.stage .section {
+  flex: none;
+  width: calc(var(--mh) * var(--section-ratio));
+}
+
+.stage.tilebox {
+  display: block;
+  width: 150px;
+  height: 128px;
+  padding: 0;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.stage.tilebox.whole {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 4px;
+}

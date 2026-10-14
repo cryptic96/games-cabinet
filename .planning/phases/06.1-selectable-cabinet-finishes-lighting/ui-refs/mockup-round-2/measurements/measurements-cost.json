@@ -1,0 +1,116 @@
+{
+  "Classic + warm brown, Shaded, lights Off (today)": {
+    "counts": {
+      "sections": 11,
+      "nodes": 2698,
+      "gradientLayers": 2929,
+      "lightLayerCssPx": 0,
+      "lightLayerMbAt3x": 0
+    },
+    "traceMsMedianOf3": {
+      "PrePaint": 46.1,
+      "Layerize": 53.4,
+      "Commit": 19.4,
+      "UpdateLayer": 1.8,
+      "RasterTask": 255.6,
+      "UpdateLayoutTree": 4.7,
+      "Layout": 280.4,
+      "Paint": 130.7
+    }
+  },
+  "Classic + warm brown, Deep merged, Always on": {
+    "counts": {
+      "sections": 11,
+      "nodes": 2863,
+      "gradientLayers": 4084,
+      "lightLayerCssPx": 5662342,
+      "lightLayerMbAt3x": 194
+    },
+    "traceMsMedianOf3": {
+      "PrePaint": 55.4,
+      "Layerize": 64.2,
+      "Commit": 19.1,
+      "UpdateLayer": 2.4,
+      "RasterTask": 339,
+      "UpdateLayoutTree": 3.9,
+      "Layout": 312.4,
+      "Paint": 190.5
+    }
+  },
+  "Classic + warm brown, Deep six layers, Always on": {
+    "counts": {
+      "sections": 11,
+      "nodes": 2863,
+      "gradientLayers": 4414,
+      "lightLayerCssPx": 5662342,
+      "lightLayerMbAt3x": 194
+    },
+    "traceMsMedianOf3": {
+      "PrePaint": 55.2,
+      "Layerize": 68.7,
+      "Commit": 24.5,
+      "UpdateLayer": 2.7,
+      "RasterTask": 361.2,
+      "UpdateLayoutTree": 4.3,
+      "Layout": 310.4,
+      "Paint": 181.7
+    }
+  },
+  "Library + mahogany, Deep merged, Always on": {
+    "counts": {
+      "sections": 11,
+      "nodes": 2852,
+      "gradientLayers": 3875,
+      "lightLayerCssPx": 5815332,
+      "lightLayerMbAt3x": 200
+    },
+    "traceMsMedianOf3": {
+      "PrePaint": 54.3,
+      "Layerize": 63.1,
+      "Commit": 19.1,
+      "UpdateLayer": 1.9,
+      "RasterTask": 317.8,
+      "UpdateLayoutTree": 4.6,
+      "Layout": 328.6,
+      "Paint": 149.6
+    }
+  },
+  "On legs + oak, Deep merged, Always on": {
+    "counts": {
+      "sections": 11,
+      "nodes": 2863,
+      "gradientLayers": 3875,
+      "lightLayerCssPx": 5769885,
+      "lightLayerMbAt3x": 198
+    },
+    "traceMsMedianOf3": {
+      "PrePaint": 52,
+      "Layerize": 65.1,
+      "Commit": 17.3,
+      "UpdateLayer": 1.9,
+      "RasterTask": 319.7,
+      "UpdateLayoutTree": 1.9,
+      "Layout": 327.9,
+      "Paint": 160.1
+    }
+  },
+  "On legs + oak, Deep six layers, Always on": {
+    "counts": {
+      "sections": 11,
+      "nodes": 2863,
+      "gradientLayers": 4205,
+      "lightLayerCssPx": 5769885,
+      "lightLayerMbAt3x": 198
+    },
+    "traceMsMedianOf3": {
+      "PrePaint": 57.3,
+      "Layerize": 69.2,
+      "Commit": 23.9,
+      "UpdateLayer": 3.2,
+      "RasterTask": 334.6,
+      "UpdateLayoutTree": 3.8,
+      "Layout": 330.7,
+      "Paint": 171.3
+    }
+  }
+}

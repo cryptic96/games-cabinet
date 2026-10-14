@@ -1,0 +1,246 @@
+{
+  "geometry": {
+    "classic": {
+      "combos": 180,
+      "broken": 0
+    },
+    "modern": {
+      "combos": 180,
+      "broken": 0
+    },
+    "display": {
+      "combos": 180,
+      "broken": 0
+    },
+    "legs": {
+      "combos": 180,
+      "broken": 0
+    },
+    "library": {
+      "combos": 180,
+      "broken": 0
+    },
+    "plywood": {
+      "combos": 180,
+      "broken": 0
+    },
+    "plywood-legs": {
+      "combos": 180,
+      "broken": 0
+    }
+  },
+  "containment": [
+    {
+      "design": "classic",
+      "wood": "brown",
+      "worst": 0,
+      "where": ""
+    },
+    {
+      "design": "classic",
+      "wood": "walnut",
+      "worst": 3,
+      "where": "bottom"
+    },
+    {
+      "design": "classic",
+      "wood": "oak",
+      "worst": 1,
+      "where": "bottom"
+    },
+    {
+      "design": "classic",
+      "wood": "birch",
+      "worst": 2,
+      "where": "bottom"
+    },
+    {
+      "design": "classic",
+      "wood": "mahogany",
+      "worst": 2,
+      "where": "bottom"
+    },
+    {
+      "design": "modern",
+      "wood": "brown",
+      "worst": 0,
+      "where": ""
+    },
+    {
+      "design": "modern",
+      "wood": "walnut",
+      "worst": 1,
+      "where": "bottom"
+    },
+    {
+      "design": "modern",
+      "wood": "oak",
+      "worst": 1,
+      "where": "bottom"
+    },
+    {
+      "design": "modern",
+      "wood": "birch",
+      "worst": 1,
+      "where": "left"
+    },
+    {
+      "design": "modern",
+      "wood": "mahogany",
+      "worst": 1,
+      "where": "bottom"
+    },
+    {
+      "design": "display",
+      "wood": "brown",
+      "worst": 0,
+      "where": ""
+    },
+    {
+      "design": "display",
+      "wood": "walnut",
+      "worst": 1,
+      "where": "bottom"
+    },
+    {
+      "design": "display",
+      "wood": "oak",
+      "worst": 1,
+      "where": "bottom"
+    },
+    {
+      "design": "display",
+      "wood": "birch",
+      "worst": 1,
+      "where": "left"
+    },
+    {
+      "design": "display",
+      "wood": "mahogany",
+      "worst": 1,
+      "where": "bottom"
+    },
+    {
+      "design": "legs",
+      "wood": "brown",
+      "worst": 0,
+      "where": ""
+    },
+    {
+      "design": "legs",
+      "wood": "walnut",
+      "worst": 1,
+      "where": "bottom"
+    },
+    {
+      "design": "legs",
+      "wood": "oak",
+      "worst": 1,
+      "where": "bottom"
+    },
+    {
+      "design": "legs",
+      "wood": "birch",
+      "worst": 1,
+      "where": "left"
+    },
+    {
+      "design": "legs",
+      "wood": "mahogany",
+      "worst": 1,
+      "where": "bottom"
+    },
+    {
+      "design": "library",
+      "wood": "brown",
+      "worst": 0,
+      "where": ""
+    },
+    {
+      "design": "library",
+      "wood": "walnut",
+      "worst": 1,
+      "where": "left"
+    },
+    {
+      "design": "library",
+      "wood": "oak",
+      "worst": 1,
+      "where": "bottom"
+    },
+    {
+      "design": "library",
+      "wood": "birch",
+      "worst": 1,
+      "where": "left"
+    },
+    {
+      "design": "library",
+      "wood": "mahogany",
+      "worst": 1,
+      "where": "bottom"
+    },
+    {
+      "design": "plywood",
+      "wood": "brown",
+      "worst": 0,
+      "where": ""
+    },
+    {
+      "design": "plywood",
+      "wood": "walnut",
+      "worst": 1,
+      "where": "left"
+    },
+    {
+      "design": "plywood",
+      "wood": "oak",
+      "worst": 1,
+      "where": "bottom"
+    },
+    {
+      "design": "plywood",
+      "wood": "birch",
+      "worst": 1,
+      "where": "left"
+    },
+    {
+      "design": "plywood",
+      "wood": "mahogany",
+      "worst": 1,
+      "where": "bottom"
+    },
+    {
+      "design": "plywood-legs",
+      "wood": "brown",
+      "worst": 0,
+      "where": ""
+    },
+    {
+      "design": "plywood-legs",
+      "wood": "walnut",
+      "worst": 1,
+      "where": "left"
+    },
+    {
+      "design": "plywood-legs",
+      "wood": "oak",
+      "worst": 1,
+      "where": "bottom"
+    },
+    {
+      "design": "plywood-legs",
+      "wood": "birch",
+      "worst": 1,
+      "where": "left"
+    },
+    {
+      "design": "plywood-legs",
+      "wood": "mahogany",
+      "worst": 1,
+      "where": "bottom"
+    }
+  ],
+  "overflow": [],
+  "errors": []
+}
