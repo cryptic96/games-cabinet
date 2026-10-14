@@ -44,6 +44,7 @@ public static class SectionDesigns
             new ShelfRow(310, [310, 350, 500]),
         ])
     {
+        BalancesSections = true,
         MaxSpineHeightMm = 330,
         LabelCharPitchMm = 14,
         StackColumnWidthMm = 190,
