@@ -1,3 +1,5 @@
+@layer structure, design, wood, modifiers;
+
 :root {
   --wood-dark: #3b2416;
   --wood-mid: #6b4226;
@@ -204,22 +206,7 @@ main .cabinet-message {
 
 .cabinet-filling {
   max-width: 40rem;
-  margin-inline: auto;
-  margin-bottom: 24px;
   text-align: center;
-}
-
-.cabinet-retry {
-  min-height: 44px;
-  padding: 8px 16px;
-  border: 0;
-  border-radius: 4px;
-  background: var(--wood-light);
-  color: var(--ink);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
 }
 
 .sync {
@@ -406,7 +393,7 @@ main .cabinet-message {
 }
 
 a:focus-visible,
-button:focus-visible {
+button:where(:not(.placement)):focus-visible {
   outline: 2px solid var(--wood-light);
   outline-offset: 2px;
 }

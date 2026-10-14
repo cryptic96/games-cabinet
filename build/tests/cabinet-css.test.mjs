@@ -8,7 +8,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const cabinet = readFileSync(new URL('../../Cabinet.Service/wwwroot/css/cabinet.css', import.meta.url), 'utf8');
+const LAYER_FILES = ['cabinet.css', 'cabinet-design.css', 'cabinet-wood.css', 'cabinet-modifiers.css'];
+const cabinet = LAYER_FILES.map((name) => readFileSync(new URL(`../../Cabinet.Service/wwwroot/css/${name}`, import.meta.url), 'utf8')).join('\n');
 const site = readFileSync(new URL('../../Cabinet.Service/wwwroot/css/site.css', import.meta.url), 'utf8');
 
 /**

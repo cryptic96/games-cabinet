@@ -1,0 +1,13 @@
+@layer wood {
+
+/**
+ * Every wood is a block of colours and unitless strengths and nothing else: no length, no size, no layout. The base
+ * block is the warm brown of the default look and holds every shared token, so another wood only writes what makes it
+ * different. Tokens are declared on the root and on any element that carries a wood, never on a pair of choices.
+ */
+:root,
+[data-wood] {
+  --shade-rgb: 20 10 4;
+}
+
+}

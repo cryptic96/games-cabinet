@@ -2226,7 +2226,9 @@ test('a drawn marker shows only its count and carries the full name as its acces
   assert.equal(marker.title, '+4 more expansions for Invented Harbour');
 });
 
-const STYLESHEET = readFileSync(new URL('../../Cabinet.Service/wwwroot/css/cabinet.css', import.meta.url), 'utf8');
+const STYLESHEET = ['cabinet.css', 'cabinet-design.css', 'cabinet-wood.css', 'cabinet-modifiers.css']
+  .map((name) => readFileSync(new URL(`../../Cabinet.Service/wwwroot/css/${name}`, import.meta.url), 'utf8'))
+  .join('\n');
 
 test('the stylesheet carries the apron arch tokens, the length registration of the unit and the cover line steps', () => {
   assert.equal(STYLESHEET.includes('--arch-shade-alpha'), false);
