@@ -105,7 +105,10 @@ function loadEveningScript(doc) {
     const script = doc.createElement('script');
 
     script.addEventListener('load', () => resolve(), { once: true });
-    script.addEventListener('error', () => resolve(), { once: true });
+    script.addEventListener('error', () => {
+      eveningLoading = null;
+      resolve();
+    }, { once: true });
     script.setAttribute('src', address);
     doc.head.append(script);
   });
