@@ -105,7 +105,46 @@ export const OWNER_TEXT = Object.freeze({
   atTime: '{day} at {time}',
   today: 'today',
   yesterday: 'yesterday',
+  visitorsSee: 'Visitors see: {summary}',
+  trying: 'Trying: {summary}',
+  lookTrying: 'Trying a new look. Visitors still see the current one.',
+  lookDiscarded: 'Back to the current look.',
+  lookSaved: 'Saved for everyone. Open pages follow within a few seconds.',
+  lookUndone: 'Put back the earlier look.',
+  previewFailed: "The preview couldn't load. You can still choose a look and press Use for everyone.",
 });
+
+/** The display names of every look choice, by field and stored value, as the owner's controls and the change log word them. */
+export const LOOK_NAMES = Object.freeze({
+  design: Object.freeze({
+    classic: 'Classic',
+    modern: 'Modern',
+    display: 'Display',
+    legs: 'On legs',
+    library: 'Library',
+    plywood: 'Plywood',
+    'plywood-legs': 'Plywood on legs',
+  }),
+  wood: Object.freeze({ brown: 'Warm brown', walnut: 'Walnut', oak: 'Oak', birch: 'Birch', mahogany: 'Mahogany' }),
+  backs: Object.freeze({ wood: 'Wood backs', painted: 'Painted backs' }),
+  lights: Object.freeze({ off: 'Off', on: 'Always on', evenings: 'Evenings only' }),
+  depth: Object.freeze({ flat: 'Flat', shaded: 'Shaded', deep: 'Deep' }),
+});
+
+/** The fields of a look in the order the summary and the form carry them. */
+export const LOOK_FIELDS = Object.freeze(['design', 'wood', 'backs', 'lights', 'depth']);
+
+/**
+ * Describes a look on one line with the words the controls carry: `Library · Mahogany · Painted backs · Lights: Evenings only
+ * · Depth: Deep`. A value that has no name is written as it is.
+ * @param {Record<string, string>} look The five values of the look, by field.
+ * @returns {string}
+ */
+export function lookSummary(look) {
+  const name = (field) => LOOK_NAMES[field][look[field]] ?? look[field];
+
+  return [name('design'), name('wood'), name('backs'), `Lights: ${name('lights')}`, `Depth: ${name('depth')}`].join(' · ');
+}
 
 /** The locale every owner time is written in: English words, day before month and a 24-hour clock. */
 const TIME_LOCALE = 'en-NL';

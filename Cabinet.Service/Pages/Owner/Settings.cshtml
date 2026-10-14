@@ -3,6 +3,12 @@
 @using Cabinet.Repository.Storage
 @using Cabinet.Service.Owner
 @model Cabinet.Service.Pages.Owner.SettingsModel
+@section Head {
+    <link rel="stylesheet" href="~/css/cabinet.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/cabinet-design.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/cabinet-wood.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/cabinet-modifiers.css" asp-append-version="true" />
+}
 @{
     ViewData["BannerInPanel"] = true;
     var backup = Model.Backup;
@@ -11,75 +17,103 @@
 <section class="owner-panel" id="finish" aria-labelledby="finish-heading">
     <h3 id="finish-heading">@OwnerStrings.LookHeading</h3>
     <p class="owner-hint">@OwnerStrings.LookHelper</p>
-    <p class="owner-hint" id="look-current">@OwnerStrings.VisitorsSee(CabinetLooks.Summary(Model.Look))</p>
-    <form method="post" class="look-form" asp-page-handler="Look">
-        <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
-        <fieldset class="look-group">
-            <legend>@OwnerStrings.DesignLegend</legend>
-            @foreach (var design in CabinetLook.Designs)
-            {
-                <label class="look-option">
-                    <input type="radio" name="design" value="@design" checked="@(design == Model.Look.Design)" />
-                    <span class="pic-label">@CabinetLook.DesignName(design)</span>
-                    <span class="pic-sub">@OwnerStrings.DesignSubLine(design)</span>
-                </label>
-            }
-        </fieldset>
-        <fieldset class="look-group">
-            <legend>@OwnerStrings.WoodLegend</legend>
-            @foreach (var wood in CabinetLook.Woods)
-            {
-                <label class="look-option">
-                    <input type="radio" name="wood" value="@wood" checked="@(wood == Model.Look.Wood)" />
-                    <span class="pic-label">@CabinetLook.WoodName(wood)</span>
-                    <span class="pic-sub">@OwnerStrings.WoodSubLine(wood)</span>
-                </label>
-            }
-        </fieldset>
-        <div class="look-group">
-            <label class="look-option">
-                <input type="checkbox" role="switch" name="backs" value="painted" checked="@(Model.Look.Backs == "painted")" aria-describedby="look-backs-hint" />
-                <span class="pic-label">@OwnerStrings.PaintedBacksLabel</span>
-            </label>
-            <p class="owner-hint" id="look-backs-hint">@OwnerStrings.PaintedBacksHint</p>
+    <div class="look-layout">
+        <div class="look-stage">
+            <figure class="look-preview" id="look-preview" aria-hidden="true" inert
+                    data-design="@Model.Look.Design" data-wood="@Model.Look.Wood" data-backs="@Model.Look.Backs" data-lights="@Model.Look.Lights" data-depth="@Model.Look.Depth"
+                    data-sample="@Url.Content("~/js/owner-look-sample.json")">
+                <div class="cabinet look-preview-mount" id="look-preview-mount">
+                    <div class="section" data-standin></div>
+                </div>
+            </figure>
+            <p class="owner-hint look-line" id="look-current">@OwnerStrings.VisitorsSee(CabinetLooks.Summary(Model.Look))</p>
+            <p class="owner-hint look-line" id="look-trying" hidden></p>
+            <noscript><p class="owner-hint">@OwnerStrings.LookNoScript</p></noscript>
         </div>
-        <fieldset class="look-group" aria-describedby="look-lights-hint">
-            <legend>@OwnerStrings.LightsLegend</legend>
-            @foreach (var lights in CabinetLook.LightChoices)
+        <div class="look-controls">
+            <form method="post" class="look-form" id="look-form" autocomplete="off" asp-page-handler="Look">
+                <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
+                <fieldset class="look-group">
+                    <legend>@OwnerStrings.DesignLegend</legend>
+                    @foreach (var design in CabinetLook.Designs)
+                    {
+                        <label class="look-choice">
+                            <input type="radio" name="design" value="@design" checked="@(design == Model.Look.Design)" />
+                            <span class="look-choice-text">
+                                <span class="look-choice-name">@CabinetLook.DesignName(design)</span>
+                                <span class="pic-sub">@OwnerStrings.DesignSubLine(design)</span>
+                            </span>
+                        </label>
+                    }
+                </fieldset>
+                <fieldset class="look-group">
+                    <legend>@OwnerStrings.WoodLegend</legend>
+                    @foreach (var wood in CabinetLook.Woods)
+                    {
+                        <label class="look-choice">
+                            <input type="radio" name="wood" value="@wood" checked="@(wood == Model.Look.Wood)" />
+                            <span class="look-choice-text">
+                                <span class="look-choice-name">@CabinetLook.WoodName(wood)</span>
+                                <span class="pic-sub">@OwnerStrings.WoodSubLine(wood)</span>
+                            </span>
+                        </label>
+                    }
+                </fieldset>
+                <div class="look-group">
+                    <label class="look-choice">
+                        <input type="checkbox" role="switch" name="backs" value="painted" checked="@(Model.Look.Backs == "painted")" aria-describedby="look-backs-hint" />
+                        <span class="look-choice-text">
+                            <span class="look-choice-name">@OwnerStrings.PaintedBacksLabel</span>
+                        </span>
+                    </label>
+                    <p class="owner-hint" id="look-backs-hint">@OwnerStrings.PaintedBacksHint</p>
+                </div>
+                <fieldset class="look-group" aria-describedby="look-lights-hint">
+                    <legend>@OwnerStrings.LightsLegend</legend>
+                    @foreach (var lights in CabinetLook.LightChoices)
+                    {
+                        <label class="look-choice">
+                            <input type="radio" name="lights" value="@lights" checked="@(lights == Model.Look.Lights)" />
+                            <span class="look-choice-text">
+                                <span class="look-choice-name">@CabinetLook.LightsName(lights)</span>
+                            </span>
+                        </label>
+                    }
+                    <p class="owner-hint" id="look-lights-hint">@OwnerStrings.LightsHint</p>
+                </fieldset>
+                <fieldset class="look-group" aria-describedby="look-depth-hint">
+                    <legend>@OwnerStrings.DepthLegend</legend>
+                    @foreach (var depth in CabinetLook.DepthChoices)
+                    {
+                        <label class="look-choice">
+                            <input type="radio" name="depth" value="@depth" checked="@(depth == Model.Look.Depth)" />
+                            <span class="look-choice-text">
+                                <span class="look-choice-name">@CabinetLook.DepthName(depth)</span>
+                            </span>
+                        </label>
+                    }
+                    <p class="owner-hint" id="look-depth-hint">@OwnerStrings.DepthHint</p>
+                </fieldset>
+                <div class="look-actions">
+                    <button type="submit" class="owner-btn owner-btn-primary" id="look-publish">@OwnerStrings.UseForEveryoneButton</button>
+                    <button type="button" class="owner-btn" id="look-discard" hidden>@OwnerStrings.BackToCurrentButton</button>
+                </div>
+            </form>
+            <p class="row-status" id="finish-status" role="status" data-problem="@(Model.LookNoticeIsProblem ? "true" : null)">
+                @if (Model.LookNotice is not null)
+                {
+                    <span>@Model.LookNotice</span>
+                }
+            </p>
+            @if (Model.LookUndoRevision is { } undoRevision)
             {
-                <label class="look-option">
-                    <input type="radio" name="lights" value="@lights" checked="@(lights == Model.Look.Lights)" />
-                    <span class="pic-label">@CabinetLook.LightsName(lights)</span>
-                </label>
+                <form method="post" class="look-undo" asp-page-handler="Undo">
+                    <input type="hidden" name="revision" value="@undoRevision" />
+                    <button type="submit" class="owner-btn">@OwnerStrings.UndoButton</button>
+                </form>
             }
-            <p class="owner-hint" id="look-lights-hint">@OwnerStrings.LightsHint</p>
-        </fieldset>
-        <fieldset class="look-group" aria-describedby="look-depth-hint">
-            <legend>@OwnerStrings.DepthLegend</legend>
-            @foreach (var depth in CabinetLook.DepthChoices)
-            {
-                <label class="look-option">
-                    <input type="radio" name="depth" value="@depth" checked="@(depth == Model.Look.Depth)" />
-                    <span class="pic-label">@CabinetLook.DepthName(depth)</span>
-                </label>
-            }
-            <p class="owner-hint" id="look-depth-hint">@OwnerStrings.DepthHint</p>
-        </fieldset>
-        <button type="submit" class="owner-btn">@OwnerStrings.UseForEveryoneButton</button>
-    </form>
-    <p class="row-status" id="finish-status" role="status" data-problem="@(Model.LookNoticeIsProblem ? "true" : null)">
-        @if (Model.LookNotice is not null)
-        {
-            <span>@Model.LookNotice</span>
-        }
-    </p>
-    @if (Model.LookUndoRevision is { } undoRevision)
-    {
-        <form method="post" class="look-undo" asp-page-handler="Undo">
-            <input type="hidden" name="revision" value="@undoRevision" />
-            <button type="submit" class="owner-btn">@OwnerStrings.UndoButton</button>
-        </form>
-    }
+        </div>
+    </div>
 </section>
 <section class="owner-panel" id="backup" aria-labelledby="backup-heading">
     <h3 id="backup-heading">@OwnerStrings.BackupHeading</h3>
@@ -149,4 +183,5 @@
     </section>
 }
 @section Scripts {
+    <script type="module" src="~/js/owner-look.js" asp-append-version="true"></script>
 }
