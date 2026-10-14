@@ -5,6 +5,7 @@
  */
 :root {
   --sheet-spring: 200ms;
+  --look-fade: 250ms;
 }
 
 .card-dialog {
@@ -655,6 +656,10 @@ html[data-pull-dir="close"] {
 ::view-transition-group(pull),
 ::view-transition-group(card) {
   animation-duration: var(--pull-dur);
+}
+
+html[data-look-switch]::view-transition-group(root) {
+  animation-duration: var(--look-fade);
 }
 
 ::view-transition-group(pull) {

@@ -12,6 +12,7 @@ import { indexPlacements, recordFromPlacement } from './card-flow.js';
 import { initRoving } from './keys.js';
 import { initGamesList } from './games-list.js';
 import { initLook } from './look.js';
+import { applyLookStatus } from './look-switch.js';
 
 const mount = document.getElementById('cabinet');
 const syncRoot = document.querySelector('.sync');
@@ -402,7 +403,13 @@ async function reloadForNewProfile() {
 if (syncRoot !== null) {
   const sync = initSyncStatus(syncRoot, { onCollectionChanged: redrawWhenCardIsClosed });
 
-  startLive({ applyStatus: sync.applyStatus, fetchStatus });
+  startLive({
+    applyStatus: (status) => {
+      applyLookStatus(status);
+      sync.applyStatus(status);
+    },
+    fetchStatus,
+  });
 }
 
 if (mount !== null && dialog !== null) {
