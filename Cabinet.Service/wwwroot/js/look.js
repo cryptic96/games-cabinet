@@ -14,7 +14,7 @@ const MILLISECONDS_PER_SECOND = 1000;
 const DRAWN_EVENT = 'cabinet:drawn';
 const SECONDS_PER_CHECK = 60;
 const BOUNDARY_SLACK_MS = 250;
-const followedRoots = new WeakSet();
+const followedRoots = new WeakMap();
 
 /**
  * Tells whether the lights are lit for a stored choice and a clock reading.
@@ -197,18 +197,21 @@ function applyClock(root) {
 /**
  * Keeps an open page right about the evening. It checks the clock at once, every minute while the page is visible, when the
  * page becomes visible again, and with one timer set for the next sunrise or lamp-on moment (set again each time it fires), so
- * a page left open across sunset or sunrise fades at that moment. Calling it again for the same page does nothing. Only
- * evenings only needs the timer; always on and off never change with the clock.
+ * a page left open across sunset or sunrise fades at that moment. Calling it again for the same page checks the clock again at
+ * once, without adding another timer or listener, so a live change of the lights takes effect without waiting for the minute
+ * check. Only evenings only needs the timer; always on and off never change with the clock.
  * @param {Document} [doc] The page; the current document by default.
  */
 export function followClock(doc = document) {
   const root = doc.documentElement;
 
-  if (followedRoots.has(root)) {
+  const followed = followedRoots.get(root);
+
+  if (followed) {
+    followed();
+
     return;
   }
-
-  followedRoots.add(root);
 
   let boundary;
   const check = () => {
@@ -227,6 +230,7 @@ export function followClock(doc = document) {
     }
   };
 
+  followedRoots.set(root, check);
   check();
   window.setInterval(checkWhenVisible, MILLISECONDS_PER_SECOND * SECONDS_PER_CHECK);
   doc.addEventListener('visibilitychange', checkWhenVisible);

@@ -27,7 +27,7 @@ function runHeadScript(root, storage, local = WINTER_MIDDAY) {
 
   Object.defineProperty(window, 'sessionStorage', { get: () => storage, enumerable: true });
 
-  const context = vm.createContext({ window, document: { documentElement: root }, Date: fakeDate({ local }) });
+  const context = vm.createContext({ window, document: { documentElement: root }, Date: fakeDate({ reading: local }) });
 
   vm.runInContext(EVENING_SOURCE, context);
 
@@ -423,6 +423,20 @@ test('without the head script there is no clock to follow and nothing changes', 
   assert.equal(root.hasAttribute('data-evening'), false);
   assert.equal(root.hasAttribute('data-lit'), false);
   assert.equal(timers.length, 0);
+});
+
+test('a page that loaded with the lights off lights at once when they change to evenings only at night', async () => {
+  const { root, doc, intervals } = await startLook({ dataset: { lights: 'off' } });
+
+  assert.equal(root.hasAttribute('data-evening'), false);
+
+  root.dataset.lights = 'evenings';
+  globalThis.window.cabinetEvening = fakeClock(true);
+  followClock(doc);
+
+  assert.equal(root.hasAttribute('data-evening'), true);
+  assert.equal(root.hasAttribute('data-lit'), true);
+  assert.equal(intervals.length, 1);
 });
 
 test('following the clock of a page twice sets up one interval and one listener', async () => {
