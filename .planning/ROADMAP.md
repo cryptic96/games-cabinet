@@ -475,7 +475,7 @@ Plans:
   4. The owner can choose the cubby depth (flat, shaded or deep), and it combines with every finish and with the lights.
   5. Every spine label keeps at least 4.5:1 contrast under every finish, light and depth combination. Header, status line and footer stay readable on every wall, and the cabinet stays smooth on a phone.
 
-**Plans:** 14/21 plans executed
+**Plans:** 16/21 plans executed
 
 Plans:
 **Wave 1**
@@ -512,8 +512,8 @@ Plans:
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 06.1-15-PLAN.md — Evenings only - the lights follow sunset and sunrise by each visitor's own clock
-- [ ] 06.1-16-PLAN.md — Tracer for the live switch - open pages follow the owner's new look within seconds
+- [x] 06.1-15-PLAN.md — Evenings only - the lights follow sunset and sunrise by each visitor's own clock
+- [x] 06.1-16-PLAN.md — Tracer for the live switch - open pages follow the owner's new look within seconds
 
 **Wave 8** *(blocked on Wave 7 completion)*
 
@@ -578,6 +578,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 4. Enrichment, Box Images & Shape | 23/23 | Complete    | 2026-10-09 |
 | 5. Game Detail, Accessibility & Language | 16/16 | Complete    | 2026-10-12 |
 | 6. Owner Tools & Persistence | 30/30 | Complete    | 2026-10-13 |
-| 6.1. Selectable Cabinet Finishes & Lighting (INSERTED) | 14/21 | In Progress|  |
+| 6.1. Selectable Cabinet Finishes & Lighting (INSERTED) | 16/21 | In Progress|  |
 | 7. Game-Night Filters & Location Cabinets | 0/0 | Not started | - |
 | 8. Public Hardening & Go-Public | 0/0 | Not started | - |
