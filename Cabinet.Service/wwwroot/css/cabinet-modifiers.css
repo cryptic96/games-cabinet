@@ -17,4 +17,73 @@
   --shade-depth: 20%;
 }
 
+/**
+ * Flat draws no shading at all: no shade over the boxes, none under the shelf above and none down the sides of the back. The
+ * back keeps its construction, and the grain and lit edges of the furniture are untouched, because they are the design's own.
+ */
+[data-depth="flat"] {
+  --depth-k: 0;
+}
+
+[data-depth="flat"] .cabinet {
+  --shade-alpha: 0;
+}
+
+/**
+ * Deep keeps the shade of the shelf above but lighter over the boxes, because the walls now carry part of the depth. The
+ * look of a deep cubby is the wood's own: a ceiling, two side walls and a floor drawn from the wall tokens, seen from a
+ * little above, so the floor is the largest and lightest face, the ceiling the thinnest and darkest, and each side wall
+ * darkens toward the back.
+ */
+[data-depth="deep"] .cabinet {
+  --shade-alpha: 0.12;
+}
+
+/**
+ * The four faces are the four gradient layers of the cubby's own back, through the slot its design leaves for them, so
+ * they paint behind the boxes and add no element and no clip. Sizes are the design's millimetre values.
+ */
+[data-depth="deep"] .cubby {
+  --dw: calc(var(--depth-inset) * var(--u));
+  --dt: calc(var(--depth-ceil) * var(--u));
+  --df: calc(var(--depth-floor) * var(--u));
+  --deep-img:
+    linear-gradient(180deg, var(--cubby-top), color-mix(in srgb, var(--cubby-top) 70%, rgb(0 0 0 / 1))),
+    linear-gradient(90deg, var(--cubby-left), color-mix(in srgb, var(--cubby-left) 70%, rgb(0 0 0 / 1))),
+    linear-gradient(270deg, var(--cubby-right), color-mix(in srgb, var(--cubby-right) 70%, rgb(0 0 0 / 1))),
+    linear-gradient(180deg, var(--cubby-floor-back), var(--cubby-floor-front));
+  --deep-size: 100% var(--dt), var(--dw) calc(100% - var(--df)), var(--dw) calc(100% - var(--df)), 100% var(--df);
+  --deep-pos: 0 0, 0 0, 100% 0, 0 100%;
+}
+
+/**
+ * Every shelf board shows a thin lit top face in Deep, lit from above like the front edge: a hairline highlight that
+ * fades into the board.
+ */
+[data-depth="deep"] .cubby::before {
+  --top-hair: max(1px, calc(1 * var(--u)));
+  --top-face-img: linear-gradient(
+    to bottom,
+    rgb(var(--highlight-rgb) / 0.55) 0 var(--top-hair),
+    rgb(var(--highlight-rgb) / 0.20) var(--top-hair),
+    transparent 100%
+  );
+  --top-face-size: 100% calc(var(--top-face) * var(--u));
+}
+
+/**
+ * Painted backs. The back panel is one flat matte colour with no planks, no grain and no seams, the same on every wood. The
+ * shade of the shelf above and down the sides stays, because it is depth and not construction, so it follows the depth
+ * choice. The strengths the wood tunes for its own back return to the neutral ones, because the painted colour is not the
+ * wood's back.
+ */
+[data-backs="painted"] {
+  --seam-k: 0;
+  --back: var(--back-painted);
+  --pool-k: var(--pool-k-painted, 1);
+  --back-shade-k: 1;
+  --fill-k: 0;
+  --keyline-lit: 0.4;
+}
+
 }

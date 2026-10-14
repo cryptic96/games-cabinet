@@ -72,8 +72,12 @@
   --groove: max(1px, calc(1 * var(--u)));
   --plank: max(1px, calc(var(--plank-width) * var(--u)));
   --seam-eff: calc(var(--seam-k) * min(1, var(--plank-width)));
+  --deep-img: none;
+  --deep-size: auto;
+  --deep-pos: 0 0;
   background-color: var(--back);
   background-image:
+    var(--deep-img),
     linear-gradient(to bottom, rgb(var(--shade-deep-rgb) / calc(0.55 * var(--depth-k) * var(--back-shade-k))), transparent 24%),
     linear-gradient(to right, rgb(var(--shade-deep-rgb) / calc(0.30 * var(--depth-k))), transparent 7%, transparent 93%, rgb(var(--shade-deep-rgb) / calc(0.30 * var(--depth-k)))),
     repeating-linear-gradient(
@@ -88,8 +92,8 @@
       rgb(var(--plank-lift-rgb) / calc(0.04 * var(--seam-k))) var(--plank) calc(2 * var(--plank))
     ),
     repeating-linear-gradient(to right, rgb(var(--plank-lift-rgb) / calc(0.025 * var(--seam-k))) 0 1px, transparent 1px calc(17 * var(--u)));
-  background-size: auto, auto, var(--span) 100%, var(--span) 100%, var(--span) 100%;
-  background-position: 0 0, 0 0, var(--ox) 0, var(--ox) 0, var(--ox) 0;
+  background-size: var(--deep-size), auto, auto, var(--span) 100%, var(--span) 100%, var(--span) 100%;
+  background-position: var(--deep-pos), 0 0, 0 0, var(--ox) 0, var(--ox) 0, var(--ox) 0;
   background-repeat: no-repeat;
   box-shadow: 1px 0 0 var(--edge-up-6);
 }
@@ -98,8 +102,11 @@
   --board-tone: var(--wood);
   --figure-x: 18%;
   --grain-y: 0px;
+  --top-face-img: none;
+  --top-face-size: auto;
   background-color: var(--board-tone);
   background-image:
+    var(--top-face-img),
     linear-gradient(
       to bottom,
       var(--wood-lit) 0 1px,
@@ -114,9 +121,9 @@
       var(--ga) calc(9 * var(--u)) calc(9 * var(--u) + var(--lw))
     ),
     var(--sweep-h);
-  background-size: auto, auto, auto, auto, var(--span) 100%, var(--span) 100%;
-  background-position: 0 0, 0 var(--grain-y), 0 var(--grain-y), 0 var(--grain-y), var(--ox) 0, var(--ox) 0;
-  background-repeat: no-repeat, repeat, repeat, repeat, no-repeat, no-repeat;
+  background-size: var(--top-face-size), auto, auto, auto, auto, var(--span) 100%, var(--span) 100%;
+  background-position: 0 0, 0 0, 0 var(--grain-y), 0 var(--grain-y), 0 var(--grain-y), var(--ox) 0, var(--ox) 0;
+  background-repeat: no-repeat, no-repeat, repeat, repeat, repeat, no-repeat, no-repeat;
 }
 
 .cubby[data-board="0"]::before {
