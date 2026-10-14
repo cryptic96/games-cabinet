@@ -5,7 +5,7 @@
  * where it has none or the visitor prefers less motion. The footer logo follows the wall, and the script that decides when the lights
  * are lit is loaded first when the page was opened with the lights off and never loaded it.
  */
-import { refreshLamp } from './look.js';
+import * as lamp from './look.js';
 import { isOutdatedStatus } from './status.js';
 
 const LOOK_FIELDS = ['design', 'wood', 'backs', 'lights', 'depth'];
@@ -13,6 +13,7 @@ const MAX_VALUE_LENGTH = 32;
 const LIGHTS_FIELD = 'lights';
 const LIGHTS_OFF = 'off';
 const SWITCH_MARKER = 'data-look-switch';
+const EVENING_MARKER = 'data-evening';
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 const EVENING_META = 'meta[name="cabinet-evening-script"]';
 const LOGO_SELECTOR = 'footer .bgg-credit img';
@@ -118,7 +119,9 @@ function loadEveningScript(doc) {
 
 /**
  * Writes the look on the root, then lights or darkens the lamp. The layout is read in between so a light layer that was not shown
- * before has its unlit style on screen when it is lit, and the lamp fades on instead of appearing.
+ * before has its unlit style on screen when it is lit, and the lamp fades on instead of appearing. Lights that are off also drop
+ * the evening marker, and lights that are not off hand the clock to the lamp script's follower when the lamp module has one, so
+ * evenings only is decided by the visitor's own clock from this moment on.
  * @param {Element} root The root element.
  * @param {{ values: string[], lightWall: boolean }} look The look to show.
  */
@@ -126,7 +129,16 @@ function writeLook(root, look) {
   LOOK_FIELDS.forEach((field, index) => root.setAttribute('data-' + field, look.values[index]));
   swapLogo(root, look.lightWall);
   root.getBoundingClientRect?.();
-  refreshLamp(root);
+
+  if (look.values[LOOK_FIELDS.indexOf(LIGHTS_FIELD)] === LIGHTS_OFF) {
+    root.removeAttribute(EVENING_MARKER);
+  }
+
+  lamp.refreshLamp(root);
+
+  if (root.getAttribute('data-' + LIGHTS_FIELD) !== LIGHTS_OFF) {
+    lamp.followClock?.(root.ownerDocument);
+  }
 }
 
 /**

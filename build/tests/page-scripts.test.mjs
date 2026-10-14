@@ -2894,6 +2894,21 @@ test('turning the lights on from a page that never loaded the lamp script loads 
   });
 });
 
+test('turning the lights off drops the evening marker and the lit marker', async () => {
+  const page = lookPage({ look: { ...BASE_LOOK, lights: 'evenings' } });
+
+  page.root.setAttribute('data-evening', '');
+  page.root.setAttribute('data-lit', '');
+
+  await withLookPage(page, async () => {
+    await applyLookStatus(lookStatus({ lights: 'off' }), page.root);
+
+    assert.equal(page.root.getAttribute('data-lights'), 'off');
+    assert.equal(page.root.hasAttribute('data-evening'), false);
+    assert.equal(page.root.hasAttribute('data-lit'), false);
+  });
+});
+
 test('a lamp script that is already on the page is not loaded again', async () => {
   const page = lookPage({ lampScriptLoaded: true });
 
