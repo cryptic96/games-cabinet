@@ -1294,6 +1294,10 @@ class FakeElement {
     return this.attributes.has(name) ? this.attributes.get(name) : null;
   }
 
+  hasAttribute(name) {
+    return this.attributes.has(name);
+  }
+
   removeAttribute(name) {
     this.attributes.delete(name);
   }
@@ -1380,6 +1384,7 @@ function createFakeDocument() {
   page.createElementNS = (namespace, tagName) => new FakeElement(page, tagName);
   page.createTextNode = (text) => Object.assign(new FakeElement(page, '#text'), { ownText: String(text) });
   page.body = page.createElement('body');
+  page.documentElement = page.createElement('html');
   page.activeElement = page.body;
 
   return page;
@@ -1945,6 +1950,11 @@ async function startCabinetPage({ firstLayout, status, cards = [], withList = fa
     ...clock.timers,
     matchMedia: () => ({ matches: false, addEventListener: () => undefined }),
     addEventListener: (type, handler) => (windowHandlers[type] ??= []).push(handler),
+    requestAnimationFrame: (callback) => {
+      callback(0);
+
+      return 0;
+    },
   };
   globalThis.document = page;
   globalThis.CSS = { escape: (value) => value };

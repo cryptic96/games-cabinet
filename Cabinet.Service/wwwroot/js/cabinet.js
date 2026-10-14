@@ -11,6 +11,7 @@ import { initCardDialog } from './detail.js';
 import { indexPlacements, recordFromPlacement } from './card-flow.js';
 import { initRoving } from './keys.js';
 import { initGamesList } from './games-list.js';
+import { initLook } from './look.js';
 
 const mount = document.getElementById('cabinet');
 const syncRoot = document.querySelector('.sync');
@@ -423,6 +424,7 @@ if (skipLink !== null && gamesList !== null) {
 }
 
 if (mount !== null) {
+  initLook(document);
   phoneQuery.addEventListener('change', reloadForNewProfile);
   load();
 }

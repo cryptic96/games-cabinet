@@ -7,6 +7,14 @@
 :root {
   --depth-k: 1;
   --seam-k: 1;
+  --lamp-fade: 2000ms;
+  --lamp-front: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --lamp-fade: 0ms;
+  }
 }
 
 /**
@@ -84,6 +92,78 @@
   --back-shade-k: 1;
   --fill-k: 0;
   --keyline-lit: 0.4;
+}
+
+/**
+ * Lights. One layer per section holds everything that is lit and fades by opacity alone. It sits under the boxes, so it
+ * lights the back, the shelves and the uprights and never a box face, which is why the share of the lamp that reaches a box
+ * face, --lamp-front, is nothing and nothing in this file reads it above a box. While the lights are off the layer is not
+ * displayed at all.
+ */
+[data-lights="on"] .section > .section-light,
+[data-lights="evenings"] .section > .section-light {
+  display: block;
+}
+
+[data-lit] .section > .section-light {
+  opacity: 1;
+}
+
+/**
+ * The fade exists only once the page is settled, so the first frame is exactly the markup the server wrote. The compositor
+ * hint is given only while the fade runs.
+ */
+[data-settled] .section > .section-light {
+  transition: opacity var(--lamp-fade) ease-in-out;
+}
+
+[data-fading] .section > .section-light {
+  will-change: opacity;
+}
+
+/**
+ * The dark outer keyline of every box switches on only while the lights are lit, where a soft light can bring the back to
+ * the lightness of a dark box. It is an outer ring of the box shadow, never on the face, and it has no transition.
+ */
+[data-lit] {
+  --keyline: var(--keyline-lit, 0.4);
+}
+
+/**
+ * The lamp is a hidden strip behind the shelf above each cubby. Its bright source line is the top two millimetres of the
+ * cubby, a short warm fill runs below it on a wood that has a light back, and the wide pool on the back panel is an ellipse
+ * wider than the cubby, so the corners keep most of the strength of the middle and the wash reads as a strip.
+ */
+.light-pool {
+  background-image:
+    linear-gradient(
+      to bottom,
+      rgb(var(--lamp-hot-rgb) / 0.8) 0 max(2px, calc(2.5 * var(--u))),
+      rgb(var(--lamp-rgb) / calc(0.25 * var(--fill-k) * var(--depth-k))) max(2px, calc(2.5 * var(--u))),
+      transparent 14%
+    ),
+    radial-gradient(
+      ellipse 200% 50% at 50% 0%,
+      rgb(var(--lamp-rgb) / calc(0.55 * var(--pool-k))) 0,
+      rgb(var(--lamp-rgb) / calc(0.55 * var(--pool-k))) 18%,
+      rgb(var(--lamp-rgb) / calc(0.30 * var(--pool-k))) 34%,
+      rgb(var(--lamp-rgb) / calc(0.12 * var(--pool-k))) 50%,
+      rgb(var(--lamp-rgb) / calc(0.05 * var(--pool-k))) 70%,
+      transparent 100%
+    );
+}
+
+/**
+ * The faint spill of the lamp on the upright to the left of the cubby and on the shelf front below it.
+ */
+.light-pool::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 calc(-1 * var(--frame) * var(--u)) calc(-1 * var(--frame) * var(--u));
+  box-sizing: border-box;
+  border-style: solid;
+  border-color: rgb(var(--lamp-rgb) / calc(0.08 * var(--lamp-k)));
+  border-width: 0 0 calc(var(--frame) * var(--u)) calc(var(--frame) * var(--u));
 }
 
 }
