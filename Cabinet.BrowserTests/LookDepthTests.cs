@@ -23,6 +23,10 @@ public sealed class LookDepthTests : CabinetPageTest
 
     private const int WallColourDifference = 12;
 
+    private const int GradientDither = 2;
+
+    private const int SeamContrast = 12;
+
     private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
 
     private static readonly string[] Depths = ["flat", "shaded", "deep"];
@@ -81,6 +85,74 @@ public sealed class LookDepthTests : CabinetPageTest
                 (await RectsAsync()).Should().Equal(reference, label);
                 (await EdgeDifferencesAsync()).Should().OnlyContain(difference => difference <= EdgeTolerance, label);
             }
+        }
+    }
+
+    [Fact]
+    public async Task Flat_draws_no_shade_over_the_boxes_or_the_back_and_keeps_the_planks()
+    {
+        await StartAsync(PrototypeOn);
+        await OpenBareAsync(1440);
+        await SetLookAsync(("depth", "flat"), ("backs", "wood"));
+
+        (await CubbyPropertyAsync("--shade-alpha")).Should().Be("0");
+
+        using var frame = await FrameAsync();
+        var cubbies = await CubbyRectsAsync();
+        var widest = cubbies.OrderByDescending(cubby => cubby[2]).First();
+        var topRow = (int)Math.Round(widest[1]) + 2;
+        var middleRow = (int)Math.Round(widest[1] + (widest[3] / 2));
+        var span = Columns(widest);
+
+        var middleSums = span.Select(x => Sum(frame.Pixel(x, middleRow))).ToList();
+
+        (middleSums.Max() - middleSums.Min()).Should().BeGreaterThan(SeamContrast, "the planks and their seams are still drawn");
+        span.Should().OnlyContain(x => Distance(frame.Pixel(x, topRow), frame.Pixel(x, middleRow)) <= GradientDither, "nothing shades the top of the back");
+        (await CubbyPropertyAsync("--seam-k")).Should().Be("1");
+    }
+
+    [Theory]
+    [InlineData("flat")]
+    [InlineData("shaded")]
+    [InlineData("deep")]
+    public async Task A_painted_back_is_one_flat_colour_and_keeps_the_shade_of_the_shelf_above(string depth)
+    {
+        await StartAsync(PrototypeOn);
+        await OpenBareAsync(1440);
+        await SetLookAsync(("depth", depth), ("backs", "painted"));
+
+        var painted = ParseHex(await RootPropertyAsync("--back-painted"));
+        using var frame = await FrameAsync();
+
+        (await CubbyPropertyAsync("--seam-k")).Should().Be("0");
+
+        foreach (var cubby in await CubbyRectsAsync())
+        {
+            var middleRow = (int)Math.Round(cubby[1] + (cubby[3] / 2));
+            var span = Columns(cubby, from: 0.25, to: 0.75);
+
+            foreach (var x in span)
+            {
+                Distance(frame.Pixel(x, middleRow), painted).Should().BeLessThanOrEqualTo(GradientDither, $"{depth}: column {x}");
+            }
+        }
+
+        if (depth != "flat")
+        {
+            var cubby = (await CubbyRectsAsync())[0];
+            var x = (int)Math.Round(cubby[0] + (cubby[2] / 2));
+            var top = frame.Pixel(x, (int)Math.Round(cubby[1]) + 2);
+            var middle = frame.Pixel(x, (int)Math.Round(cubby[1] + (cubby[3] / 2)));
+
+            Sum(top).Should().BeLessThan(Sum(middle), "the shelf above still shades the top of the back");
+        }
+
+        if (depth == "deep")
+        {
+            var cubby = (await CubbyRectsAsync())[0];
+            var wall = frame.Pixel((int)Math.Round(cubby[0]) + 2, (int)Math.Round(cubby[1] + (cubby[3] / 2)));
+
+            Distance(wall, painted).Should().BeGreaterThan(WallColourDifference, "the inner walls stay wood");
         }
     }
 

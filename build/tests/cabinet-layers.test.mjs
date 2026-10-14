@@ -417,3 +417,83 @@ test('the section light is hidden outright until a look turns it on, and sits at
   assert.equal(light.declarations.find(({ name }) => name === 'display')?.value, 'none');
   assert.equal(light.declarations.find(({ name }) => name === 'opacity')?.value, '0');
 });
+
+/**
+ * Reads the value a rule of the modifiers layer gives a property.
+ * @param {string} selector The exact selector of the rule.
+ * @param {string} property The property name.
+ * @returns {string | undefined}
+ */
+function modifierValue(selector, property) {
+  return allRules.modifiers
+    .filter((rule) => rule.selector === selector)
+    .flatMap((rule) => rule.declarations)
+    .find(({ name }) => name === property)?.value;
+}
+
+test('the shade over the boxes is 0 when flat, 0.20 when shaded and 0.12 when deep, and never above the palette cap', () => {
+  const palette = readFileSync(new URL('../../Cabinet.Domain/Layout/SpinePalette.cs', import.meta.url), 'utf8');
+  const cap = Number(/MaxShadePercent\s*=\s*(\d+)/.exec(palette)?.[1]) / 100;
+
+  assert.equal(cap, 0.2);
+  assert.equal(modifierValue('[data-depth="flat"] .cabinet', '--shade-alpha'), '0');
+  assert.equal(modifierValue('.cabinet', '--shade-alpha'), '0.20');
+  assert.equal(modifierValue('[data-depth="deep"] .cabinet', '--shade-alpha'), '0.12');
+
+  for (const rule of allRules.modifiers) {
+    for (const { name, value } of rule.declarations) {
+      if (name === '--shade-alpha') {
+        assert.ok(Number(value) <= cap, `${rule.selector}: ${value}`);
+      }
+    }
+  }
+});
+
+test('flat switches the depth strength off and painted backs switch the seams off and paint the back', () => {
+  assert.equal(modifierValue(':root', '--depth-k'), '1');
+  assert.equal(modifierValue('[data-depth="flat"]', '--depth-k'), '0');
+  assert.equal(modifierValue(':root', '--seam-k'), '1');
+  assert.equal(modifierValue('[data-backs="painted"]', '--seam-k'), '0');
+  assert.equal(modifierValue('[data-backs="painted"]', '--back'), 'var(--back-painted)');
+  assert.equal(modifierValue('[data-backs="painted"]', '--back-shade-k'), '1');
+  assert.ok(sheets.modifiers.indexOf('[data-depth="flat"] {') > sheets.modifiers.indexOf(':root {'), 'flat comes after the defaults it replaces');
+  assert.ok(sheets.modifiers.indexOf('[data-backs="painted"] {') > sheets.modifiers.indexOf(':root {'), 'painted comes after the defaults it replaces');
+});
+
+test('deep is four gradient layers on the cubby and one on each shelf board, with no clip and no extra element', () => {
+  const gradients = (value) => (value.match(/(?<![\w-])linear-gradient\(/g) ?? []).length;
+  const listLength = (value) => value.split(/,(?![^(]*\))/).length;
+  const walls = modifierValue('[data-depth="deep"] .cubby', '--deep-img');
+  const shelf = modifierValue('[data-depth="deep"] .cubby::before', '--top-face-img');
+
+  assert.equal(gradients(walls), 4);
+  assert.equal(gradients(shelf), 1);
+  assert.equal(listLength(modifierValue('[data-depth="deep"] .cubby', '--deep-size')), 4);
+  assert.equal(listLength(modifierValue('[data-depth="deep"] .cubby', '--deep-pos')), 4);
+  assert.equal(/clip-path|cubby-deco/.test(sheets.modifiers), false);
+});
+
+test('the modifiers layer sets no size, position, margin, padding or display outside the light layer', () => {
+  const forbidden = ['width', 'height', 'inset', 'top', 'left', 'right', 'bottom', 'aspect-ratio', 'margin', 'padding', 'display'];
+  const light = /section-light|light-pool/;
+
+  for (const rule of allRules.modifiers) {
+    if (light.test(rule.selector)) {
+      continue;
+    }
+
+    for (const { name } of rule.declarations) {
+      assert.equal(forbidden.includes(name), false, `${rule.selector} sets ${name}`);
+    }
+  }
+});
+
+test('the depth and back rules are single-choice selectors on any ancestor, so combinations come from the cascade', () => {
+  const choices = allRules.modifiers.flatMap((rule) => selectorsOf(rule.selector)).filter((selector) => /\[data-(depth|backs)\b/.test(selector));
+
+  assert.ok(choices.length >= 5);
+
+  for (const selector of choices) {
+    assert.equal(LOOK_ATTRIBUTES.filter((name) => new RegExp(`\\[data-${name}\\b`).test(selector)).length, 1, selector);
+  }
+});
