@@ -357,8 +357,13 @@ are due. The server downloads them by itself, never a visitor:
 
 - only over https, only from the hosts listed in `Images__AllowedHosts`, and
   without the BGG token or any other credential;
-- at most one request at a time, with a pause between requests that is
-  independent of the pause the BGG API gets;
+- at most one request at a time on each fetch slot, with a pause between
+  requests that is independent of the pause the BGG API gets. The sync's
+  pictures and the background fetching of pictures the owner linked share one
+  slot, so they never run at the same time. The owner's own "Check link" on the
+  pictures page has a second slot, with its own pause and its own connection,
+  so a check never waits behind background work. At most two picture requests
+  can therefore overlap, one from each slot, and each slot keeps its own pause;
 - with a size limit on the download, a pixel limit and a shape check that are
   both read from the file header before anything is decoded, and a limit of
   three redirects, each target checked against the host list again;
@@ -420,7 +425,7 @@ Optional settings for the env file:
 | `Images__AllowedHosts` | `cf.geekdo-images.com` | host names, comma separated | The only hosts pictures are downloaded from. A host must match in full. |
 | `Images__MaxMegabytes` | `12` | 1 to 50 | The largest picture download accepted. |
 | `Images__MaxMegapixels` | `36` | 1 to 100 | The most pixels, in millions, a picture may hold. |
-| `Images__DownloadGapMilliseconds` | `1000` | 500 to 60000 | The least time between two picture requests. |
+| `Images__DownloadGapMilliseconds` | `1000` | 500 to 60000 | The least time between two picture requests on one fetch slot. The background slot and the owner's own check each keep it for themselves. |
 | `Images__DownloadTimeoutSeconds` | `30` | 5 to 60 | The longest one picture request may take, headers and body together; each redirect is a request of its own. A request that runs out of time counts as a failed picture. |
 | `Images__MaxDownloadsPerRun` | `80` | 1 to 1000 | The most pictures one sync run downloads. |
 | `Images__RetryFailedAfterHours` | `24` | 1 to 720 | How long a failed picture waits before it is tried again. |

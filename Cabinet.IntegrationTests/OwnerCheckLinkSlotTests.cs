@@ -17,7 +17,7 @@ namespace Cabinet.IntegrationTests;
 /// <summary>
 /// Proves that the owner's own check of a picture link has a fetch slot of its own: while the background work is held up on
 /// a slow picture link, the check of another game's working link answers with its preview at once, the check sends no
-/// credentials.
+/// credentials, and two checks in a row keep the picture gap on their own slot.
 /// </summary>
 [Trait("Category", "Owner")]
 public sealed class OwnerCheckLinkSlotTests
@@ -25,6 +25,7 @@ public sealed class OwnerCheckLinkSlotTests
     private const string CheckPath = "/owner/pictures?handler=CheckLink";
     private const string SlowUrl = "https://example.org/owner/slow-picture.png";
     private const string FineUrl = "https://example.org/owner/fine-picture.png";
+    private const string SecondFineUrl = "https://example.org/owner/second-fine-picture.png";
 
     private static readonly TimeSpan AnswerWithin = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan Gap = TimeSpan.FromMilliseconds(500);
@@ -48,6 +49,25 @@ public sealed class OwnerCheckLinkSlotTests
         host.SlowRequest.Release();
         await host.WaitUntilStoredAsync();
         host.SlowLinkRecord!.Files.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public async Task Two_checks_in_a_row_keep_the_picture_gap_on_the_slot_of_the_owner_check()
+    {
+        await using var host = await SlotHost.StartAsync(holdSlowLink: false);
+        var first = await host.CheckAsync(FineUrl);
+
+        var second = host.CheckAsync(SecondFineUrl);
+        await Task.Delay(TimeSpan.FromMilliseconds(300), TestContext.Current.CancellationToken);
+        var requestedBeforeGap = host.Images.Requests.Count(request => request.Uri.AbsoluteUri == SecondFineUrl);
+        host.Clock.Advance(Gap);
+        var reply = await second.WaitAsync(AnswerWithin, TestContext.Current.CancellationToken);
+
+        first.JsonText("outcome").Should().Be("ready");
+        requestedBeforeGap.Should().Be(0);
+        reply.JsonText("outcome").Should().Be("ready");
+        host.Images.Requests.Where(request => request.Uri.AbsoluteUri is FineUrl or SecondFineUrl).Should().HaveCount(2).And.OnlyContain(
+            request => request.AuthorizationScheme == null && request.AuthorizationParameter == null && !request.HasCookie);
     }
 
     private sealed class SlotHost : IAsyncDisposable
@@ -89,7 +109,7 @@ public sealed class OwnerCheckLinkSlotTests
             ? ready.Data.Games.FirstOrDefault(game => game.GameId == _slowGameId)?.Picture?.Link?.Record
             : null;
 
-        public static async Task<SlotHost> StartAsync()
+        public static async Task<SlotHost> StartAsync(bool holdSlowLink = true)
         {
             var storage = new TemporaryDirectory();
             var items = SyntheticBggCollection.Create(5);
@@ -98,8 +118,14 @@ public sealed class OwnerCheckLinkSlotTests
             var checkedGame = owned[1];
             var images = new ScriptedImageHandler()
                 .Serve(SlowUrl, SyntheticArt.Encode(SyntheticArtKind.CoverColouredField))
-                .Serve(FineUrl, SyntheticArt.Encode(SyntheticArtKind.FlatCover));
+                .Serve(FineUrl, SyntheticArt.Encode(SyntheticArtKind.FlatCover))
+                .Serve(SecondFineUrl, SyntheticArt.Encode(SyntheticArtKind.CoverColouredField));
             var held = images.Hold(SlowUrl);
+
+            if (!holdSlowLink)
+            {
+                held.Release();
+            }
 
             var link = new PictureLink(SlowUrl, null, 0, null);
             var seeded = new OwnerGame(slowGame.ObjectId, null, null, new PictureSetting(PictureChoice.Link, true, null, null, link));
@@ -117,7 +143,15 @@ public sealed class OwnerCheckLinkSlotTests
                     ["Sync:BackgroundEnabled"] = "true",
                 },
                 images,
-                services => services.AddSingleton<IImagePacer>(new ImagePacer(Gap, clock)));
+                services =>
+                {
+                    services.AddSingleton<IOwnerCheckPacer>(new OwnerCheckPacer(Gap, clock));
+
+                    if (holdSlowLink)
+                    {
+                        services.AddSingleton<IImagePacer>(new ImagePacer(Gap, clock));
+                    }
+                });
 
             var host = new SlotHost(storage, factory, images, clock, held, slowGame.ObjectId, checkedGame.ObjectId);
             using var publicClient = factory.CreatePublicClient();
