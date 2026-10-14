@@ -62,13 +62,13 @@ export function fakeStorage({ throws = false, initial = {} } = {}) {
  * universal time is the winter offset from November to March and the summer offset from April to October, as a zone with
  * summer time reports it.
  * @param {object} setup The reading of the local clock and the offsets.
- * @param {number[]} setup.local The local year, month (counted from 0), day, hour and minute, and optionally second.
+ * @param {number[]} setup.reading The local year, month (counted from 0), day, hour and minute, and optionally second.
  * @param {number} [setup.winter] The offset in minutes outside summer time, as getTimezoneOffset reports it.
  * @param {number} [setup.summer] The offset in minutes in summer time; the winter offset by default, a zone without summer time.
  * @returns {typeof Date} The class.
  */
-export function fakeDate({ local, winter = -60, summer = winter }) {
-  const fixed = Date.UTC(...local);
+export function fakeDate({ reading, winter = -60, summer = winter }) {
+  const fixed = Date.UTC(...reading);
 
   return class FakeDate extends Date {
     constructor(...parts) {

@@ -34,7 +34,7 @@ const NOVEMBER_15_LAMP_ON = 980;
  */
 function runScript({ dataset = { lights: 'evenings' }, attributes = [], storage = fakeStorage(), local, winter = WINTER_OFFSET, summer = SUMMER_OFFSET }) {
   const root = fakeRoot(dataset, attributes);
-  const clockClass = fakeDate({ local, winter, summer });
+  const clockClass = fakeDate({ reading: local, winter, summer });
   const window = {};
 
   Object.defineProperty(window, 'sessionStorage', { get: () => storage, enumerable: true });
