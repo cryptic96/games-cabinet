@@ -75,7 +75,7 @@
   background-color: var(--back);
   background-image:
     var(--deep-img),
-    linear-gradient(to bottom, rgb(var(--shade-deep-rgb) / calc(0.55 * var(--depth-k))), transparent 24%),
+    linear-gradient(to bottom, rgb(var(--shade-deep-rgb) / calc(0.55 * var(--depth-k) * var(--back-shade-k))), transparent 24%),
     linear-gradient(to right, rgb(var(--shade-deep-rgb) / calc(0.30 * var(--depth-k))), transparent 7%, transparent 93%, rgb(var(--shade-deep-rgb) / calc(0.30 * var(--depth-k)))),
     repeating-linear-gradient(
       to right,

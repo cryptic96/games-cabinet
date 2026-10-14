@@ -71,16 +71,25 @@ if (want('lamp')) {
 }
 
 if (want('R-10')) {
-  const backs = [['brown', 'wood', 'Warm brown back'], ['walnut', 'wood', 'Walnut back'], ['oak', 'wood', 'Oak back'], ['birch', 'wood', 'Birch back'], ['mahogany', 'wood', 'Mahogany back'], ['brown', 'painted', 'Painted back on brown'], ['birch', 'painted', 'Painted back on birch']];
+  const backs = [['brown', 'wood', 'Warm brown back', '#1f5a3a'], ['walnut', 'wood', 'Walnut back', '#434f5e'], ['oak', 'wood', 'Oak back', '#1f5a3a'], ['birch', 'wood', 'Birch back', '#17766f'], ['mahogany', 'wood', 'Mahogany back', '#8a2432'], ['brown', 'painted', 'Painted back on brown', '#1f5a3a'], ['birch', 'painted', 'Painted back on birch', '#1f5a3a']];
   const items = [];
-  const boxes = [{ x: 24, w: 150, h: 216, bg: '#23407a' }, { x: 196, w: 150, h: 216, bg: '#e09aa5', fg: '#2a1a10' }];
-  for (const lights of ['off', 'on']) {
-    const cells = backs.map(([wood, bk, label]) => ({ label, sub: lights === 'off' ? 'bare: Navy and Rose box' : 'lamp lit: tall boxes reach the peak', attrs: { design: 'modern', wood, backs: bk, lights, depth: 'flat' }, mini: { boxes: [...boxes], mm: 200, cubbyH: 240 } }));
-    const out = `tmp-r10-${lights}.png`;
-    await stageShot('vis2-' + lights, { cells, cols: 7, mini: 200, cellW: 260 }, out, 1, 2060);
-    items.push({ file: out, label: lights === 'off' ? 'Bare backs: every back, one Navy and one Rose box' : 'The same seven backs under the lamp', sub: 'All seven backs are in view; the boxes are tall enough to reach the top 12 % of the cubby where the lamp peaks' });
+  const rows = [
+    ['off', 'shaded', null, 'Bare backs at the default depth (Shaded)', 'Navy and Rose reach the top tenth; the third box ends at 18 % of the cubby height, where the lamp is at its brightness parity with the box'],
+    ['on', 'shaded', '--keyline-lit:0', 'Under the lamp, no keyline (the box tops in the ring)', 'Each back lit at the default depth; the third box top meets the back at nearly the same lightness'],
+    ['on', 'shaded', null, 'Under the lamp, with the lit-state keyline (the default now)', 'The 1 px dark outer line separates the box top from the back; birch has none because its back is pale'],
+    ['on', 'deep', null, 'Under the lamp at Deep, with the keyline', 'The same seven backs with the inner walls, ceiling and floor of Deep'],
+  ];
+  let n = 0;
+  for (const [lights, depth, style, title, sub] of rows) {
+    const cells = backs.map(([wood, bk, label, ring]) => {
+      const boxes = [{ x: 12, w: 100, h: 216, bg: '#23407a' }, { x: 126, w: 100, h: 216, bg: '#e09aa5', fg: '#2a1a10' }, { x: 240, w: 100, h: 197, bg: ring }];
+      return { label, sub: depth === 'deep' ? 'Deep' : 'Shaded', style, attrs: { design: 'modern', wood, backs: bk, lights, depth }, mini: { boxes, mm: 200, cubbyH: 240 } };
+    });
+    const out = `tmp-r10-${n}.png`;
+    await stageShot('vis2-' + n++, { cells, cols: 7, mini: 200, cellW: 260 }, out, 1, 2060);
+    items.push({ file: out, label: title, sub });
   }
-  await montage(browser, { items, cols: 1, out: 'round2-R-10.png', title: 'R-10 corrected: all seven backs, Navy and Rose box, bare and under the lamp', cell: [2060, 330], labelH: 50 });
+  await montage(browser, { items, cols: 1, out: 'round2-R-10.png', title: 'R-10: all seven backs at the default depth, with Navy, Rose and a box whose top sits in the ring', cell: [2060, 330], labelH: 64 });
 }
 
 if (want('kicks')) {
@@ -96,7 +105,7 @@ if (want('depth')) {
   const items = [];
   const states = [
     ['Shaded (today)', { design: 'classic', wood: 'brown', depth: 'shaded' }, 'Reference'],
-    ['Deep, floor merged into the wall element', { design: 'classic', wood: 'brown', depth: 'deep', deepvar: 'merged' }, 'Four layers on one element, no clip-path'],
+    ['Deep, floor merged into the wall element (chosen)', { design: 'classic', wood: 'brown', depth: 'deep', deepvar: 'merged' }, 'Four layers on one element, no clip-path'],
     ['Deep, six layers with mitred corners', { design: 'classic', wood: 'brown', depth: 'deep', deepvar: 'mitre' }, 'Floor on the cubby, five on the wall element, clip-path'],
     ['Deep, merged, oak', { design: 'legs', wood: 'oak', depth: 'deep', deepvar: 'merged' }, 'Light wood'],
     ['Deep, mitred, oak', { design: 'legs', wood: 'oak', depth: 'deep', deepvar: 'mitre' }, 'Light wood'],
@@ -117,7 +126,7 @@ if (want('depth')) {
     await page.context().close();
     items.push({ file: out, label, sub });
   }
-  await montage(browser, { items, cols: 3, out: 'round2-depth.png', title: 'Depth: Deep with the floor merged into the wall element, or with six layers and mitred corners', cell: [520, 400], labelH: 56 });
+  await montage(browser, { items, cols: 3, out: 'round2-depth.png', title: 'Depth: Deep with the floor merged into the wall element (chosen), against the six-layer mitred version (reference)', cell: [520, 400], labelH: 56 });
 }
 
 if (want('walnut')) {

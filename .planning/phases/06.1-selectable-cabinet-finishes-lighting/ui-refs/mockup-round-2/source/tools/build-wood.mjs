@@ -34,8 +34,8 @@ const woods = {
     '--wood-src': '#593a29',
     '--wood-lit-src': 'color-mix(in oklch, #593a29, white 22%)',
     '--back-src': '#261811',
-    '--recess-src': 'color-mix(in oklch, #593a29, black 55%)',
-    '--recess-low-src': 'color-mix(in oklch, #593a29, black 55%)',
+    '--recess-src': 'color-mix(in oklch, #593a29, black 35%)',
+    '--recess-low-src': 'color-mix(in oklch, #593a29, black 25%)',
     '--cubby-top-src': 'color-mix(in oklch, #593a29, black 78%)',
     '--cubby-left-src': 'color-mix(in oklch, #593a29, black 31%)',
     '--cubby-right-src': 'color-mix(in oklch, #593a29, black 56%)',
@@ -110,6 +110,9 @@ const woods = {
     '--inlay-src': '#876528',
     '--lamp-k': '0.18',
     '--pool-k': '0.12',
+    '--fill-k': '1',
+    '--keyline-lit': '0',
+    '--back-shade-k': '0.35',
     '--wall-shadow': '0.22',
     '--arch-alpha-top': '0.60',
     '--arch-alpha-bottom': '0.45',
@@ -165,6 +168,9 @@ lines.push('  --lamp-rgb: 255 212 150;');
 lines.push('  --lamp-k: 1;');
 lines.push('  --pool-k: var(--lamp-k);');
 lines.push('  --lamp-hot-rgb: 255 236 205;');
+lines.push('  --fill-k: 0;');
+lines.push('  --back-shade-k: 1;');
+lines.push('  --keyline: 0;');
 lines.push('  --room-shade-rgb: var(--shade-rgb);');
 lines.push('  --room-shade-deep-rgb: var(--shade-deep-rgb);');
 lines.push('  --highlight-rgb: 255 236 205;');

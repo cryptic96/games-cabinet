@@ -36,6 +36,12 @@ structure = must(structure, '  position: absolute;\n  left: calc(var(--x) * var(
 structure = must(structure, '.placement:focus-visible {\n  z-index: 2;', '.placement:focus-visible {\n  z-index: 4;');
 structure = must(structure, '.placement[data-open] {\n  z-index: 2;', '.placement[data-open] {\n  z-index: 4;');
 structure = must(structure, 'background: linear-gradient(to bottom, rgb(var(--shade-rgb) / var(--shade-alpha)), transparent var(--shade-depth));', 'background: linear-gradient(to bottom, rgb(var(--box-shade-rgb) / var(--shade-alpha)), transparent var(--shade-depth));');
+structure = must(
+  structure,
+  '  box-shadow:\n    inset 1px 1px 0 rgb(255 255 255 / 0.2),\n    0 1px 2px rgb(0 0 0 / 0.5);\n  transition: transform 120ms ease-out;',
+  '  box-shadow:\n    inset 1px 1px 0 rgb(255 255 255 / 0.2),\n    0 1px 2px rgb(0 0 0 / 0.5),\n    0 0 0 1px rgb(var(--box-shade-rgb) / var(--keyline, 0));\n  transition: transform 120ms ease-out;',
+);
+structure = must(structure, '  background: var(--edge-t, var(--bg));\n  box-shadow: 0 1px 2px rgb(0 0 0 / 0.5);', '  background: var(--edge-t, var(--bg));\n  box-shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 0 0 1px rgb(var(--box-shade-rgb) / var(--keyline, 0));');
 structure += read(join(here, 'css/structure-add.css'));
 write('structure.css', wrap('structure', structure));
 

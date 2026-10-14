@@ -163,7 +163,8 @@
   scroll-margin: 16px;
   box-shadow:
     inset 1px 1px 0 rgb(255 255 255 / 0.2),
-    0 1px 2px rgb(0 0 0 / 0.5);
+    0 1px 2px rgb(0 0 0 / 0.5),
+    0 0 0 1px rgb(var(--box-shade-rgb) / var(--keyline, 0));
   transition: transform 120ms ease-out;
 }
 
@@ -374,7 +375,7 @@
  */
 .placement[data-art="true"] {
   background: var(--edge-t, var(--bg));
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.5);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 0 0 1px rgb(var(--box-shade-rgb) / var(--keyline, 0));
 }
 
 .placement[data-art="true"][data-fit="width"] {

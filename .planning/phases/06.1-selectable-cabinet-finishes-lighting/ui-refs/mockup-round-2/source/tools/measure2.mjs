@@ -76,10 +76,10 @@ const lampRgb = [255, 212, 150];
 const lampK = { brown: 1, walnut: 1, oak: 1, birch: 0.12, mahogany: 1.1 };
 const poolK = (wood, backs) => (backs === 'painted' ? 1 : lampK[wood]);
 
-async function samplePage(lights, scale = 1) {
-  const cells = BACKS.map(([wood, backs, label]) => ({ label, sub: lights, attrs: { design: 'modern', wood, backs, lights, depth: 'flat' }, style: scale === 1 ? undefined : '--lamp-k:' + lampK[wood] * scale, mini: { empty: true, mm: 220 } }));
-  writeStage('visibility', { cells, cols: 4, mini: 220, cellW: 300 });
-  const page = await open(browser, pathToFileURL(`${OUT}/visibility.html`).href, 1400, 900, 1);
+async function samplePage(lights, depth = 'flat', scale = 1) {
+  const cells = BACKS.map(([wood, backs, label]) => ({ label, sub: lights, attrs: { design: 'modern', wood, backs, lights, depth }, style: scale === 1 ? undefined : '--lamp-k:' + lampK[wood] * scale, mini: { empty: true, mm: 220 } }));
+  writeStage(`visibility-${depth}-${lights}`, { cells, cols: 4, mini: 220, cellW: 300 });
+  const page = await open(browser, pathToFileURL(`${OUT}/visibility-${depth}-${lights}.html`).href, 1400, 900, 1);
   await growViewport(page, 1400);
   const rects = await page.evaluate(() => Array.from(document.querySelectorAll('.cubby')).map((c) => {
     const r = c.getBoundingClientRect();
@@ -111,8 +111,6 @@ async function samplePage(lights, scale = 1) {
   return out;
 }
 
-const bareSet = await samplePage('off');
-const litSet = await samplePage('on');
 const weakest = (colour) => {
   let worst = 99;
   let tone = '';
@@ -122,19 +120,21 @@ const weakest = (colour) => {
   }
   return { value: round2(worst), tone };
 };
-BACKS.forEach(([wood, backs, label], i) => {
-  const bare = weakest(bareSet[i].bare);
-  const peak = weakest(litSet[i].peak);
-  const tail = weakest(litSet[i].tail);
-  const modelBack = bareSet[i].bare;
-  results.visibility[label] = {
-    bare, peak, tail,
-    cornerPeak: weakest(litSet[i].cornerPeak),
-    ringMin: litSet[i].profile.map((c) => weakest(c)).reduce((a, b) => (b.value < a.value ? b : a)),
-    modelPeak: weakest(blend(modelBack, lampRgb, 0.55 * poolK(wood, backs))),
-    modelTail: weakest(blend(modelBack, lampRgb, 0.05 * poolK(wood, backs))),
-  };
-});
+for (const depth of (process.env.DEPTHS || 'flat,shaded,deep').split(',')) {
+  const bareSet = await samplePage('off', depth);
+  const litSet = await samplePage('on', depth);
+  results.visibility[depth] = {};
+  BACKS.forEach(([wood, backs, label], i) => {
+    const bare = weakest(bareSet[i].bare);
+    const peak = weakest(litSet[i].peak);
+    const tail = weakest(litSet[i].tail);
+    results.visibility[depth][label] = {
+      bare, peak, tail,
+      cornerPeak: weakest(litSet[i].cornerPeak),
+      ringMin: litSet[i].profile.map((c) => weakest(c)).reduce((a, b) => (b.value < a.value ? b : a)),
+    };
+  });
+}
 
 async function cost(file, state, width) {
   const page = await open(browser, switcherUrl(file, state), width, 900, 1);
@@ -216,7 +216,7 @@ for (const [label, state] of process.env.SKIP_COST ? [] : COST_STATES) {
 }
 
 await browser.close();
-writeFileSync(`${S}/round2/measurements2${process.env.SKIP_COST ? '-vis' : ''}.json`, JSON.stringify(results, null, 2));
+writeFileSync(`${S}/round2/measurements3${process.env.SKIP_COST ? '-vis' : ''}.json`, JSON.stringify(results, null, 2));
 console.log(JSON.stringify(results.visibility, null, 1));
 console.log(JSON.stringify(results.spine, null, 1));
 console.log(JSON.stringify(results.chrome, null, 1));

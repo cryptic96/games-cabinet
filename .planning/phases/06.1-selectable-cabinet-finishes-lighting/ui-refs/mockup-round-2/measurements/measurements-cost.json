@@ -2,115 +2,115 @@
   "Classic + warm brown, Shaded, lights Off (today)": {
     "counts": {
       "sections": 11,
-      "nodes": 2698,
-      "gradientLayers": 2929,
+      "nodes": 2170,
+      "gradientLayers": 2577,
       "lightLayerCssPx": 0,
       "lightLayerMbAt3x": 0
     },
     "traceMsMedianOf3": {
-      "PrePaint": 46.1,
-      "Layerize": 53.4,
-      "Commit": 19.4,
-      "UpdateLayer": 1.8,
-      "RasterTask": 255.6,
-      "UpdateLayoutTree": 4.7,
-      "Layout": 280.4,
-      "Paint": 130.7
+      "PrePaint": 46.2,
+      "Layerize": 53.2,
+      "Commit": 20.9,
+      "UpdateLayer": 1.7,
+      "RasterTask": 231.7,
+      "UpdateLayoutTree": 2.8,
+      "Layout": 293.1,
+      "Paint": 122.9
     }
   },
   "Classic + warm brown, Deep merged, Always on": {
     "counts": {
       "sections": 11,
-      "nodes": 2863,
-      "gradientLayers": 4084,
+      "nodes": 2852,
+      "gradientLayers": 4073,
       "lightLayerCssPx": 5662342,
       "lightLayerMbAt3x": 194
     },
     "traceMsMedianOf3": {
-      "PrePaint": 55.4,
-      "Layerize": 64.2,
-      "Commit": 19.1,
-      "UpdateLayer": 2.4,
-      "RasterTask": 339,
-      "UpdateLayoutTree": 3.9,
-      "Layout": 312.4,
-      "Paint": 190.5
+      "PrePaint": 53.2,
+      "Layerize": 66.1,
+      "Commit": 20.3,
+      "UpdateLayer": 1.6,
+      "RasterTask": 327.5,
+      "UpdateLayoutTree": 4.3,
+      "Layout": 327.2,
+      "Paint": 194.3
     }
   },
   "Classic + warm brown, Deep six layers, Always on": {
     "counts": {
       "sections": 11,
-      "nodes": 2863,
-      "gradientLayers": 4414,
+      "nodes": 2852,
+      "gradientLayers": 4403,
       "lightLayerCssPx": 5662342,
       "lightLayerMbAt3x": 194
     },
     "traceMsMedianOf3": {
-      "PrePaint": 55.2,
+      "PrePaint": 55.8,
       "Layerize": 68.7,
-      "Commit": 24.5,
-      "UpdateLayer": 2.7,
-      "RasterTask": 361.2,
-      "UpdateLayoutTree": 4.3,
-      "Layout": 310.4,
-      "Paint": 181.7
+      "Commit": 19.1,
+      "UpdateLayer": 1.6,
+      "RasterTask": 330.9,
+      "UpdateLayoutTree": 3.7,
+      "Layout": 320.4,
+      "Paint": 184.2
     }
   },
   "Library + mahogany, Deep merged, Always on": {
     "counts": {
       "sections": 11,
-      "nodes": 2852,
-      "gradientLayers": 3875,
+      "nodes": 2841,
+      "gradientLayers": 3864,
       "lightLayerCssPx": 5815332,
       "lightLayerMbAt3x": 200
     },
     "traceMsMedianOf3": {
-      "PrePaint": 54.3,
-      "Layerize": 63.1,
-      "Commit": 19.1,
-      "UpdateLayer": 1.9,
-      "RasterTask": 317.8,
-      "UpdateLayoutTree": 4.6,
-      "Layout": 328.6,
-      "Paint": 149.6
+      "PrePaint": 55.5,
+      "Layerize": 66.1,
+      "Commit": 20.6,
+      "UpdateLayer": 0.9,
+      "RasterTask": 275.1,
+      "UpdateLayoutTree": 3.4,
+      "Layout": 359,
+      "Paint": 155.6
     }
   },
   "On legs + oak, Deep merged, Always on": {
     "counts": {
       "sections": 11,
-      "nodes": 2863,
+      "nodes": 2852,
       "gradientLayers": 3875,
       "lightLayerCssPx": 5769885,
       "lightLayerMbAt3x": 198
     },
     "traceMsMedianOf3": {
-      "PrePaint": 52,
-      "Layerize": 65.1,
-      "Commit": 17.3,
-      "UpdateLayer": 1.9,
-      "RasterTask": 319.7,
-      "UpdateLayoutTree": 1.9,
-      "Layout": 327.9,
-      "Paint": 160.1
+      "PrePaint": 50,
+      "Layerize": 63.6,
+      "Commit": 18.9,
+      "UpdateLayer": 1.2,
+      "RasterTask": 314.8,
+      "UpdateLayoutTree": 4.1,
+      "Layout": 339.9,
+      "Paint": 159.6
     }
   },
   "On legs + oak, Deep six layers, Always on": {
     "counts": {
       "sections": 11,
-      "nodes": 2863,
+      "nodes": 2852,
       "gradientLayers": 4205,
       "lightLayerCssPx": 5769885,
       "lightLayerMbAt3x": 198
     },
     "traceMsMedianOf3": {
-      "PrePaint": 57.3,
-      "Layerize": 69.2,
-      "Commit": 23.9,
-      "UpdateLayer": 3.2,
-      "RasterTask": 334.6,
-      "UpdateLayoutTree": 3.8,
-      "Layout": 330.7,
-      "Paint": 171.3
+      "PrePaint": 52.6,
+      "Layerize": 65.7,
+      "Commit": 21.1,
+      "UpdateLayer": 3,
+      "RasterTask": 317.1,
+      "UpdateLayoutTree": 4.5,
+      "Layout": 342.7,
+      "Paint": 164.7
     }
   }
 }

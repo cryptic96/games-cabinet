@@ -1,0 +1,268 @@
+{
+  "Warm brown/shaded": {
+    "off": {
+      "withoutKeyline": {
+        "n": 390,
+        "under13": 2,
+        "under115": 1,
+        "min": 1.12,
+        "p10": 1.66,
+        "median": 3.04
+      },
+      "withKeyline": {
+        "n": 390,
+        "under13": 2,
+        "under115": 1,
+        "min": 1.12,
+        "p10": 1.66,
+        "median": 3.04
+      }
+    },
+    "on": {
+      "withoutKeyline": {
+        "n": 390,
+        "under13": 47,
+        "under115": 23,
+        "min": 1,
+        "p10": 1.27,
+        "median": 2.18
+      },
+      "withKeyline": {
+        "n": 390,
+        "under13": 12,
+        "under115": 0,
+        "min": 1.23,
+        "p10": 1.4,
+        "median": 2.18
+      }
+    }
+  },
+  "Walnut/shaded": {
+    "off": {
+      "withoutKeyline": {
+        "n": 390,
+        "under13": 1,
+        "under115": 1,
+        "min": 1.04,
+        "p10": 1.72,
+        "median": 3.12
+      },
+      "withKeyline": {
+        "n": 390,
+        "under13": 1,
+        "under115": 1,
+        "min": 1.04,
+        "p10": 1.72,
+        "median": 3.12
+      }
+    },
+    "on": {
+      "withoutKeyline": {
+        "n": 390,
+        "under13": 47,
+        "under115": 20,
+        "min": 1,
+        "p10": 1.25,
+        "median": 2.21
+      },
+      "withKeyline": {
+        "n": 390,
+        "under13": 11,
+        "under115": 0,
+        "min": 1.22,
+        "p10": 1.43,
+        "median": 2.21
+      }
+    }
+  },
+  "Oak/shaded": {
+    "off": {
+      "withoutKeyline": {
+        "n": 390,
+        "under13": 3,
+        "under115": 1,
+        "min": 1.14,
+        "p10": 1.69,
+        "median": 3.05
+      },
+      "withKeyline": {
+        "n": 390,
+        "under13": 3,
+        "under115": 1,
+        "min": 1.14,
+        "p10": 1.69,
+        "median": 3.05
+      }
+    },
+    "on": {
+      "withoutKeyline": {
+        "n": 390,
+        "under13": 46,
+        "under115": 22,
+        "min": 1,
+        "p10": 1.27,
+        "median": 2.24
+      },
+      "withKeyline": {
+        "n": 390,
+        "under13": 11,
+        "under115": 0,
+        "min": 1.23,
+        "p10": 1.43,
+        "median": 2.24
+      }
+    }
+  },
+  "Birch/shaded": {
+    "off": {
+      "withoutKeyline": {
+        "n": 390,
+        "under13": 14,
+        "under115": 2,
+        "min": 1.12,
+        "p10": 1.48,
+        "median": 1.87
+      },
+      "withKeyline": {
+        "n": 390,
+        "under13": 14,
+        "under115": 2,
+        "min": 1.12,
+        "p10": 1.48,
+        "median": 1.87
+      }
+    },
+    "on": {
+      "withoutKeyline": {
+        "n": 390,
+        "under13": 5,
+        "under115": 1,
+        "min": 1.11,
+        "p10": 1.49,
+        "median": 1.76
+      },
+      "withKeyline": {
+        "n": 390,
+        "under13": 5,
+        "under115": 1,
+        "min": 1.11,
+        "p10": 1.49,
+        "median": 1.76
+      }
+    }
+  },
+  "Mahogany/shaded": {
+    "off": {
+      "withoutKeyline": {
+        "n": 390,
+        "under13": 1,
+        "under115": 1,
+        "min": 1.13,
+        "p10": 1.87,
+        "median": 3.34
+      },
+      "withKeyline": {
+        "n": 390,
+        "under13": 1,
+        "under115": 1,
+        "min": 1.13,
+        "p10": 1.87,
+        "median": 3.34
+      }
+    },
+    "on": {
+      "withoutKeyline": {
+        "n": 390,
+        "under13": 37,
+        "under115": 16,
+        "min": 1,
+        "p10": 1.31,
+        "median": 2.27
+      },
+      "withKeyline": {
+        "n": 390,
+        "under13": 11,
+        "under115": 0,
+        "min": 1.24,
+        "p10": 1.44,
+        "median": 2.27
+      }
+    }
+  },
+  "Painted on brown/shaded": {
+    "off": {
+      "withoutKeyline": {
+        "n": 390,
+        "under13": 2,
+        "under115": 1,
+        "min": 1.12,
+        "p10": 1.77,
+        "median": 3.17
+      },
+      "withKeyline": {
+        "n": 390,
+        "under13": 2,
+        "under115": 1,
+        "min": 1.12,
+        "p10": 1.77,
+        "median": 3.17
+      }
+    },
+    "on": {
+      "withoutKeyline": {
+        "n": 390,
+        "under13": 50,
+        "under115": 24,
+        "min": 1,
+        "p10": 1.26,
+        "median": 2.2
+      },
+      "withKeyline": {
+        "n": 390,
+        "under13": 12,
+        "under115": 0,
+        "min": 1.25,
+        "p10": 1.43,
+        "median": 2.2
+      }
+    }
+  },
+  "Painted on birch/shaded": {
+    "off": {
+      "withoutKeyline": {
+        "n": 390,
+        "under13": 4,
+        "under115": 1,
+        "min": 1.12,
+        "p10": 1.66,
+        "median": 3.08
+      },
+      "withKeyline": {
+        "n": 390,
+        "under13": 4,
+        "under115": 1,
+        "min": 1.12,
+        "p10": 1.66,
+        "median": 3.08
+      }
+    },
+    "on": {
+      "withoutKeyline": {
+        "n": 390,
+        "under13": 43,
+        "under115": 19,
+        "min": 1.01,
+        "p10": 1.29,
+        "median": 2.29
+      },
+      "withKeyline": {
+        "n": 390,
+        "under13": 10,
+        "under115": 0,
+        "min": 1.24,
+        "p10": 1.44,
+        "median": 2.29
+      }
+    }
+  }
+}

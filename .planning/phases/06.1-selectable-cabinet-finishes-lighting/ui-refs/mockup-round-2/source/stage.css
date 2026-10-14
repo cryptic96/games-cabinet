@@ -72,3 +72,7 @@ body.sheet {
   align-items: center;
   padding: 4px;
 }
+
+.stage.tilebox:not(.whole) .cabinet {
+  margin-left: 12px;
+}

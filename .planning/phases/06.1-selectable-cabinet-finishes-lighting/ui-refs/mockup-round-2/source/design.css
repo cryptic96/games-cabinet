@@ -76,7 +76,7 @@
   background-color: var(--back);
   background-image:
     var(--deep-img),
-    linear-gradient(to bottom, rgb(var(--shade-deep-rgb) / calc(0.55 * var(--depth-k))), transparent 24%),
+    linear-gradient(to bottom, rgb(var(--shade-deep-rgb) / calc(0.55 * var(--depth-k) * var(--back-shade-k))), transparent 24%),
     linear-gradient(to right, rgb(var(--shade-deep-rgb) / calc(0.30 * var(--depth-k))), transparent 7%, transparent 93%, rgb(var(--shade-deep-rgb) / calc(0.30 * var(--depth-k)))),
     repeating-linear-gradient(
       to right,
@@ -333,7 +333,27 @@
     );
   --v-arris: linear-gradient(to right, rgb(var(--arris-light-rgb) / var(--lit-a)) 0, transparent var(--lit-end-v), transparent var(--dark-start-v), rgb(var(--arris-dark-rgb) / var(--dark-a)) 100%);
   --v-face: var(--v-arris), var(--v-grain);
-  --v-grain:
+  --leg-splay: 8.4deg;
+  --leg-stripes-left:
+    repeating-linear-gradient(
+      calc(90deg + var(--leg-splay)),
+      transparent 0 calc(2.7 * var(--u)),
+      var(--gs) calc(2.7 * var(--u)) calc(2.7 * var(--u) + var(--lw)),
+      transparent calc(2.7 * var(--u) + var(--lw)) calc(7.3 * var(--u)),
+      var(--gls) calc(7.3 * var(--u)) calc(7.3 * var(--u) + 2 * var(--lw)),
+      transparent calc(7.3 * var(--u) + 2 * var(--lw)) calc(11.9 * var(--u))
+    );
+  --leg-stripes-right:
+    repeating-linear-gradient(
+      calc(90deg - var(--leg-splay)),
+      transparent 0 calc(2.7 * var(--u)),
+      var(--gs) calc(2.7 * var(--u)) calc(2.7 * var(--u) + var(--lw)),
+      transparent calc(2.7 * var(--u) + var(--lw)) calc(7.3 * var(--u)),
+      var(--gls) calc(7.3 * var(--u)) calc(7.3 * var(--u) + 2 * var(--lw)),
+      transparent calc(7.3 * var(--u) + 2 * var(--lw)) calc(11.9 * var(--u))
+    );
+  --v-grain: var(--v-stripes), var(--v-rest);
+  --v-stripes:
     repeating-linear-gradient(
       to right,
       transparent 0 calc(2.7 * var(--u)),
@@ -341,7 +361,8 @@
       transparent calc(2.7 * var(--u) + var(--lw)) calc(7.3 * var(--u)),
       var(--gls) calc(7.3 * var(--u)) calc(7.3 * var(--u) + 2 * var(--lw)),
       transparent calc(7.3 * var(--u) + 2 * var(--lw)) calc(11.9 * var(--u))
-    ),
+    );
+  --v-rest:
     repeating-linear-gradient(to bottom, transparent 0 calc(57 * var(--u)), var(--streak) calc(92 * var(--u)), transparent calc(131 * var(--u)) calc(307 * var(--u))),
     repeating-linear-gradient(
       to bottom,
@@ -719,9 +740,11 @@
     linear-gradient(to right, rgb(var(--arris-light-rgb) / 0.35) 0, transparent 38%, rgb(var(--arris-dark-rgb) / 0.55) 100%),
     linear-gradient(to right, rgb(var(--arris-light-rgb) / 0.35) 0, transparent 38%, rgb(var(--arris-dark-rgb) / 0.55) 100%),
     linear-gradient(to bottom, rgb(var(--shade-rgb) / 0.45) 0, transparent calc(30 * var(--u))),
-    var(--v-grain);
-  background-size: calc(72 * var(--u)) 100%, calc(72 * var(--u)) 100%, auto, auto, auto, auto;
-  background-position: calc(40 * var(--u)) 0, calc(100% - 40 * var(--u)) 0, 0 0, 0 0, 0 0, 0 0;
+    var(--leg-stripes-left),
+    var(--leg-stripes-right),
+    var(--v-rest);
+  background-size: calc(72 * var(--u)) 100%, calc(72 * var(--u)) 100%, auto, 50% 100%, 50% 100%, auto, auto;
+  background-position: calc(40 * var(--u)) 0, calc(100% - 40 * var(--u)) 0, 0 0, 0 0, 100% 0, 0 0, 0 0;
 }
 
 [data-design="plywood-legs"] .section-base::before {

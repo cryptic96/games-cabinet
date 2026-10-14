@@ -102,6 +102,9 @@
   --seam-k: 0;
   --back: var(--back-paint);
   --pool-k: var(--pool-k-painted, 1);
+  --back-shade-k: 1;
+  --fill-k: 0;
+  --keyline-lit: 0.4;
 }
 
 /**
@@ -117,12 +120,21 @@
   opacity: 1;
 }
 
+/**
+ * The dark outer keyline of every box switches on only while the lights are on, where a soft light can bring the back
+ * to the lightness of a dark box. It is an outer ring of the box shadow, never on the face.
+ */
+[data-lit] {
+  --keyline: var(--keyline-lit, 0.4);
+}
+
 .light-pool {
   background-image:
     linear-gradient(
       to bottom,
       rgb(var(--lamp-hot-rgb) / 0.8) 0 max(2px, calc(2.5 * var(--u))),
-      transparent max(2px, calc(2.5 * var(--u)))
+      rgb(var(--lamp-rgb) / calc(0.25 * var(--fill-k) * var(--depth-k))) max(2px, calc(2.5 * var(--u))),
+      transparent 14%
     ),
     radial-gradient(
       ellipse 200% 50% at 50% 0%,
@@ -171,12 +183,3 @@
   );
 }
 
-.section-light::after {
-  content: "";
-  position: absolute;
-  left: calc(-28 * var(--u));
-  width: calc(100% + 56 * var(--u));
-  top: calc(100% + (var(--base-height) - 50) * var(--u));
-  height: calc(36 * var(--u));
-  background-image: linear-gradient(to right, transparent, rgb(var(--lamp-rgb) / calc(0.10 * var(--lamp-k) * var(--room-k))) 22%, rgb(var(--lamp-rgb) / calc(0.10 * var(--lamp-k) * var(--room-k))) 78%, transparent);
-}

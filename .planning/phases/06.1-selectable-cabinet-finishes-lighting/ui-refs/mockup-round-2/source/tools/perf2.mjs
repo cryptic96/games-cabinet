@@ -30,7 +30,7 @@ async function counts(state) {
       if (bg && bg !== 'none') layers += (bg.match(/gradient\(/g) || []).length;
     };
     for (const s of sections) {
-      const all = [s, ...s.querySelectorAll('*')];
+      const all = [s, ...s.querySelectorAll('*')].filter((el) => el.checkVisibility({ visibilityProperty: false }));
       nodes += all.length;
       for (const el of all) {
         count(el, null);
@@ -98,4 +98,4 @@ for (const [label, state] of STATES) {
   console.log(label, JSON.stringify(results[label]));
 }
 await browser.close();
-writeFileSync(`${S}/round2/perf2.json`, JSON.stringify(results, null, 2));
+writeFileSync(`${S}/round2/perf3.json`, JSON.stringify(results, null, 2));

@@ -1,0 +1,142 @@
+{
+  "generated": "scratch measurement of the round",
+  "spine": {
+    "brown": {
+      "flat 0": {
+        "worst": 5.28,
+        "tone": "Rust"
+      },
+      "deep 0.12": {
+        "worst": 4.84,
+        "tone": "Rust"
+      },
+      "shaded 0.20": {
+        "worst": 4.51,
+        "tone": "Rust"
+      }
+    },
+    "walnut": {
+      "flat 0": {
+        "worst": 5.28,
+        "tone": "Rust"
+      },
+      "deep 0.12": {
+        "worst": 4.84,
+        "tone": "Rust"
+      },
+      "shaded 0.20": {
+        "worst": 4.51,
+        "tone": "Rust"
+      }
+    },
+    "oak": {
+      "flat 0": {
+        "worst": 5.28,
+        "tone": "Rust"
+      },
+      "deep 0.12": {
+        "worst": 4.84,
+        "tone": "Rust"
+      },
+      "shaded 0.20": {
+        "worst": 4.51,
+        "tone": "Rust"
+      }
+    },
+    "birch": {
+      "flat 0": {
+        "worst": 5.28,
+        "tone": "Rust"
+      },
+      "deep 0.12": {
+        "worst": 4.84,
+        "tone": "Rust"
+      },
+      "shaded 0.20": {
+        "worst": 4.51,
+        "tone": "Rust"
+      }
+    },
+    "mahogany": {
+      "flat 0": {
+        "worst": 5.28,
+        "tone": "Rust"
+      },
+      "deep 0.12": {
+        "worst": 4.84,
+        "tone": "Rust"
+      },
+      "shaded 0.20": {
+        "worst": 4.51,
+        "tone": "Rust"
+      }
+    }
+  },
+  "chrome": {
+    "brown": {
+      "wallLuminance": 0.02,
+      "textDay": 11.34,
+      "mutedDay": 6.33,
+      "lineDay": 5.06,
+      "textEvening": 11.34,
+      "mutedEvening": 6.33,
+      "lineEvening": 5.06,
+      "logoDay": 14.48,
+      "logoEvening": 14.48,
+      "logoRule": "white",
+      "logoUsed": "white"
+    },
+    "walnut": {
+      "wallLuminance": 0.61,
+      "textDay": 11.63,
+      "mutedDay": 5.12,
+      "lineDay": 3.86,
+      "textEvening": 11.63,
+      "mutedEvening": 5.12,
+      "lineEvening": 3.86,
+      "logoDay": 7.47,
+      "logoEvening": 7.47,
+      "logoRule": "dark",
+      "logoUsed": "dark"
+    },
+    "oak": {
+      "wallLuminance": 0.03,
+      "textDay": 9.39,
+      "mutedDay": 5.54,
+      "lineDay": 4.53,
+      "textEvening": 9.39,
+      "mutedEvening": 5.54,
+      "lineEvening": 4.53,
+      "logoDay": 10.98,
+      "logoEvening": 10.98,
+      "logoRule": "white",
+      "logoUsed": "white"
+    },
+    "birch": {
+      "wallLuminance": 0.68,
+      "textDay": 12.31,
+      "mutedDay": 5.25,
+      "lineDay": 3.93,
+      "textEvening": 12.31,
+      "mutedEvening": 5.25,
+      "lineEvening": 3.93,
+      "logoDay": 8,
+      "logoEvening": 8,
+      "logoRule": "dark",
+      "logoUsed": "dark"
+    },
+    "mahogany": {
+      "wallLuminance": 0.02,
+      "textDay": 9.9,
+      "mutedDay": 5.73,
+      "lineDay": 4.65,
+      "textEvening": 9.9,
+      "mutedEvening": 5.73,
+      "lineEvening": 4.65,
+      "logoDay": 12.6,
+      "logoEvening": 12.6,
+      "logoRule": "white",
+      "logoUsed": "white"
+    }
+  }
+}

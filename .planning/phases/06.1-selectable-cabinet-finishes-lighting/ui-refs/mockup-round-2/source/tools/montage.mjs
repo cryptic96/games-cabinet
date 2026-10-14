@@ -41,13 +41,27 @@ export async function montage(browser, { items, cols, out, title = '', cell = nu
       const w = img.width * scale;
       const h = img.height * scale;
       ctx.drawImage(img, x + (cw - w) / 2, y + (ch - h), w, h);
+      const wrap = (text, width) => {
+        const lines = [];
+        let line = '';
+        for (const word of String(text).split(' ')) {
+          const next = line ? line + ' ' + word : word;
+          if (ctx.measureText(next).width > width && line) {
+            lines.push(line);
+            line = word;
+          } else line = next;
+        }
+        if (line) lines.push(line);
+        return lines;
+      };
       ctx.fillStyle = foreground;
       ctx.font = '600 15px DejaVu Sans, sans-serif';
-      ctx.fillText(it.label || '', x, y + ch + 6);
+      const head = wrap(it.label || '', cw);
+      head.forEach((ln, n) => ctx.fillText(ln, x, y + ch + 6 + n * 19));
       if (it.sub) {
         ctx.font = '13px DejaVu Sans, sans-serif';
         ctx.fillStyle = '#b5b5bd';
-        ctx.fillText(it.sub, x, y + ch + 25);
+        wrap(it.sub, cw).forEach((ln, n) => ctx.fillText(ln, x, y + ch + 6 + head.length * 19 + n * 17));
       }
     });
     return canvas.toDataURL('image/png');

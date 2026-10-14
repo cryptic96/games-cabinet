@@ -32,22 +32,22 @@ for (const wood of woods) {
     const ring = rgb(r.outline);
     const back = rgb(r.back);
     report.push({ wood, backs, outline: r.outline, outlineWidth: r.width, outlineStyle: r.style, backColour: r.back, ringAgainstBack: Math.round(ratio(ring, back) * 100) / 100, halo: r.halo.includes('6px') });
-    if (backs === 'painted' && wood !== 'birch' && wood !== 'brown') { await page.context().close(); continue; }
-    if (backs === 'wood' || wood === 'birch' || wood === 'brown') {
-      await page.waitForTimeout(150);
-      const out = `tmp-focus-${wood}-${backs}.png`;
-      await page.screenshot({ path: `${SHEETS}/${out}`, clip: { x: r.x - 40, y: r.y - 30, width: Math.max(r.w, 60) + 120, height: 150 } });
-    }
+    await page.waitForTimeout(150);
+    const out = `tmp-focus-${wood}-${backs}.png`;
+    await page.screenshot({ path: `${SHEETS}/${out}`, clip: { x: r.x - 40, y: r.y - 30, width: Math.max(r.w, 60) + 120, height: 150 } });
     await page.context().close();
   }
 }
-const labels = { brown: 'Warm brown', walnut: 'Walnut on warm stone', oak: 'Oak (ink halo)', birch: 'Birch (ink halo)', mahogany: 'Mahogany' };
+const labels = { brown: 'Warm brown', walnut: 'Walnut on warm stone', oak: 'Oak', birch: 'Birch', mahogany: 'Mahogany' };
 const items = [];
-for (const [wood, backs] of [['brown', 'wood'], ['walnut', 'wood'], ['oak', 'wood'], ['birch', 'wood'], ['mahogany', 'wood'], ['brown', 'painted'], ['birch', 'painted']]) {
-  const rep = report.find((x) => x.wood === wood && x.backs === backs);
-  items.push({ file: `tmp-focus-${wood}-${backs}.png`, label: `${labels[wood]}${backs === 'painted' ? ', painted back' : ''}`, sub: wood === 'birch' && backs === 'wood' ? 'ring on an ink halo: ring 8.98:1 on the halo, halo 4.99:1 on the back' : wood === 'oak' ? `ring ${rep.ringAgainstBack}:1 on the back; ink halo 7.19:1 on the frame` : `ring ${rep.ringAgainstBack}:1 against the back` });
+for (const wood of woods) {
+  for (const backs of ['wood', 'painted']) {
+    const rep = report.find((x) => x.wood === wood && x.backs === backs);
+    const halo = rep.halo && ['oak', 'birch'].includes(wood) ? 'ring on an ink halo' : 'plain ring';
+    items.push({ file: `tmp-focus-${wood}-${backs}.png`, label: `${labels[wood]}${backs === 'painted' ? ', painted back' : ''}`, sub: `${rep.outline} ${rep.outlineWidth} ${rep.outlineStyle}, ${halo}; ring ${rep.ringAgainstBack}:1 against the back` });
+  }
 }
-await montage(browser, { items, cols: 4, out: 'round2-focus-rings.png', title: 'Focus ring on a box at the edge of a section: accent ring on every wood and back', cell: [330, 300], labelH: 50 });
+await montage(browser, { items, cols: 5, out: 'round2-focus-rings.png', title: 'Focus ring on a box at the edge of a section: accent ring on all 10 wood and back pairs', cell: [330, 220], labelH: 100 });
 writeFileSync(`${SHEETS}/focus-report.json`, JSON.stringify(report, null, 2));
 console.log(JSON.stringify(report, null, 1));
 await browser.close();
