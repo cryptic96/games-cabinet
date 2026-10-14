@@ -1294,6 +1294,10 @@ class FakeElement {
     return this.attributes.has(name) ? this.attributes.get(name) : null;
   }
 
+  hasAttribute(name) {
+    return this.attributes.has(name);
+  }
+
   removeAttribute(name) {
     this.attributes.delete(name);
   }
@@ -1380,6 +1384,7 @@ function createFakeDocument() {
   page.createElementNS = (namespace, tagName) => new FakeElement(page, tagName);
   page.createTextNode = (text) => Object.assign(new FakeElement(page, '#text'), { ownText: String(text) });
   page.body = page.createElement('body');
+  page.documentElement = page.createElement('html');
   page.activeElement = page.body;
 
   return page;
@@ -1781,7 +1786,7 @@ test('a generated cover of a game with a colour takes it, and one without keeps 
 });
 
 test('the page scripts never write a style attribute or an inline handler', () => {
-  for (const name of ['render.js', 'cabinet.js', 'sync.js', 'status.js', 'live.js', 'copy.js']) {
+  for (const name of ['render.js', 'cabinet.js', 'sync.js', 'status.js', 'live.js', 'copy.js', 'look.js', 'evening.js']) {
     const source = readFileSync(new URL('../../Cabinet.Service/wwwroot/js/' + name, import.meta.url), 'utf8');
 
     assert.doesNotMatch(source, /setAttribute\(\s*['"]style['"]/);
@@ -1945,6 +1950,11 @@ async function startCabinetPage({ firstLayout, status, cards = [], withList = fa
     ...clock.timers,
     matchMedia: () => ({ matches: false, addEventListener: () => undefined }),
     addEventListener: (type, handler) => (windowHandlers[type] ??= []).push(handler),
+    requestAnimationFrame: (callback) => {
+      callback(0);
+
+      return 0;
+    },
   };
   globalThis.document = page;
   globalThis.CSS = { escape: (value) => value };

@@ -1,5 +1,7 @@
 using System.Text.Json;
 using Cabinet.BrowserTests.Infrastructure;
+using Cabinet.Domain.Owner;
+using Cabinet.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.Playwright;
 
@@ -28,6 +30,7 @@ public sealed class ReducedMotionTests : CabinetPageTest
         """;
     private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
     private static readonly JsonSerializerOptions WebOptions = new(JsonSerializerDefaults.Web);
+    private readonly TemporaryDirectory _storage = new();
 
     [Fact]
     public async Task Opening_and_closing_boxes_and_swapping_never_start_a_view_transition_and_the_box_is_outlined_in_place()
@@ -97,6 +100,34 @@ public sealed class ReducedMotionTests : CabinetPageTest
         reducedText.Should().NotBeNullOrWhiteSpace();
         fullText.Should().Be(reducedText);
         (await TransitionCallsAsync()).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task The_lights_come_on_at_once_with_no_fade_and_the_lamp_has_no_transition()
+    {
+        OwnerDataSeed.Write(_storage.FullPath, OwnerData.Empty with { Revision = 1, Look = new CabinetLook("classic", "brown", "wood", "on", "shaded") });
+        await Page.SetViewportSizeAsync(1440, 900);
+        await Page.EmulateMediaAsync(new PageEmulateMediaOptions { ReducedMotion = ReducedMotion.Reduce });
+        await StartAsync(new Dictionary<string, string?>(PrototypeOn) { ["Storage:Directory"] = _storage.FullPath });
+        await GotoCabinetAsync("/?sample=65");
+
+        await Page.WaitForSelectorAsync("html[data-lit]", new PageWaitForSelectorOptions { Timeout = 5000 });
+        await Page.EvaluateAsync("() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
+
+        var light = Page.Locator("#cabinet .section-light").First;
+        await Expect(light).ToHaveCSSAsync("transition-duration", "0s");
+        await Expect(light).ToHaveCSSAsync("opacity", "1");
+        (await Page.EvaluateAsync<int>("() => document.querySelector('#cabinet .section-light').getAnimations().length")).Should().Be(0);
+        await Expect(Page.Locator("html")).Not.ToHaveAttributeAsync("data-fading", string.Empty);
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    /// <inheritdoc />
+    public override async ValueTask DisposeAsync()
+    {
+        await base.DisposeAsync();
+        _storage.Dispose();
+        GC.SuppressFinalize(this);
     }
 
     private async Task StartCabinetAsync(int width, int height, string pathAndQuery)
