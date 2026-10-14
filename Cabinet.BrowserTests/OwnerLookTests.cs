@@ -317,6 +317,211 @@ public sealed class OwnerLookTests : CabinetPageTest
         await SaveScreenshotAsync("owner-look-tiles-library-oak");
     }
 
+    [Fact]
+    public async Task The_preview_lights_follow_the_trial_and_Evening_matters_only_with_Evenings_only()
+    {
+        await Page.EmulateMediaAsync(new() { ReducedMotion = ReducedMotion.Reduce });
+        await OpenSettingsAsync(1440, 900);
+        var light = Page.Locator($"{Preview} .section-light");
+        var evening = Page.Locator("#look-evening input[name=preview-time][value=day]");
+
+        await Expect(light).ToBeHiddenAsync();
+        await Expect(evening).ToBeDisabledAsync();
+        await Expect(Page.Locator("#look-evening-hint")).ToHaveTextAsync("Only matters with Evenings only.");
+
+        await Page.Locator("input[name=lights][value=on]").CheckAsync();
+
+        await Expect(light).ToHaveCSSAsync("opacity", "1");
+        (await light.EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration")).Should().Be("0s");
+        await Expect(evening).ToBeDisabledAsync();
+
+        await Page.Locator("input[name=lights][value=evenings]").CheckAsync();
+
+        await Expect(evening).ToBeEnabledAsync();
+        await Expect(Page.Locator("#look-evening-hint")).ToHaveTextAsync("Only changes this preview.");
+        await Expect(light).ToHaveCSSAsync("opacity", "0");
+        await Expect(Page.Locator(Preview)).Not.ToHaveAttributeAsync("data-lit", new Regex(".*"));
+
+        await Page.Locator("input[name=preview-time][value=evening]").CheckAsync();
+
+        await Expect(light).ToHaveCSSAsync("opacity", "1");
+        await Expect(Page.Locator(Preview)).ToHaveAttributeAsync("data-evening", string.Empty);
+        (await Page.EvaluateAsync<bool>("() => document.documentElement.hasAttribute('data-evening') || document.documentElement.hasAttribute('data-lit')")).Should().BeFalse();
+        (await PublicAttributeAsync("data-evening")).Should().BeNull();
+        (await PublicAttributeAsync("data-lights")).Should().Be("off");
+
+        await Page.Locator("input[name=preview-time][value=day]").CheckAsync();
+
+        await Expect(light).ToHaveCSSAsync("opacity", "0");
+        await Expect(Page.Locator(Preview)).Not.ToHaveAttributeAsync("data-evening", new Regex(".*"));
+
+        await Page.Locator("input[name=lights][value=off]").CheckAsync();
+
+        await Expect(light).ToBeHiddenAsync();
+        await Expect(evening).ToBeDisabledAsync();
+        ExpectCleanPage();
+    }
+
+    [Fact]
+    public async Task With_motion_the_preview_lamp_fades_in_over_the_lamp_fade()
+    {
+        await OpenSettingsAsync(1440, 900);
+        var light = Page.Locator($"{Preview} .section-light");
+
+        await Page.Locator("input[name=lights][value=on]").CheckAsync();
+
+        (await light.EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration")).Should().Be("2s");
+        await Expect(light).ToHaveCSSAsync("opacity", "1", new() { Timeout = 10000 });
+    }
+
+    [Fact]
+    public async Task Beside_the_preview_the_five_woods_share_one_row_and_each_wood_tile_leaves_about_a_quarter_of_its_width_as_wall()
+    {
+        await OpenSettingsAsync(1440, 900);
+
+        var rows = await Page.Locator(".look-swatch-wood").EvaluateAllAsync<double[]>("swatches => swatches.map(swatch => Math.round(swatch.getBoundingClientRect().top))");
+        rows.Distinct().Should().HaveCount(1);
+        var walls = await Page.Locator(".look-swatch-wood").EvaluateAllAsync<double[]>(
+            "swatches => swatches.map(swatch => (swatch.querySelector('.section-body').getBoundingClientRect().left - swatch.getBoundingClientRect().left) / swatch.getBoundingClientRect().width)");
+        walls.Should().OnlyContain(share => share > 0.22 && share < 0.32);
+    }
+
+    [Fact]
+    public async Task Plywood_tiles_keep_their_ply_stripes_at_tile_size()
+    {
+        await OpenSettingsAsync(1440, 900);
+
+        var read = await Page.Locator(".look-swatch-design[data-design^=plywood] .section-top").EvaluateAllAsync<string[]>(
+            "tops => tops.map(top => getComputedStyle(top).getPropertyValue('--ply-g').trim() + '|' + getComputedStyle(top).getPropertyValue('--ply-p').trim())");
+
+        read.Should().HaveCount(2);
+        read.Should().OnlyContain(pair => pair.StartsWith("0px|", StringComparison.Ordinal));
+        read.Should().OnlyContain(pair => pair.Contains("max(4px", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task On_a_phone_the_preview_stays_in_view_and_never_crops_the_section_for_any_design()
+    {
+        await OpenSettingsAsync(390, 844);
+        var preview = Page.Locator(Preview);
+
+        (await preview.EvaluateAsync<string>("element => getComputedStyle(element).position")).Should().Be("sticky");
+        var shadow = await preview.EvaluateAsync<string>("element => getComputedStyle(element).boxShadow");
+        shadow.Should().Contain("rgba(120, 90, 60, 0.12) 0px 1px 0px 16px");
+
+        var controlsBefore = await Page.Locator("#look-form").BoundingBoxAsync();
+        await Page.EvaluateAsync("() => window.scrollTo(0, document.querySelector('#look-form').getBoundingClientRect().top + window.scrollY - 300)");
+        await Page.EvaluateAsync("() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
+        var pinned = await preview.BoundingBoxAsync();
+        var controlsAfter = await Page.Locator("#look-form").BoundingBoxAsync();
+
+        pinned!.Y.Should().BeInRange(-1f, 1f);
+        controlsAfter!.Y.Should().BeLessThan(controlsBefore!.Y);
+        await Page.EvaluateAsync("() => window.scrollTo(0, 0)");
+
+        foreach (var design in new[] { "classic", "modern", "display", "legs", "library", "plywood", "plywood-legs" })
+        {
+            await Page.Locator($"input[name=design][value={design}]").CheckAsync();
+            await Expect(preview).ToHaveAttributeAsync("data-design", design);
+
+            var wrapper = await preview.BoundingBoxAsync();
+            var section = await Page.Locator($"{Preview} .section").BoundingBoxAsync();
+
+            section!.X.Should().BeGreaterThanOrEqualTo(wrapper!.X, design);
+            (section.X + section.Width).Should().BeLessThanOrEqualTo(wrapper.X + wrapper.Width + 0.5f, design);
+            section.Y.Should().BeGreaterThanOrEqualTo(wrapper.Y, design);
+            (section.Y + section.Height).Should().BeLessThanOrEqualTo(wrapper.Y + wrapper.Height + 0.5f, design);
+        }
+
+        (await Page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth > document.documentElement.clientWidth")).Should().BeFalse();
+        await SaveScreenshotAsync("owner-look-390-tiles");
+    }
+
+    [Fact]
+    public async Task On_a_phone_the_design_and_wood_rows_scroll_sideways_with_the_next_tile_peeking_and_arrowing_keeps_the_checked_tile_in_view()
+    {
+        await OpenSettingsAsync(390, 844);
+        var rows = Page.Locator(".look-tiles");
+
+        (await rows.EvaluateAllAsync<bool>("rows => rows.every(row => row.scrollWidth > row.clientWidth)")).Should().BeTrue();
+        (await rows.EvaluateAllAsync<bool>(
+            """
+            rows => rows.every(row => {
+              const edge = row.getBoundingClientRect().right;
+              return [...row.children].some(tile => { const r = tile.getBoundingClientRect(); return r.left < edge - 8 && r.right > edge + 8; });
+            })
+            """)).Should().BeTrue();
+        (await rows.EvaluateAllAsync<string[]>("rows => rows.map(row => getComputedStyle(row).scrollSnapType + '|' + getComputedStyle(row).overflowX)")).Should().OnlyContain(style => style == "x|auto" || style == "x proximity|auto");
+
+        await Page.Locator("input[name=design]:checked").FocusAsync();
+        for (var press = 0; press < 5; press++)
+        {
+            await Page.Keyboard.PressAsync("ArrowRight");
+        }
+
+        await Expect(Page.Locator("input[name=design][value=plywood]")).ToBeCheckedAsync();
+        await Expect(Page.Locator(Preview)).ToHaveAttributeAsync("data-design", "plywood");
+        await Page.EvaluateAsync("() => new Promise(resolve => setTimeout(resolve, 400))");
+        (await Page.EvaluateAsync<bool>(
+            """
+            () => {
+              const tile = document.querySelector('input[name=design]:checked').closest('.look-tile');
+              const row = tile.parentElement.getBoundingClientRect();
+              const box = tile.getBoundingClientRect();
+              return box.left >= row.left - 1 && box.right <= row.right + 1;
+            }
+            """)).Should().BeTrue();
+        (await Page.EvaluateAsync<bool>("() => document.querySelector('.look-tiles').scrollLeft > 0")).Should().BeTrue();
+
+        var heights = await Page.Locator(".look-choice, .look-tile, .look-actions .owner-btn").EvaluateAllAsync<double[]>("controls => controls.map(control => control.getBoundingClientRect().height)");
+        heights.Should().OnlyContain(height => height >= 43.5);
+    }
+
+    [Fact]
+    public async Task At_the_narrowest_width_tile_names_wrap_whole_and_no_text_is_cut_off()
+    {
+        await OpenSettingsAsync(320, 640);
+
+        var measured = await Page.EvaluateAsync<string[]>(
+            """
+            () => [...document.querySelectorAll('.look-tile .pic-label')].map(label => {
+              const lineHeight = parseFloat(getComputedStyle(label).lineHeight);
+              return label.textContent.trim() + '=' + Math.round(label.getBoundingClientRect().height / lineHeight);
+            })
+            """);
+        var lines = measured.ToDictionary(entry => entry[..entry.LastIndexOf('=')], entry => int.Parse(entry[(entry.LastIndexOf('=') + 1)..], System.Globalization.CultureInfo.InvariantCulture));
+
+        lines["Plywood on legs"].Should().Be(2);
+        lines["Mahogany"].Should().Be(1);
+        lines["Warm brown"].Should().BeLessThanOrEqualTo(2);
+        var cutOff = await Page.EvaluateAsync<string[]>(
+            "() => [...document.querySelectorAll('.pic-label, .pic-sub, .owner-hint, .look-line, .look-choice-name, #finish-status')].filter(element => element.scrollWidth > element.clientWidth).map(element => element.textContent.trim())");
+        cutOff.Should().BeEmpty();
+        (await Page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth > document.documentElement.clientWidth")).Should().BeFalse();
+
+        await Page.Locator("input[name=lights][value=evenings]").CheckAsync();
+        await Page.Locator("input[name=depth][value=deep]").CheckAsync();
+
+        (await Page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth > document.documentElement.clientWidth")).Should().BeFalse();
+        await SaveScreenshotAsync("owner-look-320-tiles");
+    }
+
+    [Fact]
+    public async Task In_a_short_landscape_window_the_preview_is_not_sticky()
+    {
+        await OpenSettingsAsync(844, 390);
+
+        (await Page.Locator(Preview).EvaluateAsync<string>("element => getComputedStyle(element).position")).Should().Be("static");
+    }
+
+    private async Task OpenSettingsAsync(int width, int height)
+    {
+        await Page.SetViewportSizeAsync(width, height);
+        await StartWithDataAsync(null);
+        await GotoOwnerAsync(SettingsPath);
+        await Expect(Page.Locator($"{Preview} .cubby")).ToHaveCountAsync(6);
+    }
+
     private async Task ExpectEverySwatchDrawnAsync()
     {
         var drawn = await Page.Locator(".look-swatch").EvaluateAllAsync<bool>(

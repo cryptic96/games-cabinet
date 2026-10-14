@@ -1597,7 +1597,8 @@ header > .header-aside {
   background-size: 100% 100%;
   box-shadow:
     0 1px 2px rgb(var(--shade-rgb) / 0.35),
-    0 0 0 16px var(--paper);
+    0 0 0 16px var(--paper),
+    0 1px 0 16px var(--paper-edge);
   color: var(--room-text);
 }
 
@@ -1863,7 +1864,7 @@ header > .header-aside {
 
 .look-swatch-wood .section {
   flex: none;
-  width: calc(min(100cqw, 150px) * 3.667);
+  width: calc(min(100cqw, 150px) * 2.7);
 }
 
 .look-swatch-wood .placement {

@@ -21,7 +21,10 @@ public sealed class LookSlotTests
     private const string DefaultAttributes = "data-design=\"classic\" data-wood=\"brown\" data-backs=\"wood\" data-lights=\"off\" data-depth=\"shaded\">";
     private const string SettingsPath = "/owner/settings";
     private const string LookPath = SettingsPath + "?handler=Look";
-    private static readonly string[] AttributeNames = ["data-design=", "data-wood=", "data-backs=", "data-lights=", "data-depth="];
+    /// <summary>The number of design and wood tiles on the settings page, each of which draws its picture with the five attributes.</summary>
+    private const int TileSwatches = 12;
+
+    private static readonly string[] AttributeNames =["data-design=", "data-wood=", "data-backs=", "data-lights=", "data-depth="];
     private static readonly string[] OwnerPagesWithoutCabinet = ["/owner/pictures", "/owner/locations"];
 
     [Fact]
@@ -68,7 +71,9 @@ public sealed class LookSlotTests
         page.Status.Should().Be(HttpStatusCode.OK);
         page.Body.Should().Contain("<html lang=\"en\">");
         page.Body.Should().MatchRegex("<figure class=\"look-preview\"[^>]*" + DefaultAttributes.Replace(">", string.Empty, StringComparison.Ordinal));
-        AttributeNames.Should().OnlyContain(name => page.Body.Split(name).Length - 1 == 1, "each attribute is written once, on the preview");
+        AttributeNames.Should().OnlyContain(
+            name => page.Body.Split(name).Length - 1 == 1 + TileSwatches,
+            "each attribute is written once on the preview and once on every design and wood tile, and never on the root element");
     }
 
     [Fact]

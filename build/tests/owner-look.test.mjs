@@ -670,6 +670,29 @@ test('the Preview time wording equals the copy contract and the server file', ()
   }
 });
 
+test('the tile groups are a grid from 40rem and one sideways row below it, and the swatch numbers live in the stylesheet', () => {
+  const stylesheet = readService('wwwroot/css/owner.css');
+  const markup = readService('Pages/Owner/Settings.cshtml');
+
+  assert.match(stylesheet, /\.look-tiles \{[^}]*display: flex;[^}]*scroll-snap-type: x proximity;[^}]*scroll-padding-inline: 16px;/);
+  assert.match(stylesheet, /\.look-tiles > \.look-tile \{[^}]*flex: 0 0 7rem;[^}]*scroll-snap-align: start;/);
+  assert.match(stylesheet, /@media \(min-width: 40rem\) \{\s*\.look-tiles \{[^}]*grid-template-columns: repeat\(auto-fill, minmax\(7rem, 1fr\)\);[^}]*gap: 24px;/);
+  assert.match(stylesheet, /\.look-swatch \.section \{[^}]*--section-w: 400;[^}]*--section-h: 240;[^}]*--frame: 20;/);
+  assert.match(stylesheet, /\.look-swatch \.cubby \{[^}]*--w: 360;[^}]*--h: 200;/);
+  assert.equal(markup.includes('style='), false);
+  assert.equal(markup.includes('look-swatch-design'), false);
+  assert.match(markup, /look-swatch-@item\.Kind/);
+  assert.match(markup, /aria-hidden="true"/);
+});
+
+test('the preview is sticky below 64rem with a paper edge, and not sticky in a short landscape window', () => {
+  const stylesheet = readService('wwwroot/css/owner.css');
+
+  assert.match(stylesheet, /\.look-preview \{[^}]*position: sticky;[^}]*top: 0;/);
+  assert.match(stylesheet, /0 1px 0 16px var\(--paper-edge\)/);
+  assert.match(stylesheet, /@media \(max-height: 36rem\) \{\s*\.look-stage,\s*\.look-preview \{\s*position: static;/);
+});
+
 test('the script never reaches the page root and writes no inline style or markup', () => {
   const script = readService('wwwroot/js/owner-look.js');
 
