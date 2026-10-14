@@ -1,0 +1,114 @@
+
+/**
+ * Added by the look layers. The base unit, the section ratio and the wall shadow need the box size in millimetres, so
+ * the two lengths are kept as unitless numbers here.
+ */
+.section {
+  --bw: calc(var(--section-w) + 2 * var(--side-allowance));
+  --bh: calc(var(--top-height) + var(--section-h) + var(--base-height) + var(--floor-margin));
+  --section-ratio: calc(var(--bw) / var(--bh));
+  --ws-w: calc(28 - var(--side-trim));
+  --ws-y: calc(var(--top-height) * 0.5);
+  --ws-h: calc(var(--bh) - var(--floor-margin) - var(--ws-y));
+  background-image: radial-gradient(ellipse 100% 50% at 0% 50%, rgb(var(--shade-rgb) / var(--wall-shadow)), transparent);
+  background-repeat: no-repeat;
+  background-size: calc(var(--ws-w) / var(--bw) * 100%) calc(var(--ws-h) / var(--bh) * 100%);
+  background-position:
+    calc((var(--side-allowance) + var(--section-w) + var(--side-trim)) / (var(--bw) - var(--ws-w)) * 100%)
+    calc(var(--ws-y) / (var(--bh) - var(--ws-h)) * 100%);
+}
+
+/**
+ * The light of the section, positioned exactly like the body. It holds every pool and the floor glow, and only its
+ * opacity ever changes. It is hidden outright when the lights are off.
+ */
+.section > .section-light {
+  left: calc(var(--side-allowance) * var(--u));
+  top: calc(var(--top-height) * var(--u));
+  width: calc(var(--section-w) * var(--u));
+  height: calc(var(--section-h) * var(--u));
+  z-index: 1;
+  display: none;
+  opacity: 0;
+}
+
+.light-pool {
+  position: absolute;
+  left: calc((var(--frame) + var(--x)) * var(--u));
+  top: calc((var(--frame) + var(--y)) * var(--u));
+  width: calc(var(--w) * var(--u));
+  height: calc(var(--h) * var(--u));
+}
+
+/**
+ * The floor patch of a section sits behind the body and ends inside the section box. It draws nothing until the
+ * wood layer gives it a floor.
+ */
+.section > .section-floor {
+  inset: 0;
+  z-index: -1;
+}
+
+/**
+ * The room behind the page. The wall itself is the body background; this fixed layer holds the soft light falloff from
+ * above and, when the room dims, the dusk, at the large viewport height so a phone's collapsing address bar never
+ * resizes it.
+ */
+html::before {
+  content: var(--room-layer, none);
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 100lvh;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--room-falloff), var(--room-dusk);
+}
+
+/**
+ * The ring of a focused or open box on a wood whose frame is light also carries an ink halo outside the accent ring.
+ * The spread is a length, so it is written here and only its colour comes from the wood.
+ */
+.placement:focus-visible,
+.placement[data-open] {
+  box-shadow:
+    inset 1px 1px 0 rgb(255 255 255 / 0.2),
+    0 1px 2px rgb(0 0 0 / 0.5),
+    0 0 0 6px var(--ring-halo);
+}
+
+.placement[data-art="true"]:focus-visible,
+.placement[data-art="true"][data-open] {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 0 0 6px var(--ring-halo);
+}
+
+/**
+ * Lamp fade. The transition exists only once the page is settled, so the first frame is exactly the server's markup.
+ */
+[data-settled] .section > .section-light {
+  transition: opacity var(--lamp-fade, 2000ms) ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-settled] .section > .section-light {
+    transition: none;
+  }
+}
+
+/**
+ * The optional decoration of a cubby, used only by the deep depth for the inner walls. It fills the cubby, sits under
+ * the boxes and is hidden unless the look draws something in it.
+ */
+.cubby > .cubby-deco {
+  position: absolute;
+  inset: 0;
+  display: none;
+  pointer-events: none;
+}
+
+/**
+ * The furniture that stands in front of the back sits above the light and, in tree order, above the boxes exactly as it
+ * does today: the side boards, the top and the base. Only the back, the shelves and the uprights are lit.
+ */
+.section > :is(.section-top, .section-trim, .section-base) {
+  z-index: 2;
+}

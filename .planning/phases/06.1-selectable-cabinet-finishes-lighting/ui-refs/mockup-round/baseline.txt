@@ -1,0 +1,8 @@
+sample: 65
+width: 1440
+differing pixels: 0
+checked: sample 65 at 1440 px wide, differing pixels 0, largest channel difference 0
+checked: sample 65 at 390 px wide, differing pixels 0, largest channel difference 0
+checked: sample 400 at 1440 px wide, differing pixels 0, largest channel difference 0
+checked: sample 400 at 390 px wide, differing pixels 0, largest channel difference 0
+what is compared: the cabinet element of the release page and of the switcher page, both drawn by the same browser under the same font setup with the page header hidden so both start at the same position
