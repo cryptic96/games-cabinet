@@ -91,7 +91,7 @@ public sealed record ChangeEntry(DateTimeOffset AtUtc, string Text);
 /// <param name="SchemaVersion">The version of the stored shape; a reader refuses a version newer than it knows.</param>
 /// <param name="Revision">Counts the saves, so a writer working from an old copy is told it is out of date.</param>
 /// <param name="SavedAtUtc">When the data was last saved, or null before the first save.</param>
-/// <param name="Finish">The wood finish of the cabinet.</param>
+/// <param name="Look">The look of the cabinet for every visitor.</param>
 /// <param name="Locations">The locations in the order the owner set.</param>
 /// <param name="Games">The per-game decisions, sorted by game identifier.</param>
 /// <param name="LastDownloadAtUtc">When the owner last downloaded a backup, or null when never.</param>
@@ -102,7 +102,7 @@ public sealed record OwnerData(
     int SchemaVersion,
     long Revision,
     DateTimeOffset? SavedAtUtc,
-    string Finish,
+    CabinetLook Look,
     IReadOnlyList<OwnerLocation> Locations,
     IReadOnlyList<OwnerGame> Games,
     DateTimeOffset? LastDownloadAtUtc,
@@ -113,7 +113,7 @@ public sealed record OwnerData(
     public const string KindMarker = "games-cabinet-owner-data";
 
     /// <summary>The stored shape this build writes and understands.</summary>
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 
     /// <summary>The most locations the owner can have.</summary>
     public const int MaxLocations = 50;
@@ -127,11 +127,8 @@ public sealed record OwnerData(
     /// <summary>How many change log lines the owner page shows.</summary>
     public const int VisibleChanges = 20;
 
-    /// <summary>The wood finish used until the owner picks another.</summary>
-    public const string DefaultFinish = "classic";
-
     /// <summary>Owner data with nothing entered yet.</summary>
-    public static OwnerData Empty { get; } = new(KindMarker, CurrentSchemaVersion, 0, null, DefaultFinish, [], [], null, 0, []);
+    public static OwnerData Empty { get; } = new(KindMarker, CurrentSchemaVersion, 0, null, CabinetLook.Default, [], [], null, 0, []);
 }
 
 /// <summary>What a load of the owner data found.</summary>

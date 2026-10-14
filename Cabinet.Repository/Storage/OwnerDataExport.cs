@@ -86,7 +86,6 @@ public static class OwnerDataExport
     /// <summary>The most changes since the last download a restored file may report.</summary>
     public const int MaxChangesSinceDownload = OwnerData.MaxStoredChanges * 1000;
 
-    private const int MaxFinishLength = 32;
     private const int MaxChangeTextLength = 1000;
     private const string FileNamePrefix = "cabinet-owner-data-";
     private const string FileNameSuffix = ".json";
@@ -115,7 +114,7 @@ public static class OwnerDataExport
     /// Checks the bytes of a file chosen for a restore. The file is accepted only whole: it has to be an owner-data file in the
     /// strict shape the site writes, within the size, count, name and link rules, with every reference pointing at something in
     /// it. Its fetched records are left out so every linked picture is fetched again, and its games are put in order of
-    /// identifier. A file from an older format would be upgraded here; no older format exists yet.
+    /// identifier. A file from an older format is upgraded here, in memory, and reports the format it came in.
     /// </summary>
     /// <param name="bytes">The content of the file, or null when none was chosen.</param>
     /// <param name="policy">Says which addresses a linked picture may be fetched from; every link of the file must meet it.</param>
@@ -145,7 +144,7 @@ public static class OwnerDataExport
             return RestoreCheck.Problem(RestoreProblem.Newer, formatVersion: header.SchemaVersion);
         }
 
-        if (header.SchemaVersion < 1 || Deserialize(bytes) is not { } data)
+        if (header.SchemaVersion < 1 || OwnerDataStore.UpgradeToCurrent(bytes, header.SchemaVersion) is not { } upgraded || Deserialize(upgraded) is not { } data)
         {
             return RestoreCheck.Problem(RestoreProblem.Damaged);
         }
@@ -212,7 +211,7 @@ public static class OwnerDataExport
         {
             var data = JsonSerializer.Deserialize<OwnerData>(bytes, OwnerDataStore.StoredOptions);
 
-            return data is null || data.Locations.Any(location => location is null) || data.Games.Any(game => game is null) || data.Changes.Any(change => change is null)
+            return data is null || data.Look is null || data.Locations.Any(location => location is null) || data.Games.Any(game => game is null) || data.Changes.Any(change => change is null)
                 ? null
                 : data;
         }
@@ -228,7 +227,7 @@ public static class OwnerDataExport
             || data.Revision > MaxRevision
             || data.ChangesSinceDownload < 0
             || data.ChangesSinceDownload > MaxChangesSinceDownload
-            || data.Finish.Length > MaxFinishLength
+            || LookIsOverLimit(data.Look)
             || data.Changes.Count > OwnerData.MaxStoredChanges
             || data.Changes.Any(change => change.Text.Length > MaxChangeTextLength)
             || data.Games.Count > MaxGames)
@@ -238,6 +237,9 @@ public static class OwnerDataExport
 
         return LocationsAreAcceptable(data.Locations) && GamesAreAcceptable(data, policy);
     }
+
+    private static bool LookIsOverLimit(CabinetLook look) =>
+        new[] { look.Design, look.Wood, look.Backs, look.Lights, look.Depth }.Any(value => value.Length > CabinetLook.MaxValueLength);
 
     private static bool LocationsAreAcceptable(IReadOnlyList<OwnerLocation> locations)
     {
@@ -307,6 +309,7 @@ public static class OwnerDataExport
     private static OwnerData Accepted(OwnerData data) =>
         data with
         {
+            Look = data.Look.Normalized(),
             Games = [.. data.Games.Select(WithoutFetchedRecord).OrderBy(game => game.GameId)],
         };
 

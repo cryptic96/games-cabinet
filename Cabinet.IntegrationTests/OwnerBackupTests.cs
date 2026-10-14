@@ -122,8 +122,8 @@ public sealed class OwnerBackupTests
         download.Header("Cache-Control").Should().Be("no-store");
         download.Body.Should().Contain("\n  \"kind\": \"games-cabinet-owner-data\"");
         data.Kind.Should().Be("games-cabinet-owner-data");
-        data.SchemaVersion.Should().Be(1);
-        data.Finish.Should().Be("classic");
+        data.SchemaVersion.Should().Be(2);
+        data.Look.Should().Be(CabinetLook.Default);
         data.Locations.Select(location => location.Name).Should().Equal("Cabinet A", "Shelf B");
         data.Locations[0].Id.Should().Be(first);
         data.Changes.Select(change => change.Text).Should().HaveCount(2).And.OnlyContain(text => text.Contains("location"));

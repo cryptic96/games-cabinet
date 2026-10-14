@@ -4,7 +4,6 @@
 @inject IAntiforgery Antiforgery
 @inject Microsoft.AspNetCore.Mvc.ViewFeatures.IFileVersionProvider FileVersions
 @inject OwnerDataService OwnerData
-@inject SiteFinish Finish
 @{
     var page = ViewData["Title"] as string;
     var backup = OwnerData.Backup;
@@ -24,7 +23,7 @@
     <link rel="stylesheet" href="~/css/owner.css" asp-append-version="true" />
     @await RenderSectionAsync("Head", required: false)
 </head>
-<body class="@Finish.BodyClass()">
+<body>
     <a class="skip-link" href="#owner-main">@OwnerStrings.SkipLink</a>
     <header>
         <h1>@SiteLanguage.English.Text.SiteName</h1>

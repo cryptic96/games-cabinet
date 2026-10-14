@@ -25,7 +25,7 @@ public sealed record RestorePreview(string Token, int? OlderFormat, RestoreSide 
 }
 
 /// <summary>
-/// The owner's settings page. It exists only on the owner port. It holds the finish of the cabinet, the backup, where the owner downloads all the owner
+/// The owner's settings page. It exists only on the owner port. It holds the look of the cabinet, the backup, where the owner downloads all the owner
 /// data as a file and sees how long ago that was, the restore of such a file, and the list of the latest changes with a line at the last download.
 /// A restore file is untrusted: it is checked whole before anything is shown, shown next to the data on the server, and only a confirming post
 /// replaces anything. The request limit of this page is higher than the owner folder's default, so a file just over the rule gets its words.
@@ -38,7 +38,7 @@ public class SettingsModel : OwnerPage
     private const string PagePath = "/Owner/Settings";
     private const string DownloadFailedCode = "download-failed";
     private const string UnchangedCode = "unchanged";
-    private const string FinishAnchor = "finish";
+    private const string LookAnchor = "finish";
     private const string FileInputAnchor = "restore-file";
     private const string PreviewAnchor = "restore-preview-heading";
     private const string JsonMediaType = "application/json";
@@ -85,17 +85,17 @@ public class SettingsModel : OwnerPage
     /// <summary>The words for what went wrong with the post that sent the browser here, or null.</summary>
     public string? Notice { get; private set; }
 
-    /// <summary>The revision of the owner data the page was built from, which the finish form posts back.</summary>
+    /// <summary>The revision of the owner data the page was built from, which the look form posts back.</summary>
     public long Revision { get; private set; }
 
-    /// <summary>The finish in use, which the checked tile shows.</summary>
-    public string Finish { get; private set; } = OwnerData.DefaultFinish;
+    /// <summary>The look in use, with every field on its allow-list, which the checked choices show.</summary>
+    public CabinetLook Look { get; private set; } = CabinetLook.Default;
 
-    /// <summary>The words for the result of the finish post that sent the browser here, or null.</summary>
-    public string? FinishNotice { get; private set; }
+    /// <summary>The words for the result of the look post that sent the browser here, or null.</summary>
+    public string? LookNotice { get; private set; }
 
-    /// <summary>Whether <see cref="FinishNotice"/> says something went wrong.</summary>
-    public bool FinishNoticeIsProblem { get; private set; }
+    /// <summary>Whether <see cref="LookNotice"/> says something went wrong.</summary>
+    public bool LookNoticeIsProblem { get; private set; }
 
     /// <summary>The words for why the file chosen for a restore was refused, or null.</summary>
     public string? RestoreNotice { get; private set; }
@@ -118,15 +118,23 @@ public class SettingsModel : OwnerPage
         Preview = PreviewOf(restore);
     }
 
-    /// <summary>Saves the finish of the cabinet. A finish that is not on the allow-list is refused, and the finish already in use is nothing to change.</summary>
+    /// <summary>
+    /// Saves the look of the cabinet. A value that is not on its field's allow-list refuses the whole look, and the look already in use is
+    /// nothing to change. A browser leaves an unticked switch out of the post, so an absent <paramref name="backs"/> means wood backs.
+    /// </summary>
     /// <param name="revision">The revision the form was built from.</param>
-    /// <param name="finish">The finish the owner chose.</param>
+    /// <param name="design">The design the owner chose.</param>
+    /// <param name="wood">The wood the owner chose.</param>
+    /// <param name="backs">What the backs of the cubbies are; absent when the painted backs switch is off.</param>
+    /// <param name="lights">When the cubby lights are on.</param>
+    /// <param name="depth">How deep the cubbies are drawn.</param>
     /// <param name="cancellationToken">Cancels the wait for the writer.</param>
-    public async Task<IActionResult> OnPostFinishAsync(long revision, string? finish, CancellationToken cancellationToken)
+    public async Task<IActionResult> OnPostLookAsync(long revision, string? design, string? wood, string? backs, string? lights, string? depth, CancellationToken cancellationToken)
     {
-        var result = await _owner.MutateAsync(revision, data => Finishes.SetFinish(data, finish), cancellationToken);
+        var chosenBacks = backs ?? CabinetLook.Default.Backs;
+        var result = await _owner.MutateAsync(revision, data => CabinetLooks.SetLook(data, design, wood, chosenBacks, lights, depth), cancellationToken);
 
-        return OwnerResponses.For(this, result, PagePath, FinishAnchor);
+        return OwnerResponses.For(this, result, PagePath, LookAnchor);
     }
 
     /// <summary>
@@ -284,9 +292,9 @@ public class SettingsModel : OwnerPage
     {
         Backup = _owner.Backup;
         Revision = _owner.Revision;
-        Finish = _owner.State is OwnerDataState.Ready current ? Finishes.Normalize(current.Data.Finish) : OwnerData.DefaultFinish;
-        FinishNotice = string.Equals(done, UnchangedCode, StringComparison.Ordinal) ? OwnerStrings.FinishSaved : OwnerResponses.NoticeFor(done);
-        FinishNoticeIsProblem = OwnerResponses.IsProblem(done);
+        Look = _owner.State is OwnerDataState.Ready current ? current.Data.Look.Normalized() : CabinetLook.Default;
+        LookNotice = string.Equals(done, UnchangedCode, StringComparison.Ordinal) ? OwnerStrings.LookSaved : OwnerResponses.NoticeFor(done);
+        LookNoticeIsProblem = OwnerResponses.IsProblem(done);
 
         if (_owner.State is OwnerDataState.Ready ready)
         {

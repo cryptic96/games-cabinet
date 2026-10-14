@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Cabinet.Domain.Collection;
 using Cabinet.Domain.Layout;
 using Cabinet.Domain.Owner;
@@ -157,11 +158,18 @@ public sealed class OwnerDataStore : IOwnerDataStore
             return Unreadable("newer format");
         }
 
+        var upgraded = UpgradeToCurrent(content, known.SchemaVersion);
+
+        if (upgraded is null)
+        {
+            return Unreadable("malformed");
+        }
+
         OwnerData? data;
 
         try
         {
-            data = JsonSerializer.Deserialize<OwnerData>(content, JsonOptions);
+            data = JsonSerializer.Deserialize<OwnerData>(upgraded, JsonOptions);
         }
         catch (JsonException)
         {
@@ -170,7 +178,51 @@ public sealed class OwnerDataStore : IOwnerDataStore
 
         return data is null || data.SchemaVersion < 1 || HasNullMember(data)
             ? Unreadable("malformed")
-            : new OwnerDataState.Ready(data);
+            : new OwnerDataState.Ready(data with { Look = data.Look.Normalized() });
+    }
+
+    /// <summary>
+    /// Brings the bytes of a stored or downloaded owner-data file in an older format to the current one, in memory only. A file
+    /// of the first format held one finish name, which is dropped for the default look, because no earlier finish was ever
+    /// anything but the default. A file that is already current is returned as it is.
+    /// </summary>
+    /// <param name="content">The content of the file, whose header was already read.</param>
+    /// <param name="schemaVersion">The format version the header names.</param>
+    /// <returns>The content in the current format, or null when an older file cannot be brought to it.</returns>
+    internal static byte[]? UpgradeToCurrent(byte[] content, int schemaVersion)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+
+        if (schemaVersion >= OwnerData.CurrentSchemaVersion)
+        {
+            return content;
+        }
+
+        try
+        {
+            if (JsonNode.Parse(content) is not JsonObject root)
+            {
+                return null;
+            }
+
+            var look = CabinetLook.Default;
+            root.Remove("finish");
+            root["look"] = new JsonObject
+            {
+                ["design"] = look.Design,
+                ["wood"] = look.Wood,
+                ["backs"] = look.Backs,
+                ["lights"] = look.Lights,
+                ["depth"] = look.Depth,
+            };
+            root["schemaVersion"] = OwnerData.CurrentSchemaVersion;
+
+            return JsonSerializer.SerializeToUtf8Bytes(root);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     private static (string? Kind, int SchemaVersion)? ReadHeader(byte[] content)
@@ -198,7 +250,8 @@ public sealed class OwnerDataStore : IOwnerDataStore
     }
 
     private static bool HasNullMember(OwnerData data) =>
-        data.Locations.Any(location => location is null)
+        data.Look is null
+        || data.Locations.Any(location => location is null)
         || data.Games.Any(game => game is null)
         || data.Changes.Any(change => change is null)
         || data.Games.Any(game => game.Picture?.Link?.Record?.Files?.Any(file => file is null) == true);
@@ -213,7 +266,8 @@ public sealed class OwnerDataStore : IOwnerDataStore
     private static JsonSerializerOptions CreateJsonOptions() => StoredJson.CreateOptions(
         new Dictionary<Type, string[]>
         {
-            [typeof(OwnerData)] = ["kind", "schemaVersion", "revision", "finish", "locations", "games", "changesSinceDownload", "changes"],
+            [typeof(OwnerData)] = ["kind", "schemaVersion", "revision", "look", "locations", "games", "changesSinceDownload", "changes"],
+            [typeof(CabinetLook)] = ["design", "wood", "backs", "lights", "depth"],
             [typeof(OwnerLocation)] = ["id", "name"],
             [typeof(OwnerGame)] = ["gameId"],
             [typeof(PictureSetting)] = ["choice", "checked"],

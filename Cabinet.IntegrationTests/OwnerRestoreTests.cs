@@ -173,7 +173,7 @@ public sealed class OwnerRestoreTests
             ("no file", null, "Choose a file first."),
             ("not an owner-data file", "just a note"u8.ToArray(), "That isn't an owner-data file. Choose a file you downloaded here."),
             ("truncated", Truncated(), "That file is damaged or incomplete, so nothing was changed."),
-            ("newer", Encoding.UTF8.GetBytes($"{{\"kind\":\"{OwnerData.KindMarker}\",\"schemaVersion\":2}}"), "That file was made by a newer version of the site (file format 2; this site reads up to 1). Update the site first, or use an older download."),
+            ("newer", Encoding.UTF8.GetBytes($"{{\"kind\":\"{OwnerData.KindMarker}\",\"schemaVersion\":3}}"), "That file was made by a newer version of the site (file format 3; this site reads up to 2). Update the site first, or use an older download."),
             ("too large", Oversized(), "That file is too large (2.1 MB; the limit is 2 MB). Owner-data files are small, so this is probably the wrong file."),
             ("over the limits", TooManyLocations(), "That file holds more than this site accepts, so nothing was changed."),
         };
