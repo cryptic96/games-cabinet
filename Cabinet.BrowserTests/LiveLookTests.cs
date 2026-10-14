@@ -22,6 +22,7 @@ public sealed class LiveLookTests : CabinetPageTest
     private const string FirstBox = "#cabinet .placement:not([data-kind=\"moreMarker\"])";
     private const string SavedText = "Saved for everyone. Open pages follow within a few seconds.";
     private const float FollowTimeoutMs = 5000;
+    private const int ManyGames = 400;
     private const string TransitionSpy = """
         (() => {
           window.__lookSpy = { calls: 0 };
@@ -47,6 +48,77 @@ public sealed class LiveLookTests : CabinetPageTest
             }
           }).observe(document, { attributes: true, subtree: true, attributeFilter: ['data-lit'] });
         })();
+        """;
+
+    private const string PullGate = """
+        (() => {
+          const original = document.startViewTransition?.bind(document);
+          const gate = { open: false, release: () => {}, releasedAt: null, changes: [] };
+          window.__pullGate = gate;
+          new MutationObserver(() => gate.changes.push(performance.now())).observe(document, { attributes: true, subtree: true, attributeFilter: ['data-wood'] });
+          if (original === undefined) {
+            return;
+          }
+          document.startViewTransition = (callback) => {
+            const transition = original(callback);
+            if (!gate.open || !document.documentElement.hasAttribute('data-pull-kind')) {
+              return transition;
+            }
+            const held = new Promise((resolve) => {
+              gate.release = () => {
+                gate.releasedAt = performance.now();
+                resolve();
+              };
+            });
+            return {
+              ready: transition.ready,
+              updateCallbackDone: transition.updateCallbackDone,
+              finished: transition.finished.then(() => held),
+              skipTransition: () => transition.skipTransition(),
+            };
+          };
+        })();
+        """;
+
+    private const string AnchorSpy = """
+        (() => {
+          window.__anchor = [];
+          const set = CSSStyleDeclaration.prototype.setProperty;
+          const remove = CSSStyleDeclaration.prototype.removeProperty;
+          CSSStyleDeclaration.prototype.setProperty = function (name, value, priority) {
+            if (name === 'overflow-anchor') {
+              window.__anchor.push(value);
+            }
+            return set.call(this, name, value, priority);
+          };
+          CSSStyleDeclaration.prototype.removeProperty = function (name) {
+            if (name === 'overflow-anchor') {
+              window.__anchor.push('removed');
+            }
+            return remove.call(this, name);
+          };
+        })();
+        """;
+
+    private const string PlaceScript = """
+        () => {
+          const centre = innerHeight / 2;
+          const sections = [...document.querySelectorAll('#cabinet .section')];
+          const index = sections.findIndex((section) => {
+            const rect = section.getBoundingClientRect();
+            return rect.top <= centre && centre < rect.bottom;
+          });
+          return [index, sections[index].getBoundingClientRect().top, scrollY];
+        }
+        """;
+
+    private const string SectionTopScript = "(index) => document.querySelectorAll('#cabinet .section')[index].getBoundingClientRect().top";
+
+    private const string ScrollToThirdSectionScript = """
+        () => {
+          const rect = document.querySelectorAll('#cabinet .section')[2].getBoundingClientRect();
+          window.scrollTo(0, rect.top + scrollY + rect.height / 2 - innerHeight / 2);
+        }
         """;
 
     private static readonly Regex WhiteLogo = new(@"/img/powered-by-bgg\.[^/]*svg", RegexOptions.None, TimeSpan.FromSeconds(1));
@@ -162,9 +234,67 @@ public sealed class LiveLookTests : CabinetPageTest
         await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-wood", "mahogany");
     }
 
-    private async Task StartCabinetAsync()
+    [Fact]
+    public async Task A_design_change_keeps_the_section_in_the_middle_of_the_screen_where_it_was_and_a_wood_change_moves_nothing()
     {
-        var bgg = new SyncRounds.SwitchableBgg(SyntheticBggCollection.Create(5));
+        await Page.AddInitScriptAsync(AnchorSpy);
+        await StartCabinetAsync(gameCount: ManyGames);
+        await Expect(Page.Locator("#cabinet .section").Nth(2)).ToBeVisibleAsync();
+        await Page.EvaluateAsync(ScrollToThirdSectionScript);
+        var before = await Page.EvaluateAsync<double[]>(PlaceScript);
+        var index = (int)before[0];
+        before[2].Should().BeGreaterThan(0, "the page is scrolled down to the third section");
+
+        await PublishAsync(("design", "library"));
+
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-design", "library", new() { Timeout = FollowTimeoutMs });
+        await Expect(Page.Locator("html[data-look-switch]")).ToHaveCountAsync(0);
+        var after = await Page.EvaluateAsync<double>(SectionTopScript, index);
+        after.Should().BeApproximately(before[1], 2, "the section that was in the middle of the screen is where it was");
+        (await Page.EvaluateAsync<double[]>(PlaceScript))[2].Should().NotBe(before[2], "the sections grew, so the page had to scroll to keep the place");
+        (await Page.EvaluateAsync<string[]>("() => window.__anchor")).Should().Equal(["none", "removed"], "native scroll anchoring is off only while the design is applied");
+
+        var settled = await Page.EvaluateAsync<double[]>(PlaceScript);
+
+        await PublishAsync(("wood", "oak"));
+
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-wood", "oak", new() { Timeout = FollowTimeoutMs });
+        await Expect(Page.Locator("html[data-look-switch]")).ToHaveCountAsync(0);
+        (await Page.EvaluateAsync<double[]>(PlaceScript))[2].Should().Be(settled[2], "a change of the wood does not scroll");
+        (await Page.EvaluateAsync<string[]>("() => window.__anchor")).Should().HaveCount(2, "a change of the wood leaves the anchoring alone");
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_look_that_arrives_while_a_box_is_being_pulled_out_waits_until_the_pull_out_is_over_and_the_card_stays_open()
+    {
+        await Page.AddInitScriptAsync(PullGate);
+        await StartCabinetAsync();
+        await Page.EvaluateAsync("() => { window.__pullGate.open = true; }");
+
+        await Page.Locator(FirstBox).First.ClickAsync();
+        await Expect(Page.Locator(OpenCard)).ToBeVisibleAsync();
+        await Expect(Page.Locator("html[data-pull-kind]")).ToHaveCountAsync(1);
+
+        await PublishAsync(("wood", "oak"));
+        await Task.Delay(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-wood", "brown");
+        await Expect(Page.Locator("html[data-pull-kind]")).ToHaveCountAsync(1);
+
+        await Page.EvaluateAsync("() => window.__pullGate.release()");
+
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-wood", "oak", new() { Timeout = FollowTimeoutMs });
+        await Expect(Page.Locator("html[data-pull-kind]")).ToHaveCountAsync(0);
+        await Expect(Page.Locator(OpenCard)).ToBeVisibleAsync();
+        var timing = await Page.EvaluateAsync<double[]>("() => [window.__pullGate.releasedAt, ...window.__pullGate.changes]");
+        timing[1].Should().BeGreaterThanOrEqualTo(timing[0], "the look is applied only after the pull-out has ended");
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    private async Task StartCabinetAsync(int gameCount = 5)
+    {
+        var bgg = new SyncRounds.SwitchableBgg(SyntheticBggCollection.Create(gameCount));
         var factory = SyncHarness.CreateFactory(
             bgg.Handler,
             _clock,
