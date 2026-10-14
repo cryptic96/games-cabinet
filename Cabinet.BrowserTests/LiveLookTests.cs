@@ -17,12 +17,14 @@ namespace Cabinet.BrowserTests;
 [Trait("Category", "Browser")]
 public sealed class LiveLookTests : CabinetPageTest
 {
-    private const string SettingsPath = "/owner/settings";
+    internal const string SettingsPath = "/owner/settings";
     private const string OpenCard = "dialog.card-dialog[open]";
     private const string FirstBox = "#cabinet .placement:not([data-kind=\"moreMarker\"])";
-    private const string SavedText = "Saved for everyone. Open pages follow within a few seconds.";
+    internal const string SavedText = "Saved for everyone. Open pages follow within a few seconds.";
     private const float FollowTimeoutMs = 5000;
-    private const int ManyGames = 400;
+    internal const int ManyGames = 400;
+    private const string ViewerZone = "Europe/Berlin";
+    private const string EveningMoment = "2027-01-15T20:00:00+01:00";
     private const string TransitionSpy = """
         (() => {
           window.__lookSpy = { calls: 0 };
@@ -80,7 +82,7 @@ public sealed class LiveLookTests : CabinetPageTest
         })();
         """;
 
-    private const string AnchorSpy = """
+    internal const string AnchorSpy = """
         (() => {
           window.__anchor = [];
           const set = CSSStyleDeclaration.prototype.setProperty;
@@ -100,7 +102,7 @@ public sealed class LiveLookTests : CabinetPageTest
         })();
         """;
 
-    private const string PlaceScript = """
+    internal const string PlaceScript = """
         () => {
           const centre = innerHeight / 2;
           const sections = [...document.querySelectorAll('#cabinet .section')];
@@ -112,9 +114,9 @@ public sealed class LiveLookTests : CabinetPageTest
         }
         """;
 
-    private const string SectionTopScript = "(index) => document.querySelectorAll('#cabinet .section')[index].getBoundingClientRect().top";
+    internal const string SectionTopScript = "(index) => document.querySelectorAll('#cabinet .section')[index].getBoundingClientRect().top";
 
-    private const string ScrollToThirdSectionScript = """
+    internal const string ScrollToThirdSectionScript = """
         () => {
           const rect = document.querySelectorAll('#cabinet .section')[2].getBoundingClientRect();
           window.scrollTo(0, rect.top + scrollY + rect.height / 2 - innerHeight / 2);
@@ -125,6 +127,15 @@ public sealed class LiveLookTests : CabinetPageTest
     private static readonly Regex DarkLogo = new(@"/img/powered-by-bgg-dark\.[^/]*svg", RegexOptions.None, TimeSpan.FromSeconds(1));
     private readonly TemporaryDirectory _storage = new();
     private readonly FakeTimeProvider _clock =SyncHarness.NewClock();
+
+    /// <summary>Makes the browser read the clock in a Central European zone, which has summer time.</summary>
+    public override BrowserNewContextOptions ContextOptions()
+    {
+        var options = base.ContextOptions();
+        options.TimezoneId = ViewerZone;
+
+        return options;
+    }
 
     [Fact]
     public async Task A_look_published_on_the_owner_page_reaches_an_open_public_page_with_one_cross_fade_and_the_card_stays_open()
@@ -292,7 +303,32 @@ public sealed class LiveLookTests : CabinetPageTest
         ConsoleErrors.Should().BeEmpty();
     }
 
-    private async Task StartCabinetAsync(int gameCount = 5)
+    [Fact]
+    public async Task Turning_the_lights_from_off_to_evenings_only_after_dusk_loads_the_lamp_script_marks_the_evening_and_fades_the_lights_on()
+    {
+        var eveningRequests = 0;
+        Page.Request += (_, request) =>
+        {
+            if (request.Url.Contains("/js/evening.js", StringComparison.Ordinal))
+            {
+                Interlocked.Increment(ref eveningRequests);
+            }
+        };
+        await StartCabinetAsync(browserTime: EveningMoment);
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-lights", "off");
+        Volatile.Read(ref eveningRequests).Should().Be(0, "a page opened with the lights off has no reason to load the lamp script");
+
+        await PublishAsync(("lights", "evenings"));
+
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-lights", "evenings", new() { Timeout = FollowTimeoutMs });
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-evening", string.Empty);
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-lit", string.Empty);
+        await Expect(Page.Locator("#cabinet .section-light").First).ToHaveCSSAsync("opacity", "1");
+        Volatile.Read(ref eveningRequests).Should().Be(1);
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    private async Task StartCabinetAsync(int gameCount = 5, string? browserTime = null)
     {
         var bgg = new SyncRounds.SwitchableBgg(SyntheticBggCollection.Create(gameCount));
         var factory = SyncHarness.CreateFactory(
@@ -304,6 +340,12 @@ public sealed class LiveLookTests : CabinetPageTest
         await SyncRounds.PressAndWait(client, _clock, advance: false);
         await Page.SetViewportSizeAsync(1440, 900);
         await Page.AddInitScriptAsync(TransitionSpy);
+
+        if (browserTime is not null)
+        {
+            await Page.Clock.InstallAsync(new ClockInstallOptions { TimeString = browserTime });
+        }
+
         await GotoCabinetAsync("/");
     }
 

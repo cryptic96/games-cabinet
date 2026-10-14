@@ -91,10 +91,20 @@ jobs:
       - name: Install Chromium
         run: Cabinet.BrowserTests/bin/Debug/net10.0/.playwright/node/linux-x64/node Cabinet.BrowserTests/bin/Debug/net10.0/.playwright/package/cli.js install --with-deps chromium-headless-shell
 
+      - name: Install WebKit
+        run: Cabinet.BrowserTests/bin/Debug/net10.0/.playwright/node/linux-x64/node Cabinet.BrowserTests/bin/Debug/net10.0/.playwright/package/cli.js install --with-deps webkit
+
       - name: Run browser tests
         run: dotnet test --project Cabinet.BrowserTests --no-build
         env:
           CI: true
+          CABINET_SCREENSHOT_DIR: ${{ runner.temp }}/screenshots
+
+      - name: Run WebKit tests
+        run: dotnet test --project Cabinet.BrowserTests --no-build --filter-trait "Engine=WebKit"
+        env:
+          CI: true
+          CABINET_WEBKIT: 1
           CABINET_SCREENSHOT_DIR: ${{ runner.temp }}/screenshots
 
       - name: Upload screenshots
