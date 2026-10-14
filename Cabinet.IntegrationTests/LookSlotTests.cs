@@ -22,7 +22,7 @@ public sealed class LookSlotTests
     private const string SettingsPath = "/owner/settings";
     private const string LookPath = SettingsPath + "?handler=Look";
     private static readonly string[] AttributeNames = ["data-design=", "data-wood=", "data-backs=", "data-lights=", "data-depth="];
-    private static readonly string[] OwnerPagesWithoutCabinet = [SettingsPath, "/owner/pictures", "/owner/locations"];
+    private static readonly string[] OwnerPagesWithoutCabinet = ["/owner/pictures", "/owner/locations"];
 
     [Fact]
     public async Task The_cabinet_on_both_ports_carries_the_default_look_on_the_root_element_and_no_finish_class()
@@ -55,6 +55,20 @@ public sealed class LookSlotTests
             AttributeNames.Should().OnlyContain(name => !page.Body.Contains(name, StringComparison.Ordinal), path);
             page.Body.Should().NotContain("finish-classic");
         }
+    }
+
+    [Fact]
+    public async Task The_settings_page_carries_the_look_only_on_its_preview_and_not_on_the_root_element()
+    {
+        await using var factory = NewFactory();
+        using var session = new OwnerSession(factory);
+
+        var page = await session.GetAsync(SettingsPath);
+
+        page.Status.Should().Be(HttpStatusCode.OK);
+        page.Body.Should().Contain("<html lang=\"en\">");
+        page.Body.Should().MatchRegex("<figure class=\"look-preview\"[^>]*" + DefaultAttributes.Replace(">", string.Empty, StringComparison.Ordinal));
+        AttributeNames.Should().OnlyContain(name => page.Body.Split(name).Length - 1 == 1, "each attribute is written once, on the preview");
     }
 
     [Fact]
