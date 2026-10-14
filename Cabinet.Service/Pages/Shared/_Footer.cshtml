@@ -1,15 +1,14 @@
 @model SiteLanguage
 @inject BuildInfo Build
+@inject Microsoft.AspNetCore.Mvc.ViewFeatures.IFileVersionProvider FileVersions
+@{
+    var whiteLogo = FileVersions.AddFileVersionToPath(Context.Request.PathBase, "/img/powered-by-bgg.svg");
+    var darkLogo = FileVersions.AddFileVersionToPath(Context.Request.PathBase, "/img/powered-by-bgg-dark.svg");
+    var shownLogo = ViewData["LightWall"] is true ? darkLogo : whiteLogo;
+}
 <footer>
     <p class="version">@Model.Text.Version(Build.Version, Build.ShortCommit)</p>
     <a class="bgg-credit" href="https://boardgamegeek.com" rel="noopener">
-        @if (ViewData["LightWall"] is true)
-        {
-            <img src="~/img/powered-by-bgg-dark.svg" alt="@Model.Text.LogoAlt" width="342" height="76" asp-append-version="true" />
-        }
-        else
-        {
-            <img src="~/img/powered-by-bgg.svg" alt="@Model.Text.LogoAlt" width="342" height="76" asp-append-version="true" />
-        }
+        <img src="@shownLogo" data-logo-light="@whiteLogo" data-logo-dark="@darkLogo" alt="@Model.Text.LogoAlt" width="342" height="76" />
     </a>
 </footer>
