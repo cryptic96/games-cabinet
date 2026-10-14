@@ -42,7 +42,13 @@ public sealed class LookContainmentTests : CabinetPageTest, IDisposable
     private readonly TemporaryDirectory _storage = new();
 
     [Theory]
+    [InlineData("classic")]
+    [InlineData("modern")]
+    [InlineData("display")]
     [InlineData("legs")]
+    [InlineData("library")]
+    [InlineData("plywood")]
+    [InlineData("plywood-legs")]
     public async Task Every_section_ends_inside_its_own_box_with_the_wall_at_its_edge(string design)
     {
         OwnerDataSeed.Write(
