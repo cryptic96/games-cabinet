@@ -1,0 +1,25 @@
+
+/**
+ * The floor patch of one piece: a skirting band behind the base and a floor tone in front of it, both fading to the
+ * wall before the section box ends. The floor line is where the feet or the base meet the floor; the skirting ends
+ * 14 mm above it, so it shows beside the base and between legs. Everything stays inside the section box.
+ */
+.section > .section-floor {
+  --floor-y: calc((var(--bh) - var(--floor-margin) - 14) * var(--u));
+  background-image:
+    linear-gradient(to right, transparent, rgb(var(--shade-rgb) / calc(0.30 * var(--room-k))) 12%, rgb(var(--shade-rgb) / calc(0.30 * var(--room-k))) 88%, transparent),
+    linear-gradient(to right, transparent, rgb(var(--highlight-rgb) / calc(0.30 * var(--room-k))) 12%, rgb(var(--highlight-rgb) / calc(0.30 * var(--room-k))) 88%, transparent),
+    linear-gradient(to right, transparent, var(--skirting) 12%, var(--skirting) 88%, transparent),
+    radial-gradient(ellipse 50% 100% at 50% 0%, var(--floor) 0 62%, transparent 100%);
+  background-repeat: no-repeat;
+  background-size:
+    100% max(1px, calc(2 * var(--u))),
+    100% max(1px, calc(1 * var(--u))),
+    100% calc(36 * var(--u)),
+    100% calc((var(--floor-margin) + 14) * var(--u));
+  background-position:
+    0 var(--floor-y),
+    0 calc((var(--bh) - var(--floor-margin) - 50) * var(--u)),
+    0 calc((var(--bh) - var(--floor-margin) - 50) * var(--u)),
+    0 var(--floor-y);
+}
