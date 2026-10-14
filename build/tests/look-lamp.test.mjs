@@ -7,74 +7,27 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import { fakeDate, fakeRoot, fakeStorage } from './fake-page.mjs';
 
 const COMMENT_SLASHES = '/'.repeat(2);
 const EVENING_SOURCE = readFileSync(new URL('../../Cabinet.Service/wwwroot/js/evening.js', import.meta.url), 'utf8');
 const LOOK_SOURCE = readFileSync(new URL('../../Cabinet.Service/wwwroot/js/look.js', import.meta.url), 'utf8');
-const { initLook, isLit, refreshLamp } = await import('data:text/javascript;base64,' + Buffer.from(LOOK_SOURCE).toString('base64'));
-
-/**
- * Builds a fake root element that keeps its attributes and its listeners.
- * @param {object} dataset The data attributes the server wrote.
- * @param {string[]} [attributes] Attributes that are present before any script runs.
- * @returns {object} The root.
- */
-function fakeRoot(dataset, attributes = []) {
-  const present = new Set(attributes);
-  const listeners = new Set();
-
-  return {
-    dataset,
-    present,
-    listeners,
-    hasAttribute: (name) => present.has(name),
-    setAttribute: (name) => present.add(name),
-    removeAttribute: (name) => present.delete(name),
-    getAttribute: (name) => (present.has(name) ? '' : (dataset[name.replace(/^data-/, '')] ?? null)),
-    addEventListener: (type, handler) => listeners.add(handler),
-    removeEventListener: (type, handler) => listeners.delete(handler),
-  };
-}
-
-/**
- * Builds a fake storage that holds what is written to it, or throws on every use.
- * @param {object} [options] Whether the storage refuses every use, and what it holds before the script runs.
- * @returns {object} The storage.
- */
-function fakeStorage({ throws = false, initial = {} } = {}) {
-  const values = new Map(Object.entries(initial));
-
-  return {
-    values,
-    getItem: (key) => {
-      if (throws) {
-        throw new Error('storage refused');
-      }
-
-      return values.has(key) ? values.get(key) : null;
-    },
-    setItem: (key, value) => {
-      if (throws) {
-        throw new Error('storage refused');
-      }
-
-      values.set(key, value);
-    },
-  };
-}
+const { followClock, initLook, isLit, refreshLamp } = await import('data:text/javascript;base64,' + Buffer.from(LOOK_SOURCE).toString('base64'));
+const WINTER_MIDDAY = [2027, 0, 15, 12, 0];
 
 /**
  * Runs the head script in an isolated context against a fake page.
  * @param {object} root The fake root element.
  * @param {object} storage The fake session storage.
+ * @param {number[]} [local] The local clock reading the script sees; a winter midday, when it is not evening, by default.
  * @returns {{ context: object, window: object }} The context and the window it saw.
  */
-function runHeadScript(root, storage) {
+function runHeadScript(root, storage, local = WINTER_MIDDAY) {
   const window = {};
 
   Object.defineProperty(window, 'sessionStorage', { get: () => storage, enumerable: true });
 
-  const context = vm.createContext({ window, document: { documentElement: root } });
+  const context = vm.createContext({ window, document: { documentElement: root }, Date: fakeDate({ local }) });
 
   vm.runInContext(EVENING_SOURCE, context);
 
@@ -84,16 +37,18 @@ function runHeadScript(root, storage) {
 test('the head script is a classic script: no comment slashes, no import, no export, and it is small', () => {
   assert.equal(EVENING_SOURCE.includes(COMMENT_SLASHES), false);
   assert.doesNotMatch(EVENING_SOURCE, /^\s*(import|export)\b/m);
-  assert.ok(Buffer.byteLength(EVENING_SOURCE) < 2048, 'about a kilobyte');
+  assert.ok(Buffer.byteLength(EVENING_SOURCE) < 8192, 'a small table and a few rules');
 });
 
 test('the head script assigns only the cabinetEvening bridge and leaks no other global', () => {
   const { context, window } = runHeadScript(fakeRoot({ lights: 'on' }), fakeStorage());
 
-  assert.deepEqual(Object.keys(context).sort(), ['document', 'window']);
+  assert.deepEqual(Object.keys(context).sort(), ['Date', 'document', 'window']);
   assert.deepEqual(Object.keys(window).sort(), ['cabinetEvening', 'sessionStorage']);
   assert.equal(typeof window.cabinetEvening.key, 'string');
   assert.equal(typeof window.cabinetEvening.markLit, 'function');
+  assert.equal(typeof window.cabinetEvening.isEvening, 'function');
+  assert.equal(typeof window.cabinetEvening.msToNextChange, 'function');
 });
 
 test('with the lights on and this tab already faded in, the head script lights the page before the first paint', () => {
@@ -184,7 +139,15 @@ test('refreshing a root sets or removes the lit marker from the attributes it ca
 async function startLook({ dataset, attributes = [], storage = fakeStorage(), fade = '2000ms', bridge = undefined }) {
   const root = fakeRoot(dataset, attributes);
   const timers = [];
-  const drawn = [];
+  const cleared = [];
+  const intervals = [];
+  const events = [];
+  const doc = {
+    documentElement: root,
+    visibilityState: 'visible',
+    querySelector: () => ({}),
+    addEventListener: (type, handler) => events.push({ type, handler }),
+  };
 
   globalThis.window = {
     sessionStorage: storage,
@@ -200,18 +163,17 @@ async function startLook({ dataset, attributes = [], storage = fakeStorage(), fa
 
       return timers.length;
     },
-    clearTimeout: () => undefined,
-  };
+    clearTimeout: (id) => cleared.push(id),
+    setInterval: (callback, milliseconds) => {
+      intervals.push({ callback, milliseconds });
 
-  const doc = {
-    documentElement: root,
-    querySelector: () => ({}),
-    addEventListener: (type, handler) => drawn.push({ type, handler }),
+      return intervals.length;
+    },
   };
 
   await initLook(doc);
 
-  return { root, storage, timers };
+  return { root, storage, timers, cleared, intervals, events, doc };
 }
 
 test('on the first load in a tab the lights settle, fade and light in one task and the tab is remembered', async () => {
@@ -308,6 +270,7 @@ test('start-up waits for the cabinet to be drawn when no light layer exists yet'
     },
     setTimeout: () => 1,
     clearTimeout: () => undefined,
+    setInterval: () => 1,
   };
 
   try {

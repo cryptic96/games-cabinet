@@ -21,6 +21,8 @@ public sealed class LightsTests : CabinetPageTest
 
     private const int FadeWaitMilliseconds = 6000;
 
+    private const string ViewerZone = "Europe/Berlin";
+
     private const int EdgeTolerance = 3;
 
     private const int BackAboveBoxPixels = 3;
@@ -63,10 +65,11 @@ public sealed class LightsTests : CabinetPageTest
 
     private const string RecordDomState = """
         (() => {
-          window.__dom = { lit: null, bridge: null, violations: [] };
+          window.__dom = { lit: null, evening: null, bridge: null, violations: [] };
           document.addEventListener('securitypolicyviolation', (event) => window.__dom.violations.push(event.violatedDirective));
           document.addEventListener('DOMContentLoaded', () => {
             window.__dom.lit = document.documentElement.hasAttribute('data-lit');
+            window.__dom.evening = document.documentElement.hasAttribute('data-evening');
             window.__dom.bridge = typeof window.cabinetEvening;
           });
         })();
@@ -94,6 +97,46 @@ public sealed class LightsTests : CabinetPageTest
     private static readonly JsonSerializerOptions WebOptions = new(JsonSerializerDefaults.Web);
 
     private readonly TemporaryDirectory _storage = new();
+
+    /// <summary>Makes the browser read the clock in a Central European zone, which has summer time.</summary>
+    public override BrowserNewContextOptions ContextOptions()
+    {
+        var options = base.ContextOptions();
+        options.TimezoneId = ViewerZone;
+
+        return options;
+    }
+
+    [Theory]
+    [InlineData("2027-01-15T20:00:00+01:00", true)]
+    [InlineData("2027-01-15T12:00:00+01:00", false)]
+    [InlineData("2027-07-15T21:00:00+02:00", false)]
+    [InlineData("2027-07-15T22:00:00+02:00", true)]
+    public async Task With_evenings_only_the_page_is_evening_from_the_first_frame_only_when_it_is_dark_for_the_visitor(string moment, bool evening)
+    {
+        await StartLitAsync("evenings");
+        await Page.Clock.InstallAsync(new ClockInstallOptions { TimeString = moment });
+        await Page.AddInitScriptAsync(RecordDomState);
+        await Page.SetViewportSizeAsync(1440, 900);
+        await GotoCabinetAsync("/?sample=65");
+
+        (await ReadDomAsync()).Evening.Should().Be(evening, "the head script marks the evening before the first paint");
+        await Page.WaitForSelectorAsync("html[data-settled]", new PageWaitForSelectorOptions { Timeout = FadeWaitMilliseconds });
+
+        if (evening)
+        {
+            await WaitUntilLitAsync();
+            await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-evening", string.Empty);
+        }
+        else
+        {
+            await Expect(Page.Locator("html")).Not.ToHaveAttributeAsync("data-evening", string.Empty);
+            await Expect(Page.Locator("html")).Not.ToHaveAttributeAsync("data-lit", string.Empty);
+            (await Page.EvaluateAsync<double>($"() => Number(getComputedStyle(document.querySelector('{LayerSelector}')).opacity)")).Should().Be(0);
+        }
+
+        ConsoleErrors.Should().BeEmpty();
+    }
 
     [Fact]
     public async Task With_the_lights_always_on_the_cubbies_start_dark_and_fade_in_after_the_first_paint()
@@ -648,7 +691,7 @@ public sealed class LightsTests : CabinetPageTest
 
     private sealed record BoxTop(double Centre, double Width, double Top, double CubbyTop, double CubbyHeight, double[] Colour, double Shade, double[] ShadeRgb, double Keyline);
 
-    private sealed record DomState(bool Lit, string Bridge);
+    private sealed record DomState(bool Lit, bool Evening, string Bridge);
 
     private sealed record LayerReading(string Display, double Opacity, bool Lit, bool Settled, int Animations);
 }

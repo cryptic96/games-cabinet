@@ -12,6 +12,9 @@ const FRAMES_BEFORE_FADE = 2;
 const FADE_GRACE_MS = 150;
 const MILLISECONDS_PER_SECOND = 1000;
 const DRAWN_EVENT = 'cabinet:drawn';
+const SECONDS_PER_CHECK = 60;
+const BOUNDARY_SLACK_MS = 250;
+const followedRoots = new WeakSet();
 
 /**
  * Tells whether the lights are lit for a stored choice and a clock reading.
@@ -127,19 +130,17 @@ function endFadingWhenDone(root) {
 }
 
 /**
- * Starts the markers for the page's first draw. Lights that are off only settle the page. Lights that are lit and not yet
- * marked fade on: settled, fading and lit are set in one task, so the transition runs from the unlit state. Lights the head
- * script already lit before the first paint are left lit and only settle.
+ * Moves the lamp to what the attributes now say. Nothing happens when the lamp already is that way. Otherwise the fading hint
+ * is set before the lit marker changes, so the opacity transition runs from the state the layer is in; a fade in is
+ * remembered for this tab. With a fade of nothing (reduced motion) no hint is set.
  * @param {Element} root The root element.
+ * @returns {boolean} Whether the lamp changed.
  */
-function start(root) {
-  const alreadyLit = root.hasAttribute('data-lit');
+function changeLamp(root) {
   const lit = isLit(root.dataset.lights, root.hasAttribute('data-evening'));
 
-  root.setAttribute('data-settled', '');
-
-  if (alreadyLit || !lit) {
-    return;
+  if (root.hasAttribute('data-lit') === lit) {
+    return false;
   }
 
   const fades = fadeMilliseconds(root) > 0;
@@ -149,11 +150,86 @@ function start(root) {
   }
 
   refreshLamp(root);
-  rememberFadeInThisTab();
+
+  if (lit) {
+    rememberFadeInThisTab();
+  }
 
   if (fades) {
     endFadingWhenDone(root);
   }
+
+  return true;
+}
+
+/**
+ * Starts the markers for the page's first draw. Lights that are off only settle the page. Lights that are lit and not yet
+ * marked fade on: settled, fading and lit are set in one task, so the transition runs from the unlit state. Lights the head
+ * script already lit before the first paint are left lit and only settle.
+ * @param {Element} root The root element.
+ */
+function start(root) {
+  root.setAttribute('data-settled', '');
+  changeLamp(root);
+}
+
+/**
+ * Brings data-evening and the lamp in line with the visitor's clock. Nothing happens without the clock the head script
+ * provides; with the lights off the evening marker is removed.
+ * @param {Element} root The root element.
+ */
+function applyClock(root) {
+  const clock = window.cabinetEvening;
+
+  if (typeof clock?.isEvening !== 'function') {
+    return;
+  }
+
+  if (root.dataset.lights !== 'off' && clock.isEvening(new Date())) {
+    root.setAttribute('data-evening', '');
+  } else {
+    root.removeAttribute('data-evening');
+  }
+
+  changeLamp(root);
+}
+
+/**
+ * Keeps an open page right about the evening. It checks the clock at once, every minute while the page is visible, when the
+ * page becomes visible again, and with one timer set for the next sunrise or lamp-on moment (set again each time it fires), so
+ * a page left open across sunset or sunrise fades at that moment. Calling it again for the same page does nothing. Only
+ * evenings only needs the timer; always on and off never change with the clock.
+ * @param {Document} [doc] The page; the current document by default.
+ */
+export function followClock(doc = document) {
+  const root = doc.documentElement;
+
+  if (followedRoots.has(root)) {
+    return;
+  }
+
+  followedRoots.add(root);
+
+  let boundary;
+  const check = () => {
+    window.clearTimeout(boundary);
+    applyClock(root);
+
+    const clock = window.cabinetEvening;
+
+    if (root.dataset.lights === 'evenings' && typeof clock?.msToNextChange === 'function') {
+      boundary = window.setTimeout(check, clock.msToNextChange(new Date()) + BOUNDARY_SLACK_MS);
+    }
+  };
+  const checkWhenVisible = () => {
+    if (doc.visibilityState === 'visible') {
+      check();
+    }
+  };
+
+  check();
+  window.setInterval(checkWhenVisible, MILLISECONDS_PER_SECOND * SECONDS_PER_CHECK);
+  doc.addEventListener('visibilitychange', checkWhenVisible);
 }
 
 /**
@@ -174,5 +250,6 @@ export async function initLook(doc = document) {
 
   if (!root.hasAttribute('data-settled')) {
     start(root);
+    followClock(doc);
   }
 }
