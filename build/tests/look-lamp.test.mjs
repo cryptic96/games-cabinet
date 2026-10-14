@@ -305,3 +305,131 @@ test('starting up twice on one page changes nothing the second time', async () =
 
   assert.deepEqual([...first.root.present], marks);
 });
+
+/**
+ * Builds a stand-in for the clock the head script provides, whose answers the test changes by hand.
+ * @param {boolean} evening Whether it is evening at the start.
+ * @returns {{ evening: boolean, isEvening: Function, msToNextChange: Function }} The stand-in.
+ */
+function fakeClock(evening) {
+  const clock = {
+    evening,
+    isEvening: () => clock.evening,
+    msToNextChange: () => 90000,
+  };
+
+  return clock;
+}
+
+test('an open page lights when the clock says evening: the minute check sets the evening marker, fades and remembers the tab', async () => {
+  const clock = fakeClock(false);
+  const { root, storage, intervals } = await startLook({ dataset: { lights: 'evenings' }, bridge: clock });
+
+  assert.equal(root.hasAttribute('data-lit'), false);
+  assert.equal(intervals.length, 1);
+  assert.equal(intervals[0].milliseconds, 60000);
+
+  clock.evening = true;
+  intervals[0].callback();
+
+  assert.equal(root.hasAttribute('data-evening'), true);
+  assert.equal(root.hasAttribute('data-fading'), true, 'the lamp fades on');
+  assert.equal(root.hasAttribute('data-lit'), true);
+  assert.deepEqual([...storage.values.entries()], [['cabinet-lit', '1']]);
+});
+
+test('at sunrise the open page loses the evening marker and the lamp fades out', async () => {
+  const clock = fakeClock(true);
+  const { root, intervals } = await startLook({ dataset: { lights: 'evenings' }, bridge: clock });
+
+  assert.equal(root.hasAttribute('data-lit'), true, 'the load itself lit the evening page');
+
+  for (const listener of [...root.listeners]) {
+    listener({ propertyName: 'opacity' });
+  }
+
+  assert.equal(root.hasAttribute('data-fading'), false, 'the first fade is over');
+
+  clock.evening = false;
+  intervals[0].callback();
+
+  assert.equal(root.hasAttribute('data-evening'), false);
+  assert.equal(root.hasAttribute('data-lit'), false);
+  assert.equal(root.hasAttribute('data-fading'), true, 'the lamp fades out');
+});
+
+test('the minute check does nothing in a hidden tab, and the tab catches up the moment it is shown', async () => {
+  const clock = fakeClock(false);
+  const { root, doc, intervals, events } = await startLook({ dataset: { lights: 'evenings' }, bridge: clock });
+  const change = events.find(({ type }) => type === 'visibilitychange');
+
+  clock.evening = true;
+  doc.visibilityState = 'hidden';
+  intervals[0].callback();
+  change.handler();
+
+  assert.equal(root.hasAttribute('data-lit'), false, 'nothing runs while the tab is hidden');
+
+  doc.visibilityState = 'visible';
+  change.handler();
+
+  assert.equal(root.hasAttribute('data-evening'), true);
+  assert.equal(root.hasAttribute('data-lit'), true);
+});
+
+test('one timer waits for the next boundary and is set again each time it fires', async () => {
+  const clock = fakeClock(false);
+  const { root, timers, cleared } = await startLook({ dataset: { lights: 'evenings' }, bridge: clock, fade: '0ms' });
+
+  assert.equal(timers.length, 1);
+  assert.equal(timers[0].milliseconds, 90250, 'the next change plus a small margin');
+
+  clock.evening = true;
+  timers[0].callback();
+
+  assert.equal(root.hasAttribute('data-lit'), true);
+  assert.equal(timers.length, 2, 'set again');
+  assert.equal(cleared.includes(1), true, 'the old timer was cleared before the new one was set');
+  assert.equal(timers[1].milliseconds, 90250);
+});
+
+test('always on and off never arm the boundary timer, and off never carries the evening marker', async () => {
+  const on = await startLook({ dataset: { lights: 'on' }, bridge: fakeClock(true), fade: '0ms' });
+  const off = await startLook({ dataset: { lights: 'off' }, bridge: fakeClock(true), fade: '0ms' });
+
+  assert.equal(on.timers.length, 0);
+  assert.equal(off.timers.length, 0);
+  assert.equal(off.root.hasAttribute('data-evening'), false);
+  assert.equal(off.root.hasAttribute('data-lit'), false);
+  assert.equal(on.root.hasAttribute('data-lit'), true);
+});
+
+test('under reduced motion the evening comes and goes with no fading hint', async () => {
+  const clock = fakeClock(false);
+  const { root, intervals } = await startLook({ dataset: { lights: 'evenings' }, bridge: clock, fade: '0ms' });
+
+  clock.evening = true;
+  intervals[0].callback();
+
+  assert.equal(root.hasAttribute('data-lit'), true);
+  assert.equal(root.hasAttribute('data-fading'), false);
+});
+
+test('without the head script there is no clock to follow and nothing changes', async () => {
+  const { root, intervals, timers } = await startLook({ dataset: { lights: 'evenings' } });
+
+  intervals[0].callback();
+
+  assert.equal(root.hasAttribute('data-evening'), false);
+  assert.equal(root.hasAttribute('data-lit'), false);
+  assert.equal(timers.length, 0);
+});
+
+test('following the clock of a page twice sets up one interval and one listener', async () => {
+  const { doc, intervals, events } = await startLook({ dataset: { lights: 'evenings' }, bridge: fakeClock(false) });
+
+  followClock(doc);
+
+  assert.equal(intervals.length, 1);
+  assert.equal(events.filter(({ type }) => type === 'visibilitychange').length, 1);
+});
