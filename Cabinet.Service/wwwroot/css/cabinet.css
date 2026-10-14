@@ -5,8 +5,9 @@
  * never under 37rem, the narrowest a desktop section is ever drawn. Every row is centred, so a lone section and a last
  * row with fewer sections than columns sit in the middle, and the column count is the only thing that sets a section's
  * width, so the last section is as wide as the others. The row stops growing at three full columns, so a very wide
- * screen gets margins instead of a fourth column. Sections start at the top of their row, so a shorter last section
- * lines up with its neighbours.
+ * screen gets margins instead of a fourth column. Sections stand on the bottom of their row, so when balancing leaves one
+ * section a shelf row shorter than its neighbour, the feet of every piece in the row share one line and the floor reads
+ * as one floor with gaps.
  */
 .cabinet {
   --column-gap: 24px;
@@ -14,7 +15,7 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: var(--column-gap);
   justify-self: stretch;
   width: 100%;
@@ -58,7 +59,7 @@
   aspect-ratio: var(--section-ratio);
   content-visibility: auto;
   flex: 0 0 var(--section-basis);
-  align-self: flex-start;
+  align-self: flex-end;
   background-image: radial-gradient(ellipse 100% 50% at 0% 50%, rgb(var(--room-shade-rgb) / var(--wall-shadow)), transparent);
   background-repeat: no-repeat;
   background-size: calc(var(--ws-w) / var(--bw) * 100%) calc(var(--ws-h) / var(--bh) * 100%);
