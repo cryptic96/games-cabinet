@@ -7,10 +7,10 @@
 .section > .section-floor {
   --floor-y: calc((var(--bh) - var(--floor-margin) - 14) * var(--u));
   background-image:
-    linear-gradient(to right, transparent, rgb(var(--shade-rgb) / calc(0.30 * var(--room-k))) 12%, rgb(var(--shade-rgb) / calc(0.30 * var(--room-k))) 88%, transparent),
-    linear-gradient(to right, transparent, rgb(var(--highlight-rgb) / calc(0.30 * var(--room-k))) 12%, rgb(var(--highlight-rgb) / calc(0.30 * var(--room-k))) 88%, transparent),
-    linear-gradient(to right, transparent, var(--skirting) 12%, var(--skirting) 88%, transparent),
-    radial-gradient(ellipse 50% 100% at 50% 0%, var(--floor) 0 62%, transparent 100%);
+    linear-gradient(to right, transparent, rgb(var(--shade-rgb) / calc(0.16 * var(--room-k))) 22%, rgb(var(--shade-rgb) / calc(0.16 * var(--room-k))) 78%, transparent),
+    linear-gradient(to right, transparent, rgb(var(--highlight-rgb) / calc(0.12 * var(--room-k))) 22%, rgb(var(--highlight-rgb) / calc(0.12 * var(--room-k))) 78%, transparent),
+    linear-gradient(to right, transparent, var(--skirting) 22%, var(--skirting) 78%, transparent),
+    radial-gradient(ellipse 50% 100% at 50% 0%, var(--floor) 0 56%, transparent 92%);
   background-repeat: no-repeat;
   background-size:
     100% max(1px, calc(2 * var(--u))),

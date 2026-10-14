@@ -20,7 +20,7 @@ for (const f of readdirSync(join(here, 'out'))) {
 
 for (const f of readdirSync(here)) {
   const p = join(here, f);
-  if (statSync(p).isFile() && ['.mjs', '.js', '.css', '.svg'].includes(extname(f)) && f !== 'switcher.js' && f !== 'switcher.css' && f !== 'bgg-dark-standin.svg') {
+  if (statSync(p).isFile() && ['.mjs', '.js', '.css', '.svg'].includes(extname(f)) && f !== 'structure.backup.css' && f !== 'switcher.js' && f !== 'switcher.css' && f !== 'bgg-dark-standin.svg') {
     writeFileSync(join(tools, f), scrub(readFileSync(p, 'utf8')));
   }
 }
@@ -28,13 +28,19 @@ for (const f of readdirSync(join(here, 'css'))) {
   writeFileSync(join(tools, 'css', f), readFileSync(join(here, 'css', f), 'utf8'));
 }
 
-const skip = /^(c[0-9]|b1-|tmp-|scratch-|baseline-mask-|baseline-(release|layers)-400-)/;
+const skip = /^(c[0-9]|b1-|tmp-|scratch-|t-|t5|t7|q-|quick|baseline-mask-|baseline-(release|layers)-400-)/;
 for (const f of readdirSync(join(here, 'sheets'))) {
-  if (extname(f) === '.png' && !skip.test(f) && !f.startsWith('baseline-mask-')) {
+  if (['.png', '.jpg'].includes(extname(f)) && !skip.test(f) && !f.startsWith('baseline-mask-')) {
     cpSync(join(here, 'sheets', f), join(sheets, f));
   }
 }
 
+mkdirSync(join(target, 'measurements'), { recursive: true });
+for (const f of ['measurements.json', 'measurements-vis.json', 'invariants.json']) {
+  if (existsSync(join(here, f))) cpSync(join(here, f), join(target, 'measurements', f));
+}
+cpSync(join(here, 'sheets/quick-looks.png'), join(sheets, 'look-overview.png'));
+cpSync(join(here, 'README.md'), join(tools, 'README.md'));
 const resultsPath = join(here, 'sheets/baseline-results.json');
 if (existsSync(resultsPath)) {
   const results = JSON.parse(readFileSync(resultsPath, 'utf8'));

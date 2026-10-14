@@ -73,6 +73,7 @@ const woods = {
     '--arris-light-rgb': '255 250 235',
     '--arris-dark-rgb': '95 62 25',
     '--ring-halo': 'var(--ink)',
+    '--inlay-src': '#7d5a1e',
     '--room-k': '1',
     '--room-layer': '""',
     '--room': '#27323b',
@@ -102,11 +103,13 @@ const woods = {
     '--arris-light-rgb': '255 252 240',
     '--arris-dark-rgb': '90 65 30',
     '--ring-halo': 'var(--ink)',
+    '--inlay-src': '#876528',
     '--lamp-k': '0.18',
     '--wall-shadow': '0.22',
     '--room-k': '1',
     '--room-layer': '""',
     '--dusk-wall-alpha': '0.08',
+    '--dusk-furniture-alpha': '0.12',
     '--room': '#ddd6ca',
     '--room-text': '#251f1b',
     '--room-accent': '#2a1a10',
@@ -156,6 +159,7 @@ lines.push('  --falloff-rgb: 255 244 228;');
 lines.push('  --lamp-rgb: 255 212 150;');
 lines.push('  --lamp-k: 1;');
 lines.push('  --highlight-rgb: 255 236 205;');
+lines.push('  --box-shade-rgb: 20 10 4;');
 lines.push('  --shade-rgb: 20 10 4;');
 lines.push('  --shade-deep-rgb: 10 5 2;');
 lines.push('  --sheen-rgb: 255 245 230;');
@@ -174,9 +178,9 @@ lines.push('  --back-src: #2a1a10;');
 lines.push('  --back-paint-src: #0f2025;');
 lines.push('  --recess-src: color-mix(in oklch, #6b4226, black 22%);');
 lines.push('  --recess-low-src: color-mix(in oklch, #6b4226, black 22%);');
-lines.push('  --ply-a-src: color-mix(in oklch, var(--wood-src), white 10%);');
-lines.push('  --ply-b-src: color-mix(in oklch, var(--wood-src), black 8%);');
-lines.push('  --ply-glue-src: color-mix(in oklch, var(--wood-src), black 45%);');
+lines.push('  --ply-a-src: color-mix(in oklch, var(--wood-src), white 16%);');
+lines.push('  --ply-b-src: color-mix(in oklch, var(--wood-src), black 14%);');
+lines.push('  --ply-glue-src: color-mix(in oklch, var(--wood-src), black 60%);');
 lines.push('  --inlay-src: #c4a15a;');
 lines.push('  --cubby-top-src: #170d07;');
 lines.push('  --cubby-left-src: #4a2e1b;');

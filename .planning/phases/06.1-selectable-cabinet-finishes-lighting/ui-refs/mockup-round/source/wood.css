@@ -12,6 +12,7 @@
   --lamp-rgb: 255 212 150;
   --lamp-k: 1;
   --highlight-rgb: 255 236 205;
+  --box-shade-rgb: 20 10 4;
   --shade-rgb: 20 10 4;
   --shade-deep-rgb: 10 5 2;
   --sheen-rgb: 255 245 230;
@@ -30,9 +31,9 @@
   --back-paint-src: #0f2025;
   --recess-src: color-mix(in oklch, #6b4226, black 22%);
   --recess-low-src: color-mix(in oklch, #6b4226, black 22%);
-  --ply-a-src: color-mix(in oklch, var(--wood-src), white 10%);
-  --ply-b-src: color-mix(in oklch, var(--wood-src), black 8%);
-  --ply-glue-src: color-mix(in oklch, var(--wood-src), black 45%);
+  --ply-a-src: color-mix(in oklch, var(--wood-src), white 16%);
+  --ply-b-src: color-mix(in oklch, var(--wood-src), black 14%);
+  --ply-glue-src: color-mix(in oklch, var(--wood-src), black 60%);
   --inlay-src: #c4a15a;
   --cubby-top-src: #170d07;
   --cubby-left-src: #4a2e1b;
@@ -125,6 +126,7 @@
   --arris-light-rgb: 255 250 235;
   --arris-dark-rgb: 95 62 25;
   --ring-halo: var(--ink);
+  --inlay-src: #7d5a1e;
   --room-k: 1;
   --room-layer: "";
   --room: #27323b;
@@ -155,11 +157,13 @@
   --arris-light-rgb: 255 252 240;
   --arris-dark-rgb: 90 65 30;
   --ring-halo: var(--ink);
+  --inlay-src: #876528;
   --lamp-k: 0.18;
   --wall-shadow: 0.22;
   --room-k: 1;
   --room-layer: "";
   --dusk-wall-alpha: 0.08;
+  --dusk-furniture-alpha: 0.12;
   --room: #ddd6ca;
   --room-text: #251f1b;
   --room-accent: #2a1a10;

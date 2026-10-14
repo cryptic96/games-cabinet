@@ -97,6 +97,7 @@
 
 .light-pool {
   background-image:
+    linear-gradient(to bottom, rgb(var(--lamp-rgb) / calc(0.22 * var(--lamp-k))) 0, transparent 14%),
     linear-gradient(
       to bottom,
       rgb(var(--lamp-rgb) / calc(0.55 * var(--lamp-k))) 0 max(1px, calc(1.5 * var(--u))),
@@ -154,12 +155,7 @@
   width: calc(100% + 56 * var(--u));
   top: calc(100% + (var(--base-height) - 50) * var(--u));
   height: calc(36 * var(--u));
-  background-image:
-    linear-gradient(to right, transparent, rgb(var(--lamp-rgb) / calc(0.10 * var(--lamp-k) * var(--room-k))) 40%),
-    linear-gradient(to left, transparent, rgb(var(--lamp-rgb) / calc(0.10 * var(--lamp-k) * var(--room-k))) 40%);
-  background-size: calc(28 * var(--u)) 100%;
-  background-position: 0 0, 100% 0;
-  background-repeat: no-repeat;
+  background-image: linear-gradient(to right, transparent, rgb(var(--lamp-rgb) / calc(0.10 * var(--lamp-k) * var(--room-k))) 22%, rgb(var(--lamp-rgb) / calc(0.10 * var(--lamp-k) * var(--room-k))) 78%, transparent);
 }
 
 /**

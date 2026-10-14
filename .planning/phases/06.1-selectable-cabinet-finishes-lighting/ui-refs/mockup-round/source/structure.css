@@ -132,7 +132,7 @@
   inset: 0;
   pointer-events: none;
   z-index: 3;
-  background: linear-gradient(to bottom, rgb(var(--shade-rgb) / var(--shade-alpha)), transparent var(--shade-depth));
+  background: linear-gradient(to bottom, rgb(var(--box-shade-rgb) / var(--shade-alpha)), transparent var(--shade-depth));
 }
 
 /**

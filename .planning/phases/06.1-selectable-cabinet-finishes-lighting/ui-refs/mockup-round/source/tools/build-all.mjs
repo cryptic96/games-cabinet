@@ -35,6 +35,7 @@ structure = must(structure, '  pointer-events: none;\n  z-index: 1;\n  backgroun
 structure = must(structure, '  position: absolute;\n  left: calc(var(--x) * var(--u));\n  bottom: calc(var(--y) * var(--u));', '  position: absolute;\n  z-index: 2;\n  left: calc(var(--x) * var(--u));\n  bottom: calc(var(--y) * var(--u));');
 structure = must(structure, '.placement:focus-visible {\n  z-index: 2;', '.placement:focus-visible {\n  z-index: 4;');
 structure = must(structure, '.placement[data-open] {\n  z-index: 2;', '.placement[data-open] {\n  z-index: 4;');
+structure = must(structure, 'background: linear-gradient(to bottom, rgb(var(--shade-rgb) / var(--shade-alpha)), transparent var(--shade-depth));', 'background: linear-gradient(to bottom, rgb(var(--box-shade-rgb) / var(--shade-alpha)), transparent var(--shade-depth));');
 structure += read(join(here, 'css/structure-add.css'));
 write('structure.css', wrap('structure', structure));
 
@@ -61,6 +62,7 @@ cpSync(join(repo, 'Cabinet.Service/wwwroot/css/card.css'), join(out, 'card.css')
 
 cpSync(join(here, 'switcher.css'), join(out, 'switcher.css'));
 cpSync(join(here, 'switcher.js'), join(out, 'switcher.js'));
+cpSync(join(here, 'stage.css'), join(out, 'stage.css'));
 cpSync(join(repo, 'Cabinet.Service/wwwroot/img/powered-by-bgg.svg'), join(out, 'img/powered-by-bgg.svg'));
 cpSync(join(here, 'bgg-dark-standin.svg'), join(out, 'img/bgg-dark-standin.svg'));
 for (const f of readdirSync(join(here, 'markup'))) cpSync(join(here, 'markup', f), join(out, 'markup', f));
