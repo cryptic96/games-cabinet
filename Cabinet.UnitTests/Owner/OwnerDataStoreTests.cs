@@ -224,6 +224,30 @@ public sealed class OwnerDataStoreTests : IDisposable
         Directory.EnumerateFileSystemEntries(_directory.FullPath).Should().BeEquivalentTo([FilePath, VersionsPath]);
     }
 
+    [Fact]
+    public void The_stored_schema_version_is_null_without_a_file_and_the_version_of_the_header_with_one()
+    {
+        var store = CreateStore();
+        store.StoredSchemaVersion().Should().BeNull();
+
+        File.WriteAllText(FilePath, "{\"kind\":\"games-cabinet-owner-data\",\"schemaVersion\":1}");
+        store.StoredSchemaVersion().Should().Be(1);
+
+        store.Save(OwnerData.Empty with { Revision = 1 });
+        store.StoredSchemaVersion().Should().Be(OwnerData.CurrentSchemaVersion);
+    }
+
+    [Fact]
+    public void The_stored_schema_version_is_null_when_the_header_cannot_be_read_and_the_file_is_left_alone()
+    {
+        File.WriteAllText(FilePath, "not json at all");
+        var before = File.ReadAllBytes(FilePath);
+
+        CreateStore().StoredSchemaVersion().Should().BeNull();
+
+        File.ReadAllBytes(FilePath).Should().Equal(before);
+    }
+
     private OwnerDataStore CreateStore() => new(_directory.FullPath, NullLogger<OwnerDataStore>.Instance);
 
     private string[] Listing() => [.. Directory.EnumerateFileSystemEntries(_directory.FullPath).Order(StringComparer.Ordinal)];

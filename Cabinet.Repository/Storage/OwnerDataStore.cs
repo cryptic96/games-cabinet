@@ -112,6 +112,19 @@ public sealed class OwnerDataStore : IOwnerDataStore
     /// <inheritdoc />
     public DateTimeOffset? NewestEarlierVersionAt() => ListVersionFiles() is [var newest, ..] ? newest.SavedAtUtc : null;
 
+    /// <inheritdoc />
+    public int? StoredSchemaVersion()
+    {
+        try
+        {
+            return File.Exists(_path) && ReadHeader(File.ReadAllBytes(_path)) is { } header ? header.SchemaVersion : null;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
     private List<(string Path, DateTimeOffset SavedAtUtc)> ListVersionFiles()
     {
         if (!Directory.Exists(_versionsDirectory))

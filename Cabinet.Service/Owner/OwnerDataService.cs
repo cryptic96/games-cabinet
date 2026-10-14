@@ -75,7 +75,7 @@ public interface IOwnerArtReferences
 /// <summary>
 /// The only code that changes the owner data. Writes are one at a time, each one is checked against the revision the writer
 /// worked from, and each saved change is logged for the owner, stored atomically and announced so the collection shown to
-/// visitors is rebuilt. Before a write an earlier copy of the file is kept when the newest one is more than an hour old.
+/// visitors is rebuilt. Before a write an earlier copy of the file is kept when the newest one is more than an hour old, and always when the file is in an older format than this build writes.
 /// The housekeeping the sync triggers, stamping and forgetting games that left the collection, goes through the same lock
 /// but is not an owner change. It writes nothing to the application log but counts and categories.
 /// </summary>
@@ -450,11 +450,19 @@ public sealed class OwnerDataService : IOwnerArtReferences
         return MutateSystemAsync(data => OwnerExpiry.Reconcile(data, listedGameIds, _time.GetUtcNow()), cancellationToken);
     }
 
+    /// <summary>
+    /// Keeps a copy of the stored file before a save when the newest copy is more than an hour old or there is none. A file in
+    /// an older format is always copied, whatever the interval says, so the release that wrote it can be rolled back to: after
+    /// the save no earlier release can read the file, and the copy is the only one it can. A copy that fails is logged and the save goes on.
+    /// </summary>
+    /// <param name="now">The moment the copy is stamped with.</param>
     private void KeepEarlierVersionWhenDue(DateTimeOffset now)
     {
         try
         {
-            if (_store.NewestEarlierVersionAt() is not { } newest || now - newest > VersionInterval)
+            if (_store.StoredSchemaVersion() < OwnerData.CurrentSchemaVersion
+                || _store.NewestEarlierVersionAt() is not { } newest
+                || now - newest > VersionInterval)
             {
                 _store.KeepEarlierVersion(now);
             }

@@ -34,4 +34,7 @@ public sealed class SometimesFailingStore(IOwnerDataStore inner) : IOwnerDataSto
 
     /// <inheritdoc />
     public DateTimeOffset? NewestEarlierVersionAt() => inner.NewestEarlierVersionAt();
+
+    /// <inheritdoc />
+    public int? StoredSchemaVersion() => inner.StoredSchemaVersion();
 }

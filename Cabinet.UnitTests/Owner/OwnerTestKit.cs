@@ -23,6 +23,9 @@ internal sealed class InMemoryOwnerDataStore : IOwnerDataStore
     /// <summary>Whether a file exists to copy; a save creates it, and a test that starts from stored data sets it.</summary>
     public bool FileExists { get; set; }
 
+    /// <summary>The schema version of a file a test started from, or null to use the version of whatever was stored last; a save replaces it.</summary>
+    public int? SeededSchemaVersion { get; set; }
+
     /// <summary>The moments earlier versions were kept, oldest first.</summary>
     public List<DateTimeOffset> KeptAt { get; } = [];
 
@@ -41,6 +44,7 @@ internal sealed class InMemoryOwnerDataStore : IOwnerDataStore
 
         Saved.Add(data);
         FileExists = true;
+        SeededSchemaVersion = null;
         State = new OwnerDataState.Ready(data);
     }
 
@@ -62,6 +66,10 @@ internal sealed class InMemoryOwnerDataStore : IOwnerDataStore
 
     /// <inheritdoc />
     public DateTimeOffset? NewestEarlierVersionAt() => KeptAt.Count == 0 ? null : KeptAt.Max();
+
+    /// <inheritdoc />
+    public int? StoredSchemaVersion() =>
+        !FileExists ? null : SeededSchemaVersion ?? (State as OwnerDataState.Ready)?.Data.SchemaVersion;
 }
 
 /// <summary>A writer wired to an in-memory store, a clock the test moves, and a publisher that fills a collection store.</summary>
