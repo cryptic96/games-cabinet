@@ -1,0 +1,286 @@
+@layer design {
+
+/**
+ * Classic furniture, the default design. Every size is a millimetre value on the cabinet and every colour is read from
+ * the wood tokens, so the same recipes draw any wood. Everything that makes the cabinet read as a piece of wooden
+ * furniture lives in this layer: grain on every board, a lit front edge and a stable tone per shelf, a moulded top that
+ * overhangs thicker side boards, a planked back in every cubby and a plinth with an arched opening over a soft floor
+ * shadow. One light comes from above and slightly to the left, so top and left edges are lit and shadows fall down and
+ * slightly right. The look is gradients only and stays inside the section box. Another design overrides this layer's
+ * sizes and recipes and nothing else.
+ */
+.cabinet {
+  --side-allowance: 32;
+  --side-trim: 12;
+  --overhang: 14;
+  --top-height: 34;
+  --base-height: 80;
+  --base-overhang: 0;
+  --floor-margin: 24;
+  --foot-width: 70;
+  --arch-rise: 40;
+  --arch-radius: 110;
+  --arch-lit: 0.14;
+  --plank-width: 110;
+  --depth-inset: 16;
+  --depth-floor: 24;
+  --depth-ceil: 8;
+  --top-face: 6;
+}
+
+.section > * {
+  --grain-fine: 1;
+  --lw: max(1px, calc(0.8 * var(--u)));
+  --gd: rgb(var(--grain-dark-rgb) / calc(0.08 * var(--grain-k)));
+  --gd-fine: rgb(var(--grain-dark-rgb) / calc(0.08 * var(--grain-k) * var(--grain-fine)));
+  --gl: rgb(var(--grain-light-rgb) / calc(0.04 * var(--grain-k)));
+  --ga: rgb(var(--grain-dark-rgb) / calc(0.05 * var(--grain-k)));
+  --grain-h:
+    repeating-linear-gradient(to bottom, var(--gd-fine) 0 var(--lw), transparent var(--lw) calc(15 * var(--u))),
+    repeating-linear-gradient(to bottom, var(--gd) 0 var(--lw), transparent var(--lw) calc(23 * var(--u))),
+    repeating-linear-gradient(to bottom, var(--gl) 0 calc(2 * var(--lw)), transparent calc(2 * var(--lw)) calc(37 * var(--u)));
+  --grain-v:
+    repeating-linear-gradient(to right, var(--gd-fine) 0 var(--lw), transparent var(--lw) calc(15 * var(--u))),
+    repeating-linear-gradient(to right, var(--gd) 0 var(--lw), transparent var(--lw) calc(23 * var(--u))),
+    repeating-linear-gradient(to right, var(--gl) 0 calc(2 * var(--lw)), transparent calc(2 * var(--lw)) calc(37 * var(--u)));
+  --sweep-h: linear-gradient(to right, rgb(var(--neutral-dark-rgb) / 0.07), transparent 30%, rgb(var(--neutral-light-rgb) / 0.04) 55%, rgb(var(--neutral-dark-rgb) / 0.06));
+  --sweep-v: linear-gradient(to bottom, rgb(var(--neutral-dark-rgb) / 0.07), transparent 30%, rgb(var(--neutral-light-rgb) / 0.04) 55%, rgb(var(--neutral-dark-rgb) / 0.06));
+  --span: calc(var(--section-w) * var(--u));
+}
+
+@container (max-width: 400px) {
+  .section > * {
+    --grain-fine: 0;
+    --arch-lit: 0.22;
+  }
+}
+
+.section-body {
+  background-color: var(--wood);
+  background-image:
+    var(--grain-v),
+    repeating-radial-gradient(
+      ellipse 70% 420% at 160% 40%,
+      transparent 0 calc(9 * var(--u)),
+      var(--ga) calc(9 * var(--u)) calc(9 * var(--u) + var(--lw))
+    ),
+    var(--sweep-v);
+}
+
+.cubby {
+  --ox: calc(-1 * (var(--frame) + var(--x)) * var(--u));
+  --groove: max(1px, calc(1 * var(--u)));
+  --plank: max(1px, calc(var(--plank-width) * var(--u)));
+  --seam-eff: calc(var(--seam-k) * min(1, var(--plank-width)));
+  background-color: var(--back);
+  background-image:
+    linear-gradient(to bottom, rgb(var(--shade-deep-rgb) / calc(0.55 * var(--depth-k) * var(--back-shade-k))), transparent 24%),
+    linear-gradient(to right, rgb(var(--shade-deep-rgb) / calc(0.30 * var(--depth-k))), transparent 7%, transparent 93%, rgb(var(--shade-deep-rgb) / calc(0.30 * var(--depth-k)))),
+    repeating-linear-gradient(
+      to right,
+      rgb(var(--neutral-dark-rgb) / calc(0.45 * var(--seam-eff))) 0 var(--groove),
+      rgb(var(--plank-lift-rgb) / calc(0.08 * var(--seam-eff))) var(--groove) calc(var(--groove) + 1px),
+      transparent calc(var(--groove) + 1px) var(--plank)
+    ),
+    repeating-linear-gradient(
+      to right,
+      transparent 0 var(--plank),
+      rgb(var(--plank-lift-rgb) / calc(0.04 * var(--seam-k))) var(--plank) calc(2 * var(--plank))
+    ),
+    repeating-linear-gradient(to right, rgb(var(--plank-lift-rgb) / calc(0.025 * var(--seam-k))) 0 1px, transparent 1px calc(17 * var(--u)));
+  background-size: auto, auto, var(--span) 100%, var(--span) 100%, var(--span) 100%;
+  background-position: 0 0, 0 0, var(--ox) 0, var(--ox) 0, var(--ox) 0;
+  background-repeat: no-repeat;
+  box-shadow: 1px 0 0 var(--edge-up-6);
+}
+
+.cubby::before {
+  --board-tone: var(--wood);
+  --figure-x: 18%;
+  --grain-y: 0px;
+  background-color: var(--board-tone);
+  background-image:
+    linear-gradient(
+      to bottom,
+      var(--wood-lit) 0 1px,
+      rgb(var(--sheen-rgb) / 0.06) 1px,
+      transparent 45%,
+      rgb(var(--shade-rgb) / 0.30) 100%
+    ),
+    var(--grain-h),
+    repeating-radial-gradient(
+      ellipse 420% 70% at var(--figure-x) 160%,
+      transparent 0 calc(9 * var(--u)),
+      var(--ga) calc(9 * var(--u)) calc(9 * var(--u) + var(--lw))
+    ),
+    var(--sweep-h);
+  background-size: auto, auto, auto, auto, var(--span) 100%, var(--span) 100%;
+  background-position: 0 0, 0 var(--grain-y), 0 var(--grain-y), 0 var(--grain-y), var(--ox) 0, var(--ox) 0;
+  background-repeat: no-repeat, repeat, repeat, repeat, no-repeat, no-repeat;
+}
+
+.cubby[data-board="0"]::before {
+  --board-tone: var(--wood);
+  --figure-x: 18%;
+  --grain-y: 0px;
+}
+
+.cubby[data-board="1"]::before {
+  --board-tone: var(--wood-up-4);
+  --figure-x: 64%;
+  --grain-y: calc(7 * var(--u));
+}
+
+.cubby[data-board="2"]::before {
+  --board-tone: var(--wood-dn-4);
+  --figure-x: 37%;
+  --grain-y: calc(3 * var(--u));
+}
+
+.cubby[data-board="3"]::before {
+  --board-tone: var(--wood-up-2);
+  --figure-x: 82%;
+  --grain-y: calc(11 * var(--u));
+}
+
+.cubby[data-board="4"]::before {
+  --board-tone: var(--wood-dn-6);
+  --figure-x: 9%;
+  --grain-y: calc(5 * var(--u));
+}
+
+.cubby[data-board="5"]::before {
+  --board-tone: var(--wood-up-6);
+  --figure-x: 51%;
+  --grain-y: calc(9 * var(--u));
+}
+
+.section-trim::before,
+.section-trim::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: calc((var(--side-trim) + var(--frame)) * var(--u));
+  height: 100%;
+  background-color: var(--wood);
+  background-image:
+    var(--edge),
+    var(--grain-v),
+    repeating-radial-gradient(
+      ellipse 70% 420% at 160% 40%,
+      transparent 0 calc(9 * var(--u)),
+      var(--ga) calc(9 * var(--u)) calc(9 * var(--u) + var(--lw))
+    ),
+    var(--sweep-v);
+}
+
+.section-trim::before {
+  --edge: linear-gradient(
+    to right,
+    rgb(var(--arris-light-rgb) / 0.30) 0 1px,
+    transparent 1px calc(100% - 1px),
+    rgb(var(--shade-rgb) / 0.40) calc(100% - 1px)
+  );
+  left: 0;
+}
+
+.section-trim::after {
+  --edge: linear-gradient(
+    to right,
+    rgb(var(--arris-light-rgb) / 0.10) 0 1px,
+    rgb(var(--shade-rgb) / 0.12) 1px,
+    rgb(var(--shade-rgb) / 0.18) calc(100% - 1px),
+    rgb(var(--shade-rgb) / 0.45) calc(100% - 1px)
+  );
+  right: 0;
+  background-color: var(--wood-dn-6);
+  box-shadow: calc(2 * var(--u)) 0 calc(6 * var(--u)) calc(-1 * var(--u)) rgb(var(--shade-deep-rgb) / 0.38);
+}
+
+.section-top {
+  border-radius: 2px;
+  background-color: var(--wood);
+  background-image:
+    linear-gradient(
+      to bottom,
+      var(--edge-up-12) 0 1px,
+      rgb(var(--arris-light-rgb) / 0.10) 1px 14%,
+      rgb(var(--shade-rgb) / 0.38) 14% calc(14% + 1px),
+      rgb(var(--shade-rgb) / 0.30) calc(14% + 1px) 20%,
+      rgb(var(--arris-light-rgb) / 0.12) 52%,
+      rgb(var(--shade-rgb) / 0.40) 52% calc(52% + 1px),
+      rgb(var(--arris-light-rgb) / 0.14) calc(52% + 1px) 62%,
+      transparent 82%,
+      rgb(var(--shade-rgb) / 0.30) 96%,
+      rgb(var(--shade-rgb) / 0.55) calc(100% - 1px)
+    ),
+    var(--grain-h),
+    repeating-radial-gradient(
+      ellipse 420% 70% at 44% 160%,
+      transparent 0 calc(9 * var(--u)),
+      var(--ga) calc(9 * var(--u)) calc(9 * var(--u) + var(--lw))
+    ),
+    var(--sweep-h);
+  box-shadow: 0 calc(3 * var(--u)) calc(4 * var(--u)) calc(-1.5 * var(--u)) rgb(var(--shade-deep-rgb) / 0.45);
+}
+
+.section-top::before {
+  content: "";
+  position: absolute;
+  left: calc((var(--side-trim) + var(--overhang) + var(--frame)) * var(--u));
+  top: 100%;
+  width: calc((var(--section-w) - 2 * var(--frame)) * var(--u));
+  height: calc(var(--frame) * var(--u));
+  background-color: var(--wood);
+  background-image:
+    linear-gradient(to bottom, rgb(var(--shade-rgb) / 0.45) 0 1px, transparent 1px 60%, rgb(var(--shade-rgb) / 0.20) 100%),
+    var(--grain-h),
+    var(--sweep-h);
+}
+
+.section-base {
+  background-color: var(--wood-dn-22);
+  background-image:
+    linear-gradient(to bottom, rgb(var(--shade-deep-rgb) / 0.70) 0 1px, rgb(var(--shade-deep-rgb) / 0.45) 1px, transparent 22%),
+    var(--grain-h),
+    var(--sweep-h);
+}
+
+.section-base::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--foot-width) * var(--u));
+  right: calc(var(--foot-width) * var(--u));
+  bottom: 0;
+  height: calc(var(--arch-rise) * var(--u));
+  border-radius: calc(var(--arch-radius) * var(--u)) calc(var(--arch-radius) * var(--u)) 0 0 / 100% 100% 0 0;
+  background: linear-gradient(to bottom, rgb(var(--arch-top-rgb) / var(--arch-alpha-top)), rgb(var(--arch-bottom-rgb) / var(--arch-alpha-bottom)));
+  box-shadow:
+    inset 0 calc(6 * var(--u)) calc(8 * var(--u)) rgb(var(--neutral-dark-rgb) / 0.45),
+    calc(-1 * var(--lw)) calc(-1 * var(--lw)) 0 0 rgb(var(--plank-lift-rgb) / var(--arch-lit)),
+    inset calc(-1 * var(--lw)) calc(-1 * var(--lw)) 0 rgb(var(--shade-deep-rgb) / 0.5);
+}
+
+.section-base::after {
+  content: "";
+  position: absolute;
+  left: calc(-14 * var(--u));
+  top: 100%;
+  width: calc(100% + 28 * var(--u));
+  height: calc(var(--floor-margin) * var(--u));
+  background-image:
+    linear-gradient(to bottom, rgb(var(--room-shade-deep-rgb) / 0.85), transparent),
+    linear-gradient(to bottom, rgb(var(--room-shade-deep-rgb) / 0.85), transparent),
+    radial-gradient(ellipse 50% 85% at 50% 0%, rgb(var(--room-shade-deep-rgb) / 0.55), rgb(var(--room-shade-deep-rgb) / 0.25) 55%, transparent 100%);
+  background-size:
+    calc(var(--foot-width) * var(--u)) calc(2 * var(--u)),
+    calc(var(--foot-width) * var(--u)) calc(2 * var(--u)),
+    auto;
+  background-position:
+    left calc(14 * var(--u)) top 0,
+    right calc(14 * var(--u)) top 0,
+    0 0;
+  background-repeat: no-repeat;
+}
+
+}

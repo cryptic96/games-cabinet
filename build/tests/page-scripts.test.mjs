@@ -1797,6 +1797,73 @@ test('the page scripts never write a style attribute or an inline handler', () =
   }
 });
 
+/**
+ * Draws a layout into a fresh mount on a fake document and returns the drawn sections.
+ * @param {object} layout The layout to draw.
+ * @returns {FakeElement[]} The section elements in drawing order.
+ */
+function drawSections(layout) {
+  const previous = globalThis.document;
+  const page = createFakeDocument();
+  const mount = page.createElement('div');
+
+  globalThis.document = page;
+
+  try {
+    renderCabinet(mount, layout, COPY);
+  } finally {
+    globalThis.document = previous;
+  }
+
+  return mount.children;
+}
+
+test('a drawn section holds a floor hook, its body, its furniture and one hidden light layer with one pool per cubby', () => {
+  const cubby = (xMm, yMm, widthMm, heightMm) => ({ xMm, yMm, widthMm, heightMm, placements: [] });
+  const cubbies = [cubby(0, 0, 290, 300), cubby(310, 0, 290, 300), cubby(0, 320, 600, 300)];
+  const [section] = drawSections({ palette: [], sections: [{ index: 0, widthMm: 600, heightMm: 640, frameMm: 20, cubbies }] });
+
+  assert.deepEqual(
+    section.children.map((child) => child.className),
+    ['section-floor', 'section-body', 'section-top', 'section-trim', 'section-base', 'section-light'],
+  );
+
+  const light = section.children.at(-1);
+  const drawnCubbies = section.children[1].children;
+
+  assert.equal(light.getAttribute('aria-hidden'), 'true');
+  assert.equal(section.children[0].getAttribute('aria-hidden'), 'true');
+  assert.equal(light.children.length, cubbies.length);
+
+  light.children.forEach((pool, index) => {
+    assert.equal(pool.className, 'light-pool');
+    assert.equal(pool.getAttribute('aria-hidden'), 'true');
+    assert.equal(pool.children.length, 0);
+    assert.equal(pool.attributes.has('style'), false);
+
+    for (const name of ['--x', '--y', '--w', '--h']) {
+      assert.notEqual(pool.properties.get(name), undefined, name);
+      assert.equal(pool.properties.get(name), drawnCubbies[index].properties.get(name), `${name} of pool ${index}`);
+    }
+  });
+});
+
+test('a section with no cubbies still carries an empty light layer', () => {
+  const [section] = drawSections({ palette: [], sections: [{ index: 0, widthMm: 600, heightMm: 300, frameMm: 20, cubbies: [] }] });
+  const light = section.children.at(-1);
+
+  assert.equal(light.className, 'section-light');
+  assert.equal(light.children.length, 0);
+});
+
+test('the renderer never reads or names any of the five look attributes', () => {
+  const source = readFileSync(new URL('../../Cabinet.Service/wwwroot/js/render.js', import.meta.url), 'utf8');
+
+  for (const name of ['data-design', 'data-wood', 'data-backs', 'data-lights', 'data-depth', 'dataset.design', 'dataset.wood', 'dataset.backs', 'dataset.lights', 'dataset.depth']) {
+    assert.equal(source.includes(name), false, name);
+  }
+});
+
 const CABINET_LAYOUT_ROUTE = '/cabinet/layout?profile=desktop';
 const INVENTED_TITLES = ['Invented Lighthouse', 'Invented Orchard', 'Invented Harbour', 'Invented Meadow'];
 
@@ -2226,7 +2293,9 @@ test('a drawn marker shows only its count and carries the full name as its acces
   assert.equal(marker.title, '+4 more expansions for Invented Harbour');
 });
 
-const STYLESHEET = readFileSync(new URL('../../Cabinet.Service/wwwroot/css/cabinet.css', import.meta.url), 'utf8');
+const STYLESHEET = ['cabinet.css', 'cabinet-design.css', 'cabinet-wood.css', 'cabinet-modifiers.css']
+  .map((name) => readFileSync(new URL(`../../Cabinet.Service/wwwroot/css/${name}`, import.meta.url), 'utf8'))
+  .join('\n');
 
 test('the stylesheet carries the apron arch tokens, the length registration of the unit and the cover line steps', () => {
   assert.equal(STYLESHEET.includes('--arch-shade-alpha'), false);
