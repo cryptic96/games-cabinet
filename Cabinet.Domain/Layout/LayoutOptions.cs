@@ -45,7 +45,7 @@ public sealed record LayoutOptions(
     bool LieFlatBeforeNewSection = true,
     bool GroupSeries = true,
     int CoverFromExpansions = 2,
-    bool BalanceSections = false)
+    bool BalanceSections = true)
 {
     private const int MaxShare = 100;
     private const int MaxStack = 20;
@@ -59,8 +59,8 @@ public sealed record LayoutOptions(
     private const int CoverFromExpansionsShift = 48;
     private const int BalanceSectionsShift = 56;
 
-    /// <summary>The committed starting values: a quarter of the boxes face out, size weighted, stacks of six, twelve games to leave the all-covers look, a big box lies flat before a new section opens, the games of a series stand together, and a base game with two owned expansions faces out.</summary>
-    public static LayoutOptions Default { get; } = new(25, CoverStrategy.SizeWeighted, 6, 12, true, true, 2);
+    /// <summary>The committed starting values: a quarter of the boxes face out, size weighted, stacks of six, twelve games to leave the all-covers look, a big box lies flat before a new section opens, the games of a series stand together, a base game with two owned expansions faces out, and the games are spread evenly over the sections.</summary>
+    public static LayoutOptions Default { get; } = new(25, CoverStrategy.SizeWeighted, 6, 12, true, true, 2, true);
 
     /// <summary>Sixteen lowercase hexadecimal digits that change whenever any setting changes.</summary>
     public string Fingerprint => StableHash.Hash(Pack(), StableHash.OptionsSalt).ToString("x16", CultureInfo.InvariantCulture);

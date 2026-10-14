@@ -153,8 +153,8 @@ public class ShelfMixTests
         {
             var items = SyntheticCollections.Random(seed, 60);
             var next = SyntheticCollections.NextBaseGame(items, seed);
-            var before = KindsByGame(CabinetLayoutEngine.Build(items, Design));
-            var after = KindsByGame(CabinetLayoutEngine.Build([.. items, next], Design));
+            var before = KindsByGame(CabinetLayoutEngine.Build(items, Design, LayoutAssertions.SectionBySection));
+            var after = KindsByGame(CabinetLayoutEngine.Build([.. items, next], Design, LayoutAssertions.SectionBySection));
 
             foreach (var (gameId, kind) in before)
             {
@@ -409,8 +409,8 @@ public class ShelfMixTests
         {
             var items = SyntheticCollections.Random(seed, 120);
             var next = SyntheticCollections.NextBaseGame(items, seed);
-            var before = CabinetLayoutEngine.Build(items, Design);
-            var after = CabinetLayoutEngine.Build([.. items, next], Design);
+            var before = CabinetLayoutEngine.Build(items, Design, LayoutAssertions.SectionBySection);
+            var after = CabinetLayoutEngine.Build([.. items, next], Design, LayoutAssertions.SectionBySection);
 
             sawFlat |= PlacementsOf(before).Any(placement => placement.Kind == PlacementKind.FlatBox);
             LayoutAssertions.ChangedCubbies(before, after).Should().HaveCountLessThanOrEqualTo(1, "seed {0}", seed);

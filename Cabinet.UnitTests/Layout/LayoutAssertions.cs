@@ -114,18 +114,18 @@ internal static class LayoutAssertions
     /// section on to the first of the next. Each entry names the two games and their cubbies; an empty list means every
     /// series stands as one block or runs on from cubby to cubby without leaving one out.
     /// </summary>
-    public static IReadOnlyList<string> SeriesGaps(CabinetLayout layout, IReadOnlyList<CabinetItem> items, SectionDesign design) =>
-        [.. SeriesStanding(layout, items).SelectMany(series => GapsOf(series, design))];
+    public static IReadOnlyList<string> SeriesGaps(CabinetLayout layout, IReadOnlyList<CabinetItem> items) =>
+        [.. SeriesStanding(layout, items).SelectMany(series => GapsOf(series, layout))];
 
     /// <summary>The games of every series that does not run on in reading order (see <see cref="SeriesGaps"/>), each in entry order.</summary>
-    public static IReadOnlyList<IReadOnlyList<CabinetItem>> SeriesWithGaps(CabinetLayout layout, IReadOnlyList<CabinetItem> items, SectionDesign design)
+    public static IReadOnlyList<IReadOnlyList<CabinetItem>> SeriesWithGaps(CabinetLayout layout, IReadOnlyList<CabinetItem> items)
     {
         var byEntry = items.ToDictionary(item => (item.CollectionId, item.BggId));
 
         return
         [
             .. SeriesStanding(layout, items)
-                .Where(series => GapsOf(series, design).Count > 0)
+                .Where(series => GapsOf(series, layout).Count > 0)
                 .Select(series => (IReadOnlyList<CabinetItem>)[.. series.Select(entry => byEntry[(entry.Placement.EntryId, entry.Placement.GameId)])]),
         ];
     }
@@ -141,14 +141,14 @@ internal static class LayoutAssertions
         return [.. series, .. items.Where(item => item.Kind == ItemKind.Expansion && OwnedParentOf(item, items) is { } parent && bases.Contains(parent))];
     }
 
-    private static List<string> GapsOf(List<(int Section, int Cubby, Placement Placement)> series, SectionDesign design)
+    private static List<string> GapsOf(List<(int Section, int Cubby, Placement Placement)> series, CabinetLayout layout)
     {
         var gaps = new List<string>();
 
         for (var index = 1; index < series.Count; index++)
         {
-            var before = ReadingIndex(series[index - 1], design);
-            var now = ReadingIndex(series[index], design);
+            var before = ReadingIndex(series[index - 1], layout);
+            var now = ReadingIndex(series[index], layout);
 
             if (now != before && now != before + 1)
             {
@@ -182,8 +182,24 @@ internal static class LayoutAssertions
         ];
     }
 
-    private static int ReadingIndex((int Section, int Cubby, Placement Placement) entry, SectionDesign design) =>
-        (entry.Section * design.Cubbies.Count) + entry.Cubby;
+    private static int ReadingIndex((int Section, int Cubby, Placement Placement) entry, CabinetLayout layout) =>
+        layout.Sections.Where(section => section.Index < entry.Section).Sum(section => section.Cubbies.Count) + entry.Cubby;
+
+    /// <summary>
+    /// The committed options with section balancing off: games are placed section by section as they come, so the last
+    /// section stays short. The balanced arrangement is built from the same placement rules, so the rules are pinned here.
+    /// </summary>
+    public static LayoutOptions SectionBySection { get; } = LayoutOptions.Default with { BalanceSections = false };
+
+    /// <summary>The section every game that stands on its own is in, keyed by game identifier.</summary>
+    public static IReadOnlyDictionary<int, int> SectionOfEachGame(CabinetLayout layout) =>
+        PlacementsWithPosition(layout)
+            .Where(entry => entry.Placement.Kind is PlacementKind.Spine or PlacementKind.Cover or PlacementKind.FlatBox or PlacementKind.OrphanExpansion)
+            .ToDictionary(entry => entry.Placement.GameId, entry => entry.Section);
+
+    /// <summary>How many shelf rows each section of the layout is drawn with, in section order.</summary>
+    public static IReadOnlyList<int> RowsDrawnPerSection(CabinetLayout layout) =>
+        [.. layout.Sections.Select(section => section.Cubbies.Select(cubby => cubby.YMm).Distinct().Count())];
 
     /// <summary>Every placement of the layout with the section and cubby it stands in.</summary>
     public static IReadOnlyList<(int Section, int Cubby, Placement Placement)> PlacementsWithPosition(CabinetLayout layout) =>

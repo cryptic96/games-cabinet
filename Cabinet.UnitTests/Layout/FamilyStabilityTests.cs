@@ -5,7 +5,9 @@ using FluentAssertions;
 namespace Cabinet.UnitTests.Layout;
 
 /// <summary>
-/// Pins what stays put when games and expansions are added to a collection of the kind the cabinet really holds. Adding
+/// Pins what stays put when games and expansions are added to a collection of the kind the cabinet really holds. The
+/// placement rules are pinned on the arrangement made section by section, which the balanced desktop arrangement is built
+/// from, and on the phone design, which never balances. On both, adding
 /// a plain game, an expansion whose base game is not owned, or an expansion that joins a stack its game already has
 /// changes at most one cubby, and for an expansion of a family that cubby is the base game's. The one accepted exception
 /// is an expansion that makes its family wider: the first expansion for a base game, the first one that lies in a game's
@@ -15,6 +17,10 @@ namespace Cabinet.UnitTests.Layout;
 /// series running on without leaving a cubby out, at the default cover share and at the committed one. A game that joins
 /// a series is the other accepted exception, tested with the engine, so these checks leave out the appended games that
 /// join one.
+/// On the balanced desktop cabinet, which is what visitors get by default, adding a game changes at most one cubby inside
+/// a section, but it may move games across section boundaries so the sections stay within one shelf row of each other.
+/// The extra game can also raise the rows a section may use, which lets a game of that section stand differently, so a
+/// second cubby changes without any game crossing a boundary. Both are the exception: most added games change one cubby.
 /// </summary>
 public class FamilyStabilityTests
 {
@@ -28,8 +34,9 @@ public class FamilyStabilityTests
     private const int ThickDepthMm = 55;
 
     private static readonly SectionDesign Design = SectionDesigns.Desktop;
+    private static readonly LayoutOptions SectionBySection = LayoutAssertions.SectionBySection;
     private static readonly LayoutOptions SpinesOnly = new(0, CoverStrategy.SizeWeighted, 6, 0, CoverFromExpansions: 0);
-    private static readonly LayoutOptions WithoutExpansionCovers = LayoutOptions.Default with { CoverFromExpansions = 0 };
+    private static readonly LayoutOptions WithoutExpansionCovers = SectionBySection with { CoverFromExpansions = 0 };
 
     [Fact]
     [Trait("Category", "Layout")]
@@ -154,6 +161,103 @@ public class FamilyStabilityTests
 
     [Fact]
     [Trait("Category", "Layout")]
+    public void Appending_a_base_game_to_the_phone_cabinet_changes_at_most_one_cubby_when_the_collection_has_expansions()
+    {
+        for (var seed = 1; seed <= Seeds; seed++)
+        {
+            var items = SyntheticCollections.Random(seed, CollectionSize, ExpansionPercent);
+            var next = SyntheticCollections.NextBaseGame(items, seed);
+
+            var (before, after) = BuildBeforeAndAfter(items, next, LayoutOptions.Default, SectionDesigns.Phone);
+
+            LayoutAssertions.AssertValid(after, [.. items, next]);
+
+            if (!LayoutAssertions.JoinsSeries(items, next))
+            {
+                LayoutAssertions.ChangedCubbies(before, after).Should().HaveCountLessThanOrEqualTo(1, "seed {0}", seed);
+            }
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void Appending_an_expansion_whose_base_game_is_not_owned_to_the_phone_cabinet_changes_at_most_one_cubby()
+    {
+        for (var seed = 1; seed <= Seeds; seed++)
+        {
+            var items = SyntheticCollections.Random(seed, CollectionSize, ExpansionPercent);
+            var next = SyntheticCollections.NextOrphanExpansion(items, seed);
+
+            var (before, after) = BuildBeforeAndAfter(items, next, LayoutOptions.Default, SectionDesigns.Phone);
+
+            LayoutAssertions.AssertValid(after, [.. items, next]);
+
+            if (!LayoutAssertions.JoinsSeries(items, next))
+            {
+                LayoutAssertions.ChangedCubbies(before, after).Should().HaveCountLessThanOrEqualTo(1, "seed {0}", seed);
+            }
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void Appending_a_base_game_to_the_balanced_desktop_cabinet_changes_at_most_one_cubby_in_most_cases_and_crosses_a_section_boundary_only_to_keep_sections_even()
+    {
+        var checkedSeeds = 0;
+        var crossed = 0;
+        var unbalanced = 0;
+        var reshuffled = 0;
+
+        for (var seed = 1; seed <= Seeds; seed++)
+        {
+            var items = SyntheticCollections.Random(seed, CollectionSize, ExpansionPercent);
+            var next = SyntheticCollections.NextBaseGame(items, seed);
+
+            var (before, after) = BuildBeforeAndAfter(items, next, LayoutOptions.Default);
+
+            LayoutAssertions.AssertValid(after, [.. items, next]);
+            var rows = LayoutAssertions.RowsDrawnPerSection(after);
+
+            if (rows.Max() - rows.Min() > 1)
+            {
+                unbalanced++;
+                LayoutAssertions.Geometry(after).Should().Be(
+                    LayoutAssertions.Geometry(CabinetLayoutEngine.Build([.. items, next], Design, SectionBySection)),
+                    "seed {0}: when no spread within one shelf row keeps the number of sections, the arrangement stays as it is without balancing",
+                    seed);
+            }
+
+            if (LayoutAssertions.JoinsSeries(items, next))
+            {
+                continue;
+            }
+
+            checkedSeeds++;
+            var sectionsBefore = LayoutAssertions.SectionOfEachGame(before);
+            var sectionsAfter = LayoutAssertions.SectionOfEachGame(after);
+
+            if (sectionsBefore.Any(entry => sectionsAfter[entry.Key] != entry.Value))
+            {
+                crossed++;
+
+                continue;
+            }
+
+            if (LayoutAssertions.ChangedCubbies(before, after).Count > 1)
+            {
+                reshuffled++;
+            }
+        }
+
+        checkedSeeds.Should().BeGreaterThan(Seeds / 2, "most appended games join no series");
+        crossed.Should().BeLessThan(checkedSeeds / 5, "crossing a section boundary is the exception");
+        reshuffled.Should().BeLessThan(checkedSeeds / 20, "changing a second cubby of a section without crossing a boundary is rarer still");
+        (checkedSeeds - crossed - reshuffled).Should().BeGreaterThan(checkedSeeds * 4 / 5, "most added games change at most one cubby");
+        unbalanced.Should().BeLessThan(Seeds / 4, "most collections can be spread within one shelf row");
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
     public void Appending_an_expansion_whose_base_game_is_not_owned_changes_at_most_one_cubby()
     {
         for (var seed = 1; seed <= Seeds; seed++)
@@ -258,7 +362,7 @@ public class FamilyStabilityTests
     [Trait("Category", "Layout")]
     public void First_expansion_for_a_base_game_reserves_its_place_and_keeps_earlier_games_in_place(int coverSharePercent)
     {
-        var options = LayoutOptions.Default with { CoverSharePercent = coverSharePercent };
+        var options = SectionBySection with { CoverSharePercent = coverSharePercent };
 
         for (var seed = 1; seed <= Seeds; seed++)
         {
@@ -275,7 +379,7 @@ public class FamilyStabilityTests
             arrival?.Placement.Kind.Should().BeOneOf(PlacementKind.ExpansionLayer, PlacementKind.ExpansionSpine);
             MoreCountOf(after, baseGame.BggId).Should().Be(arrival is null ? 1 : 0, "seed {0}", seed);
             LayoutAssertions.AssertValid(after, [.. items, next]);
-            LayoutAssertions.SeriesGaps(after, [.. items, next], Design).Should().BeEmpty("seed {0}: a wider family keeps its series together", seed);
+            LayoutAssertions.SeriesGaps(after, [.. items, next]).Should().BeEmpty("seed {0}: a wider family keeps its series together", seed);
             AssertEarlierGamesKeepTheirCubby(items, baseGame, before, after, seed);
         }
     }
@@ -369,7 +473,7 @@ public class FamilyStabilityTests
             var baseGame = items[20 + (seed % 80)];
             items.Add(WithDepth(SyntheticCollections.NextExpansion(items, baseGame.BggId, seed), ThinDepthMm));
             var next = WithDepth(SyntheticCollections.NextExpansion(items, baseGame.BggId, seed + 1000), ThinDepthMm);
-            var options = LayoutOptions.Default with { CoverSharePercent = 0, FewGamesThreshold = 0 };
+            var options = SectionBySection with { CoverSharePercent = 0, FewGamesThreshold = 0 };
 
             var (before, after) = BuildBeforeAndAfter(items, next, options);
 
@@ -468,8 +572,11 @@ public class FamilyStabilityTests
     private static (CabinetLayout Before, CabinetLayout After) BuildBeforeAndAfter(
         IReadOnlyList<CabinetItem> items,
         CabinetItem next,
-        LayoutOptions? options = null) =>
-        (CabinetLayoutEngine.Build(items, Design, options ?? LayoutOptions.Default), CabinetLayoutEngine.Build([.. items, next], Design, options ?? LayoutOptions.Default));
+        LayoutOptions? options = null,
+        SectionDesign? design = null) =>
+        (
+            CabinetLayoutEngine.Build(items, design ?? Design, options ?? SectionBySection),
+            CabinetLayoutEngine.Build([.. items, next], design ?? Design, options ?? SectionBySection));
 
     private static CabinetItem WithDepth(CabinetItem expansion, int depthMm) =>
         expansion with { Box = expansion.Box with { DepthMm = depthMm } };

@@ -5,7 +5,8 @@ using FluentAssertions;
 namespace Cabinet.UnitTests.Layout;
 
 /// <summary>
-/// Pins how full the desktop cabinet is, next to the phone checks: on realistic collections no section but the last keeps a
+/// Pins how full the desktop cabinet is when its sections are filled in turn, next to the phone checks (the balanced
+/// arrangement keeps every section within one shelf row of every other instead, see the section balance tests): on realistic collections no section but the last keeps a
 /// bare shelf row, a collection of about sixty-five games has no bare row in the middle of any section, and a large
 /// collection does not end in a run of nearly empty sections because its biggest boxes had too few cubbies to go to.
 /// A section before the last holds at least 30 boxes, and a realistic mix of box sizes never ends in a section of fewer than
@@ -95,7 +96,7 @@ public class DesktopDensityTests
     [Trait("Category", "Layout")]
     public void A_large_collection_does_not_end_in_near_empty_desktop_sections(string name)
     {
-        var layout = CabinetLayoutEngine.Build(LayoutDensity.ItemsFor(name), SectionDesigns.Desktop);
+        var layout = CabinetLayoutEngine.Build(LayoutDensity.ItemsFor(name), SectionDesigns.Desktop, LayoutAssertions.SectionBySection);
         var placements = LayoutDensity.PlacementsPerSection(layout);
 
         placements.SkipLast(1).Should().OnlyContain(count => count >= NonLastSectionFloor, "{0}: placements per section {1}", name, string.Join(", ", placements));
@@ -107,7 +108,7 @@ public class DesktopDensityTests
     public void A_realistic_mix_never_ends_in_a_small_desktop_section_of_big_boxes(string name, int coverSharePercent)
     {
         var items = LayoutDensity.ItemsFor(name);
-        var options = LayoutOptions.Default with { CoverSharePercent = coverSharePercent };
+        var options = LayoutAssertions.SectionBySection with { CoverSharePercent = coverSharePercent };
 
         var layout = CabinetLayoutEngine.Build(items, SectionDesigns.Desktop, options);
         var last = layout.Sections[^1];
