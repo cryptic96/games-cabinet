@@ -2682,6 +2682,8 @@ function lookPage({ look = BASE_LOOK, transitions = true, lampScriptLoaded = tru
       return script;
     },
     querySelector: (selector) => (selector.startsWith('meta') ? { getAttribute: () => '/js/evening.js?v=abc' } : logo),
+    visibilityState: 'visible',
+    addEventListener: () => {},
   };
 
   if (transitions) {
@@ -2709,6 +2711,8 @@ function lookPage({ look = BASE_LOOK, transitions = true, lampScriptLoaded = tru
     },
   };
 
+  doc.documentElement = root;
+
   return { root, logo, started, appended, reducedMotion, lampScriptLoaded };
 }
 
@@ -2724,6 +2728,9 @@ async function withLookPage(page, body) {
   globalThis.window = {
     matchMedia: () => ({ matches: page.reducedMotion }),
     cabinetEvening: page.lampScriptLoaded ? { key: 'cabinet-lit' } : undefined,
+    setTimeout: () => 0,
+    clearTimeout: () => {},
+    setInterval: () => 0,
   };
 
   try {
