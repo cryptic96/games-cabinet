@@ -111,18 +111,22 @@ public class CabinetLayoutEngineTests
         act.Should().Throw<ArgumentException>().WithMessage("*100*");
     }
 
-    [Fact]
+    [Theory]
+    [InlineData("desktop")]
+    [InlineData("phone")]
     [Trait("Category", "Layout")]
-    public void Appending_a_game_changes_at_most_one_cubby_across_seeded_collections()
+    public void Appending_a_game_changes_at_most_one_cubby_across_seeded_collections_when_sections_are_filled_in_turn(string profile)
     {
+        SectionDesigns.TryGet(profile, out var design);
+        var options = design!.BalancesSections ? LayoutAssertions.SectionBySection : LayoutOptions.Default;
         var checkedSeeds = 0;
 
         for (var seed = 1; seed <= StabilitySeeds; seed++)
         {
             var items = SyntheticCollections.Random(seed, StabilityCollectionSize);
             var next = SyntheticCollections.NextBaseGame(items, seed);
-            var before = CabinetLayoutEngine.Build(items, SectionDesigns.Desktop);
-            var after = CabinetLayoutEngine.Build([.. items, next], SectionDesigns.Desktop);
+            var before = CabinetLayoutEngine.Build(items, design!, options);
+            var after = CabinetLayoutEngine.Build([.. items, next], design!, options);
 
             LayoutAssertions.AssertValid(after, [.. items, next]);
 
@@ -157,8 +161,8 @@ public class CabinetLayoutEngineTests
             var all = items.Append(next).OrderBy(item => item.CollectionId).ThenBy(item => item.BggId).ToList();
             var series = SeriesGrouping.Group(all).Single(group => group.Indices.Contains(all.IndexOf(next)));
             var firstEntry = all[series.Indices[0]].CollectionId;
-            var before = LayoutAssertions.PlacementsWithPosition(CabinetLayoutEngine.Build(items, SectionDesigns.Desktop));
-            var afterLayout = CabinetLayoutEngine.Build([.. items, next], SectionDesigns.Desktop);
+            var before = LayoutAssertions.PlacementsWithPosition(CabinetLayoutEngine.Build(items, SectionDesigns.Desktop, LayoutAssertions.SectionBySection));
+            var afterLayout = CabinetLayoutEngine.Build([.. items, next], SectionDesigns.Desktop, LayoutAssertions.SectionBySection);
             var after = LayoutAssertions.PlacementsWithPosition(afterLayout);
 
             series.Indices.Count.Should().BeGreaterThan(1, "seed {0}: the appended game joins a series", seed);

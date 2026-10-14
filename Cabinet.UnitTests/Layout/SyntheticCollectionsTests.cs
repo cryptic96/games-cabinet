@@ -178,7 +178,7 @@ public class SyntheticCollectionsTests
     {
         SyntheticCollections.TryGetSample("65", out var items);
 
-        var layout = CabinetLayoutEngine.Build(items, SectionDesigns.Desktop);
+        var layout = CabinetLayoutEngine.Build(items, SectionDesigns.Desktop, LayoutAssertions.SectionBySection);
 
         var kinds = layout.Sections.SelectMany(section => section.Cubbies).SelectMany(cubby => cubby.Placements).Select(placement => placement.Kind).ToHashSet();
         kinds.Should().Contain(Enum.GetValues<PlacementKind>().Where(kind => kind != PlacementKind.MoreMarker), "the review sample shows every kind of placement but the marker, which only a family of more than a dozen expansions needs");

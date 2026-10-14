@@ -70,12 +70,14 @@ public class CommittedConfigurationTests
         layout["CoverSharePercent"].Should().Be("33");
         layout["CoverFromExpansions"].Should().Be("2");
         layout["GroupSeries"].Should().BeEquivalentTo("true");
+        layout["BalanceSections"].Should().BeEquivalentTo("true");
 
         var options = LayoutSettings.FromConfiguration(configuration);
 
         options.CoverSharePercent.Should().Be(33);
         options.CoverFromExpansions.Should().Be(2);
         options.GroupSeries.Should().BeTrue();
+        options.BalanceSections.Should().BeTrue();
     }
 
     [Fact]

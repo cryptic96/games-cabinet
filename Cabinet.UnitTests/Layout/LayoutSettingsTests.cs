@@ -19,7 +19,7 @@ public class LayoutSettingsTests
 
         var options = LayoutSettings.FromConfiguration(configuration);
 
-        options.Should().Be(new LayoutOptions(33, CoverStrategy.SizeWeighted, 6, 12, true, true, 2));
+        options.Should().Be(new LayoutOptions(33, CoverStrategy.SizeWeighted, 6, 12, true, true, 2, true));
         options.Should().Be(LayoutOptions.Default with { CoverSharePercent = 33 });
     }
 
@@ -199,10 +199,10 @@ public class LayoutSettingsTests
 
     [Fact]
     [Trait("Category", "Layout")]
-    public void Balancing_sections_defaults_to_off_when_the_key_is_absent_and_on_changes_the_fingerprint()
+    public void Balancing_sections_defaults_to_on_when_the_key_is_absent_and_off_changes_the_fingerprint()
     {
-        LayoutSettings.FromConfiguration(Configure()).BalanceSections.Should().BeFalse();
-        LayoutSettings.FromConfiguration(Configure(("Layout:BalanceSections", "true"))).Fingerprint
+        LayoutSettings.FromConfiguration(Configure()).BalanceSections.Should().BeTrue();
+        LayoutSettings.FromConfiguration(Configure(("Layout:BalanceSections", "false"))).Fingerprint
             .Should().NotBe(LayoutSettings.FromConfiguration(Configure()).Fingerprint);
     }
 
@@ -229,7 +229,7 @@ public class LayoutSettingsTests
             LayoutOptions.Default with { GroupSeries = false },
             LayoutOptions.Default with { CoverFromExpansions = 3 },
             LayoutOptions.Default with { CoverFromExpansions = 0 },
-            LayoutOptions.Default with { BalanceSections = true },
+            LayoutOptions.Default with { BalanceSections = false },
         }.Select(options => options.Fingerprint).ToList();
 
         fingerprints.Distinct().Should().HaveCount(fingerprints.Count);

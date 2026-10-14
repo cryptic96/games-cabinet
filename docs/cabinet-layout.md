@@ -11,7 +11,7 @@ The cabinet is built from fixed, hand-designed sections. Each section is a
 wooden frame holding rows of cubbies of different widths and heights, like a
 real shelf unit that was assembled by hand rather than cut on a grid. Every
 cubby of a section is drawn, whether or not anything stands in it, except below
-the last section's last used shelf row (see below). An empty cubby is bare
+the last used shelf row of a section (see below). An empty cubby is bare
 shaded wood.
 
 Games are placed into the cubbies by the server, not by the browser. The
@@ -108,14 +108,37 @@ When the collection outgrows one section, a new section is added beside the
 existing ones, and once a row is full further sections start a new row below.
 Existing sections are never redesigned to make room.
 
-Only the last section is drawn short. It stops at its last shelf row that holds
-a game, with a minimum of two rows, so a section that has just opened, or a
-whole cabinet with a few games, does not show a tall hollow stretch of empty
-shelves. The furniture follows: the moulded top, the side boards and the plinth
-are drawn around the rows that are shown, and the space the page reserves for
-the section is exactly that height. A cabinet with no games shows two rows of
-bare cubbies. Every section before the last is always drawn with all of its
-rows. Trimming only decides what is drawn: where games stand never depends on it.
+The desktop cabinet is balanced. Once it needs more than one section, the games
+are spread over the same sections that were needed anyway, so that every
+desktop section is drawn within one shelf row of every other and the cabinet does
+not end in a short, half-empty section next to full ones. The server places the
+games section by section to learn how many sections are needed, then places them
+again under the smallest limit on rows per section that needs no more sections.
+Each section is then drawn down to its last shelf row that holds a game, with a
+minimum of two rows, so a section is never a tall hollow stretch of empty
+shelves. With 65 games, for example, one full section of five rows and one of two
+rows becomes two sections of four rows. A collection that fits one section is
+arranged exactly as it would be without balancing, and so is a collection whose
+games cannot be spread within one shelf row without needing another section: the
+cabinet then keeps the arrangement it has without balancing, with its short last
+section. Among invented collections of 120 games with expansions that happens in
+about one in twelve. The setting
+`Layout:BalanceSections` switches balancing off, and the desktop cabinet is then
+arranged section by section as the games come.
+
+The phone cabinet never balances: it is a single column, and a short last section
+there just reads as the end of the shelf. Its sections are filled in turn, and
+only the last section is drawn short. It stops at its last shelf row that holds a
+game, with a minimum of two rows, so a section that has just opened, or a whole
+cabinet with a few games, does not show a tall hollow stretch of empty shelves.
+The same holds for the desktop cabinet with balancing off.
+
+The furniture follows the rows that are drawn: the moulded top, the side boards
+and the plinth are drawn around the rows that are shown, and the space the page
+reserves for the section is exactly that height. A cabinet with no games shows
+two rows of bare cubbies. Where sections are filled in turn, every section before
+the last is always drawn with all of its rows. Trimming only decides what is
+drawn: where games stand never depends on it.
 
 The page asks for the layout that matches the screen width. Wide screens get
 the desktop section design; phones get their own narrower design, so the
@@ -144,6 +167,7 @@ two underscores.
 | `Layout:LieFlatBeforeNewSection` | `true` | `true` or `false` | Lets a game that fits no existing cubby standing lie flat in the first cubby that can take it lying down, instead of opening a new section for it. Turning it off keeps every game standing the way it was chosen, but may add sections that are mostly empty. |
 | `Layout:CoverFromExpansions` | 2 | 0 to 20 | The fewest owned expansions that make a base game face out, whatever the cover share and strategy. 0 turns the rule off. |
 | `Layout:GroupSeries` | `true` | `true` or `false` | Places the games of one series next to each other (see "What the cabinet layout is"). Turning it off places every game on its own, the way the cabinet was arranged before series were grouped. |
+| `Layout:BalanceSections` | `true` | `true` or `false` | Spreads the games of the desktop cabinet evenly over its sections, so every desktop section is drawn within one shelf row of every other and there is no short last section (see "What the cabinet layout is"). Turning it off fills the desktop sections one after the other, the way the cabinet was arranged before sections were balanced. The phone cabinet is never balanced, whatever this setting says. |
 | `Prototype:Enabled` | `false` in the committed settings; `true` in the development settings | `true` or `false` | Shows the invented sample collections and their switcher while running locally in development. The deployed site ignores it. See "Invented collections" below. |
 
 ### Changing a setting on the server
@@ -156,6 +180,7 @@ Layout__CoverStrategy=Random
 Layout__LieFlatBeforeNewSection=true
 Layout__GroupSeries=true
 Layout__CoverFromExpansions=2
+Layout__BalanceSections=true
 ```
 
 Then restart the service so it reads the file:
@@ -185,16 +210,33 @@ The same collection always gives the same cabinet, on every visit and after
 every restart. Nothing is random in a way that changes between requests: every
 choice comes from the game's own identifier and the settings.
 
-Adding a game that joins no series changes only the cubby it lands in.
-Neighbouring games keep their place, their orientation and their colour. A game lands lying flat when no
-cubby had room for it standing the way it was chosen.
+Adding a game that joins no series changes at most one cubby inside a section.
+On the desktop cabinet, which is balanced, it may also move games across section
+boundaries so the sections stay within one shelf row of each other. The phone
+cabinet keeps the stricter promise: adding a game changes only the cubby it lands
+in, and neighbouring games keep their place, their orientation and their colour.
+A game lands lying flat when no cubby had room for it standing the way it was
+chosen.
 
-The one thing that also changes is how much of the last section is drawn. A game
-that lands in a row below the last section's last used row adds that row, and
-any empty rows above it, to the drawn section, so the section grows taller by
-whole rows and nothing that was already drawn moves. A game that opens a new
-section gives the section before it all of its rows and starts the new last
-section with two rows. Neither changes any game's place.
+Most of the time the desktop cabinet behaves like the phone cabinet: on invented
+collections of 120 games, about nineteen added games in twenty change one cubby
+and nothing else. The exception is a game that changes how tightly the games must
+be packed to keep the sections within one row of each other, which raises the rows
+a section may use. Then a run of games, in the worst cases a few dozen, shifts from
+the end of one section to the start of the next, or, more rarely, a game of the same
+section stands differently because there is now room for it, which changes a
+second cubby of that section. With `Layout:BalanceSections` off the desktop cabinet
+keeps the stricter promise too.
+
+The one thing that also changes is how much of a section is drawn. Where sections
+are filled in turn, that is the last section only. A game that lands in a row below
+the last section's last used row adds that row, and any empty rows above it, to
+the drawn section, so the section grows taller by whole rows and nothing that was
+already drawn moves. A game that opens a new section gives the section before it
+all of its rows and starts the new last section with two rows. Neither changes any
+game's place. On the balanced desktop cabinet every section is drawn down to its
+last used row, so a change in the rows a section needs is part of the movement
+described above.
 
 A few changes rearrange more than that, and these are accepted:
 
@@ -325,7 +367,8 @@ the boxes at the standard size. When a collection starts to leave bare rows or
 the section count creeps up, retune the rows and cubby widths of the phone design
 first, then raise the layout version and record the layouts again. The last
 section is the only one that is ever drawn trimmed to its last used row, and no
-other section is, so the stability rules above stay the only exceptions.
+other section is, so the stability rules above stay the only exceptions. The
+phone design is never balanced.
 
 ### Keeping the desktop cabinet dense
 
@@ -349,8 +392,11 @@ The rules are that no section but the last keeps an empty row, that a collection
 of about sixty-five games has no empty row in the middle of any section, that a
 large collection holds at least 30 games in every section but the last, and that
 a collection with a realistic mix of box sizes never ends in a section of fewer
-than twelve placements that holds more than two big boxes. The layout tests check
-them on the samples of 65 and 400 games, on seeded collections of both sizes whose
+than twelve placements that holds more than two big boxes. They describe the
+arrangement made section by section, which is what the desktop cabinet is
+without balancing and what balancing starts from; the balanced cabinet is held to
+its own rule, every section within one shelf row of every other. The layout tests
+check them on the samples of 65 and 400 games, on seeded collections of both sizes whose
 boxes follow the spread of sizes seen on real games, and on the seeded realistic
 mix described under "Invented collections", at the cover shares of 25 and 33
 percent. The seeds of the realistic mix include ones the search never used and
@@ -383,13 +429,20 @@ cubby, series stood together and the desktop was retuned.
 The tests keep the full layout of the samples of 0, 1, 5, 12 and 65 games on
 both designs, and a digest of the layout of the 400-game sample. They live in
 `Cabinet.UnitTests/Layout/Golden/`, next to a record of the layout version they
-were made at. Any change to the arrangement or to a section design shows up as
+were made at, which is 16. Any change to the arrangement or to a section design shows up as
 a difference from those files, in the tests and in review. Series that run on
 from cubby to cubby without leaving a cubby out are why the recorded layouts
 changed from the version before: in the sample of 400 games several series used
 to leave cubbies out, and now stand side by side, which moves the games placed
 after them. The smaller samples keep their arrangement; only the version they
 record changed.
+
+Version 16 turned balancing on. The recorded desktop layout of 65 games changed
+from a section of five rows and one of two rows to two sections of four rows,
+and the digest of the desktop layout of 400 games changed with it. The recorded
+phone layouts differ from the version before only in their version number and in
+the options fingerprint, which now includes the balancing setting; every phone
+placement is the same.
 
 An intended change needs two steps. Raise `CabinetLayoutEngine.LayoutVersion`,
 then record the layouts again from the repository root:

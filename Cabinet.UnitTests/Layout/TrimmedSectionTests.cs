@@ -5,8 +5,10 @@ using FluentAssertions;
 namespace Cabinet.UnitTests.Layout;
 
 /// <summary>
-/// Pins how the last section is drawn only down to its last used shelf row: never fewer than two rows, every earlier
-/// section whole, and the section height always matching the rows that are drawn.
+/// Pins how sections are drawn only down to their last used shelf row: never fewer than two rows, and the section height
+/// always matching the rows that are drawn. When sections are filled in turn, which is what the phone design always does,
+/// only the last section is trimmed and every earlier one is whole; on the balanced desktop cabinet every section is
+/// drawn down to its last used row.
 /// </summary>
 public class TrimmedSectionTests
 {
@@ -38,7 +40,7 @@ public class TrimmedSectionTests
         SectionDesigns.TryGet(profile, out var design);
         SyntheticCollections.TryGetSample(sample, out var items);
 
-        var layout = CabinetLayoutEngine.Build(items, design!);
+        var layout = CabinetLayoutEngine.Build(items, design!, LayoutAssertions.SectionBySection);
 
         foreach (var section in layout.Sections.Take(layout.Sections.Count - 1))
         {
@@ -54,6 +56,29 @@ public class TrimmedSectionTests
         last.HeightMm.Should().Be(HeightOfRows(design, expectedRows));
         last.Cubbies.Select(cubby => cubby.Index).Should().Equal(Enumerable.Range(0, last.Cubbies.Count));
         last.Cubbies.Should().HaveCount(design.Cubbies.Count(cubby => cubby.YMm <= TopOfRow(design, expectedRows - 1)));
+        LayoutAssertions.AssertValid(layout, items);
+    }
+
+    [Theory]
+    [InlineData("12")]
+    [InlineData("65")]
+    [InlineData("400")]
+    [Trait("Category", "Layout")]
+    public void On_the_balanced_desktop_cabinet_every_section_ends_at_its_last_used_row(string sample)
+    {
+        var design = SectionDesigns.Desktop;
+        SyntheticCollections.TryGetSample(sample, out var items);
+
+        var layout = CabinetLayoutEngine.Build(items, design);
+
+        foreach (var section in layout.Sections)
+        {
+            var expectedRows = Math.Min(design.Rows.Count, Math.Max(CabinetLayoutEngine.MinTrimmedRows, RowsUsed(section, design)));
+
+            RowTops(section).Should().HaveCount(expectedRows, "section {0}", section.Index);
+            section.HeightMm.Should().Be(HeightOfRows(design, expectedRows), "section {0}", section.Index);
+        }
+
         LayoutAssertions.AssertValid(layout, items);
     }
 

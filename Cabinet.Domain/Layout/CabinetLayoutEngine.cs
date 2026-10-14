@@ -21,16 +21,21 @@ namespace Cabinet.Domain.Layout;
 /// edge of the next cubby when that cubby has room, with the marker only for what fits nowhere, unless the next game of
 /// its series needs that room to run on. Which of these applies is fixed when the family is placed. A family never
 /// reaches a third cubby, another row or another section.
-/// Every section is drawn whole except the last, which is drawn only down to its last used shelf row (at least
-/// <see cref="MinTrimmedRows"/> rows); that is a matter of drawing alone, so no placement depends on it.
-/// When the options balance sections and the design allows it, the same games are placed again under a row budget so that
-/// every section is drawn within one shelf row of every other; every section is then drawn down to its last used row, and
-/// when no budget keeps the section count the plain arrangement stays.
+/// With the options asking for balanced sections, which is the default, and a design that allows it, such as the desktop
+/// design, the games are first placed section by section as they come to find how many sections are needed, then placed
+/// again under the smallest row budget that needs no more sections, so every section is drawn within one shelf row of every
+/// other and none is left short at the end. A section is then drawn down to its last used shelf row, at least
+/// <see cref="MinTrimmedRows"/> rows. Adding a game changes at most one cubby inside a section, but it may move games across
+/// section boundaries so the sections stay within one row of each other. When no budget keeps both the section count and the
+/// spread of drawn rows within one, the plain arrangement stays.
+/// Without balancing, and in a design that never balances, such as the phone design, every section is drawn whole except
+/// the last, which is drawn only down to its last used shelf row (at least <see cref="MinTrimmedRows"/> rows); that is a
+/// matter of drawing alone, so no placement depends on it, and adding a game changes only the cubby it lands in.
 /// </summary>
 public static class CabinetLayoutEngine
 {
     /// <summary>Bumped whenever the algorithm or a design changes on purpose, so a rearrangement is always a conscious change.</summary>
-    public const int LayoutVersion = 15;
+    public const int LayoutVersion = 16;
 
     /// <summary>
     /// The fewest shelf rows the last section is drawn with, so a nearly empty cabinet still reads as a piece of furniture.
