@@ -540,7 +540,13 @@ public static class OwnerStrings
     public const string LookHeading = "Cabinet look";
 
     /// <summary>The line under the look panel's heading.</summary>
-    public const string LookHelper = "How the cabinet looks for every visitor.";
+    public const string LookHelper = "How the cabinet looks for every visitor. Try things in the preview, then press Use for everyone.";
+
+    /// <summary>The note a browser without script gets in place of the preview.</summary>
+    public const string LookNoScript = "The preview needs scripts. You can still choose a look and press Use for everyone.";
+
+    /// <summary>The button that drops the look being tried and goes back to the one visitors see.</summary>
+    public const string BackToCurrentButton = "Back to current";
 
     /// <summary>The legend of the group of designs.</summary>
     public const string DesignLegend = "Design";

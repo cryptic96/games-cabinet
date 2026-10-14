@@ -1,0 +1,199 @@
+{
+  "layoutVersion": 1,
+  "profile": "desktop",
+  "optionsFingerprint": "look-preview-sample",
+  "palette": [
+    { "background": "#8a2432", "text": "#ffffff" },
+    { "background": "#1f5a3a", "text": "#ffffff" },
+    { "background": "#23407a", "text": "#ffffff" },
+    { "background": "#e0a82e", "text": "#2a1a10" },
+    { "background": "#17766f", "text": "#ffffff" },
+    { "background": "#6a2f7a", "text": "#ffffff" },
+    { "background": "#b8481a", "text": "#ffffff" },
+    { "background": "#8fbfe0", "text": "#2a1a10" },
+    { "background": "#efe3c2", "text": "#2a1a10" },
+    { "background": "#a3b88f", "text": "#2a1a10" },
+    { "background": "#434f5e", "text": "#ffffff" },
+    { "background": "#e09aa5", "text": "#2a1a10" }
+  ],
+  "sections": [
+    {
+      "index": 0,
+      "widthMm": 940,
+      "heightMm": 620,
+      "frameMm": 20,
+      "cubbies": [
+        {
+          "index": 0,
+          "xMm": 0,
+          "yMm": 0,
+          "widthMm": 300,
+          "heightMm": 300,
+          "placements": [
+            {
+              "gameId": 9001,
+              "entryId": 91001,
+              "kind": "spine",
+              "xMm": 14,
+              "yMm": 0,
+              "widthMm": 52,
+              "heightMm": 250,
+              "title": "Lantern & Harbour",
+              "label": "Lantern & Harbour",
+              "toneIndex": 6,
+              "patternIndex": 0
+            },
+            {
+              "gameId": 9002,
+              "entryId": 91002,
+              "kind": "spine",
+              "xMm": 66,
+              "yMm": 0,
+              "widthMm": 44,
+              "heightMm": 215,
+              "title": "Quiet Quarry",
+              "label": "Quiet Quarry",
+              "toneIndex": 4,
+              "patternIndex": 0
+            },
+            {
+              "gameId": 9003,
+              "entryId": 91003,
+              "kind": "spine",
+              "xMm": 110,
+              "yMm": 0,
+              "widthMm": 58,
+              "heightMm": 270,
+              "title": "Night Market",
+              "label": "Night Market",
+              "toneIndex": 2,
+              "patternIndex": 0
+            }
+          ]
+        },
+        {
+          "index": 1,
+          "xMm": 320,
+          "yMm": 0,
+          "widthMm": 320,
+          "heightMm": 300,
+          "placements": [
+            {
+              "gameId": 9004,
+              "entryId": 91004,
+              "kind": "cover",
+              "xMm": 14,
+              "yMm": 0,
+              "widthMm": 170,
+              "heightMm": 220,
+              "title": "Copper Canal",
+              "label": "Copper Canal",
+              "toneIndex": 8,
+              "patternIndex": 1
+            },
+            {
+              "gameId": 9005,
+              "entryId": 91005,
+              "kind": "spine",
+              "xMm": 200,
+              "yMm": 0,
+              "widthMm": 48,
+              "heightMm": 245,
+              "title": "Orchard Rules",
+              "label": "Orchard Rules",
+              "toneIndex": 3,
+              "patternIndex": 0
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "xMm": 660,
+          "yMm": 0,
+          "widthMm": 280,
+          "heightMm": 300,
+          "placements": [
+            {
+              "gameId": 9006,
+              "entryId": 91006,
+              "kind": "spine",
+              "xMm": 20,
+              "yMm": 0,
+              "widthMm": 50,
+              "heightMm": 240,
+              "title": "Paper Lanterns",
+              "label": "Paper Lanterns",
+              "toneIndex": 5,
+              "patternIndex": 0
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "xMm": 0,
+          "yMm": 320,
+          "widthMm": 300,
+          "heightMm": 300,
+          "placements": [
+            {
+              "gameId": 9007,
+              "entryId": 91007,
+              "kind": "spine",
+              "xMm": 16,
+              "yMm": 0,
+              "widthMm": 40,
+              "heightMm": 230,
+              "title": "Tidewater",
+              "label": "Tidewater",
+              "toneIndex": 1,
+              "patternIndex": 0
+            },
+            {
+              "gameId": 9008,
+              "entryId": 91008,
+              "kind": "spine",
+              "xMm": 56,
+              "yMm": 0,
+              "widthMm": 56,
+              "heightMm": 190,
+              "title": "Salt and Sparrow",
+              "label": "Salt and Sparrow",
+              "toneIndex": 11,
+              "patternIndex": 0
+            }
+          ]
+        },
+        {
+          "index": 4,
+          "xMm": 320,
+          "yMm": 320,
+          "widthMm": 320,
+          "heightMm": 300,
+          "placements": []
+        },
+        {
+          "index": 5,
+          "xMm": 660,
+          "yMm": 320,
+          "widthMm": 280,
+          "heightMm": 300,
+          "placements": [
+            {
+              "gameId": 9009,
+              "entryId": 91009,
+              "kind": "spine",
+              "xMm": 22,
+              "yMm": 0,
+              "widthMm": 46,
+              "heightMm": 262,
+              "title": "Brass Garden",
+              "label": "Brass Garden",
+              "toneIndex": 10,
+              "patternIndex": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
