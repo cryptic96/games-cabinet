@@ -23,6 +23,22 @@ public sealed class LightsTests : CabinetPageTest
 
     private const int EdgeTolerance = 3;
 
+    private const int BackAboveBoxPixels = 3;
+
+    private const double SoftEdge = 1.3;
+
+    private const double HardEdge = 1.15;
+
+    private const double MostSoftEdgesShare = 0.05;
+
+    /// <summary>
+    /// The few box tops a pale wood back may have under the hard limit: the shelf's own shade takes that back down to the lightness
+    /// of a dark box, by day as well as with the lights on, and it carries no keyline.
+    /// </summary>
+    private const double PaleBackHardEdgesShare = 0.01;
+
+    private const double ShadeFadesOverTopShare = 0.2;
+
     private const string RecordFirstDraw = """
         (() => {
           window.__lamp = { drawn: null, nextFrame: null };
@@ -61,6 +77,17 @@ public sealed class LightsTests : CabinetPageTest
         """;
 
     private static readonly Regex EveningScriptAddress = new(@"/js/evening\.([^/?]+\.)?js(\?|$)");
+
+    private static readonly (string Wood, string Backs)[] BackPairs =
+    [
+        ("brown", "wood"),
+        ("walnut", "wood"),
+        ("oak", "wood"),
+        ("birch", "wood"),
+        ("mahogany", "wood"),
+        ("brown", "painted"),
+        ("birch", "painted"),
+    ];
 
     private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
 
@@ -271,6 +298,37 @@ public sealed class LightsTests : CabinetPageTest
         foreach (var band in bands)
         {
             BrightnessOf(lit, band).Should().BeGreaterThan(BrightnessOf(dark, band) + 10, "the lamp lights the top face of the board");
+        }
+    }
+
+    [Theory]
+    [InlineData("classic")]
+    [InlineData("modern")]
+    public async Task With_the_lights_on_nearly_every_box_top_keeps_an_edge_against_every_back(string design)
+    {
+        await StartLitAsync("on");
+        await Page.SetViewportSizeAsync(1440, 900);
+        await GotoCabinetAsync("/?sample=400");
+        await WaitUntilLitAsync();
+        await Page.EvaluateAsync(
+            "(css) => { const sheet = new CSSStyleSheet(); sheet.replaceSync(css); document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet]; }",
+            ".placement { visibility: hidden !important; }");
+
+        foreach (var (wood, backs) in BackPairs)
+        {
+            await Page.EvaluateAsync(
+                "([design, wood, backs]) => { const root = document.documentElement; root.dataset.design = design; root.dataset.wood = wood; root.dataset.backs = backs; root.setAttribute('data-lit', ''); }",
+                new[] { design, wood, backs });
+            await FitViewportToPageAsync();
+
+            var edges = await BoxTopEdgesAsync();
+            var label = $"{design} with {wood} and {backs} backs";
+
+            edges.Count.Should().BeGreaterThan(300, label);
+            edges.Count(edge => edge < SoftEdge).Should().BeLessThanOrEqualTo((int)Math.Floor(edges.Count * MostSoftEdgesShare), $"{label}: at most 5 % of box tops under {SoftEdge}");
+
+            var hardAllowed = wood == "birch" && backs == "wood" ? (int)Math.Ceiling(edges.Count * PaleBackHardEdgesShare) : 0;
+            edges.Count(edge => edge < HardEdge).Should().BeLessThanOrEqualTo(hardAllowed, $"{label}: no box top under {HardEdge}, except a pale back's own few");
         }
     }
 
@@ -492,6 +550,103 @@ public sealed class LightsTests : CabinetPageTest
 
         return differing;
     }
+
+    /// <summary>
+    /// Measures, for every box, how far its top edge stands out from the back above it. The boxes are hidden and the back is read
+    /// three pixels above the box's top edge; the box colour is its own colour after the shade that lies over the top fifth of the
+    /// cubby. The edge is the larger of the box against the back and the weaker side of the keyline against the back and the box.
+    /// </summary>
+    private async Task<List<double>> BoxTopEdgesAsync()
+    {
+        var boxes = JsonSerializer.Deserialize<List<BoxTop>>(
+            await Page.EvaluateAsync<string>(
+                """
+                () => JSON.stringify([...document.querySelectorAll('#cabinet .cubby')].flatMap((cubby) => {
+                  const cubbyRect = cubby.getBoundingClientRect();
+                  const style = getComputedStyle(cubby);
+                  const shade = parseFloat(style.getPropertyValue('--shade-alpha')) || 0;
+                  const shadeRgb = style.getPropertyValue('--box-shade-rgb').trim().split(/\s+/).map(Number);
+                  return [...cubby.querySelectorAll('.placement')].map((box) => {
+                    const rect = box.getBoundingClientRect();
+                    return {
+                      centre: rect.x + rect.width / 2,
+                      width: rect.width,
+                      top: rect.y + window.scrollY,
+                      cubbyTop: cubbyRect.y + window.scrollY,
+                      cubbyHeight: cubbyRect.height,
+                      colour: getComputedStyle(box).backgroundColor.match(/\d+/g).slice(0, 3).map(Number),
+                      shade,
+                      shadeRgb,
+                      keyline: parseFloat(getComputedStyle(box).getPropertyValue('--keyline')) || 0,
+                    };
+                  });
+                }))
+                """),
+            WebOptions)!;
+        using var bitmap = SKBitmap.Decode(await FullPageAsync()) ?? throw new InvalidOperationException("The picture is not readable.");
+        var edges = new List<double>();
+
+        foreach (var box in boxes)
+        {
+            var back = AverageOver(bitmap, box);
+            var fraction = (box.Top - box.CubbyTop) / box.CubbyHeight;
+            var shade = fraction < ShadeFadesOverTopShare ? box.Shade * (1 - (fraction / ShadeFadesOverTopShare)) : 0;
+            var face = Mix(box.Colour, [.. box.ShadeRgb], shade);
+            var line = Mix(back, [.. box.ShadeRgb], box.Keyline);
+            var faceOverBack = ContrastRatio(face, back);
+
+            edges.Add(Math.Max(faceOverBack, Math.Min(ContrastRatio(line, back), ContrastRatio(line, face))));
+        }
+
+        return edges;
+    }
+
+    private static double[] AverageOver(SKBitmap bitmap, BoxTop box)
+    {
+        var y = (int)Math.Round(box.Top) - BackAboveBoxPixels;
+        var left = (int)Math.Round(box.Centre - Math.Max(1, box.Width * 0.3));
+        var width = Math.Max(2, (int)Math.Round(box.Width * 0.6));
+        double[] sum = [0, 0, 0];
+        var count = 0;
+
+        for (var row = y; row < y + 2; row++)
+        {
+            for (var x = left; x < left + width; x++)
+            {
+                var pixel = bitmap.GetPixel(x, row);
+                sum[0] += pixel.Red;
+                sum[1] += pixel.Green;
+                sum[2] += pixel.Blue;
+                count++;
+            }
+        }
+
+        return [sum[0] / count, sum[1] / count, sum[2] / count];
+    }
+
+    private static double[] Mix(double[] below, double[] above, double aboveShare) =>
+        [.. below.Select((channel, index) => (channel * (1 - aboveShare)) + (above[index] * aboveShare))];
+
+    private static double ContrastRatio(double[] first, double[] second)
+    {
+        var one = Luminance(first);
+        var two = Luminance(second);
+
+        return (Math.Max(one, two) + 0.05) / (Math.Min(one, two) + 0.05);
+    }
+
+    private static double Luminance(double[] channels)
+    {
+        static double Linear(double channel)
+        {
+            var share = channel / 255;
+            return share <= 0.03928 ? share / 12.92 : Math.Pow((share + 0.055) / 1.055, 2.4);
+        }
+
+        return (0.2126 * Linear(channels[0])) + (0.7152 * Linear(channels[1])) + (0.0722 * Linear(channels[2]));
+    }
+
+    private sealed record BoxTop(double Centre, double Width, double Top, double CubbyTop, double CubbyHeight, double[] Colour, double Shade, double[] ShadeRgb, double Keyline);
 
     private sealed record DomState(bool Lit, string Bridge);
 
