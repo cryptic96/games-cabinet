@@ -38,6 +38,10 @@ public class SettingsModel : OwnerPage
     private const string PagePath = "/Owner/Settings";
     private const string DownloadFailedCode = "download-failed";
     private const string UnchangedCode = "unchanged";
+    private const string SavedCode = "saved";
+    private const string UndoneCode = "undone";
+    private const string OutOfDateCode = "out-of-date";
+    private const string SaveFailedCode = "refused-save-failed";
     private const string LookAnchor = "finish";
     private const string FileInputAnchor = "restore-file";
     private const string PreviewAnchor = "restore-preview-heading";
@@ -94,6 +98,9 @@ public class SettingsModel : OwnerPage
     /// <summary>The words for the result of the look post that sent the browser here, or null.</summary>
     public string? LookNotice { get; private set; }
 
+    /// <summary>The revision of the change the look's Undo form would take back, or null when there is none to offer.</summary>
+    public long? LookUndoRevision { get; private set; }
+
     /// <summary>Whether <see cref="LookNotice"/> says something went wrong.</summary>
     public bool LookNoticeIsProblem { get; private set; }
 
@@ -133,6 +140,16 @@ public class SettingsModel : OwnerPage
     {
         var chosenBacks = backs ?? CabinetLook.Default.Backs;
         var result = await _owner.MutateAsync(revision, data => CabinetLooks.SetLook(data, design, wood, chosenBacks, lights, depth), cancellationToken);
+
+        return OwnerResponses.For(this, result, PagePath, LookAnchor);
+    }
+
+    /// <summary>Takes back the latest change, when nothing was written after it.</summary>
+    /// <param name="revision">The revision the change produced, which the Undo form carries.</param>
+    /// <param name="cancellationToken">Cancels the wait for the writer.</param>
+    public async Task<IActionResult> OnPostUndoAsync(long revision, CancellationToken cancellationToken)
+    {
+        var result = await _owner.UndoAsync(revision, cancellationToken);
 
         return OwnerResponses.For(this, result, PagePath, LookAnchor);
     }
@@ -293,8 +310,9 @@ public class SettingsModel : OwnerPage
         Backup = _owner.Backup;
         Revision = _owner.Revision;
         Look = _owner.State is OwnerDataState.Ready current ? current.Data.Look.Normalized() : CabinetLook.Default;
-        LookNotice = string.Equals(done, UnchangedCode, StringComparison.Ordinal) ? OwnerStrings.LookSaved : OwnerResponses.NoticeFor(done);
+        LookNotice = LookNoticeFor(done);
         LookNoticeIsProblem = OwnerResponses.IsProblem(done);
+        LookUndoRevision = string.Equals(done, SavedCode, StringComparison.Ordinal) ? _owner.UndoableRevision : null;
 
         if (_owner.State is OwnerDataState.Ready ready)
         {
@@ -306,6 +324,16 @@ public class SettingsModel : OwnerPage
 
         Notice = string.Equals(done, DownloadFailedCode, StringComparison.Ordinal) ? OwnerStrings.DownloadFailed : null;
     }
+
+    private static string? LookNoticeFor(string? done) => done switch
+    {
+        UnchangedCode => OwnerStrings.LookSaved,
+        SavedCode => OwnerStrings.LookSavedForEveryone,
+        UndoneCode => OwnerStrings.LookUndone,
+        OutOfDateCode => OwnerStrings.LookOutOfDate,
+        SaveFailedCode => OwnerStrings.LookSaveFailed,
+        _ => OwnerResponses.NoticeFor(done),
+    };
 
     private async Task<RestoreCheck> CheckUploadAsync(IFormFile? file, CancellationToken cancellationToken)
     {

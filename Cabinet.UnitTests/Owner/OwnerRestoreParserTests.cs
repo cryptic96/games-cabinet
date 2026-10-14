@@ -90,6 +90,29 @@ public sealed class OwnerRestoreParserTests
     }
 
     [Fact]
+    public void A_file_of_the_first_schema_is_accepted_as_format_one_with_the_default_look()
+    {
+        var accepted = Check(Text($"{{\"kind\":\"{Marker}\",\"schemaVersion\":1,\"revision\":3,\"finish\":\"classic\",\"locations\":[],\"games\":[],\"changesSinceDownload\":0,\"changes\":[]}}"));
+
+        accepted.IsOk.Should().BeTrue();
+        accepted.FormatVersion.Should().Be(1);
+        accepted.Data!.Look.Should().Be(CabinetLook.Default);
+    }
+
+    [Fact]
+    public void A_file_of_the_current_schema_with_an_unknown_depth_is_accepted_with_the_shaded_depth_and_its_other_four_values()
+    {
+        var accepted = Check(Text(
+            $"{{\"kind\":\"{Marker}\",\"schemaVersion\":2,\"revision\":3,"
+            + "\"look\":{\"design\":\"legs\",\"wood\":\"oak\",\"backs\":\"painted\",\"lights\":\"evenings\",\"depth\":\"sideways\"},"
+            + "\"locations\":[],\"games\":[],\"changesSinceDownload\":0,\"changes\":[]}"));
+
+        accepted.IsOk.Should().BeTrue();
+        accepted.FormatVersion.Should().Be(2);
+        accepted.Data!.Look.Should().Be(new CabinetLook("legs", "oak", "painted", "evenings", "shaded"));
+    }
+
+    [Fact]
     public void A_valid_file_without_a_required_member_or_with_a_wrong_kind_of_value_is_damaged()
     {
         Check(Text($"{{\"kind\":\"{Marker}\",\"schemaVersion\":1}}")).Refusal.Should().Be(RestoreProblem.Damaged);

@@ -1,6 +1,11 @@
+using System.Text;
 using Cabinet.Domain.Owner;
+using Cabinet.Repository.Storage;
 using Cabinet.Service.Owner;
+using Cabinet.UnitTests.Infrastructure;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Cabinet.UnitTests.Owner;
 
@@ -9,10 +14,16 @@ namespace Cabinet.UnitTests.Owner;
 /// back once, nothing is written while the file is unreadable, and the log is capped while the count keeps counting.
 /// </summary>
 [Trait("Category", "Owner")]
-public sealed class OwnerDataServiceTests
+public sealed class OwnerDataServiceTests : IDisposable
 {
     private const string CabinetA = "Cabinet A";
     private const string ShelfB = "Shelf B";
+
+    private readonly TemporaryDirectory _directory = new();
+
+    private string FilePath => Path.Combine(_directory.FullPath, OwnerDataStore.FileName);
+
+    public void Dispose() => _directory.Dispose();
 
     [Fact]
     public async Task Assigning_the_location_a_game_already_has_changes_nothing_at_all()
@@ -275,5 +286,116 @@ public sealed class OwnerDataServiceTests
         await harness.Service.UndoAsync(added.Data!.Revision, CancellationToken.None);
 
         store.KeptAt.Should().Equal(OwnerTestKit.Start, OwnerTestKit.Start.AddHours(2));
+    }
+
+    [Fact]
+    public async Task The_first_save_after_an_upgrade_keeps_the_old_format_file_byte_for_byte_even_inside_the_hour()
+    {
+        var oldFile = FirstFormatFile();
+        var store = CreateStore();
+        store.KeepEarlierVersion(OwnerTestKit.Start.AddMinutes(-10));
+        var keptBefore = store.ReadEarlierVersion(0);
+        var service = CreateService(store, out _);
+
+        var result = await service.MutateAsync(service.Revision, data => LocationEdits.Add(data, CabinetA, OwnerDataService.NewId), CancellationToken.None);
+
+        result.Outcome.Should().Be(OwnerOutcome.Saved);
+        store.EarlierVersions().Should().HaveCount(2);
+        store.ReadEarlierVersion(0).Should().Equal(oldFile);
+        store.ReadEarlierVersion(1).Should().Equal(keptBefore);
+        store.StoredSchemaVersion().Should().Be(OwnerData.CurrentSchemaVersion);
+    }
+
+    [Fact]
+    public async Task A_second_save_five_minutes_after_the_upgrade_keeps_no_further_copy()
+    {
+        FirstFormatFile();
+        var store = CreateStore();
+        store.KeepEarlierVersion(OwnerTestKit.Start.AddMinutes(-10));
+        var service = CreateService(store, out var clock);
+        await service.MutateAsync(service.Revision, data => LocationEdits.Add(data, CabinetA, OwnerDataService.NewId), CancellationToken.None);
+
+        clock.Advance(TimeSpan.FromMinutes(5));
+        await service.MutateAsync(service.Revision, data => LocationEdits.Add(data, ShelfB, OwnerDataService.NewId), CancellationToken.None);
+
+        store.EarlierVersions().Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task The_first_save_after_an_upgrade_made_by_the_sync_keeps_the_old_format_file()
+    {
+        var oldFile = FirstFormatFile(gameId: 100);
+        var store = CreateStore();
+        store.KeepEarlierVersion(OwnerTestKit.Start.AddMinutes(-10));
+        var service = CreateService(store, out _);
+
+        await service.ReconcileAsync(new HashSet<int>(), CancellationToken.None);
+
+        store.EarlierVersions().Should().HaveCount(2);
+        store.ReadEarlierVersion(0).Should().Equal(oldFile);
+        store.StoredSchemaVersion().Should().Be(OwnerData.CurrentSchemaVersion);
+    }
+
+    [Fact]
+    public async Task An_undo_that_finds_an_old_format_file_on_disk_keeps_it_first()
+    {
+        var store = CreateStore();
+        var service = CreateService(store, out _);
+        var added = await service.MutateAsync(service.Revision, data => LocationEdits.Add(data, CabinetA, OwnerDataService.NewId), CancellationToken.None);
+        store.KeepEarlierVersion(OwnerTestKit.Start.AddMinutes(-1));
+        var oldFile = FirstFormatFile();
+
+        await service.UndoAsync(added.Data!.Revision, CancellationToken.None);
+
+        store.ReadEarlierVersion(0).Should().Equal(oldFile);
+        store.EarlierVersions().Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task A_save_over_a_file_of_the_current_format_follows_the_hourly_rule()
+    {
+        var store = new InMemoryOwnerDataStore { FileExists = true };
+        var harness = OwnerTestKit.Harness(store);
+        await harness.AddAsync(CabinetA);
+        store.StoredSchemaVersion().Should().Be(OwnerData.CurrentSchemaVersion);
+
+        harness.Clock.Advance(TimeSpan.FromMinutes(10));
+        await harness.AddAsync(ShelfB);
+
+        store.KeptAt.Should().Equal(OwnerTestKit.Start);
+    }
+
+    [Fact]
+    public async Task A_save_over_an_old_format_file_in_the_in_memory_store_keeps_a_copy_inside_the_hour()
+    {
+        var store = new InMemoryOwnerDataStore { FileExists = true };
+        var harness = OwnerTestKit.Harness(store);
+        await harness.AddAsync(CabinetA);
+        harness.Clock.Advance(TimeSpan.FromMinutes(10));
+        store.SeededSchemaVersion = 1;
+
+        await harness.AddAsync(ShelfB);
+
+        store.KeptAt.Should().Equal(OwnerTestKit.Start, OwnerTestKit.Start.AddMinutes(10));
+    }
+
+    private byte[] FirstFormatFile(int? gameId = null)
+    {
+        var games = gameId is { } id ? $"{{\"gameId\":{id},\"locationId\":null}}" : string.Empty;
+        var bytes = Encoding.UTF8.GetBytes(
+            "{\"kind\":\"games-cabinet-owner-data\",\"schemaVersion\":1,\"revision\":3,\"finish\":\"classic\","
+            + $"\"locations\":[],\"games\":[{games}],\"changesSinceDownload\":0,\"changes\":[]}}");
+        File.WriteAllBytes(FilePath, bytes);
+
+        return bytes;
+    }
+
+    private OwnerDataStore CreateStore() => new(_directory.FullPath, NullLogger<OwnerDataStore>.Instance);
+
+    private static OwnerDataService CreateService(OwnerDataStore store, out FakeTimeProvider clock)
+    {
+        clock = new FakeTimeProvider(OwnerTestKit.Start);
+
+        return new OwnerDataService(store, clock, NullLogger<OwnerDataService>.Instance);
     }
 }

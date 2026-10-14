@@ -171,6 +171,9 @@ public interface IOwnerDataStore
 
     /// <summary>When the newest kept copy was taken, or null when there is none.</summary>
     DateTimeOffset? NewestEarlierVersionAt();
+
+    /// <summary>The schema version written in the file on disk, or null when there is no file or its header cannot be read. It never reads more than the header and never writes.</summary>
+    int? StoredSchemaVersion();
 }
 
 /// <summary>
