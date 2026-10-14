@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Cabinet.BrowserTests.Infrastructure;
+using Cabinet.Domain.Owner;
 using FluentAssertions;
 
 namespace Cabinet.BrowserTests;
@@ -15,7 +16,7 @@ public sealed class LookGeometryTests : CabinetPageTest
 {
     private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
 
-    /// <summary>The design the first, quick case runs.</summary>
+    /// <summary>The design the case that proves the measurement has teeth runs.</summary>
     private const string LeadingDesign = "legs";
 
     private const string MeasureEveryCombination = """
@@ -32,7 +33,8 @@ public sealed class LookGeometryTests : CabinetPageTest
           const readings = new Map();
           let first = null;
           let combinations = 0;
-          let sections = document.querySelectorAll('#cabinet .section').length;
+          let widestOverflow = -1000;
+          const sections = document.querySelectorAll('#cabinet .section').length;
           for (const wood of woods) {
             for (const back of backs) {
               for (const depth of depths) {
@@ -45,6 +47,7 @@ public sealed class LookGeometryTests : CabinetPageTest
                     root.toggleAttribute(marker, state.markers.includes(marker));
                   }
                   const reading = read();
+                  widestOverflow = Math.max(widestOverflow, document.documentElement.scrollWidth - window.innerWidth);
                   first ??= reading;
                   combinations += 1;
                   const index = reading.findIndex((line, at) => line !== first[at]);
@@ -59,6 +62,7 @@ public sealed class LookGeometryTests : CabinetPageTest
           return JSON.stringify({
             combinations,
             sections,
+            widestOverflow,
             differing: [...readings.entries()].slice(0, 3),
             differingCount: readings.size,
           });
@@ -80,20 +84,25 @@ public sealed class LookGeometryTests : CabinetPageTest
         new { name = "evenings-at-night", lights = "evenings", markers = new[] { "data-lit", "data-evening" } },
     ];
 
+    /// <summary>Every design at both widths on both samples.</summary>
+    public static TheoryData<string, int, string> DesignsAndViews { get; } = BuildDesignsAndViews();
+
     /// <summary>
-    /// The leading case: with one design set, every combination of wood, back, depth and lights leaves every box exactly where the
-    /// first combination left it, at a desktop width on the sample of 65 games.
+    /// With one design set, every combination of wood, back, depth and lights leaves every box exactly where the first combination
+    /// left it, and the page neither grows nor scrolls sideways under any of them.
     /// </summary>
-    [Fact]
-    public async Task One_design_keeps_every_box_where_it_is_across_every_other_choice()
+    [Theory]
+    [MemberData(nameof(DesignsAndViews))]
+    public async Task One_design_keeps_every_box_where_it_is_across_every_other_choice(string design, int width, string path)
     {
         await StartAsync(PrototypeOn);
 
-        var summary = await MeasureAsync(LeadingDesign, 1440, "/?sample=65");
+        var summary = await MeasureAsync(design, width, path);
 
         summary.DifferingCount.Should().Be(0, string.Join(" | ", summary.Differing.Select(pair => $"{pair[0]}: {pair[1]}")));
         summary.Combinations.Should().Be(Woods.Length * Backs.Length * Depths.Length * LightStates.Length);
         summary.Sections.Should().BeGreaterThan(1);
+        summary.WidestOverflow.Should().BeLessThanOrEqualTo(0, $"{design} at {width} px on {path} scrolls sideways");
         ConsoleErrors.Should().BeEmpty();
     }
 
@@ -109,6 +118,24 @@ public sealed class LookGeometryTests : CabinetPageTest
         var summary = await MeasureAsync(LeadingDesign, 1440, "/?sample=65", "[data-wood=\"oak\"] .section { margin-top: 3px; }");
 
         summary.DifferingCount.Should().Be(Backs.Length * Depths.Length * LightStates.Length);
+    }
+
+    private static TheoryData<string, int, string> BuildDesignsAndViews()
+    {
+        var data = new TheoryData<string, int, string>();
+
+        foreach (var design in CabinetLook.Designs)
+        {
+            foreach (var width in new[] { 1440, 390 })
+            {
+                foreach (var path in new[] { "/?sample=65", "/?sample=400" })
+                {
+                    data.Add(design, width, path);
+                }
+            }
+        }
+
+        return data;
     }
 
     private async Task<Summary> MeasureAsync(string design, int width, string path, string? extraRule = null)
@@ -154,5 +181,5 @@ public sealed class LookGeometryTests : CabinetPageTest
         }
     }
 
-    private sealed record Summary(int Combinations, int Sections, List<List<string>> Differing, int DifferingCount);
+    private sealed record Summary(int Combinations, int Sections, int WidestOverflow, List<List<string>> Differing, int DifferingCount);
 }
