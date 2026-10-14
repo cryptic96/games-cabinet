@@ -21,6 +21,12 @@ public sealed class LightsTests : CabinetPageTest
 
     private const int FadeWaitMilliseconds = 6000;
 
+    private const string ViewerZone = "Europe/Berlin";
+
+    private const int TwoMinutesMilliseconds = 120000;
+
+    private const int CornerSize = 40;
+
     private const int EdgeTolerance = 3;
 
     private const int BackAboveBoxPixels = 3;
@@ -63,10 +69,11 @@ public sealed class LightsTests : CabinetPageTest
 
     private const string RecordDomState = """
         (() => {
-          window.__dom = { lit: null, bridge: null, violations: [] };
+          window.__dom = { lit: null, evening: null, bridge: null, violations: [] };
           document.addEventListener('securitypolicyviolation', (event) => window.__dom.violations.push(event.violatedDirective));
           document.addEventListener('DOMContentLoaded', () => {
             window.__dom.lit = document.documentElement.hasAttribute('data-lit');
+            window.__dom.evening = document.documentElement.hasAttribute('data-evening');
             window.__dom.bridge = typeof window.cabinetEvening;
           });
         })();
@@ -94,6 +101,156 @@ public sealed class LightsTests : CabinetPageTest
     private static readonly JsonSerializerOptions WebOptions = new(JsonSerializerDefaults.Web);
 
     private readonly TemporaryDirectory _storage = new();
+
+    /// <summary>Makes the browser read the clock in a Central European zone, which has summer time.</summary>
+    public override BrowserNewContextOptions ContextOptions()
+    {
+        var options = base.ContextOptions();
+        options.TimezoneId = ViewerZone;
+
+        return options;
+    }
+
+    [Theory]
+    [InlineData("2027-01-15T20:00:00+01:00", true)]
+    [InlineData("2027-01-15T12:00:00+01:00", false)]
+    [InlineData("2027-07-15T21:00:00+02:00", false)]
+    [InlineData("2027-07-15T22:00:00+02:00", true)]
+    public async Task With_evenings_only_the_page_is_evening_from_the_first_frame_only_when_it_is_dark_for_the_visitor(string moment, bool evening)
+    {
+        await StartLitAsync("evenings");
+        await Page.Clock.InstallAsync(new ClockInstallOptions { TimeString = moment });
+        await Page.AddInitScriptAsync(RecordDomState);
+        await Page.SetViewportSizeAsync(1440, 900);
+        await GotoCabinetAsync("/?sample=65");
+
+        (await ReadDomAsync()).Evening.Should().Be(evening, "the head script marks the evening before the first paint");
+        await Page.WaitForSelectorAsync("html[data-settled]", new PageWaitForSelectorOptions { Timeout = FadeWaitMilliseconds });
+
+        if (evening)
+        {
+            await WaitUntilLitAsync();
+            await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-evening", string.Empty);
+        }
+        else
+        {
+            await Expect(Page.Locator("html")).Not.ToHaveAttributeAsync("data-evening", string.Empty);
+            await Expect(Page.Locator("html")).Not.ToHaveAttributeAsync("data-lit", string.Empty);
+            (await Page.EvaluateAsync<double>($"() => Number(getComputedStyle(document.querySelector('{LayerSelector}')).opacity)")).Should().Be(0);
+        }
+
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("2027-01-15T16:26:00+01:00", false)]
+    [InlineData("2027-07-15T21:23:00+02:00", false)]
+    [InlineData("2027-01-15T16:26:00+01:00", true)]
+    public async Task A_page_left_open_across_the_lamp_on_moment_lights_at_that_moment_also_when_the_tab_has_faded_in_before(string moment, bool tabFlagSet)
+    {
+        await StartLitAsync("evenings");
+        await Page.Clock.InstallAsync(new ClockInstallOptions { TimeString = moment });
+        await Page.SetViewportSizeAsync(1440, 900);
+        await GotoCabinetAsync("/?sample=65");
+        await Page.WaitForSelectorAsync("html[data-settled]", new PageWaitForSelectorOptions { Timeout = FadeWaitMilliseconds });
+
+        if (tabFlagSet)
+        {
+            await Page.EvaluateAsync("() => sessionStorage.setItem('cabinet-lit', '1')");
+            await Page.ReloadAsync();
+            await Page.WaitForSelectorAsync("html[data-settled]", new PageWaitForSelectorOptions { Timeout = FadeWaitMilliseconds });
+        }
+
+        await Expect(Page.Locator("html")).Not.ToHaveAttributeAsync("data-evening", string.Empty);
+        await Expect(Page.Locator("html")).Not.ToHaveAttributeAsync("data-lit", string.Empty);
+
+        await Page.Clock.RunForAsync(TwoMinutesMilliseconds);
+
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-evening", string.Empty);
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-lit", string.Empty);
+        await WaitUntilLitAsync();
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_page_left_open_across_sunrise_loses_its_lights_at_that_moment_and_fades_them_out()
+    {
+        await StartLitAsync("evenings");
+        await Page.Clock.InstallAsync(new ClockInstallOptions { TimeString = "2027-01-15T08:39:00+01:00" });
+        await Page.SetViewportSizeAsync(1440, 900);
+        await GotoCabinetAsync("/?sample=65");
+        await WaitUntilLitAsync();
+
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-evening", string.Empty);
+
+        await Page.Clock.RunForAsync(TwoMinutesMilliseconds);
+
+        await Expect(Page.Locator("html")).Not.ToHaveAttributeAsync("data-evening", string.Empty);
+        await Expect(Page.Locator("html")).Not.ToHaveAttributeAsync("data-lit", string.Empty);
+        await Page.WaitForFunctionAsync(
+            "(selector) => [...document.querySelectorAll(selector)].every((layer) => Number(getComputedStyle(layer).opacity) === 0)",
+            LayerSelector,
+            new PageWaitForFunctionOptions { Timeout = FadeWaitMilliseconds });
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_tab_that_becomes_visible_after_the_lamp_on_moment_catches_up_at_once()
+    {
+        await StartLitAsync("evenings");
+        await Page.Clock.InstallAsync(new ClockInstallOptions { TimeString = "2027-01-15T16:20:00+01:00" });
+        await Page.SetViewportSizeAsync(1440, 900);
+        await GotoCabinetAsync("/?sample=65");
+        await Page.WaitForSelectorAsync("html[data-settled]", new PageWaitForSelectorOptions { Timeout = FadeWaitMilliseconds });
+        await Expect(Page.Locator("html")).Not.ToHaveAttributeAsync("data-evening", string.Empty);
+
+        await Page.Clock.SetFixedTimeAsync("2027-01-15T17:00:00+01:00");
+        var marked = await Page.EvaluateAsync<bool>("() => { document.dispatchEvent(new Event('visibilitychange')); return document.documentElement.hasAttribute('data-evening') && document.documentElement.hasAttribute('data-lit'); }");
+
+        marked.Should().BeTrue("the change of visibility reads the clock again straight away");
+        await WaitUntilLitAsync();
+    }
+
+    [Fact]
+    public async Task Under_reduced_motion_the_evening_lights_come_on_with_no_fade_when_the_moment_comes()
+    {
+        await StartLitAsync("evenings");
+        await Page.EmulateMediaAsync(new PageEmulateMediaOptions { ReducedMotion = ReducedMotion.Reduce });
+        await Page.Clock.InstallAsync(new ClockInstallOptions { TimeString = "2027-01-15T16:26:00+01:00" });
+        await Page.SetViewportSizeAsync(1440, 900);
+        await GotoCabinetAsync("/?sample=65");
+        await Page.WaitForSelectorAsync("html[data-settled]", new PageWaitForSelectorOptions { Timeout = FadeWaitMilliseconds });
+
+        await Page.Clock.RunForAsync(TwoMinutesMilliseconds);
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-lit", string.Empty);
+
+        var light = Page.Locator(LayerSelector).First;
+        await Expect(light).ToHaveCSSAsync("opacity", "1");
+        (await Page.EvaluateAsync<int>($"() => document.querySelector('{LayerSelector}').getAnimations().length")).Should().Be(0);
+        await Expect(Page.Locator("html")).Not.ToHaveAttributeAsync("data-fading", string.Empty);
+    }
+
+    [Fact]
+    public async Task The_room_does_not_dim_in_the_evening_only_the_lights_change()
+    {
+        await StartLitAsync("evenings");
+        await Page.Clock.InstallAsync(new ClockInstallOptions { TimeString = "2027-01-15T20:00:00+01:00" });
+        await Page.SetViewportSizeAsync(1440, 900);
+        await GotoCabinetAsync("/?sample=65");
+        await WaitUntilLitAsync();
+
+        var evening = await WallCornersAsync();
+        (await Page.EvaluateAsync<string>("() => getComputedStyle(document.documentElement).getPropertyValue('--dusk-rgb').trim()")).Should().BeEmpty("no dusk is defined");
+        (await Page.EvaluateAsync<string>("() => getComputedStyle(document.body, '::before').content")).Should().BeOneOf("none", "normal");
+
+        await Page.EvaluateAsync("() => { const root = document.documentElement; root.removeAttribute('data-evening'); root.removeAttribute('data-lit'); }");
+        var day = await WallCornersAsync();
+
+        for (var corner = 0; corner < evening.Length; corner++)
+        {
+            PixelComparison.Compare(evening[corner], day[corner]).DifferingPixels.Should().Be(0, $"the wall is the same in the evening as by day (corner {corner})");
+        }
+    }
 
     [Fact]
     public async Task With_the_lights_always_on_the_cubbies_start_dark_and_fade_in_after_the_first_paint()
@@ -380,6 +537,24 @@ public sealed class LightsTests : CabinetPageTest
         await FitViewportToPageAsync();
     }
 
+    /// <summary>Pictures of the wall in the four corners of the viewport, outside the cabinet, with animations still.</summary>
+    private async Task<byte[][]> WallCornersAsync()
+    {
+        var size = Page.ViewportSize ?? throw new InvalidOperationException("The page has no fixed viewport.");
+        var corners = new List<byte[]>();
+
+        foreach (var (x, y) in new[] { (0, 0), (size.Width - CornerSize, 0), (0, size.Height - CornerSize), (size.Width - CornerSize, size.Height - CornerSize) })
+        {
+            corners.Add(await Page.ScreenshotAsync(new PageScreenshotOptions
+            {
+                Clip = new Clip { X = x, Y = y, Width = CornerSize, Height = CornerSize },
+                Animations = ScreenshotAnimations.Disabled,
+            }));
+        }
+
+        return [.. corners];
+    }
+
     private async Task<byte[]> FullPageAsync() =>
         await Page.ScreenshotAsync(new PageScreenshotOptions { FullPage = true, Animations = ScreenshotAnimations.Disabled });
 
@@ -648,7 +823,7 @@ public sealed class LightsTests : CabinetPageTest
 
     private sealed record BoxTop(double Centre, double Width, double Top, double CubbyTop, double CubbyHeight, double[] Colour, double Shade, double[] ShadeRgb, double Keyline);
 
-    private sealed record DomState(bool Lit, string Bridge);
+    private sealed record DomState(bool Lit, bool Evening, string Bridge);
 
     private sealed record LayerReading(string Display, double Opacity, bool Lit, bool Settled, int Animations);
 }

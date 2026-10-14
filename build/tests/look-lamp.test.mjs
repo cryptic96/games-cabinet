@@ -7,74 +7,27 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import { fakeDate, fakeRoot, fakeStorage } from './fake-page.mjs';
 
 const COMMENT_SLASHES = '/'.repeat(2);
 const EVENING_SOURCE = readFileSync(new URL('../../Cabinet.Service/wwwroot/js/evening.js', import.meta.url), 'utf8');
 const LOOK_SOURCE = readFileSync(new URL('../../Cabinet.Service/wwwroot/js/look.js', import.meta.url), 'utf8');
-const { initLook, isLit, refreshLamp } = await import('data:text/javascript;base64,' + Buffer.from(LOOK_SOURCE).toString('base64'));
-
-/**
- * Builds a fake root element that keeps its attributes and its listeners.
- * @param {object} dataset The data attributes the server wrote.
- * @param {string[]} [attributes] Attributes that are present before any script runs.
- * @returns {object} The root.
- */
-function fakeRoot(dataset, attributes = []) {
-  const present = new Set(attributes);
-  const listeners = new Set();
-
-  return {
-    dataset,
-    present,
-    listeners,
-    hasAttribute: (name) => present.has(name),
-    setAttribute: (name) => present.add(name),
-    removeAttribute: (name) => present.delete(name),
-    getAttribute: (name) => (present.has(name) ? '' : (dataset[name.replace(/^data-/, '')] ?? null)),
-    addEventListener: (type, handler) => listeners.add(handler),
-    removeEventListener: (type, handler) => listeners.delete(handler),
-  };
-}
-
-/**
- * Builds a fake storage that holds what is written to it, or throws on every use.
- * @param {object} [options] Whether the storage refuses every use, and what it holds before the script runs.
- * @returns {object} The storage.
- */
-function fakeStorage({ throws = false, initial = {} } = {}) {
-  const values = new Map(Object.entries(initial));
-
-  return {
-    values,
-    getItem: (key) => {
-      if (throws) {
-        throw new Error('storage refused');
-      }
-
-      return values.has(key) ? values.get(key) : null;
-    },
-    setItem: (key, value) => {
-      if (throws) {
-        throw new Error('storage refused');
-      }
-
-      values.set(key, value);
-    },
-  };
-}
+const { followClock, initLook, isLit, refreshLamp } = await import('data:text/javascript;base64,' + Buffer.from(LOOK_SOURCE).toString('base64'));
+const WINTER_MIDDAY = [2027, 0, 15, 12, 0];
 
 /**
  * Runs the head script in an isolated context against a fake page.
  * @param {object} root The fake root element.
  * @param {object} storage The fake session storage.
+ * @param {number[]} [local] The local clock reading the script sees; a winter midday, when it is not evening, by default.
  * @returns {{ context: object, window: object }} The context and the window it saw.
  */
-function runHeadScript(root, storage) {
+function runHeadScript(root, storage, local = WINTER_MIDDAY) {
   const window = {};
 
   Object.defineProperty(window, 'sessionStorage', { get: () => storage, enumerable: true });
 
-  const context = vm.createContext({ window, document: { documentElement: root } });
+  const context = vm.createContext({ window, document: { documentElement: root }, Date: fakeDate({ local }) });
 
   vm.runInContext(EVENING_SOURCE, context);
 
@@ -84,16 +37,18 @@ function runHeadScript(root, storage) {
 test('the head script is a classic script: no comment slashes, no import, no export, and it is small', () => {
   assert.equal(EVENING_SOURCE.includes(COMMENT_SLASHES), false);
   assert.doesNotMatch(EVENING_SOURCE, /^\s*(import|export)\b/m);
-  assert.ok(Buffer.byteLength(EVENING_SOURCE) < 2048, 'about a kilobyte');
+  assert.ok(Buffer.byteLength(EVENING_SOURCE) < 8192, 'a small table and a few rules');
 });
 
 test('the head script assigns only the cabinetEvening bridge and leaks no other global', () => {
   const { context, window } = runHeadScript(fakeRoot({ lights: 'on' }), fakeStorage());
 
-  assert.deepEqual(Object.keys(context).sort(), ['document', 'window']);
+  assert.deepEqual(Object.keys(context).sort(), ['Date', 'document', 'window']);
   assert.deepEqual(Object.keys(window).sort(), ['cabinetEvening', 'sessionStorage']);
   assert.equal(typeof window.cabinetEvening.key, 'string');
   assert.equal(typeof window.cabinetEvening.markLit, 'function');
+  assert.equal(typeof window.cabinetEvening.isEvening, 'function');
+  assert.equal(typeof window.cabinetEvening.msToNextChange, 'function');
 });
 
 test('with the lights on and this tab already faded in, the head script lights the page before the first paint', () => {
@@ -184,7 +139,15 @@ test('refreshing a root sets or removes the lit marker from the attributes it ca
 async function startLook({ dataset, attributes = [], storage = fakeStorage(), fade = '2000ms', bridge = undefined }) {
   const root = fakeRoot(dataset, attributes);
   const timers = [];
-  const drawn = [];
+  const cleared = [];
+  const intervals = [];
+  const events = [];
+  const doc = {
+    documentElement: root,
+    visibilityState: 'visible',
+    querySelector: () => ({}),
+    addEventListener: (type, handler) => events.push({ type, handler }),
+  };
 
   globalThis.window = {
     sessionStorage: storage,
@@ -200,18 +163,17 @@ async function startLook({ dataset, attributes = [], storage = fakeStorage(), fa
 
       return timers.length;
     },
-    clearTimeout: () => undefined,
-  };
+    clearTimeout: (id) => cleared.push(id),
+    setInterval: (callback, milliseconds) => {
+      intervals.push({ callback, milliseconds });
 
-  const doc = {
-    documentElement: root,
-    querySelector: () => ({}),
-    addEventListener: (type, handler) => drawn.push({ type, handler }),
+      return intervals.length;
+    },
   };
 
   await initLook(doc);
 
-  return { root, storage, timers };
+  return { root, storage, timers, cleared, intervals, events, doc };
 }
 
 test('on the first load in a tab the lights settle, fade and light in one task and the tab is remembered', async () => {
@@ -308,6 +270,7 @@ test('start-up waits for the cabinet to be drawn when no light layer exists yet'
     },
     setTimeout: () => 1,
     clearTimeout: () => undefined,
+    setInterval: () => 1,
   };
 
   try {
@@ -341,4 +304,132 @@ test('starting up twice on one page changes nothing the second time', async () =
   }
 
   assert.deepEqual([...first.root.present], marks);
+});
+
+/**
+ * Builds a stand-in for the clock the head script provides, whose answers the test changes by hand.
+ * @param {boolean} evening Whether it is evening at the start.
+ * @returns {{ evening: boolean, isEvening: Function, msToNextChange: Function }} The stand-in.
+ */
+function fakeClock(evening) {
+  const clock = {
+    evening,
+    isEvening: () => clock.evening,
+    msToNextChange: () => 90000,
+  };
+
+  return clock;
+}
+
+test('an open page lights when the clock says evening: the minute check sets the evening marker, fades and remembers the tab', async () => {
+  const clock = fakeClock(false);
+  const { root, storage, intervals } = await startLook({ dataset: { lights: 'evenings' }, bridge: clock });
+
+  assert.equal(root.hasAttribute('data-lit'), false);
+  assert.equal(intervals.length, 1);
+  assert.equal(intervals[0].milliseconds, 60000);
+
+  clock.evening = true;
+  intervals[0].callback();
+
+  assert.equal(root.hasAttribute('data-evening'), true);
+  assert.equal(root.hasAttribute('data-fading'), true, 'the lamp fades on');
+  assert.equal(root.hasAttribute('data-lit'), true);
+  assert.deepEqual([...storage.values.entries()], [['cabinet-lit', '1']]);
+});
+
+test('at sunrise the open page loses the evening marker and the lamp fades out', async () => {
+  const clock = fakeClock(true);
+  const { root, intervals } = await startLook({ dataset: { lights: 'evenings' }, bridge: clock });
+
+  assert.equal(root.hasAttribute('data-lit'), true, 'the load itself lit the evening page');
+
+  for (const listener of [...root.listeners]) {
+    listener({ propertyName: 'opacity' });
+  }
+
+  assert.equal(root.hasAttribute('data-fading'), false, 'the first fade is over');
+
+  clock.evening = false;
+  intervals[0].callback();
+
+  assert.equal(root.hasAttribute('data-evening'), false);
+  assert.equal(root.hasAttribute('data-lit'), false);
+  assert.equal(root.hasAttribute('data-fading'), true, 'the lamp fades out');
+});
+
+test('the minute check does nothing in a hidden tab, and the tab catches up the moment it is shown', async () => {
+  const clock = fakeClock(false);
+  const { root, doc, intervals, events } = await startLook({ dataset: { lights: 'evenings' }, bridge: clock });
+  const change = events.find(({ type }) => type === 'visibilitychange');
+
+  clock.evening = true;
+  doc.visibilityState = 'hidden';
+  intervals[0].callback();
+  change.handler();
+
+  assert.equal(root.hasAttribute('data-lit'), false, 'nothing runs while the tab is hidden');
+
+  doc.visibilityState = 'visible';
+  change.handler();
+
+  assert.equal(root.hasAttribute('data-evening'), true);
+  assert.equal(root.hasAttribute('data-lit'), true);
+});
+
+test('one timer waits for the next boundary and is set again each time it fires', async () => {
+  const clock = fakeClock(false);
+  const { root, timers, cleared } = await startLook({ dataset: { lights: 'evenings' }, bridge: clock, fade: '0ms' });
+
+  assert.equal(timers.length, 1);
+  assert.equal(timers[0].milliseconds, 90250, 'the next change plus a small margin');
+
+  clock.evening = true;
+  timers[0].callback();
+
+  assert.equal(root.hasAttribute('data-lit'), true);
+  assert.equal(timers.length, 2, 'set again');
+  assert.equal(cleared.includes(1), true, 'the old timer was cleared before the new one was set');
+  assert.equal(timers[1].milliseconds, 90250);
+});
+
+test('always on and off never arm the boundary timer, and off never carries the evening marker', async () => {
+  const on = await startLook({ dataset: { lights: 'on' }, bridge: fakeClock(true), fade: '0ms' });
+  const off = await startLook({ dataset: { lights: 'off' }, bridge: fakeClock(true), fade: '0ms' });
+
+  assert.equal(on.timers.length, 0);
+  assert.equal(off.timers.length, 0);
+  assert.equal(off.root.hasAttribute('data-evening'), false);
+  assert.equal(off.root.hasAttribute('data-lit'), false);
+  assert.equal(on.root.hasAttribute('data-lit'), true);
+});
+
+test('under reduced motion the evening comes and goes with no fading hint', async () => {
+  const clock = fakeClock(false);
+  const { root, intervals } = await startLook({ dataset: { lights: 'evenings' }, bridge: clock, fade: '0ms' });
+
+  clock.evening = true;
+  intervals[0].callback();
+
+  assert.equal(root.hasAttribute('data-lit'), true);
+  assert.equal(root.hasAttribute('data-fading'), false);
+});
+
+test('without the head script there is no clock to follow and nothing changes', async () => {
+  const { root, intervals, timers } = await startLook({ dataset: { lights: 'evenings' } });
+
+  intervals[0].callback();
+
+  assert.equal(root.hasAttribute('data-evening'), false);
+  assert.equal(root.hasAttribute('data-lit'), false);
+  assert.equal(timers.length, 0);
+});
+
+test('following the clock of a page twice sets up one interval and one listener', async () => {
+  const { doc, intervals, events } = await startLook({ dataset: { lights: 'evenings' }, bridge: fakeClock(false) });
+
+  followClock(doc);
+
+  assert.equal(intervals.length, 1);
+  assert.equal(events.filter(({ type }) => type === 'visibilitychange').length, 1);
 });
