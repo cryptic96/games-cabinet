@@ -73,6 +73,13 @@
             <span>@Model.LookNotice</span>
         }
     </p>
+    @if (Model.LookUndoRevision is { } undoRevision)
+    {
+        <form method="post" class="look-undo" asp-page-handler="Undo">
+            <input type="hidden" name="revision" value="@undoRevision" />
+            <button type="submit" class="owner-btn">@OwnerStrings.UndoButton</button>
+        </form>
+    }
 </section>
 <section class="owner-panel" id="backup" aria-labelledby="backup-heading">
     <h3 id="backup-heading">@OwnerStrings.BackupHeading</h3>

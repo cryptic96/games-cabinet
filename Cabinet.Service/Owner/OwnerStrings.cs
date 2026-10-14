@@ -572,6 +572,18 @@ public static class OwnerStrings
     /// <summary>The words shown for a look post that found nothing to change; the look is as it was chosen.</summary>
     public const string LookSaved = "Saved";
 
+    /// <summary>The words shown after a look was published to every visitor.</summary>
+    public const string LookSavedForEveryone = "Saved for everyone. Open pages follow within a few seconds.";
+
+    /// <summary>The words shown after the published look was taken back.</summary>
+    public const string LookUndone = "Put back the earlier look.";
+
+    /// <summary>The words shown when the look form was built from a page that is no longer the latest.</summary>
+    public const string LookOutOfDate = "This page is out of date. Reload it and try again.";
+
+    /// <summary>The words shown when the look could not be stored.</summary>
+    public const string LookSaveFailed = "Couldn't save that. Nothing changed. Try again.";
+
     /// <summary>The line that says what visitors see now.</summary>
     /// <param name="summary">The look in use, as <see cref="CabinetLooks.Summary"/> words it.</param>
     public static string VisitorsSee(string summary) => $"Visitors see: {summary}";
@@ -810,7 +822,8 @@ public static class OwnerStrings
         "location-renamed" => "Location renamed.",
         "location-moved" => "Location moved.",
         "location-deleted" => "Location deleted.",
-        "game-moved" or "game-unplaced" or "picture-chosen" or "look-set" => "Saved.",
+        "game-moved" or "game-unplaced" or "picture-chosen" => "Saved.",
+        "look-set" => LookSavedForEveryone,
         "unknown-look" => "That look isn't available.",
         "picture-checked" => "Marked as checked.",
         "unchanged" => "Nothing to change.",
