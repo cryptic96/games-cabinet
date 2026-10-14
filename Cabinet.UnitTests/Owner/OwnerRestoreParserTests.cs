@@ -82,11 +82,11 @@ public sealed class OwnerRestoreParserTests
     [Fact]
     public void A_file_of_a_newer_schema_is_refused_with_its_version()
     {
-        var refused = Check(Text($"{{\"kind\":\"{Marker}\",\"schemaVersion\":2}}"));
+        var refused = Check(Text($"{{\"kind\":\"{Marker}\",\"schemaVersion\":3}}"));
 
         refused.Refusal.Should().Be(RestoreProblem.Newer);
-        refused.FormatVersion.Should().Be(2);
-        OwnerStrings.RestoreProblemText(refused).Should().Contain("file format 2; this site reads up to 1");
+        refused.FormatVersion.Should().Be(3);
+        OwnerStrings.RestoreProblemText(refused).Should().Contain("file format 3; this site reads up to 2");
     }
 
     [Fact]
@@ -106,7 +106,7 @@ public sealed class OwnerRestoreParserTests
         var check = Check(Export(data));
 
         check.IsOk.Should().BeTrue();
-        check.FormatVersion.Should().Be(1);
+        check.FormatVersion.Should().Be(2);
         check.Data!.Locations.Should().Equal(data.Locations);
         check.Data.Games.Select(game => game.GameId).Should().Equal(100, 101);
         check.Data.Changes.Should().Equal(data.Changes);
@@ -286,7 +286,7 @@ public sealed class OwnerRestoreParserTests
         OwnerStrings.RestoreProblemText(RestoreCheck.Problem(RestoreProblem.TooLarge, sizeBytes: OwnerDataExport.MaxRestoreBytes + 1))
             .Should().Be("That file is too large (2.1 MB; the limit is 2 MB). Owner-data files are small, so this is probably the wrong file.");
         OwnerStrings.RestoreProblemText(RestoreCheck.Problem(RestoreProblem.Newer, formatVersion: 4))
-            .Should().Be("That file was made by a newer version of the site (file format 4; this site reads up to 1). Update the site first, or use an older download.");
+            .Should().Be("That file was made by a newer version of the site (file format 4; this site reads up to 2). Update the site first, or use an older download.");
     }
 
     private static RestoreCheck Check(byte[]? bytes) => OwnerDataExport.Check(bytes, Policy);

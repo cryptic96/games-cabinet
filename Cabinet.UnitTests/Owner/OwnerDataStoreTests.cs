@@ -62,7 +62,7 @@ public sealed class OwnerDataStoreTests : IDisposable
     }
 
     [Theory]
-    [InlineData("{\"kind\":\"games-cabinet-owner-data\",\"schemaVersion\":2,\"revision\":7}")]
+    [InlineData("{\"kind\":\"games-cabinet-owner-data\",\"schemaVersion\":3,\"revision\":7}")]
     [InlineData("{\"kind\":\"games-cabinet-owner-data\",\"schemaVersion\":99,\"locations\":\"unknown shape\"}")]
     [InlineData("{\"kind\":\"games-cabinet-snapshot\",\"schemaVersion\":1,\"revision\":1}")]
     [InlineData("{\"schemaVersion\":1,\"revision\":1}")]
@@ -112,7 +112,7 @@ public sealed class OwnerDataStoreTests : IDisposable
     [Fact]
     public async Task A_refused_write_over_a_damaged_file_leaves_its_bytes_and_the_directory_as_they_were()
     {
-        var bytes = Encoding.UTF8.GetBytes("{\"kind\":\"games-cabinet-owner-data\",\"schemaVersion\":2,\"revision\":7}");
+        var bytes = Encoding.UTF8.GetBytes("{\"kind\":\"games-cabinet-owner-data\",\"schemaVersion\":3,\"revision\":7}");
         File.WriteAllBytes(FilePath, bytes);
         var listingBefore = Listing();
         var bytesBeforeLoad = File.ReadAllBytes(FilePath);

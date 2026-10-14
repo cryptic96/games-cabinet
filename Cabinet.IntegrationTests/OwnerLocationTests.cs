@@ -124,7 +124,7 @@ public sealed class OwnerLocationTests
     {
         using var storage = new TemporaryDirectory();
         var path = Path.Combine(storage.FullPath, "owner-data.json");
-        var content = Encoding.UTF8.GetBytes("{\"kind\":\"games-cabinet-owner-data\",\"schemaVersion\":2,\"revision\":7}");
+        var content = Encoding.UTF8.GetBytes("{\"kind\":\"games-cabinet-owner-data\",\"schemaVersion\":3,\"revision\":7}");
         await File.WriteAllBytesAsync(path, content, TestContext.Current.CancellationToken);
         await using var factory = SyncHarness.CreateFactory(new ScriptedBggHandler(), SyncHarness.NewClock(), StorageSettings(storage));
         var service = factory.ServingServices.GetRequiredService<OwnerDataService>();

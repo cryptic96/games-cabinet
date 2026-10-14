@@ -9,31 +9,68 @@
 }
 <h2>@OwnerStrings.Settings</h2>
 <section class="owner-panel" id="finish" aria-labelledby="finish-heading">
-    <h3 id="finish-heading">@OwnerStrings.FinishHeading</h3>
-    <p class="owner-hint">@OwnerStrings.FinishHelper</p>
-    <form method="post" class="finish-form" asp-page-handler="Finish" data-finish-form>
+    <h3 id="finish-heading">@OwnerStrings.LookHeading</h3>
+    <p class="owner-hint">@OwnerStrings.LookHelper</p>
+    <p class="owner-hint" id="look-current">@OwnerStrings.VisitorsSee(CabinetLooks.Summary(Model.Look))</p>
+    <form method="post" class="look-form" asp-page-handler="Look">
         <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
-        <fieldset class="pic-choices finish-choices">
-            <legend class="visually-hidden">@OwnerStrings.FinishHeading</legend>
-            @foreach (var finish in Finishes.Allowed)
+        <fieldset class="look-group">
+            <legend>@OwnerStrings.DesignLegend</legend>
+            @foreach (var design in CabinetLook.Designs)
             {
-                <label class="pic-tile finish-tile">
-                    <span class="finish-swatch" aria-hidden="true"></span>
-                    <span class="pic-caption">
-                        <input type="radio" name="finish" value="@finish" checked="@(finish == Model.Finish)" />
-                        <span class="pic-label">@OwnerStrings.FinishName(finish)</span>
-                    </span>
-                    <span class="pic-sub">@OwnerStrings.FinishSubLine(finish)</span>
+                <label class="look-option">
+                    <input type="radio" name="design" value="@design" checked="@(design == Model.Look.Design)" />
+                    <span class="pic-label">@CabinetLook.DesignName(design)</span>
+                    <span class="pic-sub">@OwnerStrings.DesignSubLine(design)</span>
                 </label>
             }
         </fieldset>
-        <p class="owner-hint finish-note">@OwnerStrings.FinishOnlyNote</p>
-        <button type="submit" class="owner-btn" data-save>@OwnerStrings.SaveFinishButton</button>
+        <fieldset class="look-group">
+            <legend>@OwnerStrings.WoodLegend</legend>
+            @foreach (var wood in CabinetLook.Woods)
+            {
+                <label class="look-option">
+                    <input type="radio" name="wood" value="@wood" checked="@(wood == Model.Look.Wood)" />
+                    <span class="pic-label">@CabinetLook.WoodName(wood)</span>
+                    <span class="pic-sub">@OwnerStrings.WoodSubLine(wood)</span>
+                </label>
+            }
+        </fieldset>
+        <div class="look-group">
+            <label class="look-option">
+                <input type="checkbox" role="switch" name="backs" value="painted" checked="@(Model.Look.Backs == "painted")" aria-describedby="look-backs-hint" />
+                <span class="pic-label">@OwnerStrings.PaintedBacksLabel</span>
+            </label>
+            <p class="owner-hint" id="look-backs-hint">@OwnerStrings.PaintedBacksHint</p>
+        </div>
+        <fieldset class="look-group" aria-describedby="look-lights-hint">
+            <legend>@OwnerStrings.LightsLegend</legend>
+            @foreach (var lights in CabinetLook.LightChoices)
+            {
+                <label class="look-option">
+                    <input type="radio" name="lights" value="@lights" checked="@(lights == Model.Look.Lights)" />
+                    <span class="pic-label">@CabinetLook.LightsName(lights)</span>
+                </label>
+            }
+            <p class="owner-hint" id="look-lights-hint">@OwnerStrings.LightsHint</p>
+        </fieldset>
+        <fieldset class="look-group" aria-describedby="look-depth-hint">
+            <legend>@OwnerStrings.DepthLegend</legend>
+            @foreach (var depth in CabinetLook.DepthChoices)
+            {
+                <label class="look-option">
+                    <input type="radio" name="depth" value="@depth" checked="@(depth == Model.Look.Depth)" />
+                    <span class="pic-label">@CabinetLook.DepthName(depth)</span>
+                </label>
+            }
+            <p class="owner-hint" id="look-depth-hint">@OwnerStrings.DepthHint</p>
+        </fieldset>
+        <button type="submit" class="owner-btn">@OwnerStrings.UseForEveryoneButton</button>
     </form>
-    <p class="row-status" id="finish-status" role="status" data-problem="@(Model.FinishNoticeIsProblem ? "true" : null)">
-        @if (Model.FinishNotice is not null)
+    <p class="row-status" id="finish-status" role="status" data-problem="@(Model.LookNoticeIsProblem ? "true" : null)">
+        @if (Model.LookNotice is not null)
         {
-            <span>@Model.FinishNotice</span>
+            <span>@Model.LookNotice</span>
         }
     </p>
 </section>
@@ -105,5 +142,4 @@
     </section>
 }
 @section Scripts {
-    <script type="module" src="~/js/owner-finish.js" asp-append-version="true"></script>
 }

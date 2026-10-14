@@ -73,7 +73,7 @@ public sealed class OwnerArtReferencesTests
         var raised = 0;
         harness.Service.Changed += () => raised++;
 
-        await harness.Service.MutateSystemAsync(data => data with { Finish = "walnut" }, CancellationToken.None);
+        await harness.Service.MutateSystemAsync(data => data with { Look = CabinetLook.Default with { Wood = "walnut" } }, CancellationToken.None);
 
         raised.Should().Be(0);
     }

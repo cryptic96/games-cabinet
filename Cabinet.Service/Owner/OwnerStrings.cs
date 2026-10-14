@@ -536,34 +536,69 @@ public static class OwnerStrings
         _ => string.Empty,
     };
 
-    /// <summary>The heading of the cabinet finish panel, and the name of its group of choices.</summary>
-    public const string FinishHeading = "Cabinet finish";
+    /// <summary>The heading of the cabinet look panel.</summary>
+    public const string LookHeading = "Cabinet look";
 
-    /// <summary>The line under the finish panel's heading.</summary>
-    public const string FinishHelper = "The look of the cabinet for every visitor.";
+    /// <summary>The line under the look panel's heading.</summary>
+    public const string LookHelper = "How the cabinet looks for every visitor.";
 
-    /// <summary>The quiet note under the finish tiles while there is only one.</summary>
-    public const string FinishOnlyNote = "Classic is the only finish for now.";
+    /// <summary>The legend of the group of designs.</summary>
+    public const string DesignLegend = "Design";
 
-    /// <summary>The button that saves the chosen finish for a browser that runs no script.</summary>
-    public const string SaveFinishButton = "Save finish";
+    /// <summary>The legend of the group of woods.</summary>
+    public const string WoodLegend = "Wood";
 
-    /// <summary>The words shown for a finish whose post found nothing to change; the finish is as it was chosen.</summary>
-    public const string FinishSaved = "Saved";
+    /// <summary>The legend of the group of light choices.</summary>
+    public const string LightsLegend = "Lights";
 
-    /// <summary>The name a finish is shown under on its tile.</summary>
-    /// <param name="finish">The finish, as it is stored.</param>
-    public static string FinishName(string finish) => finish switch
+    /// <summary>The legend of the group of depth choices.</summary>
+    public const string DepthLegend = "Depth";
+
+    /// <summary>The label of the switch that paints the back of every cubby.</summary>
+    public const string PaintedBacksLabel = "Painted backs";
+
+    /// <summary>The hint under the painted backs switch.</summary>
+    public const string PaintedBacksHint = "Paints the back of every cubby a dark colour instead of showing the wood.";
+
+    /// <summary>The hint under the light choices.</summary>
+    public const string LightsHint = "Evenings only follows sunset and sunrise by each visitor's own clock.";
+
+    /// <summary>The hint under the depth choices.</summary>
+    public const string DepthHint = "Flat has no shading. Shaded is today's look. Deep draws the inside walls and floor of every cubby.";
+
+    /// <summary>The button that publishes the chosen look to every visitor.</summary>
+    public const string UseForEveryoneButton = "Use for everyone";
+
+    /// <summary>The words shown for a look post that found nothing to change; the look is as it was chosen.</summary>
+    public const string LookSaved = "Saved";
+
+    /// <summary>The line that says what visitors see now.</summary>
+    /// <param name="summary">The look in use, as <see cref="CabinetLooks.Summary"/> words it.</param>
+    public static string VisitorsSee(string summary) => $"Visitors see: {summary}";
+
+    /// <summary>The line under a design's name.</summary>
+    /// <param name="design">The design, as it is stored.</param>
+    public static string DesignSubLine(string design) => design switch
     {
-        "classic" => "Classic",
-        _ => finish,
+        "classic" => "Moulded top, arched plinth on feet.",
+        "modern" => "Slab top, straight recessed base.",
+        "display" => "Thick slab top, dark base that seems to float.",
+        "legs" => "Apron with splayed, tapered legs.",
+        "library" => "Crown moulding, brass line on every shelf.",
+        "plywood" => "Striped ply edges, rounded corners.",
+        "plywood-legs" => "Ply edges on two splayed legs.",
+        _ => string.Empty,
     };
 
-    /// <summary>The line under a finish's name on its tile.</summary>
-    /// <param name="finish">The finish, as it is stored.</param>
-    public static string FinishSubLine(string finish) => finish switch
+    /// <summary>The line under a wood's name.</summary>
+    /// <param name="wood">The wood, as it is stored.</param>
+    public static string WoodSubLine(string wood) => wood switch
     {
-        "classic" => "Warm wood, as it is today.",
+        "brown" => "Today's wood and wall.",
+        "walnut" => "Dark and rich.",
+        "oak" => "Pale gold, open grain.",
+        "birch" => "Pale and clean, light wall.",
+        "mahogany" => "Deep red-brown.",
         _ => string.Empty,
     };
 
@@ -775,8 +810,8 @@ public static class OwnerStrings
         "location-renamed" => "Location renamed.",
         "location-moved" => "Location moved.",
         "location-deleted" => "Location deleted.",
-        "game-moved" or "game-unplaced" or "picture-chosen" or "finish-set" => "Saved.",
-        "unknown-finish" => "That finish isn't available.",
+        "game-moved" or "game-unplaced" or "picture-chosen" or "look-set" => "Saved.",
+        "unknown-look" => "That look isn't available.",
         "picture-checked" => "Marked as checked.",
         "unchanged" => "Nothing to change.",
         "undone" => "Undone.",
