@@ -16,7 +16,9 @@
   --top-height: 34;
   --base-height: 80;
   --base-overhang: 0;
+  --base-inset: 0;
   --floor-margin: 24;
+  --radius: 0;
   --foot-width: 70;
   --arch-rise: 40;
   --arch-radius: 110;
@@ -281,6 +283,268 @@
     right calc(14 * var(--u)) top 0,
     0 0;
   background-repeat: no-repeat;
+}
+
+/**
+ * The six designs that are not the classic. Each one is a block of millimetre sizes on the cabinet plus the recipe of its
+ * members. A recipe only reads wood tokens, so any wood can be drawn on any design. Soft members have a lit arris, fine
+ * grain, long streaks and a tonal wander; ply members show the glued layers on every front edge; the library adds the
+ * brass line. A face is always four background layers: arris, fine detail, a second detail and a tonal wander. Every
+ * design keeps the side allowance at 32, keeps side trim plus overhang at 28 or less and keeps the base overhang at 14 or
+ * less, so a shadow always has room inside the section box.
+ */
+:is([data-design="modern"], [data-design="display"], [data-design="legs"], [data-design="library"]) .section > * {
+  --hair: max(1px, calc(1.2 * var(--u)));
+  --gs: rgb(var(--grain-dark-rgb) / calc(0.30 * var(--grain-k) * var(--grain-fine)));
+  --gls: rgb(var(--arris-light-rgb) / calc(0.09 * var(--grain-k) * var(--grain-fine)));
+  --streak: rgb(var(--grain-dark-rgb) / calc(0.08 * var(--grain-k)));
+  --gst: rgb(var(--grain-dark-rgb) / calc(0.15 * var(--grain-k) * var(--grain-fine)));
+  --lit-a: 0.34;
+  --lit-end-h: 24%;
+  --lit-end-v: 26%;
+  --dark-start-h: 68%;
+  --dark-start-v: 66%;
+  --dark-a: 0.50;
+  --h-face-tall:
+    linear-gradient(to bottom, rgb(var(--arris-light-rgb) / var(--lit-a)) 0, transparent var(--lit-end-h), transparent var(--dark-start-h), rgb(var(--arris-dark-rgb) / var(--dark-a)) 100%),
+    repeating-linear-gradient(to bottom, transparent 0 calc(3.1 * var(--u)), var(--gst) calc(3.1 * var(--u)) calc(3.1 * var(--u) + var(--lw)), transparent calc(3.1 * var(--u) + var(--lw)) calc(7 * var(--u))),
+    repeating-linear-gradient(to bottom, transparent 0 calc(5.3 * var(--u)), var(--gst) calc(5.3 * var(--u)) calc(5.3 * var(--u) + var(--lw)), transparent calc(5.3 * var(--u) + var(--lw)) calc(11 * var(--u))),
+    repeating-linear-gradient(to bottom, transparent 0 calc(8.9 * var(--u)), var(--gst) calc(8.9 * var(--u)) calc(8.9 * var(--u) + var(--lw)), transparent calc(8.9 * var(--u) + var(--lw)) calc(17 * var(--u)));
+  --h-face:
+    linear-gradient(to bottom, rgb(var(--arris-light-rgb) / var(--lit-a)) 0, transparent var(--lit-end-h), transparent var(--dark-start-h), rgb(var(--arris-dark-rgb) / var(--dark-a)) 100%),
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0 calc(2.3 * var(--u)),
+      var(--gs) calc(2.3 * var(--u)) calc(2.3 * var(--u) + var(--lw)),
+      transparent calc(2.3 * var(--u) + var(--lw)) calc(6.1 * var(--u)),
+      var(--gls) calc(6.1 * var(--u)) calc(6.1 * var(--u) + 2 * var(--lw)),
+      transparent calc(6.1 * var(--u) + 2 * var(--lw)) calc(10.7 * var(--u))
+    ),
+    repeating-linear-gradient(to right, transparent 0 calc(41 * var(--u)), var(--streak) calc(70 * var(--u)), transparent calc(113 * var(--u)) calc(263 * var(--u))),
+    repeating-linear-gradient(
+      to right,
+      transparent 0,
+      rgb(var(--shade-rgb) / 0.10) calc(90 * var(--u)),
+      transparent calc(170 * var(--u)),
+      rgb(var(--highlight-rgb) / 0.06) calc(260 * var(--u)),
+      transparent calc(360 * var(--u))
+    );
+  --v-arris: linear-gradient(to right, rgb(var(--arris-light-rgb) / var(--lit-a)) 0, transparent var(--lit-end-v), transparent var(--dark-start-v), rgb(var(--arris-dark-rgb) / var(--dark-a)) 100%);
+  --v-face: var(--v-arris), var(--v-grain);
+  --leg-splay: 8.4deg;
+  --leg-stripes-left:
+    repeating-linear-gradient(
+      calc(90deg + var(--leg-splay)),
+      transparent 0 calc(2.7 * var(--u)),
+      var(--gs) calc(2.7 * var(--u)) calc(2.7 * var(--u) + var(--lw)),
+      transparent calc(2.7 * var(--u) + var(--lw)) calc(7.3 * var(--u)),
+      var(--gls) calc(7.3 * var(--u)) calc(7.3 * var(--u) + 2 * var(--lw)),
+      transparent calc(7.3 * var(--u) + 2 * var(--lw)) calc(11.9 * var(--u))
+    );
+  --leg-stripes-right:
+    repeating-linear-gradient(
+      calc(90deg - var(--leg-splay)),
+      transparent 0 calc(2.7 * var(--u)),
+      var(--gs) calc(2.7 * var(--u)) calc(2.7 * var(--u) + var(--lw)),
+      transparent calc(2.7 * var(--u) + var(--lw)) calc(7.3 * var(--u)),
+      var(--gls) calc(7.3 * var(--u)) calc(7.3 * var(--u) + 2 * var(--lw)),
+      transparent calc(7.3 * var(--u) + 2 * var(--lw)) calc(11.9 * var(--u))
+    );
+  --v-grain: var(--v-stripes), var(--v-rest);
+  --v-stripes:
+    repeating-linear-gradient(
+      to right,
+      transparent 0 calc(2.7 * var(--u)),
+      var(--gs) calc(2.7 * var(--u)) calc(2.7 * var(--u) + var(--lw)),
+      transparent calc(2.7 * var(--u) + var(--lw)) calc(7.3 * var(--u)),
+      var(--gls) calc(7.3 * var(--u)) calc(7.3 * var(--u) + 2 * var(--lw)),
+      transparent calc(7.3 * var(--u) + 2 * var(--lw)) calc(11.9 * var(--u))
+    );
+  --v-rest:
+    repeating-linear-gradient(to bottom, transparent 0 calc(57 * var(--u)), var(--streak) calc(92 * var(--u)), transparent calc(131 * var(--u)) calc(307 * var(--u))),
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      rgb(var(--highlight-rgb) / 0.06) calc(110 * var(--u)),
+      transparent calc(210 * var(--u)),
+      rgb(var(--shade-rgb) / 0.10) calc(300 * var(--u)),
+      transparent calc(400 * var(--u))
+    );
+}
+
+[data-design="legs"] .cabinet {
+  --side-trim: 0;
+  --overhang: 0;
+  --top-height: 0;
+  --base-height: 166;
+  --base-inset: 0;
+  --base-overhang: 0;
+  --floor-margin: 24;
+  --radius: 8;
+  --plank-width: 200;
+}
+
+:is(
+  [data-design="modern"],
+  [data-design="display"],
+  [data-design="legs"],
+  [data-design="library"],
+  [data-design="plywood"],
+  [data-design="plywood-legs"]
+) .section-body {
+  background-color: var(--wood);
+  background-image: var(--v-face);
+  border-radius: calc(var(--radius) * var(--u));
+}
+
+:is(
+  [data-design="modern"],
+  [data-design="display"],
+  [data-design="legs"],
+  [data-design="library"],
+  [data-design="plywood"],
+  [data-design="plywood-legs"]
+) .cubby {
+  box-shadow: 1px 0 0 var(--edge-up-6), -1px 0 0 rgb(var(--arris-dark-rgb) / 0.55);
+}
+
+:is(
+  [data-design="modern"],
+  [data-design="display"],
+  [data-design="legs"],
+  [data-design="library"],
+  [data-design="plywood"],
+  [data-design="plywood-legs"]
+) .cubby::before {
+  background-color: var(--board-tone);
+  background-image:
+    linear-gradient(to bottom, var(--wood-lit) 0 1px, transparent 1px, rgb(var(--shade-rgb) / 0.30) 100%),
+    var(--h-face);
+  background-size: auto, auto, auto, var(--span) 100%, var(--span) 100%;
+  background-position: 0 0, 0 0, 0 0, var(--ox) 0, var(--ox) 0;
+  background-repeat: no-repeat;
+}
+
+:is(
+  [data-design="modern"],
+  [data-design="display"],
+  [data-design="legs"],
+  [data-design="library"],
+  [data-design="plywood"],
+  [data-design="plywood-legs"]
+) .section-trim::before,
+:is(
+  [data-design="modern"],
+  [data-design="display"],
+  [data-design="legs"],
+  [data-design="library"],
+  [data-design="plywood"],
+  [data-design="plywood-legs"]
+) .section-trim::after {
+  background-image: var(--edge), var(--v-face);
+}
+
+:is(
+  [data-design="modern"],
+  [data-design="display"],
+  [data-design="legs"],
+  [data-design="library"],
+  [data-design="plywood"],
+  [data-design="plywood-legs"]
+) .section-trim::before {
+  border-radius: calc(var(--radius) * var(--u)) 0 0 calc(var(--radius) * var(--u));
+}
+
+:is(
+  [data-design="modern"],
+  [data-design="display"],
+  [data-design="legs"],
+  [data-design="library"],
+  [data-design="plywood"],
+  [data-design="plywood-legs"]
+) .section-trim::after {
+  border-radius: 0 calc(var(--radius) * var(--u)) calc(var(--radius) * var(--u)) 0;
+}
+
+:is(
+  [data-design="modern"],
+  [data-design="display"],
+  [data-design="legs"],
+  [data-design="library"],
+  [data-design="plywood"],
+  [data-design="plywood-legs"]
+) .section-top::before {
+  background-image:
+    linear-gradient(to bottom, rgb(var(--shade-rgb) / 0.45) 0 1px, transparent 1px 60%, rgb(var(--shade-rgb) / 0.20) 100%),
+    var(--h-face);
+}
+
+:is([data-design="legs"], [data-design="plywood"], [data-design="plywood-legs"]) .section-top {
+  border-radius: 0;
+  background-image: none;
+  background-color: transparent;
+  box-shadow: none;
+}
+
+[data-design="legs"] .section-base,
+
+[data-design="legs"] .section-base {
+  background-image:
+    radial-gradient(closest-side, rgb(var(--room-shade-rgb) / 0.70), transparent),
+    radial-gradient(closest-side, rgb(var(--room-shade-rgb) / 0.70), transparent),
+    radial-gradient(closest-side, rgb(var(--room-shade-rgb) / 0.45), rgb(var(--room-shade-rgb) / 0.18) 60%, transparent);
+  background-size:
+    calc(46 * var(--u)) calc(12 * var(--u)),
+    calc(46 * var(--u)) calc(12 * var(--u)),
+    calc((var(--section-w) + 40) * var(--u)) calc(40 * var(--u));
+  background-repeat: no-repeat;
+  background-position:
+    left calc(30 * var(--u)) top calc(160 * var(--u)),
+    right calc(30 * var(--u)) top calc(160 * var(--u)),
+    center top calc(146 * var(--u));
+}
+
+[data-design="legs"] .section-base::before,
+
+[data-design="legs"] .section-base::before {
+  clip-path: polygon(
+    calc(60 * var(--u)) calc(30 * var(--u)),
+    calc(112 * var(--u)) calc(30 * var(--u)),
+    calc(66 * var(--u)) calc(166 * var(--u)),
+    calc(40 * var(--u)) calc(166 * var(--u)),
+    calc(60 * var(--u)) calc(30 * var(--u)),
+    calc(100% - 112 * var(--u)) calc(30 * var(--u)),
+    calc(100% - 60 * var(--u)) calc(30 * var(--u)),
+    calc(100% - 40 * var(--u)) calc(166 * var(--u)),
+    calc(100% - 66 * var(--u)) calc(166 * var(--u)),
+    calc(100% - 112 * var(--u)) calc(30 * var(--u))
+  );
+  background-image:
+    linear-gradient(to right, rgb(var(--arris-light-rgb) / 0.35) 0, transparent 38%, rgb(var(--arris-dark-rgb) / 0.55) 100%),
+    linear-gradient(to right, rgb(var(--arris-light-rgb) / 0.35) 0, transparent 38%, rgb(var(--arris-dark-rgb) / 0.55) 100%),
+    linear-gradient(to bottom, rgb(var(--shade-rgb) / 0.45) 0, transparent calc(30 * var(--u))),
+    var(--leg-stripes-left),
+    var(--leg-stripes-right),
+    var(--v-rest);
+  background-size: calc(72 * var(--u)) 100%, calc(72 * var(--u)) 100%, auto, 50% 100%, 50% 100%, auto, auto;
+  background-position: calc(40 * var(--u)) 0, calc(100% - 40 * var(--u)) 0, 0 0, 0 0, 100% 0, 0 0, 0 0;
+}
+
+[data-design="legs"] .section-base::after {
+  left: calc(14 * var(--u));
+  right: calc(14 * var(--u));
+  width: auto;
+  top: calc(-14 * var(--u));
+  height: calc(48 * var(--u));
+  border-radius: calc(2 * var(--u));
+  background-color: var(--wood);
+  background-image:
+    linear-gradient(to bottom, rgb(var(--arris-light-rgb) / 0.50) 0 var(--hair), transparent var(--hair) 24%, transparent 66%, rgb(var(--arris-dark-rgb) / 0.55) 100%),
+    var(--h-face-tall);
+  background-size: auto;
+  background-position: 0 0;
+  background-repeat: no-repeat;
+  box-shadow: 0 calc(3 * var(--u)) calc(4 * var(--u)) calc(-1 * var(--u)) rgb(var(--shade-rgb) / 0.55);
 }
 
 }
