@@ -191,6 +191,7 @@ footer {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
+  color: var(--room-text, var(--wall-text));
 }
 
 .bgg-credit img {

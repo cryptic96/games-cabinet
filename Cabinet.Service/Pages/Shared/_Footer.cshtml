@@ -2,5 +2,14 @@
 @inject BuildInfo Build
 <footer>
     <p class="version">@Model.Text.Version(Build.Version, Build.ShortCommit)</p>
-    <a class="bgg-credit" href="https://boardgamegeek.com" rel="noopener"><img src="~/img/powered-by-bgg.svg" alt="@Model.Text.LogoAlt" width="342" height="76" asp-append-version="true" /></a>
+    <a class="bgg-credit" href="https://boardgamegeek.com" rel="noopener">
+        @if (ViewData["LightWall"] is true)
+        {
+            <img src="~/img/powered-by-bgg-dark.svg" alt="@Model.Text.LogoAlt" width="342" height="76" asp-append-version="true" />
+        }
+        else
+        {
+            <img src="~/img/powered-by-bgg.svg" alt="@Model.Text.LogoAlt" width="342" height="76" asp-append-version="true" />
+        }
+    </a>
 </footer>
