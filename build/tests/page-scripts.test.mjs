@@ -1786,7 +1786,7 @@ test('a generated cover of a game with a colour takes it, and one without keeps 
 });
 
 test('the page scripts never write a style attribute or an inline handler', () => {
-  for (const name of ['render.js', 'cabinet.js', 'sync.js', 'status.js', 'live.js', 'copy.js']) {
+  for (const name of ['render.js', 'cabinet.js', 'sync.js', 'status.js', 'live.js', 'copy.js', 'look.js', 'evening.js']) {
     const source = readFileSync(new URL('../../Cabinet.Service/wwwroot/js/' + name, import.meta.url), 'utf8');
 
     assert.doesNotMatch(source, /setAttribute\(\s*['"]style['"]/);

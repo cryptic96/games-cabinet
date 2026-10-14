@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Cabinet.BrowserTests.Infrastructure;
 using Cabinet.Domain.Owner;
 using Cabinet.IntegrationTests.Infrastructure;
@@ -20,6 +21,8 @@ public sealed class LightsTests : CabinetPageTest
 
     private const int FadeWaitMilliseconds = 6000;
 
+    private const int EdgeTolerance = 3;
+
     private const string RecordFirstDraw = """
         (() => {
           window.__lamp = { drawn: null, nextFrame: null };
@@ -33,6 +36,7 @@ public sealed class LightsTests : CabinetPageTest
                 opacity: Number(style.opacity),
                 lit: root.hasAttribute('data-lit'),
                 settled: root.hasAttribute('data-settled'),
+                animations: layer.getAnimations().length,
               };
             };
             window.__lamp.drawn = read();
@@ -40,6 +44,23 @@ public sealed class LightsTests : CabinetPageTest
           }, { once: true });
         })();
         """;
+
+    private const string RecordDomState = """
+        (() => {
+          window.__dom = { lit: null, bridge: null, violations: [] };
+          document.addEventListener('securitypolicyviolation', (event) => window.__dom.violations.push(event.violatedDirective));
+          document.addEventListener('DOMContentLoaded', () => {
+            window.__dom.lit = document.documentElement.hasAttribute('data-lit');
+            window.__dom.bridge = typeof window.cabinetEvening;
+          });
+        })();
+        """;
+
+    private const string StorageThatThrows = """
+        Object.defineProperty(window, 'sessionStorage', { get() { throw new DOMException('denied', 'SecurityError'); } });
+        """;
+
+    private static readonly Regex EveningScriptAddress = new(@"/js/evening\.([^/?]+\.)?js(\?|$)");
 
     private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
 
@@ -96,6 +117,163 @@ public sealed class LightsTests : CabinetPageTest
         FacePixelDifferences(lit, dark, faces).Should().Be(0, "no light is painted over a box face");
     }
 
+    [Fact]
+    public async Task A_later_load_in_the_same_tab_starts_lit_from_the_first_frame_with_no_fade()
+    {
+        await StartLitAsync("on");
+        await Page.AddInitScriptAsync(RecordDomState);
+        await Page.AddInitScriptAsync(RecordFirstDraw);
+        await Page.SetViewportSizeAsync(1440, 900);
+        var address = await GotoCabinetAsync("/?sample=65");
+
+        (await ReadDomAsync()).Lit.Should().BeFalse("the first load in a tab is not lit before its first paint");
+        (await ReadDrawAsync("drawn")).Opacity.Should().Be(0);
+        await WaitUntilLitAsync();
+
+        await Page.GotoAsync(address);
+        await Page.WaitForSelectorAsync("#cabinet .placement", new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached });
+        await Page.WaitForFunctionAsync("() => window.__lamp.nextFrame !== null");
+
+        (await ReadDomAsync()).Lit.Should().BeTrue("the head script lit the page before the first paint");
+        var drawn = await ReadDrawAsync("drawn");
+        var nextFrame = await ReadDrawAsync("nextFrame");
+        drawn.Opacity.Should().Be(1);
+        drawn.Animations.Should().Be(0, "no transition is running");
+        nextFrame.Opacity.Should().Be(1);
+        nextFrame.Animations.Should().Be(0);
+        await Page.WaitForSelectorAsync("html[data-settled]");
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Storage_that_refuses_to_be_used_makes_every_load_fade_on()
+    {
+        await StartLitAsync("on");
+        await Page.AddInitScriptAsync(StorageThatThrows);
+        await Page.AddInitScriptAsync(RecordDomState);
+        await Page.AddInitScriptAsync(RecordFirstDraw);
+        await Page.SetViewportSizeAsync(1440, 900);
+        var address = await GotoCabinetAsync("/?sample=65");
+        await WaitUntilLitAsync();
+
+        await Page.GotoAsync(address);
+        await Page.WaitForSelectorAsync("#cabinet .placement", new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached });
+        await Page.WaitForFunctionAsync("() => window.__lamp.drawn !== null");
+
+        (await ReadDomAsync()).Lit.Should().BeFalse();
+        (await ReadDrawAsync("drawn")).Opacity.Should().Be(0, "every load fades on when nothing can be remembered");
+        await WaitUntilLitAsync();
+    }
+
+    [Fact]
+    public async Task With_the_lights_off_the_head_script_is_not_requested_and_the_light_layer_is_not_displayed()
+    {
+        var scriptRequests = new List<string>();
+        await StartLitAsync("off");
+        Page.Request += (_, request) =>
+        {
+            if (EveningScriptAddress.IsMatch(request.Url))
+            {
+                scriptRequests.Add(request.Url);
+            }
+        };
+        await Page.SetViewportSizeAsync(1440, 900);
+        await GotoCabinetAsync("/?sample=65");
+        await Task.Delay(300, TestContext.Current.CancellationToken);
+
+        scriptRequests.Should().BeEmpty();
+        (await Page.EvaluateAsync<int>("() => document.head.querySelectorAll('script[src*=\"/js/evening.\"]').length")).Should().Be(0);
+        (await Page.EvaluateAsync<string>("() => document.querySelector('meta[name=\"cabinet-evening-script\"]').content")).Should().MatchRegex(@"^/js/evening\.js\?v=\S+$");
+        (await Page.EvaluateAsync<string>("() => getComputedStyle(document.querySelector('#cabinet .section-light')).display")).Should().Be("none");
+        await Expect(Page.Locator("html")).Not.ToHaveAttributeAsync("data-lit", string.Empty);
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task With_the_lights_on_the_head_script_loads_synchronously_in_the_head_and_breaks_no_security_rule()
+    {
+        await StartLitAsync("on");
+        await Page.AddInitScriptAsync(RecordDomState);
+        await Page.SetViewportSizeAsync(1440, 900);
+        var request = await Page.RunAndWaitForRequestAsync(
+            () => GotoCabinetAsync("/?sample=65"),
+            candidate => EveningScriptAddress.IsMatch(candidate.Url));
+
+        request.Url.Should().MatchRegex(EveningScriptAddress.ToString());
+        var script = await Page.EvaluateAsync<string[]>(
+            "() => { const element = document.head.querySelector('script[src*=\"/js/evening.\"]'); return [element.getAttribute('src'), String(element.async), String(element.defer), element.type]; }");
+        var meta = await Page.EvaluateAsync<string>("() => document.querySelector('meta[name=\"cabinet-evening-script\"]').content");
+
+        script[0].Should().MatchRegex(@"^/js/evening\.[^/]+\.js$|^/js/evening\.js\?v=\S+$");
+        script[1].Should().Be("false");
+        script[2].Should().Be("false");
+        script[3].Should().BeEmpty("it is a classic script, not a module");
+        meta.Should().MatchRegex(@"^/js/evening\.js\?v=\S+$", "the page names the versioned address of the head script");
+        (await ReadDomAsync()).Bridge.Should().Be("object", "the head script had run when the document finished parsing");
+        (await Page.EvaluateAsync<string[]>("() => window.__dom.violations")).Should().BeEmpty();
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Lit_oak_glows_on_the_floor_in_front_of_the_base_and_lit_brown_does_not_and_nothing_leaves_the_section()
+    {
+        await StartLitAsync("on", wood: "oak");
+        await Page.SetViewportSizeAsync(1440, 900);
+        await GotoCabinetAsync("/?sample=65");
+        await WaitUntilLitAsync();
+        await FitViewportToPageAsync();
+
+        var bands = await FloorBandsAsync();
+        await SaveScreenshotAsync("lights-on-oak");
+        var lit = await FullPageAsync();
+        var edges = EdgeDifferences(lit, await SectionRectsAsync());
+
+        await SwitchLightsOffAsync();
+        var dark = await FullPageAsync();
+
+        bands.Should().NotBeEmpty();
+        foreach (var band in bands)
+        {
+            WarmthOf(lit, band).Should().BeGreaterThan(WarmthOf(dark, band) + 4, "the floor in front of a lit cabinet catches a warm glow");
+        }
+
+        edges.Should().OnlyContain(difference => difference <= EdgeTolerance, "the glow ends inside the section box");
+
+        await Page.EvaluateAsync("() => { const root = document.documentElement; root.dataset.wood = 'brown'; root.dataset.lights = 'on'; root.setAttribute('data-lit', ''); }");
+        await FitViewportToPageAsync();
+        var brownBands = await FloorBandsAsync();
+        var brownLit = await FullPageAsync();
+        await SwitchLightsOffAsync();
+        var brownDark = await FullPageAsync();
+
+        foreach (var band in brownBands)
+        {
+            BandDifferences(brownLit, brownDark, band).Should().Be(0, "a wood without a floor has no glow on it");
+        }
+    }
+
+    [Fact]
+    public async Task In_deep_the_lamp_brightens_the_top_face_of_every_shelf_board()
+    {
+        await StartLitAsync("on", depth: "deep");
+        await Page.SetViewportSizeAsync(1440, 900);
+        await GotoCabinetAsync("/?sample=65");
+        await WaitUntilLitAsync();
+        await FitViewportToPageAsync();
+        await SaveScreenshotAsync("lights-on-deep");
+
+        var bands = await BoardTopBandsAsync();
+        var lit = await FullPageAsync();
+        await SwitchLightsOffAsync();
+        var dark = await FullPageAsync();
+
+        bands.Should().NotBeEmpty();
+        foreach (var band in bands)
+        {
+            BrightnessOf(lit, band).Should().BeGreaterThan(BrightnessOf(dark, band) + 10, "the lamp lights the top face of the board");
+        }
+    }
+
     /// <inheritdoc />
     public override async ValueTask DisposeAsync()
     {
@@ -138,6 +316,146 @@ public sealed class LightsTests : CabinetPageTest
         }
     }
 
+    private async Task SwitchLightsOffAsync()
+    {
+        await Page.EvaluateAsync("() => { const root = document.documentElement; root.dataset.lights = 'off'; root.removeAttribute('data-lit'); }");
+        await FitViewportToPageAsync();
+    }
+
+    private async Task<byte[]> FullPageAsync() =>
+        await Page.ScreenshotAsync(new PageScreenshotOptions { FullPage = true, Animations = ScreenshotAnimations.Disabled });
+
+    private async Task<DomState> ReadDomAsync() =>
+        JsonSerializer.Deserialize<DomState>(await Page.EvaluateAsync<string>("() => JSON.stringify(window.__dom)"), WebOptions)!;
+
+    private async Task<LayerReading> ReadDrawAsync(string moment) =>
+        JsonSerializer.Deserialize<LayerReading>(await Page.EvaluateAsync<string>("(moment) => JSON.stringify(window.__lamp[moment])", moment), WebOptions)!;
+
+    private async Task<double[][]> SectionRectsAsync() =>
+        await Page.EvaluateAsync<double[][]>(
+            "() => [...document.querySelectorAll('#cabinet .section')].map((element) => { const r = element.getBoundingClientRect(); return [r.x + scrollX, r.y + scrollY, r.width, r.height]; })");
+
+    /// <summary>
+    /// The rectangle of the floor margin under every section, over the middle half of its width: the strip in front of the base
+    /// where the lamp's floor glow falls.
+    /// </summary>
+    private async Task<List<int[]>> FloorBandsAsync()
+    {
+        var margin = await Page.EvaluateAsync<double>(
+            "() => { const style = getComputedStyle(document.querySelector('#cabinet .cubby')); return parseFloat(style.getPropertyValue('--u')) * parseFloat(style.getPropertyValue('--floor-margin')); }");
+        var bands = new List<int[]>();
+
+        foreach (var section in await SectionRectsAsync())
+        {
+            var bottom = (int)Math.Floor(section[1] + section[3]);
+            var top = (int)Math.Ceiling(section[1] + section[3] - margin) + 1;
+            var left = (int)Math.Round(section[0] + (section[2] * 0.25));
+            var right = (int)Math.Round(section[0] + (section[2] * 0.75));
+            bands.Add([left, top, right, bottom - 1]);
+        }
+
+        return bands;
+    }
+
+    /// <summary>
+    /// The rectangle of the top face of the shelf board under every cubby: the first rows below the cubby, over the middle half of
+    /// its width, as many rows as the lamp's wash covers.
+    /// </summary>
+    private async Task<List<int[]>> BoardTopBandsAsync()
+    {
+        var rows = await Page.EvaluateAsync<double>(
+            "() => { const style = getComputedStyle(document.querySelector('#cabinet .light-pool')); return Math.ceil(0.32 * parseFloat(style.getPropertyValue('--u')) * parseFloat(style.getPropertyValue('--frame'))); }");
+        var cubbies = await Page.EvaluateAsync<double[][]>(
+            "() => [...document.querySelectorAll('#cabinet .cubby')].map((element) => { const r = element.getBoundingClientRect(); return [r.x + scrollX, r.y + scrollY, r.width, r.height]; })");
+        var bands = new List<int[]>();
+
+        foreach (var cubby in cubbies)
+        {
+            var top = (int)Math.Ceiling(cubby[1] + cubby[3]);
+            bands.Add([(int)Math.Round(cubby[0] + (cubby[2] * 0.25)), top, (int)Math.Round(cubby[0] + (cubby[2] * 0.75)), top + Math.Max(1, (int)rows) - 1]);
+        }
+
+        return bands;
+    }
+
+    private static double WarmthOf(byte[] picture, int[] band) =>
+        MeanOver(picture, band, pixel => pixel.Red - pixel.Blue);
+
+    private static double BrightnessOf(byte[] picture, int[] band) =>
+        MeanOver(picture, band, pixel => pixel.Red + pixel.Green + pixel.Blue);
+
+    private static double MeanOver(byte[] picture, int[] band, Func<SKColor, int> measure)
+    {
+        using var bitmap = SKBitmap.Decode(picture) ?? throw new InvalidOperationException("The picture is not readable.");
+        var total = 0.0;
+        var count = 0;
+
+        for (var y = band[1]; y <= band[3]; y++)
+        {
+            for (var x = band[0]; x <= band[2]; x++)
+            {
+                total += measure(bitmap.GetPixel(x, y));
+                count++;
+            }
+        }
+
+        return total / count;
+    }
+
+    private static int BandDifferences(byte[] first, byte[] second, int[] band)
+    {
+        using var left = SKBitmap.Decode(first) ?? throw new InvalidOperationException("The first picture is not readable.");
+        using var right = SKBitmap.Decode(second) ?? throw new InvalidOperationException("The second picture is not readable.");
+        var differing = 0;
+
+        for (var y = band[1]; y <= band[3]; y++)
+        {
+            for (var x = band[0]; x <= band[2]; x++)
+            {
+                if (left.GetPixel(x, y) != right.GetPixel(x, y))
+                {
+                    differing++;
+                }
+            }
+        }
+
+        return differing;
+    }
+
+    /// <summary>
+    /// Reads, for every section, how far the pixels on its left, right and bottom edge are from the pixels three pixels outside
+    /// them. Anything the lamp paints beyond the section's box shows up as a difference.
+    /// </summary>
+    private static List<int> EdgeDifferences(byte[] picture, double[][] sections)
+    {
+        using var bitmap = SKBitmap.Decode(picture) ?? throw new InvalidOperationException("The picture is not readable.");
+        var differences = new List<int>();
+
+        foreach (var section in sections)
+        {
+            var left = (int)Math.Round(section[0]);
+            var top = (int)Math.Round(section[1]);
+            var right = left + (int)Math.Round(section[2]) - 1;
+            var bottom = top + (int)Math.Round(section[3]) - 1;
+
+            for (var x = left + 1; x < right; x += 3)
+            {
+                differences.Add(Distance(bitmap.GetPixel(x, bottom), bitmap.GetPixel(x, bottom + 3)));
+            }
+
+            for (var y = top + 1; y < bottom; y += 3)
+            {
+                differences.Add(Distance(bitmap.GetPixel(left, y), bitmap.GetPixel(left - 3, y)));
+                differences.Add(Distance(bitmap.GetPixel(right, y), bitmap.GetPixel(right + 3, y)));
+            }
+        }
+
+        return differences;
+    }
+
+    private static int Distance(SKColor first, SKColor second) =>
+        Math.Max(Math.Abs(first.Red - second.Red), Math.Max(Math.Abs(first.Green - second.Green), Math.Abs(first.Blue - second.Blue)));
+
     private async Task<List<double[]>> BoxFacesAsync()
     {
         var rects = await Page.EvaluateAsync<double[][]>(
@@ -175,5 +493,7 @@ public sealed class LightsTests : CabinetPageTest
         return differing;
     }
 
-    private sealed record LayerReading(string Display, double Opacity, bool Lit, bool Settled);
+    private sealed record DomState(bool Lit, string Bridge);
+
+    private sealed record LayerReading(string Display, double Opacity, bool Lit, bool Settled, int Animations);
 }

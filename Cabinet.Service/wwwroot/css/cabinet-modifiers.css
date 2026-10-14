@@ -166,4 +166,38 @@
   border-width: 0 0 calc(var(--frame) * var(--u)) calc(var(--frame) * var(--u));
 }
 
+/**
+ * In Deep the top face of the shelf board under the cubby catches the lamp: a hairline highlight and a warm wash over the top
+ * third of the board.
+ */
+[data-depth="deep"] .light-pool::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 100%;
+  width: calc(100% + var(--frame) * var(--u));
+  height: calc(var(--frame) * var(--u));
+  background-image:
+    linear-gradient(to bottom, rgb(var(--highlight-rgb) / 0.55) 0 max(1px, calc(1 * var(--u))), transparent max(1px, calc(1 * var(--u)))),
+    linear-gradient(to bottom, rgb(var(--lamp-rgb) / calc(0.32 * var(--lamp-k))) 0 32%, transparent 32%);
+}
+
+/**
+ * The faint warm glow on the floor in front of the base, inside the margin the section reserves under it. It is nothing on a
+ * wood that has no floor, because the room strength of such a wood is nothing. The skirting is not washed.
+ */
+.section-light::before {
+  content: "";
+  position: absolute;
+  left: calc(-30 * var(--u));
+  width: calc(100% + 60 * var(--u));
+  top: calc(100% + var(--base-height) * var(--u));
+  height: calc(var(--floor-margin) * var(--u));
+  background-image: radial-gradient(
+    ellipse 50% 100% at 50% 0%,
+    rgb(var(--lamp-rgb) / calc(0.14 * var(--lamp-k) * var(--room-k))),
+    transparent
+  );
+}
+
 }
