@@ -426,6 +426,29 @@ public sealed class OwnerLookTests : CabinetPageTest
         (await Page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth > document.documentElement.clientWidth")).Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData(1024)]
+    [InlineData(1152)]
+    [InlineData(1280)]
+    [InlineData(1440)]
+    public async Task Beside_the_preview_no_tile_name_touches_the_edge_of_its_tile(int width)
+    {
+        await OpenSettingsAsync(width, 900);
+
+        var room = await Page.Locator(".look-tile").EvaluateAllAsync<double[]>(
+            """
+            tiles => tiles.map(tile => {
+              const range = document.createRange();
+              range.selectNodeContents(tile.querySelector('.pic-label'));
+              const right = Math.max(...[...range.getClientRects()].map(rect => rect.right));
+
+              return tile.getBoundingClientRect().right - right;
+            })
+            """);
+
+        room.Should().OnlyContain(space => space >= 4, "every name keeps at least four pixels between its last letter and the tile's border");
+    }
+
     [Fact]
     public async Task Below_eighty_rem_the_page_keeps_its_width_and_the_same_five_columns()
     {

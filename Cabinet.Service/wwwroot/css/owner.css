@@ -1805,11 +1805,15 @@ header > .header-aside {
   }
 
   .look-tile {
-    padding: 6px;
+    padding: 6px 4px;
   }
 
   .look-tile .pic-label {
     font-size: 14px;
+  }
+
+  .look-tile .pic-sub {
+    font-size: 13px;
   }
 }
 
@@ -1934,6 +1938,12 @@ header > .header-aside {
     position: relative;
     top: auto;
     box-shadow: 0 1px 2px rgb(var(--shade-rgb) / 0.35);
+  }
+}
+
+@media (min-width: 64rem) and (max-width: 71.99rem) {
+  .look-layout {
+    grid-template-columns: minmax(0, 25rem) minmax(0, 1fr);
   }
 }
 
