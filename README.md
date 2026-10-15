@@ -10,6 +10,8 @@ The deployed site shows the real BoardGameGeek owned collection, synced every ho
 
 The owner has a second set of pages that open only from the home network or a VPN. There the owner chooses each game's picture (another picture BoardGameGeek offers for it, or a picture from the game's BoardGameGeek gallery by link), and keeps a list of storage locations and says where each game is kept. BoardGameGeek does not hand out storage locations, so the owner's own list is the only source of the "Stored in" line on a card. On the cabinet at the owner address, a small corner mark shows the games that are not placed yet. Visitors see the result and nothing else: no owner page or owner link exists on the public site. These choices live in the server's state directory, so a sync, a restart and a new release all leave them alone, and the owner backs them up by downloading them from the settings page and can restore them from that file, also into a fresh container.
 
+The owner also chooses what the cabinet looks like for everyone, from the settings page: one of seven furniture designs, one of five woods (each with its own wall), plain or painted backs, a flat, shaded or deep look inside the cubbies, and a warm light in the cubbies that is off, always on, or on only in the evening by each visitor's own clock. A preview shows the real cabinet before anything is published, and pages that are already open follow a new look within a few seconds. The default look is the original cabinet, unchanged.
+
 ## How releases work
 
 - A version tag builds, tests and attests a release as a draft.
@@ -21,6 +23,7 @@ The details live in the guides:
 - [Releasing](docs/releasing.md): cutting, approving and publishing a release.
 - [Deploying](docs/deploy.md): how the server installs, verifies and rolls back releases.
 - [Cabinet layout](docs/cabinet-layout.md): how the cabinet is arranged, the settings that tune it and what stays put when the collection changes.
+- [Cabinet looks](docs/cabinet-looks.md): the owner's choices of design, wood, backs, lights and depth, how the evening lights decide when to switch on, and what visitors see when the look changes.
 - [Server setup](docs/lxc-setup.md): provisioning the container the site runs in.
 - [BoardGameGeek sync](docs/bgg-sync.md): how the collection is synced, its settings and what happens when BoardGameGeek fails; also covers game details, box art, picking the picture and spine colour, and box sizes.
 - [Review sheet](docs/review-sheet.md): building pages on the server that show which picture each game uses, to check the art, spine colours and box sizes against the real boxes, and fetching and deleting them afterwards.

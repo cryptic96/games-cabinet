@@ -148,7 +148,7 @@ public sealed class LookSlotTests
         settings.Body.Should().MatchRegex("<input[^>]*type=\"checkbox\"[^>]*name=\"backs\"[^>]*value=\"painted\"[^>]*checked");
         settings.Body.Should().MatchRegex("<input[^>]*type=\"radio\"[^>]*name=\"lights\"[^>]*value=\"evenings\"[^>]*checked");
         settings.Body.Should().MatchRegex("<input[^>]*type=\"radio\"[^>]*name=\"depth\"[^>]*value=\"deep\"[^>]*checked");
-        WebUtility.HtmlDecode(settings.Body).Should().Contain("Visitors see: Library · Warm brown · Painted backs · Lights: Evenings only · Depth: Deep");
+        WebUtility.HtmlDecode(settings.Body).Should().Contain("Visitors see: Library\u00A0· Warm brown\u00A0· Painted backs\u00A0· Lights: Evenings only\u00A0· Depth: Deep");
     }
 
     private static CabinetWebApplicationFactory NewFactory(TemporaryDirectory? storage = null) =>

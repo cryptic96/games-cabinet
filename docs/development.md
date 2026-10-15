@@ -167,7 +167,7 @@ The owner tools are a second set of pages on a second port, served by the same h
 
 - `http://127.0.0.1:5082/owner/pictures` to choose each game's picture;
 - `http://127.0.0.1:5082/owner/locations` to keep a list of storage locations and place games in them;
-- `http://127.0.0.1:5082/owner/settings` to download, restore and review the owner's data and to see the change log.
+- `http://127.0.0.1:5082/owner/settings` to choose the cabinet look (see "Trying the cabinet look locally"), to download, restore and review the owner's data and to see the change log.
 
 The cabinet itself is also served on that port, with a small "Owner tools" plate, a strip with the number of games that are not placed yet, and an "Edit" link on each card; the public port shows none of it, and answers `404` for every owner path.
 
@@ -176,6 +176,14 @@ Use invented names only: "Cabinet A", "Shelf B" and "Lent out" are good location
 Owner data is stored apart from the synced collection, in the state directory (`.cabinet-state` next to the service project unless `Storage__Directory` says otherwise): `owner-data.json` holds the locations, where each game is kept, the picture choices and the change log, and `owner-data-versions/` holds the last ten earlier copies of it, taken before a change whenever the newest copy is more than an hour old, and before every restore. Pictures the owner links to are stored with the other pictures in the `art` folder. A sync never writes any of this, so deleting `snapshot.json` to start over leaves the owner's choices in place; delete `owner-data.json` and `owner-data-versions/` as well to start from nothing.
 
 To try a backup, press "Download owner data" on the settings page, change something, then restore the file on the same page: the page shows what the file holds next to what the server holds before it replaces anything.
+
+### Trying the cabinet look locally
+
+The look panel is the first block on the Settings page of the owner host. Open `http://127.0.0.1:5082/owner/settings`, change any choice and watch the preview; nothing is published until "Use for everyone" is pressed. To see a published look arrive on an open page, keep the public cabinet open on the public port (`http://127.0.0.1:5080/`) in another window after a sync has finished, publish a look on the owner page and the cabinet follows within a few seconds. The invented sample collections (`/?sample=65`, `/?sample=400`) have no live channel, so they pick up a published look on the next load.
+
+For "Evenings only" the preview has a Preview time choice that switches it between day and evening. On the public cabinet the evening comes from the browser's own clock, so to see it by day, change the clock in the browser's developer tools (a sensor or time emulation setting) or choose "Always on".
+
+To see the forced-colours rendering, switch on the forced-colours emulation in the browser's developer tools (the rendering panel) and reload; the cabinet, the credit to BoardGameGeek and the look panel keep their outlines and stay legible.
 
 ## Using a BGG token locally
 
@@ -221,6 +229,25 @@ dotnet test --project Cabinet.BrowserTests
 ```
 
 Set `CABINET_SCREENSHOT_DIR` to a directory to keep the screenshots the tests take; without it they are not written. A screenshot covers the whole page, except while a card is open, when only the visible window is saved, because a full-page capture resizes the window and would disturb the open card.
+
+The geometry and look tests measure real text, and the font the browser picks for `system-ui` decides how wide that text is, so a test can pass on one machine and fail on another. GitHub's runners draw `system-ui` wider than most desktops do (DejaVu Sans). To run the browser tests the way CI sees them, keep a font configuration file outside the repository that maps the three families the pages ask for to DejaVu Sans, and point `FONTCONFIG_FILE` at it:
+
+```xml
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+  <include ignore_missing="yes">/etc/fonts/fonts.conf</include>
+  <match target="pattern"><test name="family"><string>system-ui</string></test><edit name="family" mode="assign" binding="strong"><string>DejaVu Sans</string></edit></match>
+  <match target="pattern"><test name="family"><string>sans-serif</string></test><edit name="family" mode="assign" binding="strong"><string>DejaVu Sans</string></edit></match>
+  <match target="pattern"><test name="family"><string>Roboto</string></test><edit name="family" mode="assign" binding="strong"><string>DejaVu Sans</string></edit></match>
+</fontconfig>
+```
+
+```
+FONTCONFIG_FILE=/path/to/dejavu.conf dotnet test --project Cabinet.BrowserTests
+```
+
+Run the suite this way before pushing a change that moves text or boxes, and once with your normal fonts. Do not run two browser suites at the same time on one machine: each browser watches files, and several at once exhaust the system's file-watch limit and fail for reasons unrelated to the change.
 
 The test host serves module scripts without a content type when the browser accepts compressed responses, so the shared base class asks for the identity encoding. A new browser test should derive from `CabinetPageTest` to inherit that, the recording of console errors and request hosts, and the screenshot helper.
 

@@ -1634,6 +1634,11 @@ header > .header-aside {
   overflow-wrap: anywhere;
 }
 
+.look-line-trying {
+  color: var(--ink);
+  font-weight: 600;
+}
+
 .look-controls {
   min-width: 0;
 }
@@ -1707,9 +1712,26 @@ header > .header-aside {
 }
 
 @media (hover: hover) {
-  .look-choice:hover {
+  .look-choice:has(input:not(:disabled)):hover {
     background-image: linear-gradient(var(--hover-tint), var(--hover-tint));
   }
+}
+
+/**
+ * A group that is switched off wears the page's own disabled look, the one the quiet buttons use: a dashed border and muted
+ * text, in the normal weight. Its chosen pill gives up the thick ring and the tint, so it never reads as chosen and active while
+ * the preview shows something else.
+ */
+.look-group:disabled .look-choice {
+  border-style: dashed;
+  color: var(--paper-label);
+  font-weight: 400;
+  cursor: default;
+}
+
+.look-group:disabled .look-choice:has(input:checked) {
+  background-image: none;
+  box-shadow: inset 0 0 0 1px var(--paper-label);
 }
 
 .look-choice:has(:focus-visible) {
@@ -1767,8 +1789,8 @@ header > .header-aside {
 
 /**
  * A tile is too narrow for a radio and a whole word side by side in every font, so the radio sits above the name and the name
- * has the tile's full width. Beside the preview the controls column is narrow, so the tiles shrink to let the five woods share
- * one row and take the 14px name.
+ * has the tile's full width. Beside the preview the controls column is narrow, so from 64rem each group has five fixed columns,
+ * which lets the five woods share one row and the seven designs take five and two, whatever the zoom or the root font size.
  */
 .look-tile .pic-caption {
   flex-direction: column;
@@ -1778,16 +1800,20 @@ header > .header-aside {
 
 @media (min-width: 64rem) {
   .look-tiles {
-    grid-template-columns: repeat(auto-fill, minmax(5rem, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 8px;
   }
 
   .look-tile {
-    padding: 6px;
+    padding: 6px 4px;
   }
 
   .look-tile .pic-label {
     font-size: 14px;
+  }
+
+  .look-tile .pic-sub {
+    font-size: 13px;
   }
 }
 
@@ -1915,6 +1941,18 @@ header > .header-aside {
   }
 }
 
+@media (min-width: 64rem) and (max-width: 71.99rem) {
+  .look-layout {
+    grid-template-columns: minmax(0, 25rem) minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 80rem) {
+  .owner-main:has(.look-layout) {
+    --panel-max: 76rem;
+  }
+}
+
 @media (max-height: 36rem) {
   .look-stage,
   .look-preview {
@@ -1923,6 +1961,32 @@ header > .header-aside {
 
   .look-preview {
     box-shadow: 0 1px 2px rgb(var(--shade-rgb) / 0.35);
+  }
+}
+
+/**
+ * Forced colours drop every shadow and fill. The chosen tile and the chosen pill show their choice with an inset shadow, so each
+ * takes a system-coloured outline instead. A pill of a group that is switched off takes none, as it takes no ring in normal
+ * colours. The radio inside keeps its own dot and, when focused, its own ring, so a chosen item that has focus shows both marks.
+ * The miniature cabinets and the preview are pictures with a text summary beside them, so they opt out of recolouring and draw
+ * as an image would, rather than leaving an empty frame.
+ */
+@media (forced-colors: active) {
+  .pic-tile:has(input:checked),
+  .look-group:not(:disabled) .look-choice:has(input:checked) {
+    outline: 3px solid CanvasText;
+    outline-offset: -4px;
+  }
+
+  .pic-tile input:focus-visible,
+  .look-choice input:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  .look-swatch,
+  .look-preview {
+    forced-color-adjust: none;
   }
 }
 
