@@ -158,7 +158,7 @@ public interface IOwnerDataStore
     /// <param name="data">The data to store.</param>
     void Save(OwnerData data);
 
-    /// <summary>Copies the stored file, as it is and readable or not, to the earlier versions and drops the oldest copies beyond the number kept. It does nothing when there is no file yet.</summary>
+    /// <summary>Copies the stored file, as it is and readable or not, to the earlier versions and drops the oldest copies beyond the number kept. A file in an older stored format is kept apart: it is never replaced, counted or dropped. It does nothing when there is no file yet.</summary>
     /// <param name="now">The moment the copy is stamped with.</param>
     void KeepEarlierVersion(DateTimeOffset now);
 

@@ -798,10 +798,17 @@ public static class OwnerStrings
     /// <param name="count">How many pictures, at least one.</param>
     public static string FetchingPictures(int count) => $"Fetching {Counted(count, "picture", "pictures")} in the background.";
 
-    /// <summary>The line that says a file uses an older format than the site writes now.</summary>
+    /// <summary>
+    /// The line that says a file uses an older format than the site writes now. A file of the first format holds no look, so
+    /// the line also says that it restores with the default look and replaces the look every visitor sees now.
+    /// </summary>
     /// <param name="version">The file's format.</param>
-    public static string OlderFormat(int version) =>
-        $"This file uses an older format ({version.ToString(CultureInfo.InvariantCulture)}). It is upgraded when restored.";
+    public static string OlderFormat(int version)
+    {
+        var line = $"This file uses an older format ({version.ToString(CultureInfo.InvariantCulture)}). It is upgraded when restored.";
+
+        return version == 1 ? line + " It holds no look, so the cabinet is restored with the default look." : line;
+    }
 
     /// <summary>The words for a file the check refused.</summary>
     /// <param name="check">The refusal.</param>

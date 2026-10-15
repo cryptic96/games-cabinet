@@ -315,6 +315,7 @@ public sealed class OwnerBackupTests
         var page = await publicClient.GetStringAsync("/", TestContext.Current.CancellationToken);
 
         preview.Body.Should().Contain("This file uses an older format (1). It is upgraded when restored.");
+        preview.Body.Should().Contain("It holds no look, so the cabinet is restored with the default look.");
         restored.Status.Should().Be(HttpStatusCode.OK);
         page.Should().Contain("data-design=\"classic\" data-wood=\"brown\" data-backs=\"wood\" data-lights=\"off\" data-depth=\"shaded\">");
         ((OwnerDataState.Ready)factory.ServingServices.GetRequiredService<OwnerDataService>().State).Data.Locations.Should().ContainSingle();
