@@ -118,14 +118,45 @@ by default).
 ### Rolling back after a format change
 
 When a release changes the format of the owner data, it keeps a copy of the
-old file in `owner-data-versions/` before its first save. Once it has saved,
-the file is in the new format and the previous release cannot read it. A
-rollback to that release therefore opens the recovery panel on every owner
-page. Restore the copy from just before the upgrade from the earlier versions
-there (pick the version dated at the moment of the upgrade). The data comes
-back as it was then; anything changed after the upgrade is not in it, and the
-cabinet look returns to the default until it is chosen again. A downloaded
-file from before the upgrade restores the same way.
+old file in `owner-data-versions/` before its first save, whatever the hour
+rule says. The copy is named after the moment it was taken
+(`owner-data.<yyyyMMddTHHmmssZ>.json`), the same naming earlier releases use
+for their earlier versions, so the earlier release lists it. A copy in an
+older format never overwrites another copy (when its second is taken it moves
+on to the next free one, and a file already copied byte for byte is not copied
+again), and the ten-copy rule never removes it: that rule goes by the format
+written inside each copy, not by its name, so a copy an earlier upgrade made
+is kept as well. If the copy cannot be made, the save is refused and the file
+is left as it is. The same holds when the stored file cannot be read at the
+moment of the save, because its format is then unknown. The upgrade therefore
+never replaces the only file an earlier release can read.
+
+Once the new release has saved, the file is in the new format and the previous
+release cannot read it. A rollback to that release therefore opens the recovery
+panel on every owner page, and its earlier versions include the copy taken at
+the upgrade, dated at the moment of the upgrade (or a little earlier, when that
+exact file had already been copied before). Restore that copy there. The data
+comes back as it was then; anything changed after the upgrade is not in it, and
+the cabinet look returns to the default until it is chosen again. A downloaded
+file from before the upgrade restores the same way. The earlier release removes
+all but the ten newest copies whenever it keeps one, the restore included, so
+download a backup right after restoring.
+
+If the recovery panel does not offer the copy, put it back by hand. The copy
+taken at the upgrade is the newest file in `owner-data-versions/` whose header
+names the older format, for example `"schemaVersion":1,` for the first format:
+
+```sh
+grep -l '"schemaVersion":1,' /var/lib/cabinet/owner-data-versions/owner-data.*.json
+sudo systemctl stop cabinet
+sudo cp /var/lib/cabinet/owner-data-versions/owner-data.<yyyyMMddTHHmmssZ>.json /var/lib/cabinet/owner-data.json
+sudo chown cabinet:cabinet /var/lib/cabinet/owner-data.json
+sudo systemctl start cabinet
+```
+
+The copy stays in `owner-data-versions/` as it was. Copy the file only while
+the service is stopped, and only onto `owner-data.json` in the state
+directory; the service user must own it, or the site cannot save over it.
 
 ## Manual commands
 
@@ -224,9 +255,12 @@ is backed up by hand, by download.
   are not a backup.
 - **A release that changes the data format.** Before its first save the new
   release always keeps a copy of the old file, whatever the hour rule says,
-  so the last file an earlier release can read is among the earlier versions.
+  dated like any other earlier version so the earlier release lists it too.
+  That copy is never overwritten or removed, and the save is refused if the
+  copy cannot be made. The last file an earlier release can read is therefore
+  always among the earlier versions.
   After that save the file is in the new format and the previous release
-  cannot read it. See "Rolling back after a format change" below.
+  cannot read it. See "Rolling back after a format change" above.
 - **Restoring from a file.** On the Settings page, choose the file and press
   "Check file". The page shows what the file holds next to what the server
   holds, and nothing changes until "Restore file" is pressed. The current data

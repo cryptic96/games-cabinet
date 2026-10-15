@@ -21,7 +21,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Enrichment, Box Images & Shape** - Real box art, art-coloured spines, true box proportions and full game details, all served from the site (completed 2026-10-09)
 - [x] **Phase 5: Game Detail, Accessibility & Language** - Pull-out animation, detail card, keyboard and screen-reader access, English and Dutch labels (completed 2026-10-12)
 - [x] **Phase 6: Owner Tools & Persistence** - Home/VPN-only image overrides (and location editing if needed), persisted and backed up (completed 2026-10-13)
-- [ ] **Phase 6.1: Selectable Cabinet Finishes & Lighting** (INSERTED) - Seven owner-chosen finishes with their walls, lit cubbies with an optional day-and-night mode, and cubby depth
+- [x] **Phase 6.1: Selectable Cabinet Finishes & Lighting** (INSERTED) - Seven owner-chosen finishes with their walls, lit cubbies with an optional day-and-night mode, and cubby depth (completed 2026-10-15)
 - [ ] **Phase 7: Game-Night Filters & Location Cabinets** - Dim-to-filter search and a per-location cabinet toggle
 - [ ] **Phase 8: Public Hardening & Go-Public** - HTTPS exposure through Traefik with rate limits, headers, resource caps and a go-public checklist
 
@@ -475,7 +475,7 @@ Plans:
   4. The owner can choose the cubby depth (flat, shaded or deep), and it combines with every finish and with the lights.
   5. Every spine label keeps at least 4.5:1 contrast under every finish, light and depth combination. Header, status line and footer stay readable on every wall, and the cabinet stays smooth on a phone.
 
-**Plans:** 20/21 plans executed
+**Plans:** 21/21 plans complete
 
 Plans:
 **Wave 1**
@@ -527,7 +527,7 @@ Plans:
 
 **Wave 10** *(blocked on Wave 9 completion)*
 
-- [ ] 06.1-21-PLAN.md — Release v0.8.0 with the cabinet looks, after the owner approves the verified draft (owner-gated)
+- [x] 06.1-21-PLAN.md — Release v0.8.0 with the cabinet looks, after the owner approves the verified draft (owner-gated)
 
 **UI hint**: yes
 
@@ -578,6 +578,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 4. Enrichment, Box Images & Shape | 23/23 | Complete    | 2026-10-09 |
 | 5. Game Detail, Accessibility & Language | 16/16 | Complete    | 2026-10-12 |
 | 6. Owner Tools & Persistence | 30/30 | Complete    | 2026-10-13 |
-| 6.1. Selectable Cabinet Finishes & Lighting (INSERTED) | 20/21 | In Progress|  |
+| 6.1. Selectable Cabinet Finishes & Lighting (INSERTED) | 21/21 | Complete    | 2026-10-15 |
 | 7. Game-Night Filters & Location Cabinets | 0/0 | Not started | - |
 | 8. Public Hardening & Go-Public | 0/0 | Not started | - |

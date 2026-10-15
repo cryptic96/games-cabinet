@@ -26,6 +26,12 @@ internal sealed class InMemoryOwnerDataStore : IOwnerDataStore
     /// <summary>The schema version of a file a test started from, or null to use the version of whatever was stored last; a save replaces it.</summary>
     public int? SeededSchemaVersion { get; set; }
 
+    /// <summary>When true, the format of the stored file cannot be read, the way a file that cannot be opened behaves.</summary>
+    public bool FormatUnknown { get; set; }
+
+    /// <summary>When true, every copy of the stored file fails the way a file that cannot be opened does.</summary>
+    public bool FailCopies { get; set; }
+
     /// <summary>The moments earlier versions were kept, oldest first.</summary>
     public List<DateTimeOffset> KeptAt { get; } = [];
 
@@ -51,10 +57,17 @@ internal sealed class InMemoryOwnerDataStore : IOwnerDataStore
     /// <inheritdoc />
     public void KeepEarlierVersion(DateTimeOffset now)
     {
-        if (FileExists)
+        if (!FileExists)
         {
-            KeptAt.Add(now);
+            return;
         }
+
+        if (FailCopies)
+        {
+            throw new UnauthorizedAccessException("The file cannot be opened.");
+        }
+
+        KeptAt.Add(now);
     }
 
     /// <inheritdoc />
@@ -69,7 +82,7 @@ internal sealed class InMemoryOwnerDataStore : IOwnerDataStore
 
     /// <inheritdoc />
     public int? StoredSchemaVersion() =>
-        !FileExists ? null : SeededSchemaVersion ?? (State as OwnerDataState.Ready)?.Data.SchemaVersion;
+        !FileExists || FormatUnknown ? null : SeededSchemaVersion ?? (State as OwnerDataState.Ready)?.Data.SchemaVersion;
 }
 
 /// <summary>A writer wired to an in-memory store, a clock the test moves, and a publisher that fills a collection store.</summary>

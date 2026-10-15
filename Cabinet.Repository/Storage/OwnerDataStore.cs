@@ -18,13 +18,19 @@ public sealed class OwnerDataStore : IOwnerDataStore
     /// <summary>The name of the stored file.</summary>
     public const string FileName = "owner-data.json";
 
-    /// <summary>How many earlier copies of the file are kept; older ones are removed.</summary>
+    /// <summary>
+    /// How many ordinary earlier copies of the file are kept; older ones are removed. Only a copy whose header names the current
+    /// format is ordinary: a copy in an older format, in a newer one or with a header that cannot be read is never counted or removed.
+    /// </summary>
     public const int KeptVersions = 10;
 
     private const string VersionsDirectoryName = "owner-data-versions";
     private const string VersionNamePrefix = "owner-data.";
     private const string VersionNameSuffix = ".json";
+    private const string OlderFormatMark = "format-";
     private const string VersionTimeFormat = "yyyyMMdd'T'HHmmss'Z'";
+    private const string OlderFormatTimeFormat = "yyyyMMdd'T'HHmmssfff'Z'";
+    private const int HeaderBytes = 4096;
 
     private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
 
@@ -80,18 +86,39 @@ public sealed class OwnerDataStore : IOwnerDataStore
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Every copy is named after the second it was taken, <c>owner-data.&lt;yyyyMMddTHHmmssZ&gt;.json</c>, the name every earlier
+    /// release lists, so a release that is rolled back to finds the copy of the file it can read. A copy of a file in an older
+    /// format never replaces another copy: when its second is taken it moves on to the next free one, and a file already copied
+    /// byte for byte is not copied again. An ordinary copy replaces only an ordinary copy of the same second. Removing copies
+    /// beyond <see cref="KeptVersions"/> goes by what each copy holds, not by its name, and reads only the start of each copy.
+    /// A copy written under the older <c>owner-data.format-&lt;n&gt;.&lt;stamp&gt;.json</c> name is still listed, read and kept.
+    /// </remarks>
     public void KeepEarlierVersion(DateTimeOffset now)
     {
-        if (!File.Exists(_path))
+        byte[] content;
+
+        try
+        {
+            content = File.ReadAllBytes(_path);
+        }
+        catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
         {
             return;
         }
 
-        var content = File.ReadAllBytes(_path);
         Directory.CreateDirectory(_versionsDirectory);
-        AtomicJsonFile.WriteAtomically(Path.Combine(_versionsDirectory, VersionFileName(now)), content);
 
-        foreach (var (path, _) in ListVersionFiles().Skip(KeptVersions))
+        if (ReadHeader(content) is { SchemaVersion: var format } && format >= 1 && format < OwnerData.CurrentSchemaVersion)
+        {
+            KeepOlderFormatCopy(content, now);
+
+            return;
+        }
+
+        AtomicJsonFile.WriteAtomically(FreeVersionPath(now, IsOrdinaryCopy), content);
+
+        foreach (var (path, _) in ListVersionFiles().Where(version => IsOrdinaryCopy(version.Path)).Skip(KeptVersions))
         {
             File.Delete(path);
         }
@@ -140,6 +167,104 @@ public sealed class OwnerDataStore : IOwnerDataStore
             .ThenByDescending(version => version.Path, StringComparer.Ordinal)];
     }
 
+    private void KeepOlderFormatCopy(byte[] content, DateTimeOffset now)
+    {
+        if (ListVersionFiles().Any(version => HasContent(version.Path, content)))
+        {
+            return;
+        }
+
+        AtomicJsonFile.WriteAtomically(FreeVersionPath(now, _ => false), content);
+    }
+
+    /// <summary>The path of the copy for a moment, moved on a second at a time past every taken name that may not be replaced.</summary>
+    /// <param name="now">The moment the copy is taken.</param>
+    /// <param name="mayReplace">Whether the copy at a taken name may be replaced.</param>
+    private string FreeVersionPath(DateTimeOffset now, Func<string, bool> mayReplace)
+    {
+        var moment = now;
+        string target;
+
+        while (File.Exists(target = Path.Combine(_versionsDirectory, VersionFileName(moment))) && !mayReplace(target))
+        {
+            moment = moment.AddSeconds(1);
+        }
+
+        return target;
+    }
+
+    private static bool HasContent(string path, byte[] content) =>
+        new FileInfo(path).Length == content.Length && File.ReadAllBytes(path).AsSpan().SequenceEqual(content);
+
+    /// <summary>
+    /// Whether a copy is an ordinary one, which may be replaced and removed: its header names the current format and its name is
+    /// not that of a copy of an older format. A copy whose header cannot be read is not ordinary, so it is kept.
+    /// </summary>
+    /// <param name="path">The copy.</param>
+    private static bool IsOrdinaryCopy(string path) =>
+        !System.IO.Path.GetFileName(path).StartsWith(VersionNamePrefix + OlderFormatMark, StringComparison.Ordinal)
+        && ReadStoredFormat(path) == OwnerData.CurrentSchemaVersion;
+
+    /// <summary>The format a stored copy names in its header, read from its first few kilobytes only; null when that cannot be told.</summary>
+    /// <param name="path">The copy.</param>
+    private static int? ReadStoredFormat(string path)
+    {
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            var start = new byte[HeaderBytes];
+            var length = stream.ReadAtLeast(start, start.Length, throwOnEndOfStream: false);
+
+            return FormatInHeader(start.AsSpan(0, length), isWholeFile: length < start.Length);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>The <c>schemaVersion</c> among the top-level members at the start of a document, or null when it is not there.</summary>
+    /// <param name="start">The start of the document.</param>
+    /// <param name="isWholeFile">Whether the start is the whole document.</param>
+    private static int? FormatInHeader(ReadOnlySpan<byte> start, bool isWholeFile)
+    {
+        var reader = new Utf8JsonReader(start, isWholeFile, default);
+
+        try
+        {
+            if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
+            {
+                return null;
+            }
+
+            while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
+            {
+                var isFormat = reader.ValueTextEquals("schemaVersion"u8);
+
+                if (!reader.Read())
+                {
+                    return null;
+                }
+
+                if (isFormat)
+                {
+                    return reader.TokenType == JsonTokenType.Number && reader.TryGetInt32(out var format) ? format : null;
+                }
+
+                if (!reader.TrySkip())
+                {
+                    return null;
+                }
+            }
+
+            return null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
     private static string VersionFileName(DateTimeOffset moment) =>
         VersionNamePrefix + moment.UtcDateTime.ToString(VersionTimeFormat, CultureInfo.InvariantCulture) + VersionNameSuffix;
 
@@ -151,8 +276,22 @@ public sealed class OwnerDataStore : IOwnerDataStore
         }
 
         var stamp = fileName[VersionNamePrefix.Length..^VersionNameSuffix.Length];
+        var timeFormat = VersionTimeFormat;
 
-        return DateTimeOffset.TryParseExact(stamp, VersionTimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var moment)
+        if (stamp.StartsWith(OlderFormatMark, StringComparison.Ordinal))
+        {
+            var dot = stamp.IndexOf('.', StringComparison.Ordinal);
+
+            if (dot < 0)
+            {
+                return null;
+            }
+
+            stamp = stamp[(dot + 1)..];
+            timeFormat = OlderFormatTimeFormat;
+        }
+
+        return DateTimeOffset.TryParseExact(stamp, timeFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var moment)
             ? moment
             : null;
     }
@@ -169,6 +308,11 @@ public sealed class OwnerDataStore : IOwnerDataStore
         if (known.SchemaVersion > OwnerData.CurrentSchemaVersion)
         {
             return Unreadable("newer format");
+        }
+
+        if (known.SchemaVersion < 1)
+        {
+            return Unreadable("malformed");
         }
 
         var upgraded = UpgradeToCurrent(content, known.SchemaVersion);
@@ -189,7 +333,7 @@ public sealed class OwnerDataStore : IOwnerDataStore
             return Unreadable("malformed");
         }
 
-        return data is null || data.SchemaVersion < 1 || HasNullMember(data)
+        return data is null || HasNullMember(data)
             ? Unreadable("malformed")
             : new OwnerDataState.Ready(data with { Look = data.Look.Normalized() });
     }

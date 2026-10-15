@@ -68,4 +68,17 @@ public sealed class OwnerStringsTests
         OwnerStrings.TileLabel(PictureChoice.MainPicture).Should().Be("Main picture");
         OwnerStrings.TileLabel(PictureChoice.Link).Should().Be("Your link");
     }
+
+    [Fact]
+    public void The_older_format_line_for_a_file_of_the_first_format_says_it_restores_with_the_default_look()
+    {
+        OwnerStrings.OlderFormat(1).Should().Be(
+            "This file uses an older format (1). It is upgraded when restored. It holds no look, so the cabinet is restored with the default look.");
+    }
+
+    [Fact]
+    public void The_older_format_line_says_nothing_about_the_look_for_a_format_that_holds_one()
+    {
+        OwnerStrings.OlderFormat(2).Should().Be("This file uses an older format (2). It is upgraded when restored.");
+    }
 }

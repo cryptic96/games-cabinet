@@ -18,6 +18,7 @@ public sealed class OwnerDataServiceTests : IDisposable
 {
     private const string CabinetA = "Cabinet A";
     private const string ShelfB = "Shelf B";
+    private const string FileModesDoNotApply = "file modes do not stop this user from reading the file, so it cannot be made unreadable here";
 
     private readonly TemporaryDirectory _directory = new();
 
@@ -293,7 +294,7 @@ public sealed class OwnerDataServiceTests : IDisposable
     {
         var oldFile = FirstFormatFile();
         var store = CreateStore();
-        store.KeepEarlierVersion(OwnerTestKit.Start.AddMinutes(-10));
+        KeepRecentCopy();
         var keptBefore = store.ReadEarlierVersion(0);
         var service = CreateService(store, out _);
 
@@ -311,7 +312,7 @@ public sealed class OwnerDataServiceTests : IDisposable
     {
         FirstFormatFile();
         var store = CreateStore();
-        store.KeepEarlierVersion(OwnerTestKit.Start.AddMinutes(-10));
+        KeepRecentCopy();
         var service = CreateService(store, out var clock);
         await service.MutateAsync(service.Revision, data => LocationEdits.Add(data, CabinetA, OwnerDataService.NewId), CancellationToken.None);
 
@@ -326,7 +327,7 @@ public sealed class OwnerDataServiceTests : IDisposable
     {
         var oldFile = FirstFormatFile(gameId: 100);
         var store = CreateStore();
-        store.KeepEarlierVersion(OwnerTestKit.Start.AddMinutes(-10));
+        KeepRecentCopy();
         var service = CreateService(store, out _);
 
         await service.ReconcileAsync(new HashSet<int>(), CancellationToken.None);
@@ -379,6 +380,249 @@ public sealed class OwnerDataServiceTests : IDisposable
         store.KeptAt.Should().Equal(OwnerTestKit.Start, OwnerTestKit.Start.AddMinutes(10));
     }
 
+    [Fact]
+    public async Task A_change_is_refused_and_the_old_format_file_left_alone_when_its_copy_cannot_be_made()
+    {
+        var oldFile = FirstFormatFile();
+        BlockVersionsFolder();
+        var service = CreateService(CreateStore(), out _);
+
+        var result = await service.MutateAsync(service.Revision, data => LocationEdits.Add(data, CabinetA, OwnerDataService.NewId), CancellationToken.None);
+
+        result.Outcome.Should().Be(OwnerOutcome.Refused);
+        result.StatusKey.Should().Be("save-failed");
+        File.ReadAllBytes(FilePath).Should().Equal(oldFile);
+        service.Revision.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task An_undo_is_refused_and_the_old_format_file_left_alone_when_its_copy_cannot_be_made()
+    {
+        var store = CreateStore();
+        var service = CreateService(store, out _);
+        var added = await service.MutateAsync(service.Revision, data => LocationEdits.Add(data, CabinetA, OwnerDataService.NewId), CancellationToken.None);
+        BlockVersionsFolder();
+        var oldFile = FirstFormatFile();
+
+        var result = await service.UndoAsync(added.Data!.Revision, CancellationToken.None);
+
+        result.Outcome.Should().Be(OwnerOutcome.Refused);
+        result.StatusKey.Should().Be("save-failed");
+        File.ReadAllBytes(FilePath).Should().Equal(oldFile);
+    }
+
+    [Fact]
+    public async Task A_change_the_sync_makes_is_not_saved_and_the_old_format_file_left_alone_when_its_copy_cannot_be_made()
+    {
+        var oldFile = FirstFormatFile(gameId: 100);
+        BlockVersionsFolder();
+        var service = CreateService(CreateStore(), out _);
+
+        await service.ReconcileAsync(new HashSet<int>(), CancellationToken.None);
+
+        File.ReadAllBytes(FilePath).Should().Equal(oldFile);
+        ((OwnerDataState.Ready)service.State).Data.Games.Single().AbsentSinceUtc.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task A_download_is_not_recorded_and_the_old_format_file_left_alone_when_its_copy_cannot_be_made()
+    {
+        var oldFile = FirstFormatFile();
+        BlockVersionsFolder();
+        var service = CreateService(CreateStore(), out _);
+
+        var download = await service.RecordDownloadAsync(CancellationToken.None);
+
+        download.Should().BeNull();
+        File.ReadAllBytes(FilePath).Should().Equal(oldFile);
+        ((OwnerDataState.Ready)service.State).Data.LastDownloadAtUtc.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Every_write_goes_ahead_once_the_copy_of_the_old_format_file_can_be_made_again()
+    {
+        var oldFile = FirstFormatFile();
+        BlockVersionsFolder();
+        var service = CreateService(CreateStore(), out _);
+        var refused = await service.MutateAsync(service.Revision, data => LocationEdits.Add(data, CabinetA, OwnerDataService.NewId), CancellationToken.None);
+        File.Delete(Path.Combine(_directory.FullPath, "owner-data-versions"));
+
+        var saved = await service.MutateAsync(service.Revision, data => LocationEdits.Add(data, CabinetA, OwnerDataService.NewId), CancellationToken.None);
+
+        refused.Outcome.Should().Be(OwnerOutcome.Refused);
+        saved.Outcome.Should().Be(OwnerOutcome.Saved);
+        CreateStore().ReadEarlierVersion(0).Should().Equal(oldFile);
+    }
+
+    [Fact]
+    public async Task A_change_is_still_saved_when_the_routine_copy_of_a_file_in_the_current_format_cannot_be_made()
+    {
+        var store = CreateStore();
+        var service = CreateService(store, out _);
+        await service.MutateAsync(service.Revision, data => LocationEdits.Add(data, CabinetA, OwnerDataService.NewId), CancellationToken.None);
+        BlockVersionsFolder();
+
+        var result = await service.MutateAsync(service.Revision, data => LocationEdits.Add(data, ShelfB, OwnerDataService.NewId), CancellationToken.None);
+
+        result.Outcome.Should().Be(OwnerOutcome.Saved);
+        store.StoredSchemaVersion().Should().Be(OwnerData.CurrentSchemaVersion);
+        ((OwnerDataState.Ready)service.State).Data.Locations.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task A_change_is_refused_and_the_old_format_file_left_alone_when_the_file_cannot_be_read_at_the_save()
+    {
+        var oldFile = FirstFormatFile();
+        var service = CreateService(CreateStore(), out _);
+        Assert.SkipUnless(MakeStoredFileUnreadable(), FileModesDoNotApply);
+
+        var result = await service.MutateAsync(service.Revision, data => LocationEdits.Add(data, CabinetA, OwnerDataService.NewId), CancellationToken.None);
+
+        result.Outcome.Should().Be(OwnerOutcome.Refused);
+        result.StatusKey.Should().Be("save-failed");
+        ReadStoredFileBack().Should().Equal(oldFile);
+        service.Revision.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task A_download_is_not_recorded_and_the_old_format_file_left_alone_when_the_file_cannot_be_read_at_the_save()
+    {
+        var oldFile = FirstFormatFile();
+        var service = CreateService(CreateStore(), out _);
+        Assert.SkipUnless(MakeStoredFileUnreadable(), FileModesDoNotApply);
+
+        var download = await service.RecordDownloadAsync(CancellationToken.None);
+
+        download.Should().BeNull();
+        ReadStoredFileBack().Should().Equal(oldFile);
+        ((OwnerDataState.Ready)service.State).Data.LastDownloadAtUtc.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task A_change_is_refused_when_the_format_of_the_stored_file_cannot_be_read_and_its_copy_fails()
+    {
+        var store = new InMemoryOwnerDataStore { FileExists = true };
+        var harness = OwnerTestKit.Harness(store);
+        await harness.AddAsync(CabinetA);
+        var saves = store.Saved.Count;
+        store.FormatUnknown = true;
+        store.FailCopies = true;
+
+        var result = await harness.AddAsync(ShelfB);
+
+        result.Outcome.Should().Be(OwnerOutcome.Refused);
+        result.StatusKey.Should().Be("save-failed");
+        store.Saved.Should().HaveCount(saves);
+    }
+
+    [Fact]
+    public async Task A_first_save_with_no_stored_file_yet_is_not_treated_as_an_older_format()
+    {
+        var store = new InMemoryOwnerDataStore { FailCopies = true };
+        var harness = OwnerTestKit.Harness(store);
+
+        var result = await harness.AddAsync(CabinetA);
+
+        result.Outcome.Should().Be(OwnerOutcome.Saved);
+        store.KeptAt.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_restore_is_refused_and_the_old_format_file_left_alone_when_its_copy_cannot_be_made()
+    {
+        var oldFile = FirstFormatFile();
+        BlockVersionsFolder();
+        var service = CreateService(CreateStore(), out _);
+        var document = OwnerData.Empty with { Revision = 1, Locations = [new OwnerLocation("0a1b2c3d", CabinetA)] };
+
+        var result = await service.RestoreAsync(document, RestoreSource.File, null, CancellationToken.None);
+
+        result.Outcome.Should().Be(OwnerOutcome.Refused);
+        result.StatusKey.Should().Be("save-failed");
+        File.ReadAllBytes(FilePath).Should().Equal(oldFile);
+        ((OwnerDataState.Ready)service.State).Data.Locations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_download_after_an_upgrade_keeps_the_old_format_file_where_the_earlier_release_lists_it()
+    {
+        var oldFile = FirstFormatFile();
+        var store = CreateStore();
+        KeepRecentCopy();
+        var service = CreateService(store, out _);
+
+        var download = await service.RecordDownloadAsync(CancellationToken.None);
+
+        download.Should().NotBeNull();
+        store.ReadEarlierVersion(0).Should().Equal(oldFile);
+        store.StoredSchemaVersion().Should().Be(OwnerData.CurrentSchemaVersion);
+        var listed = EarlierReleaseVersionReader.List(Path.Combine(_directory.FullPath, "owner-data-versions"));
+        listed.Should().HaveCount(2);
+        File.ReadAllBytes(listed[0].Path).Should().Equal(oldFile);
+        listed[0].SavedAtUtc.Should().Be(OwnerTestKit.Start);
+    }
+
+    [Fact]
+    public async Task A_change_after_an_upgrade_keeps_the_old_format_file_where_the_earlier_release_lists_it()
+    {
+        var oldFile = FirstFormatFile();
+        var service = CreateService(CreateStore(), out _);
+
+        var result = await service.MutateAsync(service.Revision, data => LocationEdits.Add(data, CabinetA, OwnerDataService.NewId), CancellationToken.None);
+
+        result.Outcome.Should().Be(OwnerOutcome.Saved);
+        var listed = EarlierReleaseVersionReader.List(Path.Combine(_directory.FullPath, "owner-data-versions"));
+        listed.Should().ContainSingle().Which.SavedAtUtc.Should().Be(OwnerTestKit.Start);
+        File.ReadAllBytes(listed[0].Path).Should().Equal(oldFile);
+    }
+
+    /// <summary>Takes every permission off the stored file; false when the file can still be read, as it can for a user that file modes do not bind.</summary>
+    private bool MakeStoredFileUnreadable()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return false;
+        }
+
+        File.SetUnixFileMode(FilePath, UnixFileMode.None);
+
+        try
+        {
+            using (File.OpenRead(FilePath))
+            {
+                return false;
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return true;
+        }
+    }
+
+    /// <summary>Gives the stored file its permissions back and reads it.</summary>
+    private byte[] ReadStoredFileBack()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(FilePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+
+        return File.ReadAllBytes(FilePath);
+    }
+
+    /// <summary>Puts a plain file where the versions folder belongs, so that no copy can be made.</summary>
+    private void BlockVersionsFolder()
+    {
+        var versions = Path.Combine(_directory.FullPath, "owner-data-versions");
+
+        if (Directory.Exists(versions))
+        {
+            Directory.Delete(versions, recursive: true);
+        }
+
+        File.WriteAllText(versions, "in the way");
+    }
+
     private byte[] FirstFormatFile(int? gameId = null)
     {
         var games = gameId is { } id ? $"{{\"gameId\":{id},\"locationId\":null}}" : string.Empty;
@@ -388,6 +632,13 @@ public sealed class OwnerDataServiceTests : IDisposable
         File.WriteAllBytes(FilePath, bytes);
 
         return bytes;
+    }
+
+    private void KeepRecentCopy()
+    {
+        var versions = Path.Combine(_directory.FullPath, "owner-data-versions");
+        Directory.CreateDirectory(versions);
+        File.WriteAllText(Path.Combine(versions, "owner-data.20300115T115000Z.json"), "{\"an\":\"earlier copy\"}");
     }
 
     private OwnerDataStore CreateStore() => new(_directory.FullPath, NullLogger<OwnerDataStore>.Instance);

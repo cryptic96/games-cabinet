@@ -67,6 +67,22 @@ public sealed class OwnerDataUpgradeTests : IDisposable
         File.ReadAllBytes(FilePath).Should().Equal(bytes);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    public void A_stored_file_below_the_first_format_is_unreadable_and_left_as_it_is(int schemaVersion)
+    {
+        var bytes = Encoding.UTF8.GetBytes($"{{\"kind\":\"{Marker}\",\"schemaVersion\":{schemaVersion},\"revision\":3,\"finish\":\"classic\",\"locations\":[],\"games\":[],\"changesSinceDownload\":0,\"changes\":[]}}");
+        File.WriteAllBytes(FilePath, bytes);
+        var listingBefore = Directory.EnumerateFileSystemEntries(_directory.FullPath).Order().ToList();
+
+        var state = CreateStore().Load();
+
+        state.Should().BeOfType<OwnerDataState.Unreadable>().Which.Reason.Should().Be("malformed");
+        File.ReadAllBytes(FilePath).Should().Equal(bytes);
+        Directory.EnumerateFileSystemEntries(_directory.FullPath).Order().Should().Equal(listingBefore);
+    }
+
     [Fact]
     public void A_stored_file_of_the_current_format_with_an_unknown_wood_loads_with_warm_brown_and_keeps_its_other_four_fields()
     {

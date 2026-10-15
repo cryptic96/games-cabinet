@@ -343,3 +343,82 @@ test('a held look that matches what the page shows by the time the pull-out ends
     assert.deepEqual(page.log, []);
   });
 });
+
+test('a look that waits for the evening script does not overwrite a newer look that arrived and was applied meanwhile', async () => {
+  const page = scrollingPage();
+  const listeners = {};
+  const doc = page.root.ownerDocument;
+  const logoQuery = doc.querySelector;
+
+  doc.querySelector = (selector) => (selector.startsWith('meta') ? { getAttribute: () => '/js/evening.js' } : logoQuery(selector));
+  doc.createElement = () => ({
+    addEventListener: (type, listener) => {
+      listeners[type] = listener;
+    },
+    setAttribute: () => {},
+  });
+
+  await withPage(page, async () => {
+    globalThis.window.cabinetEvening = undefined;
+
+    const older = applyLookStatus(lookStatus({ lights: 'on' }), page.root);
+
+    await settle();
+    await applyLookStatus(lookStatus({ wood: 'oak' }), page.root);
+
+    assert.equal(page.root.getAttribute('data-wood'), 'oak');
+
+    listeners.load();
+    await older;
+
+    assert.equal(page.root.getAttribute('data-wood'), 'oak');
+    assert.equal(page.root.getAttribute('data-lights'), 'off', 'the older look that turned the lights on never wrote');
+    assert.deepEqual(page.log.filter((entry) => entry.startsWith('write')), ['write data-wood=oak']);
+  });
+});
+
+test('a newer look that reverts to what the page shows stops the older look waiting in a cross-fade from being written', async () => {
+  const page = scrollingPage({ transitions: true });
+
+  await withPage(page, async () => {
+    await applyLookStatus(lookStatus({ design: 'library' }), page.root);
+    await applyLookStatus(lookStatus({}), page.root);
+    await settle();
+
+    assert.equal(page.started.length, 1);
+    assert.equal(page.root.getAttribute('data-design'), 'classic');
+    assert.deepEqual(page.log.filter((entry) => entry.startsWith('write')), []);
+
+    page.started[0].finish();
+    await settle();
+
+    assert.equal(page.root.getAttribute('data-design'), 'classic');
+    assert.deepEqual(page.log.filter((entry) => entry.startsWith('write')), []);
+  });
+});
+
+test('of two looks waiting in cross-fades only the newer one is written, whatever order the updates run in', async () => {
+  const page = scrollingPage({ transitions: true });
+
+  await withPage(page, async () => {
+    await applyLookStatus(lookStatus({ design: 'library' }), page.root);
+    await applyLookStatus(lookStatus({ design: 'modern' }), page.root);
+    await settle();
+
+    assert.equal(page.root.getAttribute('data-design'), 'modern');
+    assert.deepEqual(page.log.filter((entry) => entry.startsWith('write')), ['write data-design=modern']);
+  });
+});
+
+test('a look that arrives after a newer one was applied is still ignored as older', async () => {
+  const page = scrollingPage();
+  const older = lookStatus({ design: 'library' });
+  const newer = lookStatus({ design: 'modern' });
+
+  await withPage(page, async () => {
+    await applyLookStatus(newer, page.root);
+    await applyLookStatus(older, page.root);
+
+    assert.equal(page.root.getAttribute('data-design'), 'modern');
+  });
+});

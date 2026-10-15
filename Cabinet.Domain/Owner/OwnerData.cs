@@ -158,7 +158,7 @@ public interface IOwnerDataStore
     /// <param name="data">The data to store.</param>
     void Save(OwnerData data);
 
-    /// <summary>Copies the stored file, as it is and readable or not, to the earlier versions and drops the oldest copies beyond the number kept. It does nothing when there is no file yet.</summary>
+    /// <summary>Copies the stored file, as it is and readable or not, to the earlier versions under a name every earlier release lists, and drops the oldest ordinary copies beyond the number kept. Only a copy in the current format is ordinary: a copy in an older format is never replaced, counted or dropped, whatever its name. It does nothing when there is no file yet.</summary>
     /// <param name="now">The moment the copy is stamped with.</param>
     void KeepEarlierVersion(DateTimeOffset now);
 
@@ -172,7 +172,7 @@ public interface IOwnerDataStore
     /// <summary>When the newest kept copy was taken, or null when there is none.</summary>
     DateTimeOffset? NewestEarlierVersionAt();
 
-    /// <summary>The schema version written in the file on disk, or null when there is no file or its header cannot be read. It never reads more than the header and never writes.</summary>
+    /// <summary>The schema version written in the file on disk, or null when there is no file or the file or its header cannot be read; null therefore never means the current format. It never writes.</summary>
     int? StoredSchemaVersion();
 }
 
