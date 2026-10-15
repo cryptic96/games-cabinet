@@ -6,7 +6,9 @@
  * are lit is loaded first when the page was opened with the lights off and never loaded it. A new design gives the sections other
  * heights, so the section in the middle of the screen is noted before the change and put back where it was after it, with the
  * browser's own scroll anchoring off meanwhile so that one rule alone moves the page. A look that arrives while a box is being
- * pulled out waits until the pull-out is over, and only the latest one that arrived is then applied.
+ * pulled out waits until the pull-out is over, and only the latest one that arrived is then applied. Every look that is accepted
+ * becomes the newest one the page was asked to show, and a look that is no longer the newest never writes: it is checked again
+ * after the wait for the evening script and inside the cross-fade's update, so a slower, older look cannot overwrite a newer one.
  */
 import * as lamp from './look.js';
 import { isOutdatedStatus } from './status.js';
@@ -26,6 +28,7 @@ const PULL_MARKER = 'data-pull-kind';
 const ANCHOR_PROPERTY = 'overflow-anchor';
 
 const newestSeen = new WeakMap();
+const newestAsked = new WeakMap();
 const heldLooks = new WeakMap();
 let eveningLoading = null;
 
@@ -81,6 +84,29 @@ function isStale(root, status) {
   newestSeen.set(root, Number.isFinite(at) ? Math.max(newest, at) : newest);
 
   return false;
+}
+
+/**
+ * Makes a look the newest one the page was asked to show, which every older look still on its way to the page then gives way to.
+ * @param {Element} root The root element.
+ * @returns {number} The rank of the look; a later look has a higher one.
+ */
+function askForLook(root) {
+  const rank = (newestAsked.get(root) ?? 0) + 1;
+
+  newestAsked.set(root, rank);
+
+  return rank;
+}
+
+/**
+ * Tells whether no newer look was asked for since a look got its rank.
+ * @param {Element} root The root element.
+ * @param {number} rank The rank the look got when it was accepted.
+ * @returns {boolean} True while the look is still the newest one asked for.
+ */
+function isNewest(root, rank) {
+  return newestAsked.get(root) === rank;
 }
 
 /**
@@ -279,9 +305,10 @@ function prefersReducedMotion() {
  * Puts a look on the page when it differs from what the page shows now.
  * @param {Element} root The element that carries the look attributes.
  * @param {{ values: string[], lightWall: boolean }} look The look to show.
- * @returns {Promise<void>} Resolves when the look is on the page, or at once when there was nothing to do.
+ * @param {number} rank The rank the look got when it was accepted; the look is not written once a newer one was asked for.
+ * @returns {Promise<void>} Resolves when the look is on the page, or at once when there was nothing to do or a newer look took over.
  */
-async function showLook(root, look) {
+async function showLook(root, look, rank) {
   const changed = LOOK_FIELDS.filter((field, index) => root.getAttribute('data-' + field) !== look.values[index]);
 
   if (changed.length === 0) {
@@ -293,9 +320,17 @@ async function showLook(root, look) {
 
   if (turnsLightsOn) {
     await loadEveningScript(doc);
+
+    if (!isNewest(root, rank)) {
+      return;
+    }
   }
 
-  const write = () => writeLook(root, look);
+  const write = () => {
+    if (isNewest(root, rank)) {
+      writeLook(root, look);
+    }
+  };
   const update = changed.includes(DESIGN_FIELD) ? () => keepPlace(root, write) : write;
   const lightsOnly = changed.length === 1 && changed[0] === LIGHTS_FIELD;
 
@@ -313,18 +348,20 @@ async function showLook(root, look) {
  * arrives later replaces the one held, and every caller is told when the held look is on the page.
  * @param {Element} root The root element.
  * @param {{ values: string[], lightWall: boolean }} look The look to show once the pull-out is over.
+ * @param {number} rank The rank the look got when it was accepted.
  * @returns {Promise<void>} Resolves when the look held at that time has been shown.
  */
-function holdUntilPulledOut(root, look) {
+function holdUntilPulledOut(root, look, rank) {
   const held = heldLooks.get(root);
 
   if (held !== undefined) {
     held.look = look;
+    held.rank = rank;
 
     return new Promise((resolve) => held.waiting.push(resolve));
   }
 
-  const entry = { look, waiting: [] };
+  const entry = { look, rank, waiting: [] };
   const observer = new MutationObserver(() => {
     if (root.hasAttribute(PULL_MARKER)) {
       return;
@@ -332,7 +369,7 @@ function holdUntilPulledOut(root, look) {
 
     observer.disconnect();
     heldLooks.delete(root);
-    showLook(root, entry.look).finally(() => entry.waiting.forEach((resolve) => resolve()));
+    showLook(root, entry.look, entry.rank).finally(() => entry.waiting.forEach((resolve) => resolve()));
   });
 
   heldLooks.set(root, entry);
@@ -356,11 +393,13 @@ export async function applyLookStatus(status, root = document.documentElement) {
     return;
   }
 
+  const rank = askForLook(root);
+
   if (root.hasAttribute(PULL_MARKER) || heldLooks.has(root)) {
-    await holdUntilPulledOut(root, look);
+    await holdUntilPulledOut(root, look, rank);
 
     return;
   }
 
-  await showLook(root, look);
+  await showLook(root, look, rank);
 }
