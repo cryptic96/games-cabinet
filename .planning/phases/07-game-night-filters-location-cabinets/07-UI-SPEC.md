@@ -349,7 +349,7 @@ All matching is a pure function in `filter-rules.js`, covered by `node --test` i
 | Count | See "Count, Clear and the live region" |
 | Zero matches | Every box dims, the count says "No games match", Clear is highlighted. No note covers the cabinet |
 | Stored filter no longer valid | A stored location id that no longer exists (deleted or emptied) falls back to Any. A stored view of "By location" with no locations falls back to "All together" without overwriting the remembered choice |
-| Card data needed | Players, time and location need the card data. Search needs only the layout's names and family links. If a **stored** filter other than search is active at load, the first draw waits for the card data so no undimmed frame appears (**A5**). If the card data fails, players, time and location are disabled (disabled look, see "Color") with the quiet note "Couldn't load the details. Reload the page to try again." (the existing string) and the stored filters other than search are not applied |
+| Card data needed | Players, time and location need the card data. Search needs only the layout's names and family links. If **any** stored filter is active at load (search included), the first draw waits for the card data so no undimmed or wrong frame appears (**A5**, amended with the owner after research). If the card data fails, players, time and location are disabled (disabled look, see "Color") with the quiet note "Couldn't load the details. Reload the page to try again." (the existing string) and the stored filters other than search are not applied |
 
 ### Persistence (D-17, D-28)
 
@@ -677,7 +677,7 @@ Coverage (probe over the kinds above): **54 applicable, 48 resolved (43 explicit
 | E2 | empty | resolved | explicit | With no filter the slim bar shows only the search field and "Filters"; the sheet opens with every group on the quiet "Any" and its primary button reads "Show 48 games" |
 | E2 | partial | resolved | explicit | With no locations the sheet has no view toggle and no location control and opens on players; if the card details failed, players, time and location are disabled with the existing note and search still works |
 | E3 | empty | resolved | explicit | Zero matches dim every box and show "No games match" with a highlighted Clear; no note covers the cabinet |
-| E3 | loading | resolved | explicit | The first draw includes the dim (stored filters wait for the card data if they need it), so an undimmed frame never shows |
+| E3 | loading | resolved | explicit | The first draw includes the dim (any stored filter, search included, waits for the card data, A5), so an undimmed or wrong frame never shows |
 | E3 | error | resolved | explicit | See E1 error: card-based filters are disabled and not applied; the cabinet is untouched |
 | E3 | partial | resolved | explicit | A family with an unknown player range or a game with unknown playing time dims while that filter is set |
 | E3 | overflow | resolved | backstop | statement: filtering the 400 sample on a throttled phone stays within 25% of the unfiltered frame time; verification: backstop |
@@ -751,7 +751,7 @@ These were not answered by the decisions or the review. Each takes the option mo
 | A2 | The Filters sheet is capped at **70dvh** (the card sheet is 90dvh) and scrolls inside beyond that | The cabinet must stay visible above it |
 | A3 | The sheet is **wall chrome** (`--room`, `--room-text`), not paper | Paper is for objects (the card, owner pages); the bar and sheet carry the same controls and one stylesheet serves both |
 | A4 | The selected chip, the selected segment, the primary sheet button and the highlighted Clear use the **inverted wall colours**, never accent | The accent reserved list is fixed |
-| A5 | When a stored filter other than search is active at load, the **first draw waits for the card data** | The decision requires no undimmed frame; players, time and location come from the card data. Without a stored filter the existing order (layout first, cards after) is unchanged |
+| A5 | When **any** stored filter is active at load (search included), the **first draw waits for the card data**; both are fetched at once. Amended with the owner after research: an expansion owned for two bases lights correctly only with the card data, so a search-only first draw could flash it dimmed | The decision requires no undimmed or wrong frame. Without a stored filter the existing order (layout first, cards after) is unchanged |
 | A6 | The sheet has its **own Clear**, and its primary button reads **"Close"** when nothing matches | The bar is inert while the modal sheet is open; "Show 0 games" is not a useful label |
 | A7 | The veil is an **extra child node** on every box, drawn with a lit rim on the veil | Boxes already use both pseudo-elements, a veil must cover label and art, and an inset shadow cannot cover content |
 | A8 | The **peek** is 0.20 and its worst case is 3.76:1, not 4.5:1 | At the default Shaded depth the shelf shade already stacks to 0.36; 4.5 is reached only at Flat depth or off the shaded band |
