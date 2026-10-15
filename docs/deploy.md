@@ -242,6 +242,10 @@ is backed up by hand, by download.
   offers "Restore from a file" and the earlier versions by date. Nothing is
   overwritten until one is restored.
 
+The look of the cabinet is part of the owner data, so it is in every download
+and every restore; see [Cabinet looks](cabinet-looks.md) for what it holds and
+what an older file restores to.
+
 Releases, rollbacks and re-provisioning leave the state directory untouched:
 the owner data is not part of a release archive and no install step writes to
 it. Include `/var/lib/cabinet/owner-data.json` in any whole-container backup
