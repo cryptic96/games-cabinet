@@ -40,7 +40,7 @@ jobs:
         run: build/package-release.sh --version 0.0.0 --commit "$GITHUB_SHA" --output artifacts/release
 
       # Each test project that runs here is named, so a project that finds no
-      # tests fails the run. The browser tests run in their own job.
+      # tests fails the run. The browser tests run in their own jobs.
       - name: Run tests
         run: |
           dotnet test --project Cabinet.UnitTests --no-restore
@@ -61,11 +61,15 @@ jobs:
         env:
           CABINET_E2E: 1
 
-  # Drives a real Chromium against the cabinet host. Playwright's dependency
-  # installer may not know this runner image yet; if the install step fails on
-  # an unsupported platform, set PLAYWRIGHT_HOST_PLATFORM_OVERRIDE to
-  # ubuntu24.04-x64 on that step. It is left out until a run shows it is needed.
-  browser-tests:
+  # The browser tests run as four parallel jobs so the slowest one sets the
+  # time, not the sum. Each job builds the test project, installs only the
+  # browser it needs and runs one slice; the three Chromium slices together are
+  # every test that is not the WebKit one, with no test in two of them.
+  # Playwright's dependency installer may not know this runner image yet; if
+  # an install step fails on an unsupported platform, set
+  # PLAYWRIGHT_HOST_PLATFORM_OVERRIDE to ubuntu24.04-x64 on that step. It is
+  # left out until a run shows it is needed.
+  browser-look:
     runs-on: ubuntu-26.04
     timeout-minutes: 20
     permissions:
@@ -91,16 +95,129 @@ jobs:
       - name: Install Chromium
         run: Cabinet.BrowserTests/bin/Debug/net10.0/.playwright/node/linux-x64/node Cabinet.BrowserTests/bin/Debug/net10.0/.playwright/package/cli.js install --with-deps chromium-headless-shell
 
-      - name: Install WebKit
-        run: Cabinet.BrowserTests/bin/Debug/net10.0/.playwright/node/linux-x64/node Cabinet.BrowserTests/bin/Debug/net10.0/.playwright/package/cli.js install --with-deps webkit
-
       - name: Run browser tests
-        run: dotnet test --project Cabinet.BrowserTests --no-build
+        run: dotnet test --project Cabinet.BrowserTests --no-build --filter-class "Cabinet.BrowserTests.Look*"
         env:
           CI: true
           CABINET_SCREENSHOT_DIR: ${{ runner.temp }}/screenshots
 
-      - name: Run WebKit tests
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-screenshots-look
+          path: ${{ runner.temp }}/screenshots
+          if-no-files-found: ignore
+
+  browser-owner:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore packages
+        run: dotnet restore Cabinet.slnx --locked-mode
+
+      - name: Build browser tests
+        run: dotnet build Cabinet.BrowserTests --no-restore
+
+      - name: Install Chromium
+        run: Cabinet.BrowserTests/bin/Debug/net10.0/.playwright/node/linux-x64/node Cabinet.BrowserTests/bin/Debug/net10.0/.playwright/package/cli.js install --with-deps chromium-headless-shell
+
+      - name: Run browser tests
+        run: dotnet test --project Cabinet.BrowserTests --no-build --filter-class "Cabinet.BrowserTests.Owner*"
+        env:
+          CI: true
+          CABINET_SCREENSHOT_DIR: ${{ runner.temp }}/screenshots
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-screenshots-owner
+          path: ${{ runner.temp }}/screenshots
+          if-no-files-found: ignore
+
+  # Every test class that is neither a look nor an owner class, and not WebKit.
+  browser-rest:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore packages
+        run: dotnet restore Cabinet.slnx --locked-mode
+
+      - name: Build browser tests
+        run: dotnet build Cabinet.BrowserTests --no-restore
+
+      - name: Install Chromium
+        run: Cabinet.BrowserTests/bin/Debug/net10.0/.playwright/node/linux-x64/node Cabinet.BrowserTests/bin/Debug/net10.0/.playwright/package/cli.js install --with-deps chromium-headless-shell
+
+      - name: Run browser tests
+        run: dotnet test --project Cabinet.BrowserTests --no-build --filter-not-class "Cabinet.BrowserTests.Look*" --filter-not-class "Cabinet.BrowserTests.Owner*" --filter-not-trait "Engine=WebKit"
+        env:
+          CI: true
+          CABINET_SCREENSHOT_DIR: ${{ runner.temp }}/screenshots
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-screenshots-rest
+          path: ${{ runner.temp }}/screenshots
+          if-no-files-found: ignore
+
+  # The WebKit test only; it needs WebKit and not Chromium.
+  browser-webkit:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore packages
+        run: dotnet restore Cabinet.slnx --locked-mode
+
+      - name: Build browser tests
+        run: dotnet build Cabinet.BrowserTests --no-restore
+
+      - name: Install WebKit
+        run: Cabinet.BrowserTests/bin/Debug/net10.0/.playwright/node/linux-x64/node Cabinet.BrowserTests/bin/Debug/net10.0/.playwright/package/cli.js install --with-deps webkit
+
+      - name: Run browser tests
         run: dotnet test --project Cabinet.BrowserTests --no-build --filter-trait "Engine=WebKit"
         env:
           CI: true
@@ -111,7 +228,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: browser-screenshots
+          name: browser-screenshots-webkit
           path: ${{ runner.temp }}/screenshots
           if-no-files-found: ignore
 

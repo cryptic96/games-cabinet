@@ -210,7 +210,7 @@ Use any dummy username and token. The base address override is honoured only in 
 
 `Cabinet.BrowserTests` drives a real Chromium with Playwright against the cabinet host, which the tests start in the same process on a loopback port. They cover what only a browser can show: the cabinet drawing its boxes, animations starting or not, focus moving, history steps and tab order. They use the invented sample collections and the fake BGG only, never a token or a real collection, because the screenshots they write are kept as a public build artifact.
 
-Every browser test class carries the `Category=Browser` trait, which is how the solution-wide run leaves them out: the release build and the main test job need no browser, and the browser tests run in their own job.
+Every browser test class carries the `Category=Browser` trait, which is how the solution-wide run leaves them out: the release build and the main test job need no browser, and the browser tests run in their own jobs.
 
 Install the browser once, after building the project. Playwright bundles its own Node driver, so no PowerShell is needed:
 
@@ -227,6 +227,8 @@ Run them:
 ```
 dotnet test --project Cabinet.BrowserTests
 ```
+
+CI runs the suite as four parallel jobs, each with a filter that picks its slice: the classes whose names start with `Look`, the classes whose names start with `Owner`, every other class, and the single WebKit test. The same filters work locally, for example `dotnet test --project Cabinet.BrowserTests --no-build --filter-class "Cabinet.BrowserTests.Look*"`. A new test class lands in the "every other class" slice unless its name starts with `Look` or `Owner`,, so a new class needs no change to the workflow. The WebKit test runs only where `CABINET_WEBKIT=1` is set and WebKit has been installed with the same installer command as Chromium; the other slices leave it out with `--filter-not-trait "Engine=WebKit"`.
 
 Set `CABINET_SCREENSHOT_DIR` to a directory to keep the screenshots the tests take; without it they are not written. A screenshot covers the whole page, except while a card is open, when only the visible window is saved, because a full-page capture resizes the window and would disturb the open card.
 
@@ -254,7 +256,7 @@ The test host serves module scripts without a content type when the browser acce
 ## Running the checks
 
 - Lint and script tests: `build/lint.sh`
-- .NET tests without a browser, exactly as CI runs them: `dotnet test --project Cabinet.UnitTests --no-restore` and `dotnet test --project Cabinet.IntegrationTests --no-restore`. Each project is named so that one which finds no tests fails the run; the browser project has its own job.
+- .NET tests without a browser, exactly as CI runs them: `dotnet test --project Cabinet.UnitTests --no-restore` and `dotnet test --project Cabinet.IntegrationTests --no-restore`. Each project is named so that one which finds no tests fails the run; the browser project has its own jobs.
 - Page script tests: `node --test build/tests/*.test.mjs`
 - Browser tests: `dotnet test --project Cabinet.BrowserTests` (see "Browser tests")
 - Hook tests alone: `bash build/tests/githooks-test.sh`
