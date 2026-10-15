@@ -248,8 +248,8 @@ function choose(page, name, value) {
 }
 
 test('the summary of a look is the control labels joined with plain middle dots', () => {
-  assert.equal(lookSummary(ELEVEN), 'Library · Mahogany · Painted backs · Lights: Evenings only · Depth: Deep');
-  assert.equal(lookSummary(DEFAULT_LOOK), 'Classic · Warm brown · Wood backs · Lights: Off · Depth: Shaded');
+  assert.equal(lookSummary(ELEVEN), 'Library\u00a0· Mahogany\u00a0· Painted backs\u00a0· Lights: Evenings only\u00a0· Depth: Deep');
+  assert.equal(lookSummary(DEFAULT_LOOK), 'Classic\u00a0· Warm brown\u00a0· Wood backs\u00a0· Lights: Off\u00a0· Depth: Shaded');
 });
 
 test('the look read from the controls and the look written to them agree, with the switch giving painted or wood', () => {
@@ -282,7 +282,7 @@ test('while the trial equals the current look both buttons are disabled and the 
   assert.equal(page.discard.getAttribute('aria-disabled'), 'true');
   assert.equal(page.trying.hidden, true);
   assert.equal(page.discard.hidden, false);
-  assert.equal(page.current.textContent, 'Visitors see: Classic · Warm brown · Wood backs · Lights: Off · Depth: Shaded');
+  assert.equal(page.current.textContent, 'Visitors see: Classic\u00a0· Warm brown\u00a0· Wood backs\u00a0· Lights: Off\u00a0· Depth: Shaded');
 });
 
 test('a change starts a trial: the wrapper, the lines, the buttons and the status follow and nothing is posted', async () => {
@@ -295,8 +295,8 @@ test('a change starts a trial: the wrapper, the lines, the buttons and the statu
 
   assert.equal(page.preview.getAttribute('data-wood'), 'oak');
   assert.equal(page.trying.hidden, false);
-  assert.equal(page.trying.textContent, 'Trying: Classic · Oak · Wood backs · Lights: Off · Depth: Shaded');
-  assert.equal(page.current.textContent, 'Visitors see: Classic · Warm brown · Wood backs · Lights: Off · Depth: Shaded');
+  assert.equal(page.trying.textContent, 'Trying: Classic\u00a0· Oak\u00a0· Wood backs\u00a0· Lights: Off\u00a0· Depth: Shaded');
+  assert.equal(page.current.textContent, 'Visitors see: Classic\u00a0· Warm brown\u00a0· Wood backs\u00a0· Lights: Off\u00a0· Depth: Shaded');
   assert.equal(page.publish.getAttribute('aria-disabled'), null);
   assert.equal(page.discard.getAttribute('aria-disabled'), null);
   assert.equal(textOf(page.status), 'Trying a new look. Visitors still see the current one.');
@@ -361,7 +361,7 @@ test('Use for everyone posts the five values, shows the saved line with Undo and
   assert.deepEqual(posts[0].fields, { design: 'classic', wood: 'oak', backs: 'painted', lights: 'evenings', depth: 'shaded' });
   assert.equal(textOf(page.status), 'Saved for everyone. Open pages follow within a few seconds.Undo');
   assert.equal(page.status.querySelector('button[data-undo]') !== null, true);
-  assert.equal(page.current.textContent, 'Visitors see: Classic · Oak · Painted backs · Lights: Evenings only · Depth: Shaded');
+  assert.equal(page.current.textContent, 'Visitors see: Classic\u00a0· Oak\u00a0· Painted backs\u00a0· Lights: Evenings only\u00a0· Depth: Shaded');
   assert.equal(page.publish.getAttribute('aria-disabled'), 'true');
   assert.equal(page.doc.activeElement, page.publish);
 });
@@ -380,7 +380,7 @@ test('Undo posts with the revision of the publish and puts the earlier look back
   assert.equal(posts[1].url, '?handler=Undo');
   assert.deepEqual(readLook(page.form), DEFAULT_LOOK);
   assert.equal(page.preview.getAttribute('data-wood'), 'brown');
-  assert.equal(page.current.textContent, 'Visitors see: Classic · Warm brown · Wood backs · Lights: Off · Depth: Shaded');
+  assert.equal(page.current.textContent, 'Visitors see: Classic\u00a0· Warm brown\u00a0· Wood backs\u00a0· Lights: Off\u00a0· Depth: Shaded');
   assert.equal(textOf(page.status), 'Put back the earlier look.');
 });
 

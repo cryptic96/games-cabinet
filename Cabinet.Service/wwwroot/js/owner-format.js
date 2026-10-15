@@ -138,14 +138,15 @@ export const LOOK_FIELDS = Object.freeze(['design', 'wood', 'backs', 'lights', '
 
 /**
  * Describes a look on one line with the words the controls carry: `Library · Mahogany · Painted backs · Lights: Evenings only
- * · Depth: Deep`. A value that has no name is written as it is.
+ * · Depth: Deep`. A value that has no name is written as it is. Each separator is joined to the item before it with a no-break
+ * space, so a narrow line never starts with a dot.
  * @param {Record<string, string>} look The five values of the look, by field.
  * @returns {string}
  */
 export function lookSummary(look) {
   const name = (field) => LOOK_NAMES[field][look[field]] ?? look[field];
 
-  return [name('design'), name('wood'), name('backs'), `Lights: ${name('lights')}`, `Depth: ${name('depth')}`].join(' · ');
+  return [name('design'), name('wood'), name('backs'), `Lights: ${name('lights')}`, `Depth: ${name('depth')}`].join('\u00a0· ');
 }
 
 /** The locale every owner time is written in: English words, day before month and a 24-hour clock. */

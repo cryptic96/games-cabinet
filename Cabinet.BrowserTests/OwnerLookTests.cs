@@ -114,7 +114,7 @@ public sealed class OwnerLookTests : CabinetPageTest
             }
             """);
 
-        serverLine.Should().Be("Visitors see: Library · Mahogany · Painted backs · Lights: Evenings only · Depth: Deep");
+        serverLine.Should().Be("Visitors see: Library\u00A0· Mahogany\u00A0· Painted backs\u00A0· Lights: Evenings only\u00A0· Depth: Deep");
         built.Should().Be(serverLine);
         await Expect(Page.Locator("#look-current")).ToHaveTextAsync(serverLine);
         await Expect(Page.Locator(Preview)).ToHaveAttributeAsync("data-lights", "evenings");
@@ -397,6 +397,84 @@ public sealed class OwnerLookTests : CabinetPageTest
         read.Should().HaveCount(2);
         read.Should().OnlyContain(pair => pair.StartsWith("0px|", StringComparison.Ordinal));
         read.Should().OnlyContain(pair => pair.Contains("max(4px", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task On_a_wide_screen_the_page_is_wider_and_each_tile_group_has_five_columns_with_pictures_about_a_hundred_pixels_tall()
+    {
+        await OpenSettingsAsync(1440, 900);
+
+        var page = await Page.EvaluateAsync<double[]>("() => [document.querySelector('.owner-main').getBoundingClientRect().width, parseFloat(getComputedStyle(document.documentElement).fontSize)]");
+        page[0].Should().BeApproximately(76 * page[1], 1, "the Settings page is wider than the other owner pages from 80rem");
+
+        var groups = await Page.Locator(".look-tiles").EvaluateAllAsync<double[][][]>(
+            "groups => groups.map(group => [...group.children].map(tile => { const swatch = tile.querySelector('.look-swatch').getBoundingClientRect(); const box = tile.getBoundingClientRect(); return [Math.round(box.left), Math.round(box.top), swatch.width, swatch.height]; }))");
+
+        groups.Should().HaveCount(2);
+        groups[0].Should().HaveCount(7);
+        groups[1].Should().HaveCount(5);
+        groups[0].Select(tile => tile[0]).Distinct().Should().HaveCount(5, "the seven designs take five columns and two");
+        groups[0].Select(tile => tile[1]).Distinct().Should().HaveCount(2);
+        groups[1].Select(tile => tile[1]).Distinct().Should().HaveCount(1, "the five woods share one row");
+
+        foreach (var tile in groups.SelectMany(group => group))
+        {
+            tile[3].Should().BeInRange(92, 128, "the picture is about a hundred pixels tall and never above the cap");
+            tile[2].Should().BeGreaterThan(tile[3], "the picture is wider than tall");
+        }
+
+        (await Page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth > document.documentElement.clientWidth")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Below_eighty_rem_the_page_keeps_its_width_and_the_same_five_columns()
+    {
+        await OpenSettingsAsync(1200, 900);
+
+        var page = await Page.EvaluateAsync<double[]>("() => [document.querySelector('.owner-main').getBoundingClientRect().width, parseFloat(getComputedStyle(document.documentElement).fontSize)]");
+        page[0].Should().BeApproximately(64 * page[1], 1);
+        var columns = await Page.Locator(".look-tiles").First.EvaluateAsync<int>("group => getComputedStyle(group).gridTemplateColumns.split(' ').length");
+        columns.Should().Be(5);
+    }
+
+    [Fact]
+    public async Task A_disabled_Preview_time_wears_the_disabled_look_and_never_shows_a_chosen_pill_with_a_ring()
+    {
+        await OpenSettingsAsync(1440, 900);
+        var group = Page.Locator("#look-evening");
+        var chosen = group.Locator(".look-choice:has(input:checked)");
+        var button = Page.GetByRole(AriaRole.Button, new() { Name = "Use for everyone" });
+        const string Read = "element => { const style = getComputedStyle(element); return [style.borderTopStyle, style.boxShadow, style.backgroundImage, style.fontWeight]; }";
+
+        await Expect(group.Locator("input").First).ToBeDisabledAsync();
+        var disabled = await chosen.EvaluateAsync<string[]>(Read);
+        disabled[0].Should().Be("dashed", "a disabled group uses the page's own disabled border");
+        disabled[1].Should().NotContain("3px", "no thick ring on a disabled pill");
+        disabled[2].Should().Be("none", "no tint on a disabled pill");
+        disabled[3].Should().Be("400", "no bold on a disabled pill");
+        (await button.EvaluateAsync<string>("element => getComputedStyle(element).borderTopStyle")).Should().Be("dashed");
+
+        await Page.Locator(".look-group:disabled .look-choice").Last.HoverAsync(new() { Force = true });
+        (await Page.Locator(".look-group:disabled .look-choice").Last.EvaluateAsync<string>("element => getComputedStyle(element).backgroundImage")).Should().Be("none", "a disabled pill does not light up on hover");
+
+        await Page.Locator("input[name=lights][value=evenings]").CheckAsync();
+        await Expect(group.Locator("input").First).ToBeEnabledAsync();
+        var enabled = await chosen.EvaluateAsync<string[]>(Read);
+        enabled[0].Should().Be("solid");
+        enabled[1].Should().Contain("3px", "the chosen pill of an enabled group keeps its ring");
+        enabled[3].Should().Be("600");
+    }
+
+    [Fact]
+    public async Task The_line_that_says_what_is_being_tried_is_stronger_than_the_line_for_the_current_look_and_the_dots_stay_with_the_item_before()
+    {
+        await OpenSettingsAsync(390, 844);
+        await Page.Locator("input[name=wood][value=oak]").CheckAsync();
+
+        var weights = await Page.EvaluateAsync<string[]>("() => ['#look-trying', '#look-current'].map(selector => getComputedStyle(document.querySelector(selector)).fontWeight)");
+        weights.Should().Equal("600", "400");
+        var line = await Page.Locator("#look-trying").TextContentAsync();
+        line.Should().Contain("\u00A0\u00B7 ").And.NotContain(" \u00B7 ");
     }
 
     [Fact]

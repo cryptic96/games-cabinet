@@ -609,6 +609,10 @@ public static class OwnerStrings
     /// <param name="summary">The look in use, as <see cref="CabinetLooks.Summary"/> words it.</param>
     public static string VisitorsSee(string summary) => $"Visitors see: {summary}";
 
+    /// <summary>Joins each separator of a look summary to the item before it with a no-break space, so a narrow line never starts with a dot.</summary>
+    /// <param name="summary">The look in use, as <see cref="CabinetLooks.Summary"/> words it.</param>
+    public static string SummaryLine(string summary) => summary.Replace(" · ", "\u00A0· ", StringComparison.Ordinal);
+
     /// <summary>The line under a design's name.</summary>
     /// <param name="design">The design, as it is stored.</param>
     public static string DesignSubLine(string design) => design switch
