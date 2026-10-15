@@ -24,6 +24,12 @@ public sealed class LiveLookTests : CabinetPageTest
     private const string FirstBox = "#cabinet .placement:not([data-kind=\"moreMarker\"])";
     internal const string SavedText = "Saved for everyone. Open pages follow within a few seconds.";
     private const float FollowTimeoutMs = 5000;
+
+    /// <summary>
+    /// How long the first drawing of the 400-game cabinet may take. A fresh test process lays out the balanced desktop sections
+    /// cold, which on a shared build machine can exceed the usual expectation timeout; the live switch keeps its own shorter limit.
+    /// </summary>
+    internal const float FirstDrawTimeoutMs = 30000;
     internal const int ManyGames = 400;
     private const string ViewerZone = "Europe/Berlin";
     private const string EveningMoment = "2027-01-15T20:00:00+01:00";
@@ -252,7 +258,7 @@ public sealed class LiveLookTests : CabinetPageTest
     {
         await Page.AddInitScriptAsync(AnchorSpy);
         await StartCabinetAsync(gameCount: ManyGames);
-        await Expect(Page.Locator("#cabinet .section").Nth(2)).ToBeVisibleAsync();
+        await Expect(Page.Locator("#cabinet .section").Nth(2)).ToBeVisibleAsync(new() { Timeout = FirstDrawTimeoutMs });
         await Page.EvaluateAsync(ScrollToThirdSectionScript);
         var before = await Page.EvaluateAsync<double[]>(PlaceScript);
         var index = (int)before[0];

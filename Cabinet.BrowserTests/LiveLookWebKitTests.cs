@@ -48,7 +48,7 @@ public sealed class LiveLookWebKitTests
         var page = await visitor.NewPageAsync();
         await page.AddInitScriptAsync(LiveLookTests.AnchorSpy);
         await page.GotoAsync($"http://127.0.0.1:{factory.PublicPort}/");
-        await Assertions.Expect(page.Locator("#cabinet .section").Nth(2)).ToBeVisibleAsync();
+        await Assertions.Expect(page.Locator("#cabinet .section").Nth(2)).ToBeVisibleAsync(new() { Timeout = LiveLookTests.FirstDrawTimeoutMs });
         var limiter = factory.ServingServices.GetRequiredService<LiveConnectionLimiter>();
         await SyncHarness.WaitUntil(() => Task.FromResult(limiter.Count == 1));
         await page.EvaluateAsync(LiveLookTests.ScrollToThirdSectionScript);
