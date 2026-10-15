@@ -1966,14 +1966,14 @@ header > .header-aside {
 
 /**
  * Forced colours drop every shadow and fill. The chosen tile and the chosen pill show their choice with an inset shadow, so each
- * takes a system-coloured outline instead, and the radio inside keeps its own dot and, when focused, its own ring, so a chosen
- * item that has focus shows both marks. The miniature cabinets and the preview are
- * pictures with a text summary beside them, so they opt out of recolouring and draw as an image would, rather than leaving an
- * empty frame.
+ * takes a system-coloured outline instead. A pill of a group that is switched off takes none, as it takes no ring in normal
+ * colours. The radio inside keeps its own dot and, when focused, its own ring, so a chosen item that has focus shows both marks.
+ * The miniature cabinets and the preview are pictures with a text summary beside them, so they opt out of recolouring and draw
+ * as an image would, rather than leaving an empty frame.
  */
 @media (forced-colors: active) {
   .pic-tile:has(input:checked),
-  .look-choice:has(input:checked) {
+  .look-group:not(:disabled) .look-choice:has(input:checked) {
     outline: 3px solid CanvasText;
     outline-offset: -4px;
   }

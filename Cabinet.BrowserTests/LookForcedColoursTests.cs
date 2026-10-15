@@ -66,8 +66,16 @@ public sealed class LookForcedColoursTests : CabinetPageTest, IDisposable
     {
         await OpenAsync(CabinetLook.Default, "/?sample=65", 1440);
 
-        var trim = await Page.Locator("#cabinet .section-trim").First.EvaluateAsync<string[]>("element => { const style = getComputedStyle(element); return [style.outlineStyle, style.outlineWidth]; }");
-        trim.Should().Equal("solid", "2px");
+        foreach (var part in new[] { ".section-top", ".section-trim", ".section-base" })
+        {
+            var outline = await Page.Locator($"#cabinet {part}").First.EvaluateAsync<string[]>("element => { const style = getComputedStyle(element); return [style.outlineStyle, style.outlineWidth]; }");
+            outline.Should().Equal(["solid", "2px"], part);
+        }
+
+        var edge = await Page.Locator("#cabinet .section-trim").First.EvaluateAsync<double[]>("element => { const rect = element.getBoundingClientRect(); return [rect.left, rect.top + (rect.height / 2)]; }");
+        using var strip = SKBitmap.Decode(await Page.ScreenshotAsync(new PageScreenshotOptions { Clip = new Clip { X = (float)edge[0] - 4, Y = (float)edge[1], Width = 8, Height = 1 } }))
+            ?? throw new InvalidOperationException("The side board strip is not readable.");
+        Enumerable.Range(0, strip.Width).Select(x => Luminance(strip.GetPixel(x, 0))).Min().Should().BeLessThan(70, "the side board is drawn as a dark line");
 
         var box = Page.Locator("#cabinet .placement").First;
         var outlined = await box.EvaluateAsync<string[]>("element => { const style = getComputedStyle(element); return [style.outlineStyle, style.outlineWidth]; }");
@@ -136,6 +144,10 @@ public sealed class LookForcedColoursTests : CabinetPageTest, IDisposable
         await Page.Keyboard.PressAsync("ArrowLeft");
         var focusRing = await Page.Locator("input[name=lights][value=evenings]").EvaluateAsync<string>("element => { const style = getComputedStyle(element); return style.outlineStyle + ' ' + style.outlineWidth; }");
         focusRing.Should().Be("solid 2px");
+
+        await Page.Locator("input[name=lights][value=off]").CheckAsync();
+        var switchedOff = await Page.Locator("#look-evening .look-choice:has(input:checked)").EvaluateAsync<string>("element => getComputedStyle(element).outlineStyle");
+        switchedOff.Should().Be("none", "a pill of a group that is switched off carries no selection mark");
         ConsoleErrors.Should().BeEmpty();
     }
 
