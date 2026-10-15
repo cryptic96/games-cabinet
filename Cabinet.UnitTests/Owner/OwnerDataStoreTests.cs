@@ -62,7 +62,7 @@ public sealed class OwnerDataStoreTests : IDisposable
     }
 
     [Theory]
-    [InlineData("{\"kind\":\"games-cabinet-owner-data\",\"schemaVersion\":2,\"revision\":7}")]
+    [InlineData("{\"kind\":\"games-cabinet-owner-data\",\"schemaVersion\":3,\"revision\":7}")]
     [InlineData("{\"kind\":\"games-cabinet-owner-data\",\"schemaVersion\":99,\"locations\":\"unknown shape\"}")]
     [InlineData("{\"kind\":\"games-cabinet-snapshot\",\"schemaVersion\":1,\"revision\":1}")]
     [InlineData("{\"schemaVersion\":1,\"revision\":1}")]
@@ -112,7 +112,7 @@ public sealed class OwnerDataStoreTests : IDisposable
     [Fact]
     public async Task A_refused_write_over_a_damaged_file_leaves_its_bytes_and_the_directory_as_they_were()
     {
-        var bytes = Encoding.UTF8.GetBytes("{\"kind\":\"games-cabinet-owner-data\",\"schemaVersion\":2,\"revision\":7}");
+        var bytes = Encoding.UTF8.GetBytes("{\"kind\":\"games-cabinet-owner-data\",\"schemaVersion\":3,\"revision\":7}");
         File.WriteAllBytes(FilePath, bytes);
         var listingBefore = Listing();
         var bytesBeforeLoad = File.ReadAllBytes(FilePath);
@@ -222,6 +222,30 @@ public sealed class OwnerDataStoreTests : IDisposable
         File.ReadAllBytes(FilePath).Should().Equal(before);
         Directory.EnumerateFileSystemEntries(VersionsPath).Should().HaveCount(1);
         Directory.EnumerateFileSystemEntries(_directory.FullPath).Should().BeEquivalentTo([FilePath, VersionsPath]);
+    }
+
+    [Fact]
+    public void The_stored_schema_version_is_null_without_a_file_and_the_version_of_the_header_with_one()
+    {
+        var store = CreateStore();
+        store.StoredSchemaVersion().Should().BeNull();
+
+        File.WriteAllText(FilePath, "{\"kind\":\"games-cabinet-owner-data\",\"schemaVersion\":1}");
+        store.StoredSchemaVersion().Should().Be(1);
+
+        store.Save(OwnerData.Empty with { Revision = 1 });
+        store.StoredSchemaVersion().Should().Be(OwnerData.CurrentSchemaVersion);
+    }
+
+    [Fact]
+    public void The_stored_schema_version_is_null_when_the_header_cannot_be_read_and_the_file_is_left_alone()
+    {
+        File.WriteAllText(FilePath, "not json at all");
+        var before = File.ReadAllBytes(FilePath);
+
+        CreateStore().StoredSchemaVersion().Should().BeNull();
+
+        File.ReadAllBytes(FilePath).Should().Equal(before);
     }
 
     private OwnerDataStore CreateStore() => new(_directory.FullPath, NullLogger<OwnerDataStore>.Instance);

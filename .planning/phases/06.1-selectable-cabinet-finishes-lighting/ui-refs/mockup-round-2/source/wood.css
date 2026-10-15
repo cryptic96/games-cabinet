@@ -1,0 +1,229 @@
+@layer wood {
+/**
+ * Every wood is a block of colours and unitless strengths and nothing else: no length, no size, no layout. The base
+ * block is the warm brown of today and holds every shared token, so a wood only writes what makes it different.
+ * Tokens are declared on the element that carries the wood, never on a pair of choices.
+ */
+:root,
+[data-wood] {
+  --dusk-rgb: 10 14 30;
+  --dusk-pct: 0%;
+  --falloff-rgb: 255 244 228;
+  --lamp-rgb: 255 212 150;
+  --lamp-k: 1;
+  --pool-k: var(--lamp-k);
+  --lamp-hot-rgb: 255 236 205;
+  --fill-k: 0;
+  --back-shade-k: 1;
+  --keyline: 0;
+  --room-shade-rgb: var(--shade-rgb);
+  --room-shade-deep-rgb: var(--shade-deep-rgb);
+  --highlight-rgb: 255 236 205;
+  --box-shade-rgb: 20 10 4;
+  --shade-rgb: 20 10 4;
+  --shade-deep-rgb: 10 5 2;
+  --sheen-rgb: 255 245 230;
+  --plank-lift-rgb: 255 235 210;
+  --neutral-dark-rgb: 0 0 0;
+  --neutral-light-rgb: 255 255 255;
+  --arch-top-rgb: 8 4 2;
+  --arch-bottom-rgb: 30 16 8;
+  --arris-light-rgb: 255 240 220;
+  --arris-dark-rgb: 18 8 2;
+  --grain-dark-rgb: 40 20 8;
+  --grain-strength: 1;
+  --wood-src: #6b4226;
+  --wood-lit-src: #8c5d38;
+  --back-src: #2a1a10;
+  --back-paint-src: #0f2025;
+  --recess-src: color-mix(in oklch, #6b4226, black 55%);
+  --recess-low-src: color-mix(in oklch, #6b4226, black 55%);
+  --ply-a-src: color-mix(in oklch, var(--wood-src), white 16%);
+  --ply-b-src: color-mix(in oklch, var(--wood-src), black 14%);
+  --ply-glue-src: color-mix(in oklch, var(--wood-src), black 60%);
+  --inlay-src: #c4a15a;
+  --cubby-top-src: #170d07;
+  --cubby-left-src: #4a2e1b;
+  --cubby-right-src: #2f1c10;
+  --cubby-floor-back-src: #2a1a10;
+  --cubby-floor-front-src: color-mix(in oklch, #6b4226, black 20%);
+  --wood: var(--wood-src);
+  --wood-lit: var(--wood-lit-src);
+  --back-plain: var(--back-src);
+  --back-paint: var(--back-paint-src);
+  --recess: var(--recess-src);
+  --recess-low: var(--recess-low-src);
+  --ply-a: var(--ply-a-src);
+  --ply-b: var(--ply-b-src);
+  --ply-glue: var(--ply-glue-src);
+  --inlay: var(--inlay-src);
+  --cubby-top: var(--cubby-top-src);
+  --cubby-left: var(--cubby-left-src);
+  --cubby-right: var(--cubby-right-src);
+  --cubby-floor-back: var(--cubby-floor-back-src);
+  --cubby-floor-front: var(--cubby-floor-front-src);
+  --back: var(--back-plain);
+  --edge-up-6: color-mix(in oklch, var(--wood-lit), white 6%);
+  --edge-up-12: color-mix(in oklch, var(--wood-lit), white 12%);
+  --wood-up-2: color-mix(in oklch, var(--wood), white 2%);
+  --wood-up-4: color-mix(in oklch, var(--wood), white 4%);
+  --wood-up-6: color-mix(in oklch, var(--wood), white 6%);
+  --wood-dn-4: color-mix(in oklch, var(--wood), black 4%);
+  --wood-dn-6: color-mix(in oklch, var(--wood), black 6%);
+  --wood-dn-22: color-mix(in oklch, var(--wood), black 22%);
+  --room: #3b2416;
+  --room-text: #efe3c2;
+  --room-accent: #d9b98a;
+  --room-ring: var(--room-accent);
+  --room-muted: color-mix(in srgb, var(--room-text) 70%, var(--room));
+  --room-line: color-mix(in srgb, var(--room-text) 60%, var(--room));
+  --room-lit-alpha: 0;
+  --room-falloff: none;
+  --arch-alpha-top: 0.92;
+  --arch-alpha-bottom: 0.72;
+  --floor: transparent;
+  --skirting: transparent;
+  --ring-halo: transparent;
+  --wall-shadow: 0;
+  --room-k: 0;
+}
+
+[data-wood="walnut"] {
+  --wood-src: #593a29;
+  --wood-lit-src: color-mix(in oklch, #593a29, white 22%);
+  --back-src: #261811;
+  --recess-src: color-mix(in oklch, #593a29, black 35%);
+  --recess-low-src: color-mix(in oklch, #593a29, black 25%);
+  --cubby-top-src: color-mix(in oklch, #593a29, black 78%);
+  --cubby-left-src: color-mix(in oklch, #593a29, black 31%);
+  --cubby-right-src: color-mix(in oklch, #593a29, black 56%);
+  --cubby-floor-back-src: #261811;
+  --cubby-floor-front-src: color-mix(in oklch, #593a29, black 20%);
+  --shade-rgb: 8 3 1;
+  --shade-deep-rgb: 5 2 0;
+  --grain-dark-rgb: 18 8 3;
+  --grain-strength: 1.2;
+  --arris-light-rgb: 255 210 160;
+  --arris-dark-rgb: 8 3 1;
+  --room-k: 1;
+  --room: #d2ccc0;
+  --room-text: #241e1a;
+  --room-accent: #2a1a10;
+  --room-lit-alpha: 0.30;
+  --wall-shadow: 0.15;
+  --room-shade-rgb: 60 52 44;
+  --room-shade-deep-rgb: 40 34 28;
+  --floor: #aaa393;
+  --skirting: #c4bdaf;
+  --room-falloff: radial-gradient(ellipse 120% 70% at 50% 0%, rgb(var(--falloff-rgb) / var(--room-lit-alpha)), transparent);
+}
+
+[data-wood="oak"] {
+  --wood-src: #c9a46d;
+  --wood-lit-src: #f2e3bd;
+  --back-src: #221a12;
+  --recess-src: #2a2218;
+  --recess-low-src: #2a2218;
+  --cubby-top-src: #2c2418;
+  --cubby-left-src: #8b714b;
+  --cubby-right-src: #584830;
+  --cubby-floor-back-src: #221a12;
+  --cubby-floor-front-src: #8d734c;
+  --shade-rgb: 40 22 6;
+  --shade-deep-rgb: 24 12 3;
+  --grain-dark-rgb: 130 88 38;
+  --grain-strength: 1.5;
+  --arris-light-rgb: 255 250 235;
+  --arris-dark-rgb: 95 62 25;
+  --ring-halo: var(--ink);
+  --inlay-src: #7d5a1e;
+  --arch-alpha-top: 0.60;
+  --arch-alpha-bottom: 0.45;
+  --room-k: 1;
+  --room: #27323b;
+  --room-text: #e9eef1;
+  --room-lit-alpha: 0.06;
+  --floor: #1f2124;
+  --skirting: #323c44;
+  --room-falloff: radial-gradient(ellipse 120% 70% at 50% 0%, rgb(var(--falloff-rgb) / var(--room-lit-alpha)), transparent);
+}
+
+[data-wood="birch"] {
+  --wood-src: #dfc79a;
+  --wood-lit-src: #fffcf0;
+  --back-src: #9c8a6a;
+  --recess-src: #4a4337;
+  --recess-low-src: #5f574a;
+  --ply-a-src: #ead7ad;
+  --ply-b-src: #cdb07c;
+  --ply-glue-src: #9a7b4b;
+  --cubby-top-src: #7b6d55;
+  --cubby-left-src: #c9b38b;
+  --cubby-right-src: #a79574;
+  --cubby-floor-back-src: #9c8a6a;
+  --cubby-floor-front-src: #c4af88;
+  --shade-rgb: 70 45 20;
+  --shade-deep-rgb: 50 32 14;
+  --grain-dark-rgb: 120 80 40;
+  --grain-strength: 0.8;
+  --arris-light-rgb: 255 252 240;
+  --arris-dark-rgb: 90 65 30;
+  --ring-halo: var(--ink);
+  --inlay-src: #876528;
+  --lamp-k: 0.18;
+  --pool-k: 0.12;
+  --fill-k: 1;
+  --keyline-lit: 0;
+  --back-shade-k: 0.35;
+  --wall-shadow: 0.22;
+  --arch-alpha-top: 0.60;
+  --arch-alpha-bottom: 0.45;
+  --room-shade-rgb: 60 52 44;
+  --room-shade-deep-rgb: 40 34 28;
+  --room-k: 1;
+  --room: #ddd6ca;
+  --room-text: #251f1b;
+  --room-accent: #2a1a10;
+  --room-lit-alpha: 0.30;
+  --floor: #aa9e8e;
+  --skirting: #d4cdc0;
+  --room-falloff: radial-gradient(ellipse 120% 70% at 50% 0%, rgb(var(--falloff-rgb) / var(--room-lit-alpha)), transparent);
+}
+
+[data-wood="mahogany"] {
+  --wood-src: #5e2b1c;
+  --wood-lit-src: color-mix(in srgb, #ffc4a0 38%, #5e2b1c);
+  --back-src: #1f0e09;
+  --recess-src: color-mix(in oklch, #5e2b1c, black 70%);
+  --recess-low-src: color-mix(in oklch, #5e2b1c, black 70%);
+  --cubby-top-src: #130705;
+  --cubby-left-src: #45200f;
+  --cubby-right-src: #2e140b;
+  --cubby-floor-back-src: #1f0e09;
+  --cubby-floor-front-src: #4d2416;
+  --shade-rgb: 14 3 0;
+  --shade-deep-rgb: 8 1 0;
+  --grain-dark-rgb: 28 6 2;
+  --grain-strength: 1;
+  --arris-light-rgb: 255 196 160;
+  --arris-dark-rgb: 14 3 0;
+  --lamp-k: 1.1;
+  --room-k: 1;
+  --room: #1c2a23;
+  --room-text: #ebe4cd;
+  --room-lit-alpha: 0.06;
+  --floor: #191d16;
+  --skirting: #333f39;
+  --room-falloff: radial-gradient(ellipse 120% 70% at 50% 0%, rgb(var(--falloff-rgb) / var(--room-lit-alpha)), transparent);
+}
+
+.section > * {
+  --grain-k: var(--grain-strength);
+}
+
+@container (max-width: 400px) {
+  .section > * {
+    --grain-k: calc(var(--grain-strength) * 0.5);
+  }
+}
+}

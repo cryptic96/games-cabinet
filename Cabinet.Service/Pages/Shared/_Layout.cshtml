@@ -1,24 +1,35 @@
-@inject Cabinet.Service.Owner.SiteFinish Finish
+@inject Cabinet.Service.Owner.SiteLook Look
 @inject Cabinet.Service.Owner.OwnerAccessOptions OwnerAccess
+@inject Microsoft.AspNetCore.Mvc.ViewFeatures.IFileVersionProvider FileVersions
 @{
     var language = SiteLanguage.Resolve(Context);
+    var look = Look.Current;
+    ViewData["LightWall"] = Cabinet.Domain.Owner.CabinetLook.HasLightWall(look.Wood);
 }
 <!DOCTYPE html>
-<html lang="@language.Code">
+<html lang="@language.Code" data-design="@look.Design" data-wood="@look.Wood" data-backs="@look.Backs" data-lights="@look.Lights" data-depth="@look.Depth">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
+    <meta name="cabinet-evening-script" content="@FileVersions.AddFileVersionToPath(Context.Request.PathBase, "/js/evening.js")" />
     <title>@language.Text.SiteName</title>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/cabinet.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/cabinet-design.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/cabinet-wood.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/cabinet-modifiers.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/card.css" asp-append-version="true" />
     @if (OwnerAccess.IsOwnerPort(Context))
     {
         <link rel="stylesheet" href="~/css/owner.css" asp-append-version="true" />
     }
+    @if (look.Lights != "off")
+    {
+        <script src="~/js/evening.js" asp-append-version="true"></script>
+    }
 </head>
-<body class="@Finish.BodyClass()">
+<body>
     @RenderBody()
     <partial name="_Footer" model="language" />
     @await RenderSectionAsync("Scripts", required: false)

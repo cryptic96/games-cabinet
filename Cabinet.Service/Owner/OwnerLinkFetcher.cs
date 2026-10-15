@@ -62,9 +62,11 @@ public abstract record LinkCheck
 /// Fetches a picture the owner linked and processes it into the same kind of record the sync stores. Before anything is
 /// fetched the address is classified, in this order: blank, not a web address, a page of the game site, not on the picture
 /// host. Only a direct https picture address on the allowlisted host reaches the picture source, so no page of the game site
-/// is ever fetched. The source is the one the sync uses, which sends no credentials of any kind, follows a redirect at most a
-/// few times, refuses a body that is too big or not a picture and waits its turn on the picture pacer, so the owner's
-/// pictures and the sync's pictures never run at the same time. A check takes at most <see cref="CheckTimeout"/> on the
+/// is ever fetched. The source sends no credentials of any kind, follows a redirect at most a few times, refuses a body that
+/// is too big or not a picture and waits its turn on the picture pacer of its fetch slot. There is one fetcher per slot: the
+/// one the background link worker uses shares its slot with the sync's pictures, so the two never run at the same time, and
+/// the one behind the owner's interactive check (<see cref="OwnerCheckFetcher"/>) has a slot and a pacer of its own, so a
+/// check never waits behind background work. A check takes at most <see cref="CheckTimeout"/> on the
 /// injected clock. The bytes are inspected before they are decoded, and every way a check can fail is one
 /// <see cref="LinkProblem"/>; only cancelling is passed on. It logs nothing, so no address ever reaches a log.
 /// </summary>

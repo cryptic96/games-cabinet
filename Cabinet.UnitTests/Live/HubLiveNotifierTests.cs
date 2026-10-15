@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Cabinet.Domain.Owner;
 using Cabinet.Service.Live;
 using Cabinet.Service.Sync;
 using FluentAssertions;
@@ -23,7 +24,8 @@ public class HubLiveNotifierTests
         false,
         10800,
         null,
-        null);
+        null,
+        LookStatus.From(CabinetLook.Default));
 
     [Fact]
     public async Task A_broadcast_that_never_completes_is_given_up_on_after_the_time_limit()

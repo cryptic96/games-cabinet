@@ -1,0 +1,818 @@
+/**
+ * The detail card. One native dialog is a transparent frame the size of the screen, so a tap anywhere outside the paper lands on
+ * the dialog itself; the paper is the card inside it. Above 40rem the card is a paper index card centred over a plain dim; at 40rem
+ * or narrower it is a sheet anchored to the bottom of the screen. Every colour, rhythm and timing is a custom property of the page.
+ */
+:root {
+  --sheet-spring: 200ms;
+}
+
+.card-dialog {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  inset: 0;
+  overflow: hidden;
+}
+
+.card-dialog[open] {
+  display: grid;
+  place-items: center;
+}
+
+.card-dialog::backdrop {
+  background: var(--dim);
+}
+
+html:has(dialog[open]) {
+  overflow: hidden;
+  scrollbar-gutter: stable;
+}
+
+.card {
+  position: relative;
+  width: min(640px, 100vw - 48px);
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background-color: var(--paper);
+  color: var(--ink);
+  border-radius: 2px;
+  box-shadow:
+    0 1px 1px rgb(20 10 4 / 0.4),
+    0 18px 32px -12px rgb(20 10 4 / 0.7),
+    inset 0 0 0 1px var(--paper-edge);
+}
+
+@supports (max-height: 1dvh) {
+  .card {
+    max-height: calc(100dvh - 64px);
+  }
+}
+
+.card :focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.card .card-title:focus,
+.card .card-title:focus-visible {
+  outline: none;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.card-grip {
+  display: none;
+}
+
+/**
+ * The close button stays in view while the card scrolls. It sits in a wrapper with no height of its own, so it takes no room in
+ * the card, and it has a solid paper background so ruled text that scrolls under it is hidden instead of colliding with the cross.
+ */
+.card-close-wrap {
+  position: sticky;
+  top: 8px;
+  z-index: 3;
+  display: flex;
+  justify-content: flex-end;
+  height: 0;
+  padding-inline-end: 8px;
+}
+
+.card-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.card-close svg {
+  width: 20px;
+  height: 20px;
+}
+
+/**
+ * The header is the typed zone above the red rule: the cover on the left, the title and year on the right. A long title wraps and
+ * the header grows; the year is always the last line. The row is as tall as the cover frame rounded up to a whole ruling where the
+ * browser can do that, so the ruled area below starts on the rhythm.
+ */
+.card-head {
+  --cover-w: 192px;
+  --cover-frame-h: calc(var(--cover-w) / var(--cover-ratio, 1) + 16px);
+  display: grid;
+  grid-template-columns: 208px 1fr;
+  gap: 24px;
+  align-items: start;
+  margin: 0;
+  padding: var(--ruling) 24px 16px;
+  border-bottom: 3px double var(--paper-red);
+}
+
+.card-head > * {
+  grid-column: auto;
+}
+
+@supports (min-height: round(up, 10px, 28px)) {
+  .card-head {
+    grid-template-rows: minmax(round(up, var(--cover-frame-h), var(--ruling)), auto);
+  }
+}
+
+.card-titles {
+  align-self: end;
+  min-width: 0;
+  padding-inline-end: 32px;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 28px;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.card-year {
+  margin: 0;
+  font-size: 16px;
+  line-height: 28px;
+  color: var(--paper-label);
+}
+
+/**
+ * The cover is a photo on an index card: a white border with four brown corner mounts painted under the picture, so they show on
+ * the border only. The picture is never cropped, stretched or covered.
+ */
+.card-cover {
+  min-width: 0;
+  padding: 8px;
+  background-color: var(--paper-photo);
+  background-image:
+    linear-gradient(135deg, var(--paper-mount) 0 14px, transparent 14px),
+    linear-gradient(225deg, var(--paper-mount) 0 14px, transparent 14px),
+    linear-gradient(45deg, var(--paper-mount) 0 14px, transparent 14px),
+    linear-gradient(315deg, var(--paper-mount) 0 14px, transparent 14px);
+  background-position: top left, top right, bottom left, bottom right;
+  background-size: 20px 20px;
+  background-repeat: no-repeat;
+  box-shadow:
+    0 1px 2px rgb(20 10 4 / 0.35),
+    0 6px 12px -6px rgb(20 10 4 / 0.4);
+}
+
+.card-art {
+  position: relative;
+  width: 100%;
+  aspect-ratio: var(--cover-ratio, 1);
+  overflow: hidden;
+  background: var(--bg, var(--wood-edge));
+  color: var(--fg, #ffffff);
+}
+
+.card-art[data-fit] {
+  background: var(--edge-t, var(--bg, var(--wood-edge)));
+}
+
+.card-art[data-fit="width"] {
+  background: linear-gradient(to bottom, var(--edge-t, var(--bg)) 50%, var(--edge-b, var(--bg)) 50%);
+}
+
+.card-art[data-fit="height"] {
+  background: linear-gradient(to right, var(--edge-l, var(--bg)) 50%, var(--edge-r, var(--bg)) 50%);
+}
+
+.card-art > img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  user-select: none;
+}
+
+/**
+ * The generated cover of a game without a usable picture: its colour, a pattern chosen from the game's own hash and a solid plate
+ * holding the title.
+ */
+.card-art[data-pattern]::before {
+  --pattern: color-mix(in srgb, var(--fg) 14%, transparent);
+  --tile: 24px;
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-size: var(--tile) var(--tile);
+}
+
+.card-art[data-pattern="stripes"]::before {
+  background-image: repeating-linear-gradient(90deg, var(--pattern) 0 6px, transparent 6px var(--tile));
+  background-size: auto;
+}
+
+.card-art[data-pattern="chevrons"]::before {
+  background-image:
+    linear-gradient(135deg, var(--pattern) 25%, transparent 25%),
+    linear-gradient(225deg, var(--pattern) 25%, transparent 25%),
+    linear-gradient(315deg, var(--pattern) 25%, transparent 25%),
+    linear-gradient(45deg, var(--pattern) 25%, transparent 25%);
+  background-position: calc(var(--tile) / -2) 0, calc(var(--tile) / -2) 0, 0 0, 0 0;
+}
+
+.card-art[data-pattern="dots"]::before {
+  background-image: radial-gradient(circle at 50% 50%, var(--pattern) 0 22%, transparent 24%);
+}
+
+.card-art[data-pattern="rings"]::before {
+  background-image: radial-gradient(circle at 50% 50%, transparent 0 28%, var(--pattern) 30% 40%, transparent 42%);
+}
+
+.card-art[data-pattern="diagonal"]::before {
+  background-image: repeating-linear-gradient(45deg, var(--pattern) 0 3px, transparent 3px 10px);
+  background-size: auto;
+}
+
+.card-art[data-pattern="plain"]::before {
+  background-image: none;
+}
+
+.card-plate {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-height: 100%;
+  min-height: 40%;
+  padding: 8px;
+  overflow: hidden;
+  background: var(--bg);
+  translate: 0 -50%;
+}
+
+.card-plate-label {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+  line-clamp: 6;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+/**
+ * The ruled area is one background, so every ruling is continuous. Every text line is exactly one ruling tall and every vertical
+ * space inside it is a whole number of rulings, so wrapped text always ends on a rule.
+ */
+.card-ruled {
+  padding: var(--ruling) 24px 0;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0 calc(var(--ruling) - 1px),
+    var(--paper-rule) calc(var(--ruling) - 1px) var(--ruling)
+  );
+  background-position: 0 calc(-1 * var(--ruling-drop));
+  line-height: var(--ruling);
+}
+
+.card-note {
+  font-size: 14px;
+  color: var(--paper-label);
+}
+
+:where(.card-ruled) :where(p, h3, ul, dl, dd, li) {
+  margin: 0;
+  padding: 0;
+  line-height: var(--ruling);
+}
+
+/**
+ * Groups are separated by exactly one blank ruled line and nothing else: the only vertical space between two groups is this
+ * margin, and the first group has none because the area's own padding is already one ruling.
+ */
+.card-ruled > * + * {
+  margin-block-start: var(--ruling);
+}
+
+.card-ruled dd,
+.card-ruled dt,
+.card-ruled .v,
+.card-ruled .l {
+  overflow-wrap: anywhere;
+  unicode-bidi: isolate;
+}
+
+.card-ruled [dir="auto"] {
+  unicode-bidi: plaintext;
+}
+
+/**
+ * The game-night strip: up to four entries in two columns, one per line on a phone. Each entry hangs on its icon, so a label that
+ * wraps stays in flow after the value and the icon stays on the first line.
+ */
+.facts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  column-gap: 24px;
+  list-style: none;
+}
+
+.fact {
+  position: relative;
+  padding-inline-start: 32px;
+  list-style: none;
+}
+
+.fact-icon {
+  position: absolute;
+  top: 2px;
+  inset-inline-start: 0;
+  width: 24px;
+  height: 24px;
+  color: var(--ink);
+}
+
+/**
+ * The value and the label are inline text of different sizes on one line. Their own line boxes are left out of the line height so
+ * the entry's line, which is exactly one ruling, decides the height; otherwise the two sizes together make a line a pixel taller.
+ */
+.fact .v {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 0;
+}
+
+.fact .l {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 0;
+  color: var(--paper-label);
+}
+
+/**
+ * The label-and-value groups below the strip: a label column and the value wrapping beside it, so the label stays on the first line.
+ */
+.card-where,
+.card-meta {
+  display: grid;
+  grid-template-columns: 9rem 1fr;
+  column-gap: 8px;
+}
+
+.card-ruled dt {
+  align-self: start;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--paper-label);
+}
+
+.card-where dt {
+  font-weight: 600;
+}
+
+.card-ruled dd {
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.mech {
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+  list-style: none;
+}
+
+.mech li {
+  display: inline;
+  font-size: 14px;
+}
+
+.mech li:not(:last-child)::after {
+  content: "\00a0\00b7" / "";
+}
+
+/**
+ * The link to the game's page is a row like the others: its text on the first ruled line, the external icon after the text so a
+ * longer translation wraps with the icon at its end, and the whole row is the tap area, one or two rulings tall.
+ */
+.card-link,
+.exp-row {
+  min-height: calc(var(--hit-rows) * var(--ruling));
+}
+
+.card-link a {
+  display: block;
+  min-height: calc(var(--hit-rows) * var(--ruling));
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.card-link svg {
+  display: inline;
+  width: 14px;
+  height: 14px;
+  margin-inline-start: 4px;
+  vertical-align: -2px;
+}
+
+@media (hover: hover) {
+  .exp-row:hover,
+  .card-link a:hover {
+    background: rgb(42 26 16 / 0.06);
+  }
+}
+
+.exp-row:active,
+.card-link a:active {
+  background: rgb(42 26 16 / 0.06);
+}
+
+/**
+ * Pressable rows that swap the card to another owned game: the owned expansions of a base game and the owned base games of an
+ * expansion. A row is one button, text on the first ruled line; its colour chip and chevron sit inside its line and never change
+ * the line box. A long title wraps over whole rulings and the whole row stays one tap area. The row is a grid that packs its text
+ * to the start: a button centres its content vertically, which would push a one-line title half a ruling down on a phone, where
+ * the row is two rulings tall.
+ */
+.exp-row {
+  position: relative;
+  display: grid;
+  align-content: start;
+  width: 100%;
+  margin: 0;
+  padding-block: 0;
+  padding-inline: 16px 24px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 16px;
+  line-height: var(--ruling);
+  text-align: start;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.exp-chip {
+  position: absolute;
+  top: 4px;
+  inset-inline-start: 0;
+  width: 8px;
+  height: 16px;
+  background: var(--chip);
+  box-shadow: inset 0 0 0 1px rgb(42 26 16 / 0.35);
+}
+
+.exp-chev {
+  position: absolute;
+  top: 6px;
+  inset-inline-end: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--ink);
+}
+
+.exp-title {
+  overflow-wrap: anywhere;
+}
+
+.card-expansions,
+.card-bases-list {
+  list-style: none;
+}
+
+.card-expansions-title,
+.card-bases-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--paper-label);
+}
+
+.card-expansions-title:focus {
+  outline: none;
+}
+
+.card-head,
+.card-ruled {
+  transition: opacity var(--swap-fade);
+}
+
+.card[data-swap] :is(.card-head, .card-ruled) {
+  opacity: 0;
+}
+
+@media (max-height: 30rem) {
+  .card-head {
+    --cover-w: 112px;
+    grid-template-columns: 128px 1fr;
+  }
+}
+
+/**
+ * At 40rem or narrower the card is a sheet: full width, anchored to the bottom, rounded on top and at most nine tenths of the
+ * screen tall, scrolling inside. The grip strip with its handle stays at the top while the content scrolls under it.
+ */
+@media (max-width: 40rem) {
+  .card-dialog[open] {
+    place-items: end center;
+  }
+
+  .card {
+    width: 100%;
+    max-height: 90vh;
+    border-radius: 12px 12px 0 0;
+    box-shadow:
+      0 -12px 32px -12px rgb(20 10 4 / 0.7),
+      inset 0 0 0 1px var(--paper-edge);
+  }
+
+  @supports (max-height: 1dvh) {
+    .card {
+      max-height: 90dvh;
+    }
+  }
+
+  .card {
+    translate: 0 var(--sheet-dy, 0px);
+  }
+
+  .card[data-moving] {
+    will-change: transform;
+  }
+
+  .card[data-springing] {
+    transition: translate var(--sheet-spring) var(--pull-ease-out);
+  }
+
+  .card-grip,
+  .card-head {
+    touch-action: none;
+  }
+
+  .card-grip {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: block;
+    height: var(--ruling);
+    margin-bottom: calc(-1 * var(--ruling));
+    border-radius: 12px 12px 0 0;
+    background: var(--paper);
+  }
+
+  .card-grip::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 40px;
+    height: 4px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--paper-label) 70%, var(--paper));
+    translate: -50% 0;
+  }
+
+  .card-head {
+    --cover-w: 112px;
+    grid-template-columns: 128px 1fr;
+    gap: 16px;
+    padding-inline: 16px;
+  }
+
+  .card-ruled {
+    padding: var(--ruling) 16px env(safe-area-inset-bottom);
+  }
+
+  .card-expansions-title {
+    scroll-margin-block-start: var(--ruling);
+  }
+
+  .facts {
+    grid-template-columns: 1fr;
+  }
+
+  .card-where,
+  .card-meta {
+    grid-template-columns: 7rem 1fr;
+  }
+}
+
+@media (forced-colors: active) {
+  .card {
+    border: 1px solid CanvasText;
+  }
+}
+
+/**
+ * The pull-out. The script only sets attributes; every view-transition name comes from the rule below, so no style is ever written
+ * by script. The box and the cover spot are the one named snapshot, `pull`: the box is the old state and the cover spot the new
+ * one on opening, and the other way round on closing. Everything else is the page itself, cross-faded by the root group.
+ */
+[data-pulling] {
+  view-transition-name: pull;
+}
+
+html[data-pull-dir="close"] {
+  --pull-dur: var(--pull-close);
+}
+
+::view-transition-group(root),
+::view-transition-group(pull),
+::view-transition-group(card) {
+  animation-duration: var(--pull-dur);
+}
+
+::view-transition-group(pull) {
+  animation-timing-function: var(--pull-ease-out);
+}
+
+::view-transition-image-pair(pull) {
+  animation: pull-lift var(--pull-dur) var(--pull-ease-out) both;
+}
+
+::view-transition-old(pull),
+::view-transition-new(pull) {
+  height: 100%;
+  object-fit: contain;
+  mix-blend-mode: normal;
+}
+
+html[data-pull-kind="lift"]::view-transition-old(pull),
+html[data-pull-kind="lift"]::view-transition-new(pull) {
+  animation-duration: var(--pull-dur);
+}
+
+html[data-pull-kind="turn-y"]::view-transition-old(pull) {
+  animation: pull-away-y calc(var(--pull-dur) * var(--pull-flip-share)) var(--pull-ease-in) both;
+}
+
+html[data-pull-kind="turn-y"]::view-transition-new(pull) {
+  animation: pull-in-y calc(var(--pull-dur) * (1 - var(--pull-flip-share))) var(--pull-ease-out)
+    calc(var(--pull-dur) * var(--pull-flip-share)) both;
+}
+
+html[data-pull-kind="turn-x"]::view-transition-old(pull) {
+  animation: pull-away-x calc(var(--pull-dur) * var(--pull-flip-share)) var(--pull-ease-in) both;
+}
+
+html[data-pull-kind="turn-x"]::view-transition-new(pull) {
+  animation: pull-in-x calc(var(--pull-dur) * (1 - var(--pull-flip-share))) var(--pull-ease-out)
+    calc(var(--pull-dur) * var(--pull-flip-share)) both;
+}
+
+@keyframes pull-lift {
+  0% {
+    scale: 1;
+  }
+
+  40% {
+    scale: var(--pull-lift);
+  }
+
+  100% {
+    scale: 1;
+  }
+}
+
+@keyframes pull-away-y {
+  to {
+    transform: perspective(var(--pull-perspective)) rotateY(-90deg);
+    opacity: 0;
+  }
+}
+
+@keyframes pull-in-y {
+  from {
+    transform: perspective(var(--pull-perspective)) rotateY(90deg);
+    opacity: 0;
+  }
+}
+
+@keyframes pull-away-x {
+  to {
+    transform: perspective(var(--pull-perspective)) rotateX(90deg);
+    opacity: 0;
+  }
+}
+
+@keyframes pull-in-x {
+  from {
+    transform: perspective(var(--pull-perspective)) rotateX(-90deg);
+    opacity: 0;
+  }
+}
+
+/**
+ * The plain fades: the dialog and its dim fade together over the length of a timing token. They are used where a box cannot be
+ * flown, and by visitors who prefer less motion. Only opacity changes, and the held end state keeps the card gone until the dialog
+ * is closed.
+ */
+.card-dialog[data-fade="open"],
+.card-dialog[data-fade="open"]::backdrop {
+  animation: card-fade-in var(--fallback-open) ease-out both;
+}
+
+.card-dialog[data-fade="close"],
+.card-dialog[data-fade="close"]::backdrop {
+  animation: card-fade-out var(--fallback-close) ease-in both;
+}
+
+.card-dialog[data-fade="reduced-open"],
+.card-dialog[data-fade="reduced-open"]::backdrop {
+  animation: card-fade-in var(--card-fade-reduced) linear both;
+}
+
+.card-dialog[data-fade="reduced-close"],
+.card-dialog[data-fade="reduced-close"]::backdrop {
+  animation: card-fade-out var(--card-fade-reduced) linear both;
+}
+
+@keyframes card-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes card-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/**
+ * On a phone the sheet is its own snapshot while a pull-out runs, so it rises with the cover's flight and sinks on close.
+ */
+@media (max-width: 40rem) {
+  html[data-pull-kind] .card {
+    view-transition-name: card;
+  }
+
+  ::view-transition-new(card) {
+    animation: card-rise var(--pull-dur) var(--pull-ease-out) both;
+  }
+
+  ::view-transition-old(card) {
+    animation: card-sink var(--pull-dur) var(--pull-ease-in) both;
+  }
+}
+
+@keyframes card-rise {
+  from {
+    translate: 0 32px;
+    opacity: 0;
+  }
+}
+
+@keyframes card-sink {
+  to {
+    translate: 0 32px;
+    opacity: 0;
+  }
+}
+
+/**
+ * A visitor who prefers less motion never gets a view transition from the script; this block also silences every view-transition
+ * animation in case one is started some other way. The plain fades above are allowed, and so is the swap cross-fade.
+ */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

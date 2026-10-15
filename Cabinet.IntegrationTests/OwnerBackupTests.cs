@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Cabinet.Domain.Collection;
@@ -122,8 +123,8 @@ public sealed class OwnerBackupTests
         download.Header("Cache-Control").Should().Be("no-store");
         download.Body.Should().Contain("\n  \"kind\": \"games-cabinet-owner-data\"");
         data.Kind.Should().Be("games-cabinet-owner-data");
-        data.SchemaVersion.Should().Be(1);
-        data.Finish.Should().Be("classic");
+        data.SchemaVersion.Should().Be(2);
+        data.Look.Should().Be(CabinetLook.Default);
         data.Locations.Select(location => location.Name).Should().Equal("Cabinet A", "Shelf B");
         data.Locations[0].Id.Should().Be(first);
         data.Changes.Select(change => change.Text).Should().HaveCount(2).And.OnlyContain(text => text.Contains("location"));
@@ -292,6 +293,31 @@ public sealed class OwnerBackupTests
         page.Should().NotContain("since your last download").And.NotContain("Download owner data").And.NotContain("owner-banner");
         download.StatusCode.Should().Be(HttpStatusCode.NotFound);
         state.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task A_downloaded_file_of_the_first_format_shows_the_older_format_line_and_restores_as_the_default_look()
+    {
+        await using var factory = NewFactory();
+        using var session = new OwnerSession(factory);
+        using var publicClient = factory.CreatePublicClient();
+        await session.GetAsync(SettingsPath);
+        await session.PostJsonAsync(
+            SettingsPath + "?handler=Look",
+            [Field("design", "legs"), Field("wood", "oak"), Field("backs", "painted"), Field("lights", "on"), Field("depth", "deep"), Field("revision", "0")]);
+        var file = Encoding.UTF8.GetBytes(
+            "{\"kind\":\"games-cabinet-owner-data\",\"schemaVersion\":1,\"revision\":3,\"finish\":\"classic\","
+            + "\"locations\":[{\"id\":\"0a1b2c3d\",\"name\":\"Cabinet A\"}],\"games\":[],\"changesSinceDownload\":0,\"changes\":[]}");
+
+        var check = await session.PostFileAsync(SettingsPath + "?handler=CheckFile", "ownerDataFile", file);
+        var preview = await session.GetAsync(check.Location!);
+        var restored = await session.PostFormAsync(SettingsPath + "?handler=Restore", [Field("token", OwnerSession.FieldValue(preview.Body, "token"))]);
+        var page = await publicClient.GetStringAsync("/", TestContext.Current.CancellationToken);
+
+        preview.Body.Should().Contain("This file uses an older format (1). It is upgraded when restored.");
+        restored.Status.Should().Be(HttpStatusCode.OK);
+        page.Should().Contain("data-design=\"classic\" data-wood=\"brown\" data-backs=\"wood\" data-lights=\"off\" data-depth=\"shaded\">");
+        ((OwnerDataState.Ready)factory.ServingServices.GetRequiredService<OwnerDataService>().State).Data.Locations.Should().ContainSingle();
     }
 
     private static CabinetWebApplicationFactory NewFactory(TemporaryDirectory? storage = null, TimeProvider? clock = null) =>

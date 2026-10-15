@@ -22,7 +22,7 @@ public class LanguageTests
         var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        html.Should().Contain("<html lang=\"nl\">");
+        html.Should().Contain("<html lang=\"nl\" ");
         html.Should().Contain("<title>Spellenkast</title>");
         html.Should().Contain("De kast wordt gevuld.");
         html.Should().Contain("Versie ");
@@ -39,7 +39,7 @@ public class LanguageTests
         using var response = await Get(client, "/", acceptLanguage: null);
         var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
-        html.Should().Contain("<html lang=\"en\">");
+        html.Should().Contain("<html lang=\"en\" ");
         html.Should().Contain("Games Cabinet");
         html.Should().Contain("The cabinet is being filled.");
         response.Content.Headers.ContentLanguage.Should().ContainSingle().Which.Should().Be("en");
@@ -142,7 +142,7 @@ public class LanguageTests
         using var response = await Get(client, "/", acceptLanguage: "en", cookie: "lang=nl");
         var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
-        html.Should().Contain("<html lang=\"nl\">");
+        html.Should().Contain("<html lang=\"nl\" ");
         html.Should().Contain("De kast wordt gevuld.");
     }
 

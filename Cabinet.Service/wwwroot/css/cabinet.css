@@ -1,10 +1,13 @@
+@layer structure {
+
 /**
  * Sections sit in rows that wrap: one column, two from 80rem and three from 118rem, each section at most 40rem wide and
  * never under 37rem, the narrowest a desktop section is ever drawn. Every row is centred, so a lone section and a last
  * row with fewer sections than columns sit in the middle, and the column count is the only thing that sets a section's
  * width, so the last section is as wide as the others. The row stops growing at three full columns, so a very wide
- * screen gets margins instead of a fourth column. Sections start at the top of their row, so a shorter last section
- * lines up with its neighbours.
+ * screen gets margins instead of a fourth column. Sections stand on the bottom of their row, so when balancing leaves one
+ * section a shelf row shorter than its neighbour, the feet of every piece in the row share one line and the floor reads
+ * as one floor with gaps.
  */
 .cabinet {
   --column-gap: 24px;
@@ -12,7 +15,7 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: var(--column-gap);
   justify-self: stretch;
   width: 100%;
@@ -39,17 +42,30 @@
 /**
  * A section is a size container whose box includes the furniture's reserved space: a side allowance on each side, the
  * moulded top above, and the plinth and floor margin below. Its aspect ratio reserves that full height before anything
- * renders. The section itself paints nothing; the finish block at the end of the file draws the furniture.
+ * renders. The box size and its ratio are kept as unitless millimetre numbers, so a wrapper that sizes a section by
+ * height can use the same ratio. The design layer draws the furniture; the only thing the section itself paints is the
+ * soft shadow the piece casts on the wall beside it, as a background that ends inside the side allowance, whose
+ * strength comes from the wood and is nothing at all on a wall that shows none.
  */
 .section {
+  --bw: calc(var(--section-w) + 2 * var(--side-allowance));
+  --bh: calc(var(--top-height) + var(--section-h) + var(--base-height) + var(--floor-margin));
+  --section-ratio: calc(var(--bw) / var(--bh));
+  --ws-w: calc(28 - var(--side-trim));
+  --ws-y: calc(var(--top-height) * 0.5);
+  --ws-h: calc(var(--bh) - var(--floor-margin) - var(--ws-y));
   container-type: inline-size;
   position: relative;
-  aspect-ratio:
-    calc(var(--section-w) + 2 * var(--side-allowance))
-    / calc(var(--top-height) + var(--section-h) + var(--base-height) + var(--floor-margin));
+  aspect-ratio: var(--section-ratio);
   content-visibility: auto;
   flex: 0 0 var(--section-basis);
-  align-self: flex-start;
+  align-self: flex-end;
+  background-image: radial-gradient(ellipse 100% 50% at 0% 50%, rgb(var(--room-shade-rgb) / var(--wall-shadow)), transparent);
+  background-repeat: no-repeat;
+  background-size: calc(var(--ws-w) / var(--bw) * 100%) calc(var(--ws-h) / var(--bh) * 100%);
+  background-position:
+    calc((var(--side-allowance) + var(--section-w) + var(--side-trim)) / (var(--bw) - var(--ws-w)) * 100%)
+    calc(var(--ws-y) / (var(--bh) - var(--ws-h)) * 100%);
 }
 
 /**
@@ -92,9 +108,9 @@
 }
 
 .section-base {
-  left: calc((var(--side-allowance) - var(--side-trim)) * var(--u));
+  left: calc((var(--side-allowance) - var(--side-trim) - var(--base-overhang)) * var(--u));
   top: calc((var(--top-height) + var(--section-h)) * var(--u));
-  width: calc((var(--section-w) + 2 * var(--side-trim)) * var(--u));
+  width: calc((var(--section-w) + 2 * (var(--side-trim) + var(--base-overhang))) * var(--u));
   height: calc(var(--base-height) * var(--u));
 }
 
@@ -130,8 +146,8 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 1;
-  background: linear-gradient(to bottom, rgb(var(--shade-rgb) / var(--shade-alpha)), transparent var(--shade-depth));
+  z-index: 3;
+  background: linear-gradient(to bottom, rgb(var(--box-shade-rgb) / var(--shade-alpha)), transparent var(--shade-depth));
 }
 
 /**
@@ -143,6 +159,7 @@
   --rule-inset: max(6px, calc(16 * var(--u)));
   --rule: color-mix(in srgb, var(--fg) 35%, transparent);
   position: absolute;
+  z-index: 2;
   left: calc(var(--x) * var(--u));
   bottom: calc(var(--y) * var(--u));
   width: calc(var(--w) * var(--u));
@@ -161,7 +178,8 @@
   scroll-margin: 16px;
   box-shadow:
     inset 1px 1px 0 rgb(255 255 255 / 0.2),
-    0 1px 2px rgb(0 0 0 / 0.5);
+    0 1px 2px rgb(0 0 0 / 0.5),
+    0 0 0 1px rgb(var(--box-shade-rgb) / var(--keyline, 0));
   transition: transform 120ms ease-out;
 }
 
@@ -372,7 +390,9 @@
  */
 .placement[data-art="true"] {
   background: var(--edge-t, var(--bg));
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.5);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.5),
+    0 0 0 1px rgb(var(--box-shade-rgb) / var(--keyline, 0));
 }
 
 .placement[data-art="true"][data-fit="width"] {
@@ -562,26 +582,46 @@
   white-space: nowrap;
 }
 
+/**
+ * A focused box wears the accent ring on every wood, whatever the wall's own ring colour is, because the ring has to
+ * read against the furniture and not against the wall. Its geometry is fixed here; a wood whose frame is light also
+ * draws an ink halo outside it, and only the halo's colour comes from the wood.
+ */
 .placement:focus-visible {
-  z-index: 2;
+  z-index: 4;
   outline: 2px solid var(--wood-light);
   outline-offset: 2px;
 }
 
 /**
  * The box of the card that is open, for a visitor who prefers less motion: it stays in its slot and is marked with a plain light
- * outline instead of flying out. The colour is the wall text colour, not the accent.
+ * outline instead of flying out. The colour is the room's text colour, not the accent.
  */
 .placement[data-open] {
-  z-index: 2;
-  outline: 2px solid var(--wall-text);
+  z-index: 4;
+  outline: 2px solid var(--room-text, var(--wall-text));
   outline-offset: 2px;
+}
+
+.placement:focus-visible,
+.placement[data-open] {
+  box-shadow:
+    inset 1px 1px 0 rgb(255 255 255 / 0.2),
+    0 1px 2px rgb(0 0 0 / 0.5),
+    0 0 0 6px var(--ring-halo);
+}
+
+.placement[data-art="true"]:focus-visible,
+.placement[data-art="true"][data-open] {
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.5),
+    0 0 0 6px var(--ring-halo);
 }
 
 .cabinet-message {
   margin: 0 0 0.5rem;
   text-align: center;
-  color: var(--wood-light);
+  color: var(--room-accent, var(--wood-light));
 }
 
 .cabinet-retry {
@@ -593,294 +633,94 @@
   border-radius: 4px;
   font: inherit;
   font-weight: 600;
-  background: var(--wood-light);
-  color: var(--ink);
+  cursor: pointer;
+  background: var(--room-accent, var(--wood-light));
+  color: var(--room-on-accent, var(--ink));
 }
 
 .cabinet-retry:focus-visible {
-  outline: 2px solid var(--wood-light);
+  outline: 2px solid var(--room-ring, var(--wood-light));
   outline-offset: 2px;
 }
 
 /**
- * Classic furniture finish. Everything that makes the cabinet read as a piece of wooden furniture lives in this block:
- * grain on every board, a lit front edge and a stable tone per shelf, a moulded top that overhangs thicker side boards,
- * a planked back in every cubby and a plinth with an arched opening over a soft floor shadow. One light comes from
- * above and slightly to the left, so top and left edges are lit and shadows fall down and slightly right. The look is
- * gradients only and stays inside the section box. A later finish replaces this block and nothing else.
+ * The light of the section, positioned exactly like the body. It holds every pool and the glow on the floor in front of
+ * the base, and only its opacity ever changes. It is hidden outright while the lights are off, and it sits under every
+ * box, so it lights the back, the shelves and the uprights and never a box face.
  */
-.cabinet {
-  --side-allowance: 32;
-  --side-trim: 12;
-  --overhang: 14;
-  --top-height: 34;
-  --base-height: 80;
-  --floor-margin: 24;
-  --foot-width: 70;
-  --arch-rise: 40;
-  --arch-radius: 110;
-  --arch-alpha-top: 0.92;
-  --arch-alpha-bottom: 0.72;
-  --arch-lit: 0.14;
-  --plank-width: 110;
-  --shade-rgb: 20 10 4;
-  --shade-alpha: 0.20;
-  --shade-depth: 20%;
+.section > .section-light {
+  left: calc(var(--side-allowance) * var(--u));
+  top: calc(var(--top-height) * var(--u));
+  width: calc(var(--section-w) * var(--u));
+  height: calc(var(--section-h) * var(--u));
+  z-index: 1;
+  display: none;
+  opacity: 0;
 }
 
-.section > * {
-  --grain-k: 1;
-  --grain-fine: 1;
-  --lw: max(1px, calc(0.8 * var(--u)));
-  --gd: rgb(40 20 8 / calc(0.08 * var(--grain-k)));
-  --gd-fine: rgb(40 20 8 / calc(0.08 * var(--grain-k) * var(--grain-fine)));
-  --gl: rgb(255 240 220 / calc(0.04 * var(--grain-k)));
-  --ga: rgb(40 20 8 / calc(0.05 * var(--grain-k)));
-  --wood: var(--wood-mid);
-  --grain-h:
-    repeating-linear-gradient(to bottom, var(--gd-fine) 0 var(--lw), transparent var(--lw) calc(15 * var(--u))),
-    repeating-linear-gradient(to bottom, var(--gd) 0 var(--lw), transparent var(--lw) calc(23 * var(--u))),
-    repeating-linear-gradient(to bottom, var(--gl) 0 calc(2 * var(--lw)), transparent calc(2 * var(--lw)) calc(37 * var(--u)));
-  --grain-v:
-    repeating-linear-gradient(to right, var(--gd-fine) 0 var(--lw), transparent var(--lw) calc(15 * var(--u))),
-    repeating-linear-gradient(to right, var(--gd) 0 var(--lw), transparent var(--lw) calc(23 * var(--u))),
-    repeating-linear-gradient(to right, var(--gl) 0 calc(2 * var(--lw)), transparent calc(2 * var(--lw)) calc(37 * var(--u)));
-  --sweep-h: linear-gradient(to right, rgb(0 0 0 / 0.07), transparent 30%, rgb(255 255 255 / 0.04) 55%, rgb(0 0 0 / 0.06));
-  --sweep-v: linear-gradient(to bottom, rgb(0 0 0 / 0.07), transparent 30%, rgb(255 255 255 / 0.04) 55%, rgb(0 0 0 / 0.06));
-  --span: calc(var(--section-w) * var(--u));
+.light-pool {
+  position: absolute;
+  left: calc((var(--frame) + var(--x)) * var(--u));
+  top: calc((var(--frame) + var(--y)) * var(--u));
+  width: calc(var(--w) * var(--u));
+  height: calc(var(--h) * var(--u));
 }
 
-@container (max-width: 400px) {
-  .section > * {
-    --grain-k: 0.5;
-    --grain-fine: 0;
-    --arch-lit: 0.22;
+/**
+ * The floor patch of one piece sits behind the body and ends inside the section box. It is a skirting board 36 mm tall
+ * behind the base, whose lower edge stays 14 mm above the line where the feet or the base meet the floor, with a lit top
+ * line and a soft shadow line under it, and a floor tone that fades out towards the bottom of the box. Both fade to the
+ * wall towards the sides. It draws nothing until the wood gives it a floor and a skirting, so warm brown keeps its flat
+ * wall, and the strength of the two lines is nothing on such a wood.
+ */
+.section > .section-floor {
+  --floor-y: calc((var(--bh) - var(--floor-margin) - 14) * var(--u));
+  --skirting-y: calc((var(--bh) - var(--floor-margin) - 50) * var(--u));
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(to right, transparent, rgb(var(--room-shade-rgb) / calc(0.16 * var(--room-k))) 22%, rgb(var(--room-shade-rgb) / calc(0.16 * var(--room-k))) 78%, transparent),
+    linear-gradient(to right, transparent, rgb(var(--highlight-rgb) / calc(0.12 * var(--room-k))) 22%, rgb(var(--highlight-rgb) / calc(0.12 * var(--room-k))) 78%, transparent),
+    linear-gradient(to right, transparent, var(--skirting) 22%, var(--skirting) 78%, transparent),
+    radial-gradient(ellipse 52% 100% at 50% 0%, var(--floor) 0, var(--floor) 30%, transparent 90%);
+  background-repeat: no-repeat;
+  background-size:
+    100% max(1px, calc(2 * var(--u))),
+    100% max(1px, calc(1 * var(--u))),
+    100% calc(36 * var(--u)),
+    100% calc((var(--floor-margin) + 14) * var(--u));
+  background-position:
+    0 var(--floor-y),
+    0 var(--skirting-y),
+    0 var(--skirting-y),
+    0 var(--floor-y);
+}
+
+/**
+ * The furniture that stands in front of the back shares the boxes' level and, by tree order, stays above them exactly as
+ * it always has: the side boards, the top and the base. Only the back, the shelves and the uprights are lit.
+ */
+.section > :is(.section-top, .section-trim, .section-base) {
+  z-index: 2;
+}
+
+/**
+ * In forced colours every fill and shadow is dropped, which would leave the shelves as bare bars and the boxes with no edges. A
+ * thin outline in the system text colour restores the outer shape of the piece and the edge of each box. Outlines take no space.
+ * The furniture's own layers paint over anything drawn inside its edge, so its outline sits just outside the edge, and the box's
+ * focus ring is more specific than the thin outline, so it still wins on the focused box.
+ */
+@media (forced-colors: active) {
+  .placement {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+
+  .section-top,
+  .section-trim,
+  .section-base {
+    outline: 2px solid CanvasText;
   }
 }
 
-.section-body {
-  background-color: var(--wood);
-  background-image:
-    var(--grain-v),
-    repeating-radial-gradient(
-      ellipse 70% 420% at 160% 40%,
-      transparent 0 calc(9 * var(--u)),
-      var(--ga) calc(9 * var(--u)) calc(9 * var(--u) + var(--lw))
-    ),
-    var(--sweep-v);
-}
-
-.cubby {
-  --ox: calc(-1 * (var(--frame) + var(--x)) * var(--u));
-  --groove: max(1px, calc(1 * var(--u)));
-  --plank: calc(var(--plank-width) * var(--u));
-  background-color: var(--ink);
-  background-image:
-    linear-gradient(to bottom, rgb(10 5 2 / 0.55), transparent 24%),
-    linear-gradient(to right, rgb(10 5 2 / 0.30), transparent 7%, transparent 93%, rgb(10 5 2 / 0.30)),
-    repeating-linear-gradient(
-      to right,
-      rgb(0 0 0 / 0.45) 0 var(--groove),
-      rgb(255 235 210 / 0.08) var(--groove) calc(var(--groove) + 1px),
-      transparent calc(var(--groove) + 1px) var(--plank)
-    ),
-    repeating-linear-gradient(
-      to right,
-      transparent 0 var(--plank),
-      rgb(255 235 210 / 0.04) var(--plank) calc(2 * var(--plank))
-    ),
-    repeating-linear-gradient(to right, rgb(255 235 210 / 0.025) 0 1px, transparent 1px calc(17 * var(--u)));
-  background-size: auto, auto, var(--span) 100%, var(--span) 100%, var(--span) 100%;
-  background-position: 0 0, 0 0, var(--ox) 0, var(--ox) 0, var(--ox) 0;
-  background-repeat: no-repeat;
-  box-shadow: 1px 0 0 color-mix(in oklch, var(--wood-edge), white 6%);
-}
-
-.cubby::before {
-  --board-tone: var(--wood);
-  --figure-x: 18%;
-  --grain-y: 0px;
-  background-color: var(--board-tone);
-  background-image:
-    linear-gradient(
-      to bottom,
-      var(--wood-edge) 0 1px,
-      rgb(255 245 230 / 0.06) 1px,
-      transparent 45%,
-      rgb(20 10 4 / 0.30) 100%
-    ),
-    var(--grain-h),
-    repeating-radial-gradient(
-      ellipse 420% 70% at var(--figure-x) 160%,
-      transparent 0 calc(9 * var(--u)),
-      var(--ga) calc(9 * var(--u)) calc(9 * var(--u) + var(--lw))
-    ),
-    var(--sweep-h);
-  background-size: auto, auto, auto, auto, var(--span) 100%, var(--span) 100%;
-  background-position: 0 0, 0 var(--grain-y), 0 var(--grain-y), 0 var(--grain-y), var(--ox) 0, var(--ox) 0;
-  background-repeat: no-repeat, repeat, repeat, repeat, no-repeat, no-repeat;
-}
-
-.cubby[data-board="0"]::before {
-  --board-tone: var(--wood);
-  --figure-x: 18%;
-  --grain-y: 0px;
-}
-
-.cubby[data-board="1"]::before {
-  --board-tone: color-mix(in oklch, var(--wood), white 4%);
-  --figure-x: 64%;
-  --grain-y: calc(7 * var(--u));
-}
-
-.cubby[data-board="2"]::before {
-  --board-tone: color-mix(in oklch, var(--wood), black 4%);
-  --figure-x: 37%;
-  --grain-y: calc(3 * var(--u));
-}
-
-.cubby[data-board="3"]::before {
-  --board-tone: color-mix(in oklch, var(--wood), white 2%);
-  --figure-x: 82%;
-  --grain-y: calc(11 * var(--u));
-}
-
-.cubby[data-board="4"]::before {
-  --board-tone: color-mix(in oklch, var(--wood), black 6%);
-  --figure-x: 9%;
-  --grain-y: calc(5 * var(--u));
-}
-
-.cubby[data-board="5"]::before {
-  --board-tone: color-mix(in oklch, var(--wood), white 6%);
-  --figure-x: 51%;
-  --grain-y: calc(9 * var(--u));
-}
-
-.section-trim::before,
-.section-trim::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  width: calc((var(--side-trim) + var(--frame)) * var(--u));
-  height: 100%;
-  background-color: var(--wood);
-  background-image:
-    var(--edge),
-    var(--grain-v),
-    repeating-radial-gradient(
-      ellipse 70% 420% at 160% 40%,
-      transparent 0 calc(9 * var(--u)),
-      var(--ga) calc(9 * var(--u)) calc(9 * var(--u) + var(--lw))
-    ),
-    var(--sweep-v);
-}
-
-.section-trim::before {
-  --edge: linear-gradient(
-    to right,
-    rgb(255 240 220 / 0.30) 0 1px,
-    transparent 1px calc(100% - 1px),
-    rgb(20 10 4 / 0.40) calc(100% - 1px)
-  );
-  left: 0;
-}
-
-.section-trim::after {
-  --edge: linear-gradient(
-    to right,
-    rgb(255 240 220 / 0.10) 0 1px,
-    rgb(20 10 4 / 0.12) 1px,
-    rgb(20 10 4 / 0.18) calc(100% - 1px),
-    rgb(20 10 4 / 0.45) calc(100% - 1px)
-  );
-  right: 0;
-  background-color: color-mix(in oklch, var(--wood), black 6%);
-  box-shadow: calc(2 * var(--u)) 0 calc(6 * var(--u)) calc(-1 * var(--u)) rgb(10 5 2 / 0.38);
-}
-
-.section-top {
-  border-radius: 2px;
-  background-color: var(--wood);
-  background-image:
-    linear-gradient(
-      to bottom,
-      color-mix(in oklch, var(--wood-edge), white 12%) 0 1px,
-      rgb(255 240 220 / 0.10) 1px 14%,
-      rgb(20 10 4 / 0.38) 14% calc(14% + 1px),
-      rgb(20 10 4 / 0.30) calc(14% + 1px) 20%,
-      rgb(255 240 220 / 0.12) 52%,
-      rgb(20 10 4 / 0.40) 52% calc(52% + 1px),
-      rgb(255 240 220 / 0.14) calc(52% + 1px) 62%,
-      transparent 82%,
-      rgb(20 10 4 / 0.30) 96%,
-      rgb(20 10 4 / 0.55) calc(100% - 1px)
-    ),
-    var(--grain-h),
-    repeating-radial-gradient(
-      ellipse 420% 70% at 44% 160%,
-      transparent 0 calc(9 * var(--u)),
-      var(--ga) calc(9 * var(--u)) calc(9 * var(--u) + var(--lw))
-    ),
-    var(--sweep-h);
-  box-shadow: 0 calc(3 * var(--u)) calc(4 * var(--u)) calc(-1.5 * var(--u)) rgb(10 5 2 / 0.45);
-}
-
-.section-top::before {
-  content: "";
-  position: absolute;
-  left: calc((var(--side-trim) + var(--overhang) + var(--frame)) * var(--u));
-  top: 100%;
-  width: calc((var(--section-w) - 2 * var(--frame)) * var(--u));
-  height: calc(var(--frame) * var(--u));
-  background-color: var(--wood);
-  background-image:
-    linear-gradient(to bottom, rgb(20 10 4 / 0.45) 0 1px, transparent 1px 60%, rgb(20 10 4 / 0.20) 100%),
-    var(--grain-h),
-    var(--sweep-h);
-}
-
-.section-base {
-  background-color: color-mix(in oklch, var(--wood), black 22%);
-  background-image:
-    linear-gradient(to bottom, rgb(10 5 2 / 0.70) 0 1px, rgb(10 5 2 / 0.45) 1px, transparent 22%),
-    var(--grain-h),
-    var(--sweep-h);
-}
-
-.section-base::before {
-  content: "";
-  position: absolute;
-  left: calc(var(--foot-width) * var(--u));
-  right: calc(var(--foot-width) * var(--u));
-  bottom: 0;
-  height: calc(var(--arch-rise) * var(--u));
-  border-radius: calc(var(--arch-radius) * var(--u)) calc(var(--arch-radius) * var(--u)) 0 0 / 100% 100% 0 0;
-  background: linear-gradient(to bottom, rgb(8 4 2 / var(--arch-alpha-top)), rgb(30 16 8 / var(--arch-alpha-bottom)));
-  box-shadow:
-    inset 0 calc(6 * var(--u)) calc(8 * var(--u)) rgb(0 0 0 / 0.45),
-    calc(-1 * var(--lw)) calc(-1 * var(--lw)) 0 0 rgb(255 235 210 / var(--arch-lit)),
-    inset calc(-1 * var(--lw)) calc(-1 * var(--lw)) 0 rgb(10 5 2 / 0.5);
-}
-
-.section-base::after {
-  content: "";
-  position: absolute;
-  left: calc(-14 * var(--u));
-  top: 100%;
-  width: calc(100% + 28 * var(--u));
-  height: calc(var(--floor-margin) * var(--u));
-  background-image:
-    linear-gradient(to bottom, rgb(10 5 2 / 0.85), transparent),
-    linear-gradient(to bottom, rgb(10 5 2 / 0.85), transparent),
-    radial-gradient(ellipse 50% 85% at 50% 0%, rgb(10 5 2 / 0.55), rgb(10 5 2 / 0.25) 55%, transparent 100%);
-  background-size:
-    calc(var(--foot-width) * var(--u)) calc(2 * var(--u)),
-    calc(var(--foot-width) * var(--u)) calc(2 * var(--u)),
-    auto;
-  background-position:
-    left calc(14 * var(--u)) top 0,
-    right calc(14 * var(--u)) top 0,
-    0 0;
-  background-repeat: no-repeat;
 }

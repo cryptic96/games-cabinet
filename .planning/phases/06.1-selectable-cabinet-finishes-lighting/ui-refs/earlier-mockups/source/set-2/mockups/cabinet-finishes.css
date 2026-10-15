@@ -1,0 +1,527 @@
+/**
+ * Cabinet furniture finishes (mockup).
+ *
+ * Targets exactly the classes the app's renderer already emits (.cabinet, .section, .section-body, .cubby,
+ * .placement), so a chosen finish can move into wwwroot/css/cabinet.css without renderer changes.
+ * Wood is drawn with gradients and flat colours only (no bitmaps, no feTurbulence, no filters), and nothing relies on
+ * inline styles, so the strict-CSP rule holds.
+ *
+ * How the furniture is drawn:
+ *   .section-body::before  carcass: outer rails and stiles, plus the cabinet's outer shadow
+ *   .section-body::after   optional extras outside the carcass: crown and plinth, or apron and legs
+ *   .cubby                 back panel, inner shading
+ *   .cubby::before         inner side walls, top and floor (only in the "deep" depth setting)
+ *   .cubby::after          joinery: the shelf front under the cubby and the divider front to its left
+ * Extras outside the carcass are paid for with three extra millimetre values on the section: --crown (above),
+ * --base (below) and --ov (overhang on each side). They change only the section's aspect ratio and offsets.
+ */
+
+/* ---------- Room (page backdrop and chrome text) ---------- */
+
+.room {
+  --wall: #3b2416;
+  --wall-text: #efe3c2;
+  background: var(--wall);
+  color: var(--wall-text);
+}
+
+/* ---------- Shared geometry (same rules as cabinet.css, plus room for extras) ---------- */
+
+.cabinet {
+  display: grid;
+  justify-content: center;
+  gap: 24px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 32rem), 40rem));
+  width: 100%;
+}
+
+.section {
+  --crown: 0;
+  --base: 0;
+  --ov: 0;
+  container-type: inline-size;
+  aspect-ratio: calc(var(--section-w) + 2 * var(--ov)) / calc(var(--section-h) + var(--crown) + var(--base));
+  content-visibility: auto;
+  width: 100%;
+  align-self: start;
+}
+
+.section-body {
+  --u: calc(100cqw / (var(--section-w) + 2 * var(--ov)));
+  --F: calc(var(--frame) * var(--u));
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: var(--floor-shadow, none);
+
+  /* A horizontal member's front face (rail or shelf): rounded-edge light, fine grain, long streaks, base colour. */
+  --h-member:
+    linear-gradient(180deg, var(--arris-light) 0, transparent 24%, transparent 68%, var(--arris-dark) 100%),
+    repeating-linear-gradient(180deg,
+      transparent 0 calc(var(--u) * 2.3),
+      var(--grain-dark) calc(var(--u) * 2.3) calc(var(--u) * 3.1),
+      transparent calc(var(--u) * 3.1) calc(var(--u) * 6.1),
+      var(--grain-light) calc(var(--u) * 6.1) calc(var(--u) * 7.2),
+      transparent calc(var(--u) * 7.2) calc(var(--u) * 10.7)),
+    repeating-linear-gradient(90deg,
+      transparent 0 calc(var(--u) * 41),
+      var(--streak) calc(var(--u) * 70),
+      transparent calc(var(--u) * 113) calc(var(--u) * 263)),
+    repeating-linear-gradient(90deg,
+      var(--wood) 0, var(--wood-a) calc(var(--u) * 90), var(--wood) calc(var(--u) * 170),
+      var(--wood-b) calc(var(--u) * 260), var(--wood) calc(var(--u) * 360));
+
+  /* A vertical member's front face (stile or divider): the same recipe turned a quarter. */
+  --v-member:
+    linear-gradient(90deg, var(--arris-light) 0, transparent 26%, transparent 66%, var(--arris-dark) 100%),
+    repeating-linear-gradient(90deg,
+      transparent 0 calc(var(--u) * 2.7),
+      var(--grain-dark) calc(var(--u) * 2.7) calc(var(--u) * 3.4),
+      transparent calc(var(--u) * 3.4) calc(var(--u) * 7.3),
+      var(--grain-light) calc(var(--u) * 7.3) calc(var(--u) * 8.2),
+      transparent calc(var(--u) * 8.2) calc(var(--u) * 11.9)),
+    repeating-linear-gradient(180deg,
+      transparent 0 calc(var(--u) * 57),
+      var(--streak) calc(var(--u) * 92),
+      transparent calc(var(--u) * 131) calc(var(--u) * 307)),
+    repeating-linear-gradient(180deg,
+      var(--wood) 0, var(--wood-b) calc(var(--u) * 110), var(--wood) calc(var(--u) * 210),
+      var(--wood-a) calc(var(--u) * 300), var(--wood) calc(var(--u) * 400));
+
+  /* Back panel: a soft shadow under the shelf above, plus plank seams that run on behind the dividers. */
+  --back-shade: linear-gradient(180deg, var(--back-top) 0, transparent 55%);
+  --back-planks: linear-gradient(90deg,
+    transparent 0 calc(100% - var(--u) * 3),
+    var(--seam) calc(100% - var(--u) * 3) calc(100% - var(--u) * 1.2),
+    var(--seam-light) calc(100% - var(--u) * 1.2) 100%);
+  --plank: 150;
+  --cubby-shadow:
+    inset 0 calc(var(--u) * 6) calc(var(--u) * 10) rgb(0 0 0 / 0.5),
+    inset calc(var(--u) * 3) 0 calc(var(--u) * 6) rgb(0 0 0 / 0.18),
+    inset calc(var(--u) * -3) 0 calc(var(--u) * 6) rgb(0 0 0 / 0.22);
+
+  /* Visual depth of the inner walls in the "deep" setting. */
+  --depth: 16;
+}
+
+/* Carcass: rails run through at the corners, stiles sit between them. 4 layers per member. */
+.section-body::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--ov) * var(--u));
+  top: calc(var(--crown) * var(--u));
+  width: calc(var(--section-w) * var(--u));
+  height: calc(var(--section-h) * var(--u));
+  border-radius: calc(var(--carcass-radius, 0) * var(--u));
+  box-shadow: var(--carcass-shadow);
+  background-color: var(--wood);
+  background-image: var(--h-member), var(--h-member), var(--v-member), var(--v-member);
+  background-repeat: no-repeat;
+  background-size:
+    100% var(--F), 100% var(--F), 100% var(--F), 100% var(--F),
+    100% var(--F), 100% var(--F), 100% var(--F), 100% var(--F),
+    var(--F) 100%, var(--F) 100%, var(--F) 100%, var(--F) 100%,
+    var(--F) 100%, var(--F) 100%, var(--F) 100%, var(--F) 100%;
+  background-position:
+    0 0, 0 0, 0 0, 0 0,
+    0 100%, 0 100%, 0 100%, 0 100%,
+    0 0, 0 0, 0 0, 0 0,
+    100% 0, 100% 0, 100% 0, 100% 0;
+}
+
+.cubby {
+  --ext: min(var(--x), var(--frame));
+  position: absolute;
+  left: calc((var(--ov) + var(--frame) + var(--x)) * var(--u));
+  top: calc((var(--crown) + var(--frame) + var(--y)) * var(--u));
+  width: calc(var(--w) * var(--u));
+  height: calc(var(--h) * var(--u));
+  overflow: visible;
+  background-color: var(--back);
+  background-image: var(--back-shade), var(--back-planks);
+  background-size: 100% 100%, calc(var(--plank) * var(--u)) 100%;
+  background-position: 0 0, calc(var(--x) * var(--u) * -1) 0;
+  background-repeat: no-repeat, repeat-x;
+  box-shadow: var(--cubby-shadow);
+}
+
+/* Joinery: the shelf front under this cubby (continuous across the row) and the divider front to its left. */
+.cubby::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  left: calc(var(--ext) * var(--u) * -1);
+  top: 0;
+  width: calc((var(--w) + var(--ext)) * var(--u));
+  height: calc((var(--h) + var(--frame)) * var(--u));
+  background-image: var(--h-member), var(--v-member);
+  background-repeat: no-repeat;
+  background-size:
+    calc(var(--u) * 4000) var(--F), calc(var(--u) * 4000) var(--F),
+    calc(var(--u) * 4000) var(--F), calc(var(--u) * 4000) var(--F),
+    calc(var(--ext) * var(--u)) calc(var(--u) * 4000), calc(var(--ext) * var(--u)) calc(var(--u) * 4000),
+    calc(var(--ext) * var(--u)) calc(var(--u) * 4000), calc(var(--ext) * var(--u)) calc(var(--u) * 4000);
+  background-position:
+    calc((var(--x) - var(--ext) + var(--y) * 0.73) * var(--u) * -1) 100%,
+    calc((var(--x) - var(--ext) + var(--y) * 0.73) * var(--u) * -1) 100%,
+    calc((var(--x) - var(--ext) + var(--y) * 0.73) * var(--u) * -1) 100%,
+    calc((var(--x) - var(--ext) + var(--y) * 0.73) * var(--u) * -1) 100%,
+    0 calc((var(--y) + var(--x) * 0.41) * var(--u) * -1),
+    0 calc((var(--y) + var(--x) * 0.41) * var(--u) * -1),
+    0 calc((var(--y) + var(--x) * 0.41) * var(--u) * -1),
+    0 calc((var(--y) + var(--x) * 0.41) * var(--u) * -1);
+}
+
+/* ---------- Depth setting: flat / shaded / deep ---------- */
+
+[data-depth="flat"] .section-body {
+  --back-shade: none;
+  --back-planks: none;
+  --cubby-shadow: none;
+}
+
+[data-depth="deep"] .cubby {
+  background-image:
+    linear-gradient(180deg, var(--floor-back), var(--floor-front)),
+    var(--back-shade), var(--back-planks);
+  background-size: 100% calc(var(--depth) * var(--u)), 100% 100%, calc(var(--plank) * var(--u)) 100%;
+  background-position: 0 100%, 0 0, calc(var(--x) * var(--u) * -1) 0;
+  background-repeat: no-repeat, no-repeat, repeat-x;
+}
+
+/* Left wall, top and right wall as one shape with mitred corners; the floor shows through below it. */
+[data-depth="deep"] .cubby::before {
+  --d: calc(var(--depth) * var(--u));
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  clip-path: polygon(0 100%, 0 0, 100% 0, 100% 100%,
+    calc(100% - var(--d)) calc(100% - var(--d)), calc(100% - var(--d)) var(--d),
+    var(--d) var(--d), var(--d) calc(100% - var(--d)));
+  background-image:
+    linear-gradient(to top right, var(--side-left) 50%, var(--side-top) 50%),
+    linear-gradient(to top left, var(--side-right) 50%, var(--side-top) 50%),
+    linear-gradient(180deg, var(--side-top), color-mix(in srgb, var(--side-top) 70%, black)),
+    linear-gradient(90deg, var(--side-left), color-mix(in srgb, var(--side-left) 65%, black)),
+    linear-gradient(270deg, var(--side-right), color-mix(in srgb, var(--side-right) 65%, black));
+  background-size: var(--d) var(--d), var(--d) var(--d), 100% var(--d), var(--d) 100%, var(--d) 100%;
+  background-position: 0 0, 100% 0, 0 0, 0 0, 100% 0;
+  background-repeat: no-repeat;
+}
+
+/* ---------- Boxes (identical in every finish; not part of the furniture proposal) ---------- */
+
+.placement {
+  position: absolute;
+  left: calc(var(--x) * var(--u));
+  bottom: calc(var(--y) * var(--u));
+  width: calc(var(--w) * var(--u));
+  height: calc(var(--h) * var(--u));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  cursor: default;
+  background: var(--bg, #8c5d38);
+  color: var(--fg, #ffffff);
+  overflow: hidden;
+  box-shadow: inset 1px 1px 0 rgb(255 255 255 / 0.2), inset -1px 0 0 rgb(0 0 0 / 0.25);
+}
+
+.placement[data-kind="spine"] .placement-label {
+  display: block;
+  writing-mode: vertical-rl;
+  font-weight: 600;
+  line-height: 1.2;
+  font-size: clamp(12px, calc(var(--w) * var(--u) * 0.5), 16px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: 100%;
+}
+
+/* =====================================================================
+   Finish: current (today's look, for reference)
+   ===================================================================== */
+
+[data-finish="current"] {
+  --wall: #3b2416;
+  --wall-text: #efe3c2;
+  --wood: #6b4226;
+  --back: #2a1a10;
+  --carcass-shadow: 0 8px 24px rgb(0 0 0 / 0.45);
+}
+
+[data-finish="current"] .section-body {
+  --h-member: none, none, none, linear-gradient(var(--wood), var(--wood));
+  --v-member: none, none, none, linear-gradient(var(--wood), var(--wood));
+  --back-shade: none;
+  --back-planks: none;
+  --cubby-shadow: none;
+}
+
+/* =====================================================================
+   Finish 1: Walnut, done properly (closest to today and to the design contract)
+   ===================================================================== */
+
+[data-finish="walnut"] {
+  --wall: #3b2416;
+  --wall-text: #efe3c2;
+  --wood: #6b4226;
+  --wood-a: #5a361e;
+  --wood-b: #7b4e2e;
+  --streak: rgb(40 20 8 / 0.22);
+  --grain-dark: rgb(32 16 6 / 0.32);
+  --grain-light: rgb(255 214 170 / 0.08);
+  --arris-light: rgb(255 210 160 / 0.34);
+  --arris-dark: rgb(18 8 2 / 0.5);
+  --back: #2a1a10;
+  --back-top: rgb(0 0 0 / 0.35);
+  --seam: rgb(0 0 0 / 0.38);
+  --seam-light: rgb(255 200 150 / 0.05);
+  --side-top: #170d07;
+  --side-left: #4a2e1b;
+  --side-right: #2f1c10;
+  --floor-back: #2a1a10;
+  --floor-front: #4b301c;
+  --carcass-radius: 4;
+  --carcass-shadow: 0 0 0 1px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.45);
+}
+
+/* =====================================================================
+   Finish 2: Scandinavian oak on legs
+   ===================================================================== */
+
+[data-finish="oak"] {
+  --wall: #27323b;
+  --wall-text: #e9eef1;
+  --wood: #c9a46d;
+  --wood-a: #b88f58;
+  --wood-b: #d9b981;
+  --streak: rgb(150 105 50 / 0.22);
+  --grain-dark: rgb(130 88 38 / 0.28);
+  --grain-light: rgb(255 248 225 / 0.22);
+  --arris-light: rgb(255 250 235 / 0.6);
+  --arris-dark: rgb(95 62 25 / 0.38);
+  --back: #6a5136;
+  --back-top: rgb(40 25 10 / 0.45);
+  --seam: rgb(50 32 14 / 0.4);
+  --seam-light: rgb(255 240 210 / 0.12);
+  --side-top: #4f3b25;
+  --side-left: #b18d5d;
+  --side-right: #8f6f47;
+  --floor-back: #6a5136;
+  --floor-front: #ad8a5c;
+  --carcass-radius: 14;
+  --carcass-shadow: 0 10px 26px rgb(0 0 0 / 0.42);
+}
+
+[data-finish="oak"] .section {
+  --base: 170;
+}
+
+[data-finish="oak"] .section-body {
+  --plank: 200;
+  --cubby-shadow:
+    inset 0 calc(var(--u) * 5) calc(var(--u) * 12) rgb(40 22 6 / 0.45),
+    inset calc(var(--u) * 3) 0 calc(var(--u) * 6) rgb(40 22 6 / 0.15),
+    inset calc(var(--u) * -3) 0 calc(var(--u) * 6) rgb(40 22 6 / 0.2);
+  --floor-shadow: radial-gradient(ellipse 46% calc(var(--u) * 14) at 50% calc(100% - var(--u) * 4),
+    rgb(0 0 0 / 0.45), transparent);
+}
+
+/* Apron rail under the carcass with two splayed, tapered front legs. */
+[data-finish="oak"] .section-body::after {
+  --T: calc(var(--section-h) * var(--u));
+  --W: calc(var(--section-w) * var(--u));
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  clip-path: polygon(
+    calc(var(--u) * 14) calc(var(--T) - var(--u) * 14), calc(var(--W) - var(--u) * 14) calc(var(--T) - var(--u) * 14),
+    calc(var(--W) - var(--u) * 14) calc(var(--T) + var(--u) * 34),
+    calc(var(--W) - var(--u) * 60) calc(var(--T) + var(--u) * 34),
+    calc(var(--W) - var(--u) * 40) calc(var(--T) + var(--u) * 166),
+    calc(var(--W) - var(--u) * 66) calc(var(--T) + var(--u) * 166),
+    calc(var(--W) - var(--u) * 112) calc(var(--T) + var(--u) * 34),
+    calc(var(--u) * 112) calc(var(--T) + var(--u) * 34),
+    calc(var(--u) * 66) calc(var(--T) + var(--u) * 166),
+    calc(var(--u) * 40) calc(var(--T) + var(--u) * 166),
+    calc(var(--u) * 60) calc(var(--T) + var(--u) * 34),
+    calc(var(--u) * 14) calc(var(--T) + var(--u) * 34));
+  background-image:
+    linear-gradient(180deg, var(--arris-light) 0, transparent 20%, transparent 60%, rgb(70 45 15 / 0.55) 100%),
+    linear-gradient(90deg, var(--wood-b), var(--wood) 40%, var(--wood-a)),
+    linear-gradient(80deg, var(--wood-b) 20%, var(--wood) 55%, #8a6a40 100%),
+    linear-gradient(100deg, #8a6a40 0%, var(--wood) 45%, var(--wood-b) 80%);
+  background-size:
+    100% calc(var(--u) * 34), 100% calc(var(--u) * 34),
+    calc(var(--u) * 80) calc(var(--u) * 140), calc(var(--u) * 80) calc(var(--u) * 140);
+  background-position:
+    0 calc(var(--T) + var(--u) * 0), 0 calc(var(--T) + var(--u) * 0),
+    calc(var(--u) * 36) calc(var(--T) + var(--u) * 30), calc(var(--W) - var(--u) * 116) calc(var(--T) + var(--u) * 30);
+  background-repeat: no-repeat;
+}
+
+/* =====================================================================
+   Finish 3: Library mahogany with crown moulding, plinth and brass inlay
+   ===================================================================== */
+
+[data-finish="library"] {
+  --wall: #1c2a23;
+  --wall-text: #ebe4cd;
+  --wood: #5e2b1c;
+  --wood-a: #4c2014;
+  --wood-b: #713624;
+  --streak: rgb(30 6 2 / 0.25);
+  --grain-dark: rgb(28 6 2 / 0.36);
+  --grain-light: rgb(255 190 150 / 0.08);
+  --arris-light: rgb(255 196 160 / 0.38);
+  --arris-dark: rgb(14 3 0 / 0.55);
+  --inlay: #c4a15a;
+  --back: #1f0e09;
+  --back-top: rgb(0 0 0 / 0.4);
+  --seam: rgb(0 0 0 / 0.42);
+  --seam-light: rgb(255 170 130 / 0.05);
+  --side-top: #130705;
+  --side-left: #45200f;
+  --side-right: #2e140b;
+  --floor-back: #1f0e09;
+  --floor-front: #4d2416;
+  --carcass-radius: 0;
+  --carcass-shadow: 0 8px 26px rgb(0 0 0 / 0.55);
+}
+
+[data-finish="library"] .section {
+  --crown: 84;
+  --base: 104;
+  --ov: 20;
+}
+
+/* Shelves carry a thin brass inlay line instead of long streaks (mahogany reads more uniform). */
+[data-finish="library"] .section-body {
+  --plank: 110;
+  --h-member:
+    linear-gradient(180deg, var(--arris-light) 0, transparent 24%, transparent 68%, var(--arris-dark) 100%),
+    repeating-linear-gradient(180deg,
+      transparent 0 calc(var(--u) * 2.3),
+      var(--grain-dark) calc(var(--u) * 2.3) calc(var(--u) * 3.1),
+      transparent calc(var(--u) * 3.1) calc(var(--u) * 6.1),
+      var(--grain-light) calc(var(--u) * 6.1) calc(var(--u) * 7.2),
+      transparent calc(var(--u) * 7.2) calc(var(--u) * 10.7)),
+    linear-gradient(180deg,
+      transparent calc(50% - max(0.6px, var(--u) * 1)),
+      var(--inlay) calc(50% - max(0.6px, var(--u) * 1)) calc(50% + max(0.6px, var(--u) * 1)),
+      transparent calc(50% + max(0.6px, var(--u) * 1))),
+    repeating-linear-gradient(90deg,
+      var(--wood) 0, var(--wood-a) calc(var(--u) * 90), var(--wood) calc(var(--u) * 170),
+      var(--wood-b) calc(var(--u) * 260), var(--wood) calc(var(--u) * 360));
+  --floor-shadow: linear-gradient(180deg, transparent calc(100% - var(--u) * 3), rgb(0 0 0 / 0.5) 100%);
+}
+
+/* Crown (cap, cove, bead, fillet stepping back to the carcass) and plinth (top moulding, face, toe recess). */
+[data-finish="library"] .section-body::after {
+  --T: calc((var(--crown) + var(--section-h)) * var(--u));
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(180deg, rgb(255 200 165 / 0.45) 0, var(--wood-b) 18%, var(--wood) 70%, #2a0f08 100%),
+    linear-gradient(180deg, #1c0804 0, #3a170d 25%, var(--wood) 70%, rgb(255 190 150 / 0.55) 100%),
+    linear-gradient(180deg, #2a0f08 0, var(--wood-b) 40%, rgb(255 200 165 / 0.5) 55%, var(--wood) 75%, #2a0f08 100%),
+    linear-gradient(180deg, var(--wood-b) 0, var(--wood) 60%, #2a0f08 100%),
+    linear-gradient(180deg, rgb(255 200 165 / 0.45) 0, var(--wood-b) 25%, var(--wood) 65%, #2a0f08 100%),
+    linear-gradient(180deg, var(--arris-light) 0, transparent 12%),
+    repeating-linear-gradient(90deg,
+      var(--wood) 0, var(--wood-a) calc(var(--u) * 90), var(--wood) calc(var(--u) * 170),
+      var(--wood-b) calc(var(--u) * 260), var(--wood) calc(var(--u) * 360)),
+    linear-gradient(180deg, #120503, #1e0a06);
+  background-size:
+    100% calc(var(--u) * 16),
+    calc(100% - var(--u) * 12) calc(var(--u) * 36),
+    calc(100% - var(--u) * 24) calc(var(--u) * 14),
+    calc(100% - var(--u) * 34) calc(var(--u) * 18),
+    calc(100% - var(--u) * 6) calc(var(--u) * 18),
+    calc(100% - var(--u) * 18) calc(var(--u) * 70),
+    calc(100% - var(--u) * 18) calc(var(--u) * 70),
+    calc(100% - var(--u) * 60) calc(var(--u) * 16);
+  background-position:
+    50% 0,
+    50% calc(var(--u) * 16),
+    50% calc(var(--u) * 52),
+    50% calc(var(--u) * 66),
+    50% var(--T),
+    50% calc(var(--T) + var(--u) * 18),
+    50% calc(var(--T) + var(--u) * 18),
+    50% calc(var(--T) + var(--u) * 88);
+  background-repeat: no-repeat;
+}
+
+/* =====================================================================
+   Finish 4: Birch plywood with painted back panels
+   ===================================================================== */
+
+[data-finish="plywood"] {
+  --wall: #ddd6ca;
+  --wall-text: #2c2621;
+  --wood: #dfc79a;
+  --ply-a: #ead7ad;
+  --ply-b: #cdb07c;
+  --ply-glue: #9a7b4b;
+  --arris-light: rgb(255 252 240 / 0.5);
+  --arris-dark: rgb(90 65 30 / 0.3);
+  --back: #213a40;
+  --back-top: rgb(0 0 0 / 0.35);
+  --side-top: #b0915f;
+  --side-left: #e6d0a4;
+  --side-right: #cbae7c;
+  --floor-back: #c2a473;
+  --floor-front: #e4cd9f;
+  --carcass-radius: 2;
+  --carcass-shadow: 0 1px 0 rgb(255 255 255 / 0.5), 0 10px 26px rgb(70 50 25 / 0.35);
+}
+
+[data-finish="plywood"] .section {
+  --base: 46;
+}
+
+/* Every front edge shows the plies; the back is a painted sheet, so no plank seams. */
+[data-finish="plywood"] .section-body {
+  --h-member:
+    linear-gradient(180deg, var(--arris-light) 0, transparent 14%, transparent 82%, var(--arris-dark) 100%),
+    repeating-linear-gradient(180deg,
+      var(--ply-a) 0 calc(var(--u) * 2.5),
+      var(--ply-b) calc(var(--u) * 2.5) calc(var(--u) * 3.4),
+      var(--ply-glue) calc(var(--u) * 3.4) calc(var(--u) * 4)),
+    none,
+    linear-gradient(var(--wood), var(--wood));
+  --v-member:
+    linear-gradient(90deg, var(--arris-light) 0, transparent 14%, transparent 82%, var(--arris-dark) 100%),
+    repeating-linear-gradient(90deg,
+      var(--ply-a) 0 calc(var(--u) * 2.5),
+      var(--ply-b) calc(var(--u) * 2.5) calc(var(--u) * 3.4),
+      var(--ply-glue) calc(var(--u) * 3.4) calc(var(--u) * 4)),
+    none,
+    linear-gradient(var(--wood), var(--wood));
+  --back-planks: linear-gradient(transparent, transparent);
+  --back-shade: linear-gradient(180deg, var(--back-top) 0, transparent 50%, rgb(255 255 255 / 0.04) 100%);
+  --floor-shadow: linear-gradient(180deg, transparent calc(100% - var(--u) * 4), rgb(60 40 20 / 0.35) 100%);
+}
+
+/* Recessed kick base. */
+[data-finish="plywood"] .section-body::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  left: calc(var(--u) * 40);
+  right: calc(var(--u) * 40);
+  top: calc(var(--section-h) * var(--u));
+  height: calc(var(--base) * var(--u));
+  background: linear-gradient(180deg, #1c1a17 0, #2e2a24 100%);
+}

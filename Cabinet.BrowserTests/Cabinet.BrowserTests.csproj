@@ -23,6 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="LegacyStyles\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Cabinet.FakeBgg\Cabinet.FakeBgg.csproj" />
     <ProjectReference Include="..\Cabinet.Service\Cabinet.Service.csproj" />
   </ItemGroup>

@@ -40,6 +40,12 @@ public sealed record SectionDesign(string Name, int InteriorWidthMm, int FrameMm
     public int MaxSpineHeightMm { get; init; } = 330;
 
     /// <summary>
+    /// Whether this design spreads its games evenly over its sections when the layout options ask for it. The narrow
+    /// design never does: its sections stack in one column, so a short last section reads as the end of the shelf.
+    /// </summary>
+    public bool BalancesSections { get; init; }
+
+    /// <summary>
     /// Millimetres of box length that one label character takes at the smallest width the box is drawn at. Spine and flat
     /// box labels are shortened to the box length divided by this, and the page's ellipsis stays as the backstop when the
     /// estimate is generous.

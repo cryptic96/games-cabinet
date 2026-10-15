@@ -21,13 +21,21 @@ namespace Cabinet.Domain.Layout;
 /// edge of the next cubby when that cubby has room, with the marker only for what fits nowhere, unless the next game of
 /// its series needs that room to run on. Which of these applies is fixed when the family is placed. A family never
 /// reaches a third cubby, another row or another section.
-/// Every section is drawn whole except the last, which is drawn only down to its last used shelf row (at least
-/// <see cref="MinTrimmedRows"/> rows); that is a matter of drawing alone, so no placement depends on it.
+/// With the options asking for balanced sections, which is the default, and a design that allows it, such as the desktop
+/// design, the games are first placed section by section as they come to find how many sections are needed, then placed
+/// again under the smallest row budget that needs no more sections, so every section is drawn within one shelf row of every
+/// other and none is left short at the end. A section is then drawn down to its last used shelf row, at least
+/// <see cref="MinTrimmedRows"/> rows. Adding a game changes at most one cubby inside a section, but it may move games across
+/// section boundaries so the sections stay within one row of each other. When no budget keeps both the section count and the
+/// spread of drawn rows within one, the plain arrangement stays.
+/// Without balancing, and in a design that never balances, such as the phone design, every section is drawn whole except
+/// the last, which is drawn only down to its last used shelf row (at least <see cref="MinTrimmedRows"/> rows); that is a
+/// matter of drawing alone, so no placement depends on it, and adding a game changes only the cubby it lands in.
 /// </summary>
 public static class CabinetLayoutEngine
 {
     /// <summary>Bumped whenever the algorithm or a design changes on purpose, so a rearrangement is always a conscious change.</summary>
-    public const int LayoutVersion = 15;
+    public const int LayoutVersion = 16;
 
     /// <summary>
     /// The fewest shelf rows the last section is drawn with, so a nearly empty cabinet still reads as a piece of furniture.
@@ -71,21 +79,106 @@ public static class CabinetLayoutEngine
         var members = families.TopLevel
             .Select(unit => ToMember(unit, families, options, design, limits, fewGames))
             .ToList();
-        var context = new BuildContext(design, design.Cubbies, options);
-        var sections = new List<List<List<LayoutMember>>> { NewSection(context.Cubbies.Count) };
+        var cubbies = design.Cubbies;
+        var context = new BuildContext(design, cubbies, options);
+        var sections = PlaceAll(members, context, fewGames)!;
+        var balanced = false;
 
-        foreach (var group in SeriesGrouping.Group([.. members.Select(member => member.Item)], options.GroupSeries))
+        if (options.BalanceSections && design.BalancesSections && sections.Count > 1
+            && TryBalance(members, design, cubbies, options, fewGames, sections.Count) is { } even)
+        {
+            (context, sections) = even;
+            balanced = true;
+        }
+
+        var layoutSections = sections
+            .Select((section, sectionIndex) => ToLayoutSection(sectionIndex, section, context, balanced || sectionIndex == sections.Count - 1))
+            .ToList();
+
+        return new CabinetLayout(LayoutVersion, design.Name, options.Fingerprint, SpinePalette.Tones, layoutSections);
+    }
+
+    /// <summary>
+    /// Places every member, series by series, into the sections the context allows. Returns null as soon as more than
+    /// <paramref name="maxSections"/> sections are needed.
+    /// </summary>
+    private static List<List<List<LayoutMember>>>? PlaceAll(List<LayoutMember> members, BuildContext context, bool fewGames, int maxSections = int.MaxValue)
+    {
+        var sections = new List<List<List<LayoutMember>>> { NewSection(context, 0) };
+
+        foreach (var group in SeriesGrouping.Group([.. members.Select(member => member.Item)], context.Options.GroupSeries))
         {
             var series = group.Indices.Select(index => members[index] with { SeriesAnchor = group.AnchorGameId }).ToList();
 
             PlaceSeries(sections, context, series, fewGames);
+
+            if (sections.Count > maxSections)
+            {
+                return null;
+            }
         }
 
-        var layoutSections = sections
-            .Select((section, sectionIndex) => ToLayoutSection(sectionIndex, section, context, sectionIndex == sections.Count - 1))
-            .ToList();
+        return sections;
+    }
 
-        return new CabinetLayout(LayoutVersion, design.Name, options.Fingerprint, SpinePalette.Tones, layoutSections);
+    /// <summary>
+    /// Looks for an even spread of the same games over no more sections than the plain arrangement needed. It tries row
+    /// budgets from the smallest total up: every section may use only its first rows, the leading sections one row more
+    /// than the rest, so the sections the games fill are drawn within one shelf row of each other. The first budget that
+    /// places every game in no more sections, with the drawn sections within one row of each other, wins. Returns null when
+    /// no budget does, so the plain arrangement stays. Every budget is a whole placement of the same games in the same
+    /// order, so each existing placement rule still applies inside it.
+    /// </summary>
+    private static (BuildContext Context, List<List<List<LayoutMember>>> Sections)? TryBalance(
+        List<LayoutMember> members,
+        SectionDesign design,
+        IReadOnlyList<CubbyDesign> cubbies,
+        LayoutOptions options,
+        bool fewGames,
+        int plainSectionCount)
+    {
+        var rowCount = design.Rows.Count;
+
+        for (var rows = MinTrimmedRows; rows < rowCount; rows++)
+        {
+            for (var taller = 0; taller < plainSectionCount; taller++)
+            {
+                var budgets = Enumerable.Range(0, plainSectionCount).Select(index => index < taller ? rows + 1 : rows).ToArray();
+                var context = new BuildContext(design, cubbies, options, budgets);
+
+                if (TryPlaceAll(members, context, fewGames, plainSectionCount) is { } sections
+                    && DrawnRowSpread(sections, context) <= 1)
+                {
+                    return (context, sections);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Places every member under a row budget, or returns null when some game finds no place within it or more than
+    /// <paramref name="maxSections"/> sections are needed.
+    /// </summary>
+    private static List<List<List<LayoutMember>>>? TryPlaceAll(List<LayoutMember> members, BuildContext context, bool fewGames, int maxSections)
+    {
+        try
+        {
+            return PlaceAll(members, context, fewGames, maxSections);
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>How many shelf rows taller the tallest drawn section is than the shortest.</summary>
+    private static int DrawnRowSpread(List<List<List<LayoutMember>>> sections, BuildContext context)
+    {
+        var rows = sections.Select(section => DrawnRowCount(section, context)).ToList();
+
+        return rows.Max() - rows.Min();
     }
 
     private static LayoutMember ToMember(
@@ -213,8 +306,9 @@ public static class CabinetLayoutEngine
         }
     }
 
-    private static List<List<LayoutMember>> NewSection(int cubbyCount) =>
-        Enumerable.Range(0, cubbyCount).Select(_ => new List<LayoutMember>()).ToList();
+    /// <summary>An empty section with the cubbies the context allows the section at that index to use.</summary>
+    private static List<List<LayoutMember>> NewSection(BuildContext context, int sectionIndex) =>
+        Enumerable.Range(0, context.UsableCubbies(sectionIndex)).Select(_ => new List<LayoutMember>()).ToList();
 
     /// <summary>
     /// Places the games of one series, which are in entry order; a game in no series is a series of one and is placed on
@@ -272,11 +366,11 @@ public static class CabinetLayoutEngine
             {
                 foreach (var sectionIndex in sectionIndexes)
                 {
-                    for (var cubbyIndex = 0; cubbyIndex < context.Cubbies.Count; cubbyIndex++)
+                    for (var cubbyIndex = 0; cubbyIndex < context.UsableCubbies(sectionIndex); cubbyIndex++)
                     {
                         if (fresh)
                         {
-                            sections.Add(NewSection(context.Cubbies.Count));
+                            sections.Add(NewSection(context, sections.Count));
                         }
 
                         if (TryRunFrom(sections, context, series, new Position(sectionIndex, cubbyIndex), mode, mayOpen, fewGames))
@@ -385,7 +479,7 @@ public static class CabinetLayoutEngine
 
         if (opens)
         {
-            sections.Add(NewSection(context.Cubbies.Count));
+            sections.Add(NewSection(context, sections.Count));
         }
 
         if (TryAdd(sections, context, cubby.Section, cubby.Cubby, [member], permits.MayContinue))
@@ -403,7 +497,7 @@ public static class CabinetLayoutEngine
 
     /// <summary>The next cubby in reading order: the next one of the section, or the first of the next section after its last.</summary>
     private static Position Following(BuildContext context, Position cubby) =>
-        cubby.Cubby + 1 < context.Cubbies.Count ? cubby with { Cubby = cubby.Cubby + 1 } : new Position(cubby.Section + 1, 0);
+        cubby.Cubby + 1 < context.UsableCubbies(cubby.Section) ? cubby with { Cubby = cubby.Cubby + 1 } : new Position(cubby.Section + 1, 0);
 
     /// <summary>
     /// Adds the members to one cubby when it can take them, and says whether it did. A family goes there whole, its column
@@ -538,7 +632,7 @@ public static class CabinetLayoutEngine
             return position;
         }
 
-        sections.Add(NewSection(context.Cubbies.Count));
+        sections.Add(NewSection(context, sections.Count));
 
         return TryPlaceFrom(sections, context, member, new Position(sections.Count - 1, 0), previous)
             ?? throw new InvalidOperationException(
@@ -727,10 +821,36 @@ public static class CabinetLayoutEngine
         }
     }
 
-    private sealed record BuildContext(SectionDesign Design, IReadOnlyList<CubbyDesign> Cubbies, LayoutOptions Options)
+    /// <summary>
+    /// What a build works with: the design, its cubbies and the options. A row budget, when there is one, limits how many
+    /// of its shelf rows each section may use, per section in order; sections past the budget's end use the last entry.
+    /// </summary>
+    private sealed class BuildContext
     {
+        private readonly int[]? _rowBudgets;
+        private readonly int[] _cubbiesThroughRow;
+
+        public BuildContext(SectionDesign design, IReadOnlyList<CubbyDesign> cubbies, LayoutOptions options, int[]? rowBudgets = null)
+        {
+            Design = design;
+            Cubbies = cubbies;
+            Options = options;
+            _rowBudgets = rowBudgets;
+            _cubbiesThroughRow = [.. design.Rows.Select((_, row) => design.Rows.Take(row + 1).Sum(shelf => shelf.CubbyWidthsMm.Count))];
+        }
+
+        public SectionDesign Design { get; }
+
+        public IReadOnlyList<CubbyDesign> Cubbies { get; }
+
+        public LayoutOptions Options { get; }
+
         public int OrderSalt(int sectionIndex, int cubbyIndex) =>
             StableHash.CubbyOrderSaltBase + (sectionIndex * Cubbies.Count) + cubbyIndex;
+
+        /// <summary>How many cubbies, counted from the first in reading order, the section at that index may use.</summary>
+        public int UsableCubbies(int sectionIndex) =>
+            _rowBudgets is null ? Cubbies.Count : _cubbiesThroughRow[_rowBudgets[Math.Min(sectionIndex, _rowBudgets.Length - 1)] - 1];
     }
 
     /// <summary>

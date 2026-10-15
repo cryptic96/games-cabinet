@@ -4,9 +4,10 @@ using Cabinet.Service.Sync;
 namespace Cabinet.Service.Owner;
 
 /// <summary>
-/// Tells open pages that the collection changed after the owner saved, the same way they are told after a sync, but once per
+/// Tells open pages that what visitors see changed after the owner saved, the same way they are told after a sync, but once per
 /// burst of saves instead of once per save: a few seconds after the last save, and never more than a ceiling after the first
-/// save nobody was told about yet. Nothing is sent when the collection visitors see is the one the pages were last told of.
+/// save nobody was told about yet. What visitors see is the collection and the look. Nothing is sent when both are the ones the
+/// pages were last told of.
 /// What is sent is the public status only, never any owner data.
 /// </summary>
 public sealed class OwnerChangeNotifier : IHostedService, IDisposable
@@ -26,12 +27,12 @@ public sealed class OwnerChangeNotifier : IHostedService, IDisposable
     private readonly CancellationTokenSource _stopping = new();
     private ITimer? _timer;
     private DateTimeOffset? _firstUnannouncedAt;
-    private string? _lastSentVersion;
+    private Announced? _lastSent;
     private bool _closed;
 
     /// <summary>Creates the notifier; it does nothing until the host starts it.</summary>
     /// <param name="owner">Raises an event after every stored owner change.</param>
-    /// <param name="status">Reads the status that is sent, which carries the collection version.</param>
+    /// <param name="status">Reads the status that is sent, which carries the collection version and the look.</param>
     /// <param name="live">Sends the status to every open page.</param>
     /// <param name="time">The clock the waits run on.</param>
     /// <param name="logger">Receives the type of a failed send, never its message.</param>
@@ -60,7 +61,7 @@ public sealed class OwnerChangeNotifier : IHostedService, IDisposable
     {
         lock (_gate)
         {
-            _lastSentVersion = _status.Current().SnapshotVersion;
+            _lastSent = Announced.Of(_status.Current());
             _timer = _time.CreateTimer(OnTimer, null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         }
 
@@ -110,20 +111,21 @@ public sealed class OwnerChangeNotifier : IHostedService, IDisposable
 
     private async Task AnnounceAsync()
     {
-        string? previous;
+        Announced? previous;
         CabinetStatus status;
 
         lock (_gate)
         {
             status = _status.Current();
+            var now = Announced.Of(status);
 
-            if (status.SnapshotVersion == _lastSentVersion)
+            if (now == _lastSent)
             {
                 return;
             }
 
-            previous = _lastSentVersion;
-            _lastSentVersion = status.SnapshotVersion;
+            previous = _lastSent;
+            _lastSent = now;
         }
 
         try
@@ -136,7 +138,7 @@ public sealed class OwnerChangeNotifier : IHostedService, IDisposable
 
             lock (_gate)
             {
-                _lastSentVersion = previous;
+                _lastSent = previous;
             }
         }
     }
@@ -163,5 +165,15 @@ public sealed class OwnerChangeNotifier : IHostedService, IDisposable
                 _stopping.Dispose();
             }
         }
+    }
+
+    /// <summary>What the pages were last told about what visitors see: the collection version and the look.</summary>
+    /// <param name="SnapshotVersion">The identifier of the collection version shown, or null before the first sync.</param>
+    /// <param name="Look">The look visitors see.</param>
+    private sealed record Announced(string? SnapshotVersion, LookStatus Look)
+    {
+        /// <summary>Reads what a status tells about what visitors see.</summary>
+        /// <param name="status">The status to read.</param>
+        public static Announced Of(CabinetStatus status) => new(status.SnapshotVersion, status.Look);
     }
 }

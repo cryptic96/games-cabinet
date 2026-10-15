@@ -71,6 +71,20 @@ public class LiveSettingsTests
         limiter.TryAdmit("c").Should().BeTrue();
     }
 
+    [Fact]
+    public void The_limiter_tells_which_connections_hold_a_place()
+    {
+        var limiter = new LiveConnectionLimiter(new LiveOptions(1));
+
+        limiter.IsAdmitted("a").Should().BeFalse();
+        limiter.TryAdmit("a").Should().BeTrue();
+        limiter.TryAdmit("b").Should().BeFalse();
+        limiter.IsAdmitted("a").Should().BeTrue();
+        limiter.IsAdmitted("b").Should().BeFalse("a refused connection holds no place");
+        limiter.Release("a");
+        limiter.IsAdmitted("a").Should().BeFalse();
+    }
+
     private static IConfiguration Configure(params (string Key, string Value)[] values) =>
         new ConfigurationBuilder()
             .AddInMemoryCollection(values.Select(pair => new KeyValuePair<string, string?>(pair.Key, pair.Value)))

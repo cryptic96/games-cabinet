@@ -1,0 +1,53 @@
+/**
+ * Box stand-ins, identical in every option so that only the furniture changes. They follow the design
+ * contract's spine rules and placeholder palette; real box styling is separate work.
+ */
+.placement {
+  --rule: color-mix(in srgb, var(--fg) 35%, transparent);
+  --rule-h: max(1px, calc(1.5 * var(--u)));
+  position: absolute;
+  left: calc(var(--x) * var(--u));
+  bottom: calc(var(--y) * var(--u));
+  width: calc(var(--w) * var(--u));
+  height: calc(var(--h) * var(--u));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  cursor: default;
+  color: var(--fg);
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(var(--rule), var(--rule)),
+    linear-gradient(var(--rule), var(--rule));
+  background-repeat: no-repeat;
+  background-size: 100% var(--rule-h);
+  background-position: 0 calc(9 * var(--u)), 0 calc(100% - 9 * var(--u));
+  box-shadow: inset 1px 1px 0 rgb(255 255 255 / 0.2), 0 1px 2px rgb(0 0 0 / 0.5);
+  overflow: hidden;
+}
+
+.placement[data-kind="spine"] .placement-label {
+  display: block;
+  writing-mode: vertical-rl;
+  font-weight: 600;
+  line-height: 1.2;
+  font-size: clamp(12px, calc(var(--w) * var(--u) * 0.5), 16px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: calc(100% - 24 * var(--u));
+}
+
+.placement:focus-visible {
+  outline: 2px solid var(--wood-light);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .placement { transition: transform 120ms ease-out; }
+  .placement:hover { transform: translateY(calc(-6 * var(--u))); }
+}

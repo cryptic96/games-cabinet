@@ -19,7 +19,7 @@ public class LayoutSettingsTests
 
         var options = LayoutSettings.FromConfiguration(configuration);
 
-        options.Should().Be(new LayoutOptions(33, CoverStrategy.SizeWeighted, 6, 12, true, true, 2));
+        options.Should().Be(new LayoutOptions(33, CoverStrategy.SizeWeighted, 6, 12, true, true, 2, true));
         options.Should().Be(LayoutOptions.Default with { CoverSharePercent = 33 });
     }
 
@@ -172,6 +172,40 @@ public class LayoutSettingsTests
             .Should().NotBe(LayoutSettings.FromConfiguration(Configure()).Fingerprint);
     }
 
+    [Theory]
+    [InlineData("true", true)]
+    [InlineData("false", false)]
+    [InlineData("TRUE", true)]
+    [InlineData(" False ", false)]
+    [Trait("Category", "Layout")]
+    public void Balancing_sections_accepts_true_and_false_in_any_letter_case(string text, bool expected)
+    {
+        LayoutSettings.FromConfiguration(Configure(("Layout:BalanceSections", text))).BalanceSections.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("maybe")]
+    [InlineData("")]
+    [InlineData("  ")]
+    [InlineData("1")]
+    [InlineData("yes")]
+    [Trait("Category", "Layout")]
+    public void Balancing_sections_rejects_other_values_naming_the_key(string text)
+    {
+        var act = () => LayoutSettings.FromConfiguration(Configure(("Layout:BalanceSections", text)));
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Layout:BalanceSections*");
+    }
+
+    [Fact]
+    [Trait("Category", "Layout")]
+    public void Balancing_sections_defaults_to_on_when_the_key_is_absent_and_off_changes_the_fingerprint()
+    {
+        LayoutSettings.FromConfiguration(Configure()).BalanceSections.Should().BeTrue();
+        LayoutSettings.FromConfiguration(Configure(("Layout:BalanceSections", "false"))).Fingerprint
+            .Should().NotBe(LayoutSettings.FromConfiguration(Configure()).Fingerprint);
+    }
+
     [Fact]
     [Trait("Category", "Layout")]
     public void The_expansion_cover_rule_defaults_to_two_when_the_key_is_absent()
@@ -195,6 +229,7 @@ public class LayoutSettingsTests
             LayoutOptions.Default with { GroupSeries = false },
             LayoutOptions.Default with { CoverFromExpansions = 3 },
             LayoutOptions.Default with { CoverFromExpansions = 0 },
+            LayoutOptions.Default with { BalanceSections = false },
         }.Select(options => options.Fingerprint).ToList();
 
         fingerprints.Distinct().Should().HaveCount(fingerprints.Count);

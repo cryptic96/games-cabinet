@@ -1,0 +1,457 @@
+{
+  "Warm brown": {
+    "flat": {
+      "bare": {
+        "value": 1.57,
+        "tone": "Navy"
+      },
+      "peak": {
+        "t": 0.06,
+        "value": 1.48,
+        "tone": "Rust"
+      },
+      "tail": {
+        "t": 0.35,
+        "value": 1.4,
+        "tone": "Navy"
+      },
+      "ring": {
+        "t": 0.21,
+        "value": 1.03,
+        "tone": "Slate"
+      }
+    },
+    "shaded": {
+      "bare": {
+        "value": 1.57,
+        "tone": "Navy"
+      },
+      "peak": {
+        "t": 0.06,
+        "value": 1.35,
+        "tone": "Rust"
+      },
+      "tail": {
+        "t": 0.35,
+        "value": 1.4,
+        "tone": "Navy"
+      },
+      "ring": {
+        "t": 0.18,
+        "value": 1.03,
+        "tone": "Forest"
+      }
+    },
+    "deep": {
+      "bare": {
+        "value": 1.57,
+        "tone": "Navy"
+      },
+      "peak": {
+        "t": 0.06,
+        "value": 1.36,
+        "tone": "Rust"
+      },
+      "tail": {
+        "t": 0.35,
+        "value": 1.4,
+        "tone": "Navy"
+      },
+      "ring": {
+        "t": 0.18,
+        "value": 1.03,
+        "tone": "Forest"
+      }
+    }
+  },
+  "Walnut": {
+    "flat": {
+      "bare": {
+        "value": 1.61,
+        "tone": "Navy"
+      },
+      "peak": {
+        "t": 0.06,
+        "value": 1.46,
+        "tone": "Rust"
+      },
+      "tail": {
+        "t": 0.35,
+        "value": 1.43,
+        "tone": "Navy"
+      },
+      "ring": {
+        "t": 0.21,
+        "value": 1.02,
+        "tone": "Oxblood"
+      }
+    },
+    "shaded": {
+      "bare": {
+        "value": 1.61,
+        "tone": "Navy"
+      },
+      "peak": {
+        "t": 0.06,
+        "value": 1.33,
+        "tone": "Rust"
+      },
+      "tail": {
+        "t": 0.35,
+        "value": 1.43,
+        "tone": "Navy"
+      },
+      "ring": {
+        "t": 0.18,
+        "value": 1.02,
+        "tone": "Slate"
+      }
+    },
+    "deep": {
+      "bare": {
+        "value": 1.61,
+        "tone": "Navy"
+      },
+      "peak": {
+        "t": 0.06,
+        "value": 1.34,
+        "tone": "Rust"
+      },
+      "tail": {
+        "t": 0.35,
+        "value": 1.43,
+        "tone": "Navy"
+      },
+      "ring": {
+        "t": 0.21,
+        "value": 1.02,
+        "tone": "Navy"
+      }
+    }
+  },
+  "Oak": {
+    "flat": {
+      "bare": {
+        "value": 1.61,
+        "tone": "Navy"
+      },
+      "peak": {
+        "t": 0.06,
+        "value": 1.47,
+        "tone": "Rust"
+      },
+      "tail": {
+        "t": 0.35,
+        "value": 1.43,
+        "tone": "Navy"
+      },
+      "ring": {
+        "t": 0.21,
+        "value": 1.03,
+        "tone": "Slate"
+      }
+    },
+    "shaded": {
+      "bare": {
+        "value": 1.61,
+        "tone": "Navy"
+      },
+      "peak": {
+        "t": 0.06,
+        "value": 1.36,
+        "tone": "Rust"
+      },
+      "tail": {
+        "t": 0.35,
+        "value": 1.43,
+        "tone": "Navy"
+      },
+      "ring": {
+        "t": 0.18,
+        "value": 1.02,
+        "tone": "Forest"
+      }
+    },
+    "deep": {
+      "bare": {
+        "value": 1.61,
+        "tone": "Navy"
+      },
+      "peak": {
+        "t": 0.06,
+        "value": 1.38,
+        "tone": "Rust"
+      },
+      "tail": {
+        "t": 0.35,
+        "value": 1.43,
+        "tone": "Navy"
+      },
+      "ring": {
+        "t": 0.18,
+        "value": 1.02,
+        "tone": "Forest"
+      }
+    }
+  },
+  "Birch": {
+    "flat": {
+      "bare": {
+        "value": 1.42,
+        "tone": "Rose"
+      },
+      "peak": {
+        "t": 0.06,
+        "value": 1.39,
+        "tone": "Rose"
+      },
+      "tail": {
+        "t": 0.35,
+        "value": 1.43,
+        "tone": "Rust"
+      },
+      "ring": {
+        "t": 0.03,
+        "value": 1.39,
+        "tone": "Rose"
+      }
+    },
+    "shaded": {
+      "bare": {
+        "value": 1.42,
+        "tone": "Rose"
+      },
+      "peak": {
+        "t": 0.06,
+        "value": 1.37,
+        "tone": "Rose"
+      },
+      "tail": {
+        "t": 0.35,
+        "value": 1.43,
+        "tone": "Rust"
+      },
+      "ring": {
+        "t": 0.03,
+        "value": 1.31,
+        "tone": "Rose"
+      }
+    },
+    "deep": {
+      "bare": {
+        "value": 1.42,
+        "tone": "Rose"
+      },
+      "peak": {
+        "t": 0.06,
+        "value": 1.38,
+        "tone": "Rose"
+      },
+      "tail": {
+        "t": 0.35,
+        "value": 1.43,
+        "tone": "Rust"
+      },
+      "ring": {
+        "t": 0.06,
+        "value": 1.38,
+        "tone": "Rose"
+      }
+    }
+  },
+  "Mahogany": {
+    "flat": {
+      "bare": {
+        "value": 1.75,
+        "tone": "Navy"
+      },
+      "peak": {
+        "t": 0.06,
+        "value": 1.46,
+        "tone": "Rose"
+      },
+      "tail": {
+        "t": 0.35,
+        "value": 1.56,
+        "tone": "Navy"
+      },
+      "ring": {
+        "t": 0.21,
+        "value": 1.02,
+        "tone": "Oxblood"
+      }
+    },
+    "shaded": {
+      "bare": {
+        "value": 1.75,
+        "tone": "Navy"
+      },
+      "peak": {
+        "t": 0.06,
+        "value": 1.46,
+        "tone": "Rose"
+      },
+      "tail": {
+        "t": 0.35,
+        "value": 1.56,
+        "tone": "Navy"
+      },
+      "ring": {
+        "t": 0.18,
+        "value": 1.03,
+        "tone": "Oxblood"
+      }
+    },
+    "deep": {
+      "bare": {
+        "value": 1.75,
+        "tone": "Navy"
+      },
+      "peak": {
+        "t": 0.06,
+        "value": 1.48,
+        "tone": "Rust"
+      },
+      "tail": {
+        "t": 0.35,
+        "value": 1.56,
+        "tone": "Navy"
+      },
+      "ring": {
+        "t": 0.18,
+        "value": 1.02,
+        "tone": "Oxblood"
+      }
+    }
+  },
+  "Painted on brown": {
+    "flat": {
+      "bare": {
+        "value": 1.66,
+        "tone": "Navy"
+      },
+      "peak": {
+        "t": 0.06,
+        "value": 1.42,
+        "tone": "Rust"
+      },
+      "tail": {
+        "t": 0.35,
+        "value": 1.49,
+        "tone": "Navy"
+      },
+      "ring": {
+        "t": 0.18,
+        "value": 1.02,
+        "tone": "Forest"
+      }
+    },
+    "shaded": {
+      "bare": {
+        "value": 1.66,
+        "tone": "Navy"
+      },
+      "peak": {
+        "t": 0.06,
+        "value": 1.32,
+        "tone": "Rust"
+      },
+      "tail": {
+        "t": 0.35,
+        "value": 1.49,
+        "tone": "Navy"
+      },
+      "ring": {
+        "t": 0.18,
+        "value": 1.01,
+        "tone": "Forest"
+      }
+    },
+    "deep": {
+      "bare": {
+        "value": 1.66,
+        "tone": "Navy"
+      },
+      "peak": {
+        "t": 0.06,
+        "value": 1.33,
+        "tone": "Rust"
+      },
+      "tail": {
+        "t": 0.35,
+        "value": 1.49,
+        "tone": "Navy"
+      },
+      "ring": {
+        "t": 0.18,
+        "value": 1.01,
+        "tone": "Slate"
+      }
+    }
+  },
+  "Painted on birch": {
+    "flat": {
+      "bare": {
+        "value": 1.66,
+        "tone": "Navy"
+      },
+      "peak": {
+        "t": 0.06,
+        "value": 1.42,
+        "tone": "Rust"
+      },
+      "tail": {
+        "t": 0.35,
+        "value": 1.49,
+        "tone": "Navy"
+      },
+      "ring": {
+        "t": 0.18,
+        "value": 1.02,
+        "tone": "Forest"
+      }
+    },
+    "shaded": {
+      "bare": {
+        "value": 1.66,
+        "tone": "Navy"
+      },
+      "peak": {
+        "t": 0.06,
+        "value": 1.41,
+        "tone": "Rust"
+      },
+      "tail": {
+        "t": 0.35,
+        "value": 1.49,
+        "tone": "Navy"
+      },
+      "ring": {
+        "t": 0.18,
+        "value": 1.03,
+        "tone": "Forest"
+      }
+    },
+    "deep": {
+      "bare": {
+        "value": 1.66,
+        "tone": "Navy"
+      },
+      "peak": {
+        "t": 0.06,
+        "value": 1.43,
+        "tone": "Rust"
+      },
+      "tail": {
+        "t": 0.35,
+        "value": 1.49,
+        "tone": "Navy"
+      },
+      "ring": {
+        "t": 0.18,
+        "value": 1.03,
+        "tone": "Forest"
+      }
+    }
+  }
+}

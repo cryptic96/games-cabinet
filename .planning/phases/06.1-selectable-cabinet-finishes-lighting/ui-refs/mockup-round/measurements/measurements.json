@@ -1,0 +1,395 @@
+{
+  "generated": "scratch measurement of the round",
+  "spine": {
+    "brown": {
+      "flat 0": {
+        "worst": 5.28,
+        "tone": "Rust"
+      },
+      "deep 0.12": {
+        "worst": 4.84,
+        "tone": "Rust"
+      },
+      "shaded 0.20": {
+        "worst": 4.51,
+        "tone": "Rust"
+      }
+    },
+    "walnut": {
+      "flat 0": {
+        "worst": 5.28,
+        "tone": "Rust"
+      },
+      "deep 0.12": {
+        "worst": 4.87,
+        "tone": "Rust"
+      },
+      "shaded 0.20": {
+        "worst": 4.55,
+        "tone": "Rust"
+      }
+    },
+    "oak": {
+      "flat 0": {
+        "worst": 5.28,
+        "tone": "Rust"
+      },
+      "deep 0.12": {
+        "worst": 4.79,
+        "tone": "Rust"
+      },
+      "shaded 0.20": {
+        "worst": 4.44,
+        "tone": "Rust"
+      }
+    },
+    "birch": {
+      "flat 0": {
+        "worst": 5.28,
+        "tone": "Rust"
+      },
+      "deep 0.12": {
+        "worst": 4.72,
+        "tone": "Rust"
+      },
+      "shaded 0.20": {
+        "worst": 4.33,
+        "tone": "Rust"
+      }
+    },
+    "mahogany": {
+      "flat 0": {
+        "worst": 5.28,
+        "tone": "Rust"
+      },
+      "deep 0.12": {
+        "worst": 4.85,
+        "tone": "Rust"
+      },
+      "shaded 0.20": {
+        "worst": 4.53,
+        "tone": "Rust"
+      }
+    }
+  },
+  "chrome": {
+    "brown": {
+      "wallLuminance": 0.02,
+      "textDay": 11.34,
+      "mutedDay": 6.33,
+      "lineDay": 5.06,
+      "textEvening": 12.83,
+      "mutedEvening": 6.94,
+      "lineEvening": 5.47,
+      "logoDay": 14.48,
+      "logoEvening": 16.4,
+      "logoRule": "white",
+      "logoUsed": "white"
+    },
+    "walnut": {
+      "wallLuminance": 0.02,
+      "textDay": 10.08,
+      "mutedDay": 5.83,
+      "lineDay": 4.73,
+      "textEvening": 13.42,
+      "mutedEvening": 7.22,
+      "lineEvening": 5.67,
+      "logoDay": 12.35,
+      "logoEvening": 16.44,
+      "logoRule": "white",
+      "logoUsed": "white"
+    },
+    "oak": {
+      "wallLuminance": 0.03,
+      "textDay": 9.39,
+      "mutedDay": 5.54,
+      "lineDay": 4.53,
+      "textEvening": 13.16,
+      "mutedEvening": 7.17,
+      "lineEvening": 5.66,
+      "logoDay": 10.98,
+      "logoEvening": 15.38,
+      "logoRule": "white",
+      "logoUsed": "white"
+    },
+    "birch": {
+      "wallLuminance": 0.68,
+      "textDay": 12.31,
+      "mutedDay": 5.25,
+      "lineDay": 3.93,
+      "textEvening": 9.59,
+      "mutedEvening": 4.6,
+      "lineEvening": 3.56,
+      "logoDay": 8,
+      "logoEvening": 6.23,
+      "logoRule": "dark",
+      "logoUsed": "dark"
+    },
+    "mahogany": {
+      "wallLuminance": 0.02,
+      "textDay": 9.9,
+      "mutedDay": 5.73,
+      "lineDay": 4.65,
+      "textEvening": 13.06,
+      "mutedEvening": 7.03,
+      "lineEvening": 5.53,
+      "logoDay": 12.6,
+      "logoEvening": 16.61,
+      "logoRule": "white",
+      "logoUsed": "white"
+    }
+  },
+  "visibility": {
+    "Warm brown back": {
+      "bare": {
+        "value": 1.51,
+        "tone": "Navy"
+      },
+      "peak": {
+        "value": 1.37,
+        "tone": "Rose"
+      },
+      "tail": {
+        "value": 1.32,
+        "tone": "Navy"
+      },
+      "modelPeak": {
+        "value": 1.51,
+        "tone": "Rust"
+      },
+      "modelTail": {
+        "value": 1.33,
+        "tone": "Navy"
+      }
+    },
+    "Walnut back": {
+      "bare": {
+        "value": 1.42,
+        "tone": "Navy"
+      },
+      "peak": {
+        "value": 1.35,
+        "tone": "Rose"
+      },
+      "tail": {
+        "value": 1.25,
+        "tone": "Navy"
+      },
+      "modelPeak": {
+        "value": 1.51,
+        "tone": "Rose"
+      },
+      "modelTail": {
+        "value": 1.26,
+        "tone": "Navy"
+      }
+    },
+    "Oak back": {
+      "bare": {
+        "value": 1.41,
+        "tone": "Navy"
+      },
+      "peak": {
+        "value": 1.34,
+        "tone": "Rose"
+      },
+      "tail": {
+        "value": 1.24,
+        "tone": "Navy"
+      },
+      "modelPeak": {
+        "value": 1.51,
+        "tone": "Rose"
+      },
+      "modelTail": {
+        "value": 1.24,
+        "tone": "Navy"
+      }
+    },
+    "Birch back": {
+      "bare": {
+        "value": 1.42,
+        "tone": "Rose"
+      },
+      "peak": {
+        "value": 1.27,
+        "tone": "Rose"
+      },
+      "tail": {
+        "value": 1.41,
+        "tone": "Rose"
+      },
+      "modelPeak": {
+        "value": 1.29,
+        "tone": "Rose"
+      },
+      "modelTail": {
+        "value": 1.41,
+        "tone": "Rose"
+      }
+    },
+    "Mahogany back": {
+      "bare": {
+        "value": 1.71,
+        "tone": "Navy"
+      },
+      "peak": {
+        "value": 1.26,
+        "tone": "Rose"
+      },
+      "tail": {
+        "value": 1.5,
+        "tone": "Navy"
+      },
+      "modelPeak": {
+        "value": 1.44,
+        "tone": "Rose"
+      },
+      "modelTail": {
+        "value": 1.51,
+        "tone": "Navy"
+      }
+    },
+    "Painted back on brown": {
+      "bare": {
+        "value": 1.66,
+        "tone": "Navy"
+      },
+      "peak": {
+        "value": 1.43,
+        "tone": "Rose"
+      },
+      "tail": {
+        "value": 1.48,
+        "tone": "Navy"
+      },
+      "modelPeak": {
+        "value": 1.42,
+        "tone": "Rust"
+      },
+      "modelTail": {
+        "value": 1.49,
+        "tone": "Navy"
+      }
+    },
+    "Painted back on birch": {
+      "bare": {
+        "value": 1.66,
+        "tone": "Navy"
+      },
+      "peak": {
+        "value": 1.25,
+        "tone": "Navy"
+      },
+      "tail": {
+        "value": 1.63,
+        "tone": "Navy"
+      },
+      "modelPeak": {
+        "value": 1.32,
+        "tone": "Navy"
+      },
+      "modelTail": {
+        "value": 1.63,
+        "tone": "Navy"
+      }
+    }
+  },
+  "cost": {
+    "Classic + warm brown, Shaded, lights Off (today)": {
+      "desktop400": {
+        "sections": 8,
+        "nodes": 2472,
+        "gradientLayers": 2429,
+        "boxes": 396
+      },
+      "phone400": {
+        "sections": 11,
+        "nodes": 2698,
+        "gradientLayers": 3094,
+        "boxes": 390
+      },
+      "frames": {
+        "median": 16.699999999999932,
+        "p90": 16.700000000000273,
+        "frames": 117
+      }
+    },
+    "Classic + warm brown, Deep, Always on": {
+      "desktop400": {
+        "sections": 8,
+        "nodes": 2602,
+        "gradientLayers": 3599,
+        "boxes": 396
+      },
+      "phone400": {
+        "sections": 11,
+        "nodes": 2863,
+        "gradientLayers": 4579,
+        "boxes": 390
+      },
+      "frames": {
+        "median": 16.699999999999932,
+        "p90": 16.799999999999955,
+        "frames": 112
+      }
+    },
+    "Library + mahogany, Deep, Always on": {
+      "desktop400": {
+        "sections": 8,
+        "nodes": 2594,
+        "gradientLayers": 3413,
+        "boxes": 396
+      },
+      "phone400": {
+        "sections": 11,
+        "nodes": 2852,
+        "gradientLayers": 4337,
+        "boxes": 390
+      },
+      "frames": {
+        "median": 16.699999999999932,
+        "p90": 16.799999999999955,
+        "frames": 112
+      }
+    },
+    "On legs + oak, Deep, Always on": {
+      "desktop400": {
+        "sections": 8,
+        "nodes": 2602,
+        "gradientLayers": 3445,
+        "boxes": 396
+      },
+      "phone400": {
+        "sections": 11,
+        "nodes": 2863,
+        "gradientLayers": 4381,
+        "boxes": 390
+      },
+      "frames": {
+        "median": 16.699999999999932,
+        "p90": 16.799999999999955,
+        "frames": 112
+      }
+    },
+    "Plywood on legs + birch, Deep, Always on": {
+      "desktop400": {
+        "sections": 8,
+        "nodes": 2594,
+        "gradientLayers": 3057,
+        "boxes": 396
+      },
+      "phone400": {
+        "sections": 11,
+        "nodes": 2852,
+        "gradientLayers": 3875,
+        "boxes": 390
+      },
+      "frames": {
+        "median": 16.700000000000045,
+        "p90": 16.799999999999955,
+        "frames": 112
+      }
+    }
+  }
+}

@@ -1,0 +1,143 @@
+/**
+ * Option C, walnut display cabinet. Dark walnut, seen from slightly above so every shelf shows a thin top
+ * face, and each cubby is lit from inside by a warm strip light hidden behind the shelf above: a pool of
+ * light on the back panel, light on the box tops and on the shelf in front of them. A thick top with a
+ * visible top face, and a deep recessed kick so the cabinet seems to hover above the floor.
+ */
+.section {
+  --side-mm: 30;
+  --overhang-mm: 12;
+  --top-mm: 44;
+  --base-mm: 110;
+  --kick-mm: 72;
+  --kick-inset-mm: 36;
+  --walnut: oklch(0.38 0.052 50);
+  --back: oklch(0.27 0.035 45);
+  --lamp: 255 212 150;
+  --grain: rgb(18 8 3 / 0.3);
+  --grain-soft: rgb(18 8 3 / 0.14);
+  --sheen: rgb(255 220 180 / 0.06);
+  --shade: 8 3 1;
+}
+
+/** Side panels and dividers: vertical walnut boards. */
+.carcass {
+  background-color: var(--walnut);
+  background-image:
+    repeating-linear-gradient(to right, var(--grain) 0 calc(0.6 * var(--u)), transparent calc(0.6 * var(--u)) calc(4.1 * var(--u))),
+    repeating-linear-gradient(to right, var(--grain-soft) 0 calc(1 * var(--u)), transparent calc(1 * var(--u)) calc(6.3 * var(--u))),
+    repeating-linear-gradient(to right, var(--sheen) 0 calc(1.6 * var(--u)), transparent calc(1.6 * var(--u)) calc(10.7 * var(--u))),
+    linear-gradient(to bottom, rgb(255 230 200 / 0.05), transparent 45%, rgb(0 0 0 / 0.14));
+  box-shadow:
+    inset 1px 0 0 rgb(255 225 185 / 0.22),
+    inset -1px 0 0 rgb(var(--shade) / 0.6),
+    calc(3 * var(--u)) calc(10 * var(--u)) calc(20 * var(--u)) calc(-2 * var(--u)) rgb(var(--shade) / 0.7);
+}
+
+/** Top rail between the side panels, in the shadow of the thick top. */
+.carcass::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--frame) * var(--u));
+  right: calc(var(--frame) * var(--u));
+  top: 0;
+  height: calc(var(--frame) * var(--u));
+  background-color: var(--walnut);
+  background-image:
+    linear-gradient(to bottom, rgb(var(--shade) / 0.6), rgb(var(--shade) / 0.2) 50%, rgb(var(--shade) / 0.35) 100%),
+    repeating-linear-gradient(to bottom, var(--grain) 0 calc(0.6 * var(--u)), transparent calc(0.6 * var(--u)) calc(3.3 * var(--u)));
+  box-shadow: -1px 0 0 rgb(var(--shade) / 0.6), 1px 0 0 rgb(var(--shade) / 0.6);
+}
+
+/** Back: walnut veneer with a cathedral figure, lit from the top by the hidden strip light. */
+.cubby {
+  --off: calc((var(--side-mm) + var(--frame) + var(--x)) * var(--u) * -1);
+  --wide: calc(3000 * var(--u));
+  background-color: var(--back);
+  background-image:
+    linear-gradient(to bottom, rgb(var(--lamp) / 0.7) 0 max(1px, calc(1 * var(--u))), rgb(var(--lamp) / 0.22) max(1px, calc(1 * var(--u))), transparent calc(10 * var(--u))),
+    radial-gradient(ellipse 75% 95% at 50% 0, rgb(var(--lamp) / 0.34), rgb(var(--lamp) / 0.12) 45%, transparent 80%),
+    linear-gradient(to right, rgb(var(--shade) / 0.6), transparent 14%, transparent 86%, rgb(var(--shade) / 0.6)),
+    linear-gradient(to top, rgb(var(--shade) / 0.45), transparent calc(18 * var(--u))),
+    repeating-radial-gradient(ellipse calc(140 * var(--u)) calc(2400 * var(--u)) at calc(520 * var(--u)) calc(2100 * var(--u)), transparent 0 calc(9 * var(--u)), rgb(var(--shade) / 0.13) calc(9 * var(--u)) calc(10.5 * var(--u))),
+    repeating-linear-gradient(to right, rgb(var(--shade) / 0.18) 0 calc(0.6 * var(--u)), transparent calc(0.6 * var(--u)) calc(4.3 * var(--u))),
+    repeating-linear-gradient(to right, rgb(255 210 160 / 0.035) 0 calc(1.2 * var(--u)), transparent calc(1.2 * var(--u)) calc(9.7 * var(--u)));
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, var(--wide) 100%, var(--wide) 100%, var(--wide) 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, var(--off) 0, var(--off) 0, var(--off) 0;
+  box-shadow: 1px 0 0 rgb(255 225 185 / 0.14), -1px 0 0 rgb(var(--shade) / 0.6);
+}
+
+/** The same strip light on the boxes: warm on their tops, falling off towards the floor. */
+.cubby::before {
+  background-image: linear-gradient(to bottom, rgb(var(--lamp) / 0.2), rgb(var(--lamp) / 0.06) 30%, transparent 55%, rgb(var(--shade) / 0.22) 100%);
+}
+
+/** Shelves: a thin lit top face (seen from above) in front of the boxes, then the front edge. */
+.cubby::after {
+  --tone: calc(sin(var(--y) * 0.731) * 0.03);
+  background-color: oklch(from var(--walnut) calc(l + var(--tone)) c h);
+  background-image:
+    linear-gradient(to bottom,
+      rgb(var(--lamp) / 0.16) 0,
+      rgb(var(--lamp) / 0.32) 32%,
+      rgb(255 236 205 / 0.55) 32% calc(32% + 1px),
+      rgb(255 236 205 / 0.08) calc(32% + 1px) 50%,
+      transparent 62%,
+      rgb(var(--shade) / 0.45) 100%),
+    radial-gradient(ellipse 60% 100% at 50% 0, rgb(var(--lamp) / 0.22), transparent 70%),
+    repeating-linear-gradient(to bottom, var(--grain) 0 calc(0.6 * var(--u)), transparent calc(0.6 * var(--u)) calc(3.3 * var(--u))),
+    linear-gradient(to right, rgb(0 0 0 / 0.12), transparent 30%, rgb(255 236 210 / 0.05) 55%, rgb(0 0 0 / 0.1));
+  background-size: 100% 100%, calc(var(--w) * var(--u)) 32%, 100% 100%, calc(var(--section-w) * var(--u)) 100%;
+  background-repeat: no-repeat, no-repeat, repeat, repeat;
+  background-position: 0 0, 0 0, 0 calc(sin(var(--y)) * 2 * var(--u)), calc(var(--x) * var(--u) * -1) 0;
+  box-shadow: inset 0 -1px 0 rgb(var(--shade) / 0.7);
+}
+
+/** Thick top: a lit top face, a crisp arris, the front face and a dark chamfer. */
+.cabinet-top {
+  z-index: 1;
+  background-color: oklch(from var(--walnut) calc(l + 0.02) c h);
+  background-image:
+    linear-gradient(to bottom,
+      rgb(255 232 200 / 0.22) 0,
+      rgb(255 232 200 / 0.3) 26%,
+      rgb(255 240 215 / 0.6) 26% calc(26% + 1px),
+      rgb(255 232 200 / 0.1) calc(26% + 1px) 40%,
+      transparent 60%,
+      rgb(var(--shade) / 0.2) 86%,
+      rgb(var(--shade) / 0.6) 88% 100%),
+    repeating-linear-gradient(to bottom, var(--grain) 0 calc(0.6 * var(--u)), transparent calc(0.6 * var(--u)) calc(3.3 * var(--u))),
+    linear-gradient(to right, rgb(0 0 0 / 0.14), transparent 25%, rgb(255 236 210 / 0.07) 60%, rgb(0 0 0 / 0.14));
+  box-shadow: 0 calc(4 * var(--u)) calc(8 * var(--u)) rgb(var(--shade) / 0.6);
+}
+
+/** Wide, soft floor shadow: the cabinet hovers above it. */
+.cabinet-base::before {
+  content: "";
+  position: absolute;
+  left: calc((var(--side-mm) - 20) * var(--u));
+  right: calc((var(--side-mm) - 20) * var(--u));
+  top: calc((var(--kick-mm) - 22) * var(--u));
+  height: calc(46 * var(--u));
+  background: radial-gradient(closest-side, rgb(var(--shade) / 0.8), rgb(var(--shade) / 0.35) 60%, transparent);
+}
+
+/** Recessed kick: set well back and almost black with shade. */
+.cabinet-base::after {
+  content: "";
+  position: absolute;
+  left: calc((var(--side-mm) + var(--kick-inset-mm)) * var(--u));
+  right: calc((var(--side-mm) + var(--kick-inset-mm)) * var(--u));
+  top: 0;
+  height: calc(var(--kick-mm) * var(--u));
+  background-color: oklch(from var(--walnut) calc(l - 0.14) c h);
+  background-image: linear-gradient(to bottom, rgb(var(--shade) / 0.85), rgb(var(--shade) / 0.35) 45%, rgb(var(--shade) / 0.15));
+}
+
+/** Seen from slightly above, boxes show a sliver of their top; this belongs to box styling if chosen. */
+.placement {
+  box-shadow:
+    inset 0 calc(3 * var(--u)) 0 rgb(255 240 215 / 0.2),
+    inset 1px 0 0 rgb(255 255 255 / 0.15),
+    0 1px 2px rgb(0 0 0 / 0.5);
+}

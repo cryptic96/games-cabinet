@@ -1,4 +1,5 @@
 using Cabinet.Domain.Owner;
+using Cabinet.Repository.Bgg;
 using Cabinet.Repository.Images;
 using Cabinet.Repository.Storage;
 using Cabinet.Service.Collection;
@@ -27,6 +28,9 @@ public static class OwnerEndpoints
     /// <summary>The path a previewed picture is served from, followed by its token.</summary>
     public const string PreviewPath = "/owner/preview";
 
+    /// <summary>The name of the picture client the owner's own check uses, which is not the client the sync and the background link worker share.</summary>
+    public const string OwnerCheckClientName = "owner-check";
+
     private const int DefaultBodyLimitBytes = 64 * 1024;
     private const string WebpMediaType = "image/webp";
     private const string NoStore = "no-store";
@@ -54,7 +58,7 @@ public static class OwnerEndpoints
             provider.GetRequiredService<StorageDirectory>().Path,
             provider.GetRequiredService<ILogger<OwnerDataStore>>()));
         services.AddSingleton<OwnerDataService>();
-        services.AddSingleton<SiteFinish>();
+        services.AddSingleton<SiteLook>();
         services.AddSingleton<IOwnerArtReferences>(provider => provider.GetRequiredService<OwnerDataService>());
         services.AddSingleton<CollectionPublisher>();
         services.AddHostedService<OwnerChangeNotifier>();
@@ -64,6 +68,7 @@ public static class OwnerEndpoints
             provider.GetRequiredService<ImageOptions>(),
             provider.GetRequiredService<TimeProvider>()));
         services.AddHostedService<OwnerLinkWorker>();
+        AddOwnerCheckSlot(services);
         services.AddSingleton(provider => new StagedItems<StagedLink>(provider.GetRequiredService<TimeProvider>()));
         services.AddSingleton(provider => new StagedItems<RestoreCandidate>(provider.GetRequiredService<TimeProvider>()));
 
@@ -92,6 +97,40 @@ public static class OwnerEndpoints
         });
 
         return services;
+    }
+
+    /// <summary>
+    /// Registers the fetch slot of the owner's interactive check: a pacer, a picture client and a fetcher of its own, built the
+    /// way the shared picture client is (same timeout, same size limit, the transport that sends no credentials, no
+    /// authorization handler). The background link worker keeps the fetcher on the shared slot.
+    /// </summary>
+    private static void AddOwnerCheckSlot(IServiceCollection services)
+    {
+        services.AddSingleton<IOwnerCheckPacer>(provider => new OwnerCheckPacer(
+            provider.GetRequiredService<ImageOptions>().DownloadGap,
+            provider.GetRequiredService<TimeProvider>()));
+
+        services
+            .AddHttpClient(OwnerCheckClientName, (provider, client) =>
+            {
+                client.Timeout = SyncEndpoints.RequestTimeout;
+                client.MaxResponseContentBufferSize = provider.GetRequiredService<ImageOptions>().MaxBytes + 1;
+            })
+            .ConfigurePrimaryHttpMessageHandler(BggTransport.CreatePrimaryHandler);
+
+        services.AddSingleton(provider =>
+        {
+            var clients = provider.GetRequiredService<IHttpClientFactory>();
+            var options = provider.GetRequiredService<ImageOptions>();
+            var bgg = provider.GetRequiredService<BggOptions>();
+            var pacer = provider.GetRequiredService<IOwnerCheckPacer>();
+            var time = provider.GetRequiredService<TimeProvider>();
+
+            return new OwnerCheckFetcher(new OwnerLinkFetcher(
+                () => new ImageDownloader(clients.CreateClient(OwnerCheckClientName), options.Policy, options.Limits, pacer, bgg, time),
+                options,
+                time));
+        });
     }
 
     /// <summary>

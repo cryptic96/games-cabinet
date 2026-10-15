@@ -126,6 +126,15 @@ description = "Hostname under a suffix that only resolves on a private network"
 regex = '''(?im)\b[a-z0-9][a-z0-9-]*\.(?:lan|internal|home\.arpa|local)(?:[:/\s"'`]|$)'''
 keywords = [".lan", ".internal", ".home.arpa", ".local"]
 
+  [[rules.allowlists]]
+  description = "one committed note quoted the placeholder name.local as an example of what this rule matches; only that commit and that exact text are allowed"
+  condition = "AND"
+  commits = ["f24956e4a11aafdcc548e24ad7d418b8d5668faf"]
+  regexTarget = "match"
+  regexes = [
+    '''^name\.local\s$''',
+  ]
+
 [[rules]]
 id = "generic-api-key"
 

@@ -428,6 +428,31 @@ function buildDecoration(className) {
 }
 
 /**
+ * Builds the light layer of one section: one empty pool for every cubby, placed by the same four numbers as the cubby
+ * itself. The layer is drawn only when a look turns the lights on, so the renderer never reads the look.
+ * @param {object} section One section from the layout.
+ * @returns {HTMLDivElement}
+ */
+function buildLight(section) {
+  const light = buildDecoration('section-light');
+
+  light.append(
+    ...section.cubbies.map((cubby) => {
+      const pool = buildDecoration('light-pool');
+
+      setNumber(pool, '--x', cubby.xMm);
+      setNumber(pool, '--y', cubby.yMm);
+      setNumber(pool, '--w', cubby.widthMm);
+      setNumber(pool, '--h', cubby.heightMm);
+
+      return pool;
+    }),
+  );
+
+  return light;
+}
+
+/**
  * Builds one section with all of its cubbies.
  * @param {object} section One section from the layout.
  * @param {object} copy The visitor-facing strings.
@@ -447,10 +472,12 @@ function buildSection(section, copy, palette) {
   body.className = 'section-body';
   body.append(...section.cubbies.map((cubby) => buildCubby(cubby, copy, palette, section, rowTops)));
   element.append(
+    buildDecoration('section-floor'),
     body,
     buildDecoration('section-top'),
     buildDecoration('section-trim'),
     buildDecoration('section-base'),
+    buildLight(section),
   );
 
   return element;

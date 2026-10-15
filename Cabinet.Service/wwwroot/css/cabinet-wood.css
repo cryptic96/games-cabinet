@@ -1,0 +1,243 @@
+@layer wood {
+
+/**
+ * Every wood is a block of colours and unitless strengths and nothing else: no length, no size, no layout. The base
+ * block is the warm brown of the default look and holds every shared token, so another wood only writes what makes it
+ * different. Tokens are declared on the root and on any element that carries a wood, never on a pair of choices, so the
+ * colour mixes derived from the board recompute against the board of the element they sit on. A name that the
+ * unlayered site, card or owner sheets declare on the root is never reused here, because an unlayered declaration
+ * would beat this layer.
+ */
+:root,
+[data-wood] {
+  --wood: #6b4226;
+  --wood-lit: #8c5d38;
+  --back: #2a1a10;
+  --back-painted: #0f2025;
+  --recess: color-mix(in oklch, var(--wood), black 55%);
+  --recess-low: color-mix(in oklch, var(--wood), black 55%);
+  --ply-a: color-mix(in oklch, var(--wood), white 16%);
+  --ply-b: color-mix(in oklch, var(--wood), black 14%);
+  --ply-glue: color-mix(in oklch, var(--wood), black 60%);
+  --inlay: #c4a15a;
+  --cubby-top: #170d07;
+  --cubby-left: #4a2e1b;
+  --cubby-right: #2f1c10;
+  --cubby-floor-back: #2a1a10;
+  --cubby-floor-front: color-mix(in oklch, var(--wood), black 20%);
+  --edge-up-6: color-mix(in oklch, var(--wood-lit), white 6%);
+  --edge-up-12: color-mix(in oklch, var(--wood-lit), white 12%);
+  --wood-up-2: color-mix(in oklch, var(--wood), white 2%);
+  --wood-up-4: color-mix(in oklch, var(--wood), white 4%);
+  --wood-up-6: color-mix(in oklch, var(--wood), white 6%);
+  --wood-dn-4: color-mix(in oklch, var(--wood), black 4%);
+  --wood-dn-6: color-mix(in oklch, var(--wood), black 6%);
+  --wood-dn-22: color-mix(in oklch, var(--wood), black 22%);
+  --shade-rgb: 20 10 4;
+  --shade-deep-rgb: 10 5 2;
+  --box-shade-rgb: 20 10 4;
+  --room-shade-rgb: var(--shade-rgb);
+  --room-shade-deep-rgb: var(--shade-deep-rgb);
+  --sheen-rgb: 255 245 230;
+  --plank-lift-rgb: 255 235 210;
+  --highlight-rgb: 255 236 205;
+  --neutral-dark-rgb: 0 0 0;
+  --neutral-light-rgb: 255 255 255;
+  --arch-top-rgb: 8 4 2;
+  --arch-bottom-rgb: 30 16 8;
+  --arch-alpha-top: 0.92;
+  --arch-alpha-bottom: 0.72;
+  --arris-light-rgb: 255 240 220;
+  --arris-dark-rgb: 18 8 2;
+  --grain-dark-rgb: 40 20 8;
+  --grain-light-rgb: 255 240 220;
+  --grain-strength: 1;
+  --back-shade-k: 1;
+  --keyline: 0;
+  --ring-halo: transparent;
+  --wall-shadow: 0;
+  --lamp-rgb: 255 212 150;
+  --lamp-hot-rgb: 255 236 205;
+  --falloff-rgb: 255 244 228;
+  --lamp-k: 1;
+  --pool-k: var(--lamp-k);
+  --fill-k: 0;
+  --room: #3b2416;
+  --room-text: #efe3c2;
+  --room-accent: #d9b98a;
+  --room-ring: var(--room-accent);
+  --room-on-accent: var(--ink);
+  --room-muted: color-mix(in srgb, var(--room-text) 70%, var(--room));
+  --room-line: color-mix(in srgb, var(--room-text) 60%, var(--room));
+  --room-lit-alpha: 0;
+  --room-falloff: none;
+  --room-k: 0;
+  --floor: transparent;
+  --skirting: transparent;
+}
+
+/**
+ * Walnut is dark, rich furniture on a light warm-stone wall. The wall is light, so the text, the accent and the focus
+ * ring on it are ink, the label on an accent-filled control is the wall colour, and the wall casts a soft shadow of the
+ * piece. The kick under the base is a step lighter than the board's darkest tone but still darker than the wall.
+ */
+[data-wood="walnut"] {
+  --wood: #593a29;
+  --wood-lit: color-mix(in oklch, var(--wood), white 22%);
+  --back: #261811;
+  --recess: color-mix(in oklch, var(--wood), black 35%);
+  --recess-low: color-mix(in oklch, var(--wood), black 25%);
+  --cubby-top: color-mix(in oklch, var(--wood), black 78%);
+  --cubby-left: color-mix(in oklch, var(--wood), black 31%);
+  --cubby-right: color-mix(in oklch, var(--wood), black 56%);
+  --cubby-floor-back: #261811;
+  --cubby-floor-front: color-mix(in oklch, var(--wood), black 20%);
+  --shade-rgb: 8 3 1;
+  --shade-deep-rgb: 5 2 0;
+  --grain-dark-rgb: 18 8 3;
+  --grain-strength: 1.2;
+  --arris-light-rgb: 255 210 160;
+  --arris-dark-rgb: 8 3 1;
+  --wall-shadow: 0.15;
+  --room-shade-rgb: 60 52 44;
+  --room-shade-deep-rgb: 40 34 28;
+  --room-k: 1;
+  --room: #d2ccc0;
+  --room-text: #241e1a;
+  --room-accent: #2a1a10;
+  --room-on-accent: #d2ccc0;
+  --room-lit-alpha: 0.30;
+  --room-falloff: radial-gradient(ellipse 120% 70% at 50% 0%, rgb(var(--falloff-rgb) / var(--room-lit-alpha)), transparent);
+  --floor: #aaa393;
+  --skirting: #c4bdaf;
+}
+
+/**
+ * Oak is pale gold furniture with an open grain on a dark slate-blue wall. Its backs are dark so the boxes stand out
+ * from them, and its focused boxes get an ink halo because the pale frame would swallow the accent ring.
+ */
+[data-wood="oak"] {
+  --wood: #c9a46d;
+  --wood-lit: #f2e3bd;
+  --back: #221a12;
+  --recess: #2a2218;
+  --recess-low: #2a2218;
+  --inlay: #7d5a1e;
+  --cubby-top: #2c2418;
+  --cubby-left: #8b714b;
+  --cubby-right: #584830;
+  --cubby-floor-back: #221a12;
+  --cubby-floor-front: #8d734c;
+  --shade-rgb: 40 22 6;
+  --shade-deep-rgb: 24 12 3;
+  --grain-dark-rgb: 130 88 38;
+  --grain-strength: 1.5;
+  --arris-light-rgb: 255 250 235;
+  --arris-dark-rgb: 95 62 25;
+  --arch-alpha-top: 0.60;
+  --arch-alpha-bottom: 0.45;
+  --ring-halo: var(--ink);
+  --room-k: 1;
+  --room: #27323b;
+  --room-text: #e9eef1;
+  --room-lit-alpha: 0.06;
+  --room-falloff: radial-gradient(ellipse 120% 70% at 50% 0%, rgb(var(--falloff-rgb) / var(--room-lit-alpha)), transparent);
+  --floor: #1f2124;
+  --skirting: #323c44;
+}
+
+/**
+ * Birch is pale, clean furniture on a light wall. Its plain back is a mid tone, so the shade over the top of the back is
+ * weak, the lamp is gentle and warms the back directly under the light, and the box outline stays off when the lights
+ * are on. The wall is light, so the text, the accent and the ring are ink and the label on an accent-filled control is
+ * the wall colour; the focused box gets an ink halo.
+ */
+[data-wood="birch"] {
+  --wood: #dfc79a;
+  --wood-lit: #fffcf0;
+  --back: #9c8a6a;
+  --recess: #4a4337;
+  --recess-low: #5f574a;
+  --ply-a: #ead7ad;
+  --ply-b: #cdb07c;
+  --ply-glue: #9a7b4b;
+  --inlay: #876528;
+  --cubby-top: #7b6d55;
+  --cubby-left: #c9b38b;
+  --cubby-right: #a79574;
+  --cubby-floor-back: #9c8a6a;
+  --cubby-floor-front: #c4af88;
+  --shade-rgb: 70 45 20;
+  --shade-deep-rgb: 50 32 14;
+  --grain-dark-rgb: 120 80 40;
+  --grain-strength: 0.8;
+  --arris-light-rgb: 255 252 240;
+  --arris-dark-rgb: 90 65 30;
+  --arch-alpha-top: 0.60;
+  --arch-alpha-bottom: 0.45;
+  --ring-halo: var(--ink);
+  --lamp-k: 0.18;
+  --pool-k: 0.12;
+  --fill-k: 1;
+  --keyline-lit: 0;
+  --back-shade-k: 0.35;
+  --wall-shadow: 0.22;
+  --room-shade-rgb: 60 52 44;
+  --room-shade-deep-rgb: 40 34 28;
+  --room-k: 1;
+  --room: #ddd6ca;
+  --room-text: #251f1b;
+  --room-accent: #2a1a10;
+  --room-on-accent: #ddd6ca;
+  --room-lit-alpha: 0.30;
+  --room-falloff: radial-gradient(ellipse 120% 70% at 50% 0%, rgb(var(--falloff-rgb) / var(--room-lit-alpha)), transparent);
+  --floor: #aa9e8e;
+  --skirting: #d4cdc0;
+}
+
+/**
+ * Mahogany is deep red-brown furniture with a very dark back, on a dark green wall. The recess under the base is almost
+ * black and the lamp is a little stronger than the others to carry through the dark back.
+ */
+[data-wood="mahogany"] {
+  --wood: #5e2b1c;
+  --wood-lit: color-mix(in srgb, #ffc4a0 38%, var(--wood));
+  --back: #1f0e09;
+  --recess: color-mix(in oklch, var(--wood), black 70%);
+  --recess-low: color-mix(in oklch, var(--wood), black 70%);
+  --cubby-top: #130705;
+  --cubby-left: #45200f;
+  --cubby-right: #2e140b;
+  --cubby-floor-back: #1f0e09;
+  --cubby-floor-front: #4d2416;
+  --shade-rgb: 14 3 0;
+  --shade-deep-rgb: 8 1 0;
+  --grain-dark-rgb: 28 6 2;
+  --grain-strength: 1;
+  --arris-light-rgb: 255 196 160;
+  --arris-dark-rgb: 14 3 0;
+  --lamp-k: 1.1;
+  --room-k: 1;
+  --room: #1c2a23;
+  --room-text: #ebe4cd;
+  --room-lit-alpha: 0.06;
+  --room-falloff: radial-gradient(ellipse 120% 70% at 50% 0%, rgb(var(--falloff-rgb) / var(--room-lit-alpha)), transparent);
+  --floor: #191d16;
+  --skirting: #333f39;
+}
+
+/**
+ * The grain strength of a board is the wood's own, halved in a section too narrow to show fine grain. It is a unitless
+ * strength, so it belongs to the wood even though the member it lands on is set by the design.
+ */
+.section > * {
+  --grain-k: var(--grain-strength);
+}
+
+@container (max-width: 400px) {
+  .section > * {
+    --grain-k: calc(var(--grain-strength) * 0.5);
+  }
+}
+
+}

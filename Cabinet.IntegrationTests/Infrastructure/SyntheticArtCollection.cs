@@ -17,7 +17,12 @@ public sealed class SyntheticArtCollection : IAsyncDisposable
 {
     private const string LayoutPath = "/cabinet/layout?profile=desktop";
 
-    private static readonly TimeSpan PictureRunWait = TimeSpan.FromSeconds(90);
+    /// <summary>
+    /// The longest a sync of the synthetic collection may take, pictures included. A 400-picture run takes about twenty seconds
+    /// on a workstation but can take well over a minute on a shared build machine while other tests run, so the limit is generous;
+    /// a fast run is not slowed by it.
+    /// </summary>
+    private static readonly TimeSpan PictureRunWait = TimeSpan.FromSeconds(180);
 
     private readonly TemporaryDirectory _storage = new();
     private readonly Microsoft.AspNetCore.Builder.WebApplication _fake;

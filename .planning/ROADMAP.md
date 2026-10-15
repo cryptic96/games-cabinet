@@ -475,7 +475,60 @@ Plans:
   4. The owner can choose the cubby depth (flat, shaded or deep), and it combines with every finish and with the lights.
   5. Every spine label keeps at least 4.5:1 contrast under every finish, light and depth combination. Header, status line and footer stay readable on every wall, and the cabinet stays smooth on a phone.
 
-**Plans**: TBD
+**Plans:** 20/21 plans executed
+
+Plans:
+**Wave 1**
+
+- [x] 06.1-01-PLAN.md — The default look is guarded - a zero-pixel comparison against the released stylesheets
+- [x] 06.1-02-PLAN.md — The mock-up round - every look on the real cabinet, chosen by sight (owner-gated)
+- [x] 06.1-03-PLAN.md — Your own "Check link" never waits behind the background worker
+- [x] 06.1-04-PLAN.md — Balanced desktop sections - the prototype, the numbers and the owner's choice of promise (owner-gated)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 06.1-05-PLAN.md — Balanced desktop sections for every visitor, with the promise the owner chose
+- [x] 06.1-06-PLAN.md — The round's outcome becomes the contract, with a second round only for adjusted looks (owner-gated)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 06.1-07-PLAN.md — Tracer for the stored look - the owner publishes a look and every page carries it from the first paint
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [x] 06.1-08-PLAN.md — The cabinet stylesheets in four layers, with today's look frozen and the light hook in place
+- [x] 06.1-09-PLAN.md — Older data survives, a rollback finds its copy, and publishing follows the owner-page rules
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [x] 06.1-10-PLAN.md — Five woods, each with its room and wall - and the right logo on every wall
+- [x] 06.1-11-PLAN.md — Seven designs, each a full piece of furniture that never spills out of its box
+- [x] 06.1-12-PLAN.md — Cubby depth - flat, shaded or deep - and painted backs on any design
+- [x] 06.1-13-PLAN.md — Tracer for the Settings look panel - try a look in a real preview, then use it for everyone
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [x] 06.1-14-PLAN.md — Lit cubbies - Always on, fading in gently once per tab, never over a box
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [x] 06.1-15-PLAN.md — Evenings only - the lights follow sunset and sunrise by each visitor's own clock
+- [x] 06.1-16-PLAN.md — Tracer for the live switch - open pages follow the owner's new look within seconds
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [x] 06.1-17-PLAN.md — Choosing by sight - tiles that preview themselves, Preview time, and a panel that works on a phone
+- [x] 06.1-18-PLAN.md — A new design never scrolls the visitor away - in Chrome and in Safari's engine
+- [x] 06.1-19-PLAN.md — Every combination keeps its geometry, stays in its box and keeps its focus ring
+
+**Wave 9** *(blocked on Wave 8 completion)*
+
+- [x] 06.1-20-PLAN.md — The owner reviews the built looks on synthetic data, and the guides describe them (owner-gated)
+
+**Wave 10** *(blocked on Wave 9 completion)*
+
+- [ ] 06.1-21-PLAN.md — Release v0.8.0 with the cabinet looks, after the owner approves the verified draft (owner-gated)
+
 **UI hint**: yes
 
 ### Phase 7: Game-Night Filters & Location Cabinets
@@ -525,6 +578,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 4. Enrichment, Box Images & Shape | 23/23 | Complete    | 2026-10-09 |
 | 5. Game Detail, Accessibility & Language | 16/16 | Complete    | 2026-10-12 |
 | 6. Owner Tools & Persistence | 30/30 | Complete    | 2026-10-13 |
-| 6.1. Selectable Cabinet Finishes & Lighting (INSERTED) | 0/0 | Not started | - |
+| 6.1. Selectable Cabinet Finishes & Lighting (INSERTED) | 20/21 | In Progress|  |
 | 7. Game-Night Filters & Location Cabinets | 0/0 | Not started | - |
 | 8. Public Hardening & Go-Public | 0/0 | Not started | - |

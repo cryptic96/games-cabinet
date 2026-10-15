@@ -150,6 +150,7 @@ public class LiveHubTests
         await using var factory = SyncHarness.CreateFactory(handler, SyncHarness.NewClock(), settings);
         using var client = factory.CreatePublicClient();
         var limiter = factory.ServingServices.GetRequiredService<LiveConnectionLimiter>();
+        using var upgrades = new KestrelUpgradeWatch(factory.PublicPort);
         await using var first = await LivePage.ConnectAsync(factory, transport);
         await using var second = await LivePage.ConnectAsync(factory, transport);
 
@@ -161,6 +162,7 @@ public class LiveHubTests
 
         await first.Connection.StopAsync(TestContext.Current.CancellationToken);
         await SyncHarness.WaitUntil(() => Task.FromResult(limiter.Count == 1));
+        await upgrades.WaitForOpenAsync(transport == HttpTransportType.WebSockets ? 1 : 0);
         await using var admitted = await LivePage.ConnectAsync(factory, transport);
         await SyncHarness.WaitUntil(() => Task.FromResult(limiter.Count == 2));
 
@@ -248,13 +250,26 @@ public class LiveHubTests
         /// <summary>The connection itself, for tests that send something.</summary>
         public HubConnection Connection => _connection;
 
-        /// <summary>Connects to the live route of a booted host over the given transport.</summary>
+        /// <summary>
+        /// Connects to the live route of a booted host over the given transport and returns once the hub holds the connection. The
+        /// client is told the connection is up when the handshake is answered, a moment before the hub registers it to receive
+        /// broadcasts, and a broadcast sent in between would be missed.
+        /// </summary>
         public static async Task<LivePage> ConnectAsync(CabinetWebApplicationFactory factory, HttpTransportType transport)
         {
             var page = Create(factory, transport);
             await page._connection.StartAsync(TestContext.Current.CancellationToken);
+            await page.WaitUntilHeldAsync(factory);
 
             return page;
+        }
+
+        /// <summary>Waits until the hub has admitted this connection, which is after it has been registered for broadcasts.</summary>
+        public Task WaitUntilHeldAsync(CabinetWebApplicationFactory factory)
+        {
+            var limiter = factory.ServingServices.GetRequiredService<LiveConnectionLimiter>();
+
+            return SyncHarness.WaitUntil(() => Task.FromResult(limiter.IsAdmitted(_connection.ConnectionId!)));
         }
 
         /// <summary>Builds the connection without starting it, so a test can expect the start to fail.</summary>

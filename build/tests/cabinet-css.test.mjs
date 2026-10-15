@@ -8,7 +8,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const cabinet = readFileSync(new URL('../../Cabinet.Service/wwwroot/css/cabinet.css', import.meta.url), 'utf8');
+const LAYER_FILES = ['cabinet.css', 'cabinet-design.css', 'cabinet-wood.css', 'cabinet-modifiers.css'];
+const cabinet = LAYER_FILES.map((name) => readFileSync(new URL(`../../Cabinet.Service/wwwroot/css/${name}`, import.meta.url), 'utf8')).join('\n');
 const site = readFileSync(new URL('../../Cabinet.Service/wwwroot/css/site.css', import.meta.url), 'utf8');
 
 /**
@@ -75,7 +76,8 @@ test('one-line titles step to their larger size inside size queries', () => {
 });
 
 test('the plinth lip is an outer edge at least one pixel thick, brighter in a narrow section', () => {
-  assert.match(stripped, /calc\(-1 \* var\(--lw\)\) calc\(-1 \* var\(--lw\)\) 0 0 rgb\(255 235 210 \/ var\(--arch-lit\)\)/);
+  assert.match(stripped, /calc\(-1 \* var\(--lw\)\) calc\(-1 \* var\(--lw\)\) 0 0 rgb\(var\(--plank-lift-rgb\) \/ var\(--arch-lit\)\)/);
+  assert.match(withoutComments(readFileSync(new URL('../../Cabinet.Service/wwwroot/css/cabinet-wood.css', import.meta.url), 'utf8')), /--plank-lift-rgb:\s*255 235 210;/);
   assert.match(stripped, /--lw:\s*max\(1px, calc\(0\.8 \* var\(--u\)\)\)/);
   assert.match(containerQueries('max-width: 400px').join('\n'), /--arch-lit:\s*0\.22/);
 });

@@ -32,6 +32,11 @@ public enum CoverStrategy
 /// The fewest owned expansions that make a base game face out, from 0 to 20; 0 turns the rule off. A base game with at
 /// least this many owned expansions faces out whatever the strategy and the share.
 /// </param>
+/// <param name="BalanceSections">
+/// Whether the games are spread evenly over the sections of a design that asks for it, so no section is left short at the
+/// end. Turning it off places games section by section as they come. A design that does not ask for it, such as the phone
+/// design, is never balanced.
+/// </param>
 public sealed record LayoutOptions(
     int CoverSharePercent,
     CoverStrategy CoverStrategy,
@@ -39,7 +44,8 @@ public sealed record LayoutOptions(
     int FewGamesThreshold,
     bool LieFlatBeforeNewSection = true,
     bool GroupSeries = true,
-    int CoverFromExpansions = 2)
+    int CoverFromExpansions = 2,
+    bool BalanceSections = true)
 {
     private const int MaxShare = 100;
     private const int MaxStack = 20;
@@ -51,9 +57,10 @@ public sealed record LayoutOptions(
     private const int LieFlatShift = 40;
     private const int GroupSeriesShift = 41;
     private const int CoverFromExpansionsShift = 48;
+    private const int BalanceSectionsShift = 56;
 
-    /// <summary>The committed starting values: a quarter of the boxes face out, size weighted, stacks of six, twelve games to leave the all-covers look, a big box lies flat before a new section opens, the games of a series stand together, and a base game with two owned expansions faces out.</summary>
-    public static LayoutOptions Default { get; } = new(25, CoverStrategy.SizeWeighted, 6, 12, true, true, 2);
+    /// <summary>The committed starting values: a quarter of the boxes face out, size weighted, stacks of six, twelve games to leave the all-covers look, a big box lies flat before a new section opens, the games of a series stand together, a base game with two owned expansions faces out, and the games are spread evenly over the sections.</summary>
+    public static LayoutOptions Default { get; } = new(25, CoverStrategy.SizeWeighted, 6, 12, true, true, 2, true);
 
     /// <summary>Sixteen lowercase hexadecimal digits that change whenever any setting changes.</summary>
     public string Fingerprint => StableHash.Hash(Pack(), StableHash.OptionsSalt).ToString("x16", CultureInfo.InvariantCulture);
@@ -85,5 +92,6 @@ public sealed record LayoutOptions(
         | ((long)FewGamesThreshold << ThresholdShift)
         | ((LieFlatBeforeNewSection ? 1L : 0L) << LieFlatShift)
         | ((GroupSeries ? 1L : 0L) << GroupSeriesShift)
-        | ((long)CoverFromExpansions << CoverFromExpansionsShift);
+        | ((long)CoverFromExpansions << CoverFromExpansionsShift)
+        | ((BalanceSections ? 1L : 0L) << BalanceSectionsShift);
 }

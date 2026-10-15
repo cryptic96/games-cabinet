@@ -1,0 +1,102 @@
+[
+  {
+    "wood": "brown",
+    "backs": "wood",
+    "outline": "rgb(217, 185, 138)",
+    "outlineWidth": "2px",
+    "outlineStyle": "solid",
+    "backColour": "rgb(42, 26, 16)",
+    "ringAgainstBack": 8.98,
+    "halo": true
+  },
+  {
+    "wood": "brown",
+    "backs": "painted",
+    "outline": "rgb(217, 185, 138)",
+    "outlineWidth": "2px",
+    "outlineStyle": "solid",
+    "backColour": "rgb(15, 32, 37)",
+    "ringAgainstBack": 8.98,
+    "halo": true
+  },
+  {
+    "wood": "walnut",
+    "backs": "wood",
+    "outline": "rgb(217, 185, 138)",
+    "outlineWidth": "2px",
+    "outlineStyle": "solid",
+    "backColour": "rgb(38, 24, 17)",
+    "ringAgainstBack": 9.22,
+    "halo": true
+  },
+  {
+    "wood": "walnut",
+    "backs": "painted",
+    "outline": "rgb(217, 185, 138)",
+    "outlineWidth": "2px",
+    "outlineStyle": "solid",
+    "backColour": "rgb(15, 32, 37)",
+    "ringAgainstBack": 8.98,
+    "halo": true
+  },
+  {
+    "wood": "oak",
+    "backs": "wood",
+    "outline": "rgb(217, 185, 138)",
+    "outlineWidth": "2px",
+    "outlineStyle": "solid",
+    "backColour": "rgb(34, 26, 18)",
+    "ringAgainstBack": 9.19,
+    "halo": true
+  },
+  {
+    "wood": "oak",
+    "backs": "painted",
+    "outline": "rgb(217, 185, 138)",
+    "outlineWidth": "2px",
+    "outlineStyle": "solid",
+    "backColour": "rgb(15, 32, 37)",
+    "ringAgainstBack": 8.98,
+    "halo": true
+  },
+  {
+    "wood": "birch",
+    "backs": "wood",
+    "outline": "rgb(217, 185, 138)",
+    "outlineWidth": "2px",
+    "outlineStyle": "solid",
+    "backColour": "rgb(156, 138, 106)",
+    "ringAgainstBack": 1.8,
+    "halo": true
+  },
+  {
+    "wood": "birch",
+    "backs": "painted",
+    "outline": "rgb(217, 185, 138)",
+    "outlineWidth": "2px",
+    "outlineStyle": "solid",
+    "backColour": "rgb(15, 32, 37)",
+    "ringAgainstBack": 8.98,
+    "halo": true
+  },
+  {
+    "wood": "mahogany",
+    "backs": "wood",
+    "outline": "rgb(217, 185, 138)",
+    "outlineWidth": "2px",
+    "outlineStyle": "solid",
+    "backColour": "rgb(31, 14, 9)",
+    "ringAgainstBack": 10.01,
+    "halo": true
+  },
+  {
+    "wood": "mahogany",
+    "backs": "painted",
+    "outline": "rgb(217, 185, 138)",
+    "outlineWidth": "2px",
+    "outlineStyle": "solid",
+    "backColour": "rgb(15, 32, 37)",
+    "ringAgainstBack": 8.98,
+    "halo": true
+  }
+]

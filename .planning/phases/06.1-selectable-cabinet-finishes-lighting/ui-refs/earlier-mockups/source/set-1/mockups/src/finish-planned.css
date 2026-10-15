@@ -1,0 +1,17 @@
+/**
+ * Baseline: the finish exactly as the design contract describes it today (flat frame with a 1px lit top
+ * edge and an outer shadow, flat dark cubby backs with one inset shadow and a 1px floor line).
+ */
+.section { box-shadow: 0 8px 24px rgb(0 0 0 / 0.45); }
+
+.carcass {
+  background: var(--wood-mid);
+  box-shadow: inset 0 1px 0 var(--wood-edge);
+}
+
+.cubby {
+  background: var(--ink);
+  box-shadow:
+    inset 0 calc(6 * var(--u)) calc(10 * var(--u)) rgb(0 0 0 / 0.5),
+    inset 0 -1px 0 var(--wood-edge);
+}

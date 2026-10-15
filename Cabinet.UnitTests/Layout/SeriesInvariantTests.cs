@@ -56,14 +56,14 @@ public class SeriesInvariantTests
 
             LayoutAssertions.AssertValid(layout, items);
 
-            foreach (var series in LayoutAssertions.SeriesWithGaps(layout, items, design!))
+            foreach (var series in LayoutAssertions.SeriesWithGaps(layout, items))
             {
                 var alone = LayoutAssertions.WithOwnExpansions(series, items);
                 var isolated = CabinetLayoutEngine.Build(alone, design!, options with { FewGamesThreshold = 0 });
 
-                LayoutAssertions.SeriesGaps(isolated, alone, design!).Should().NotBeEmpty(
+                LayoutAssertions.SeriesGaps(isolated, alone).Should().NotBeEmpty(
                     "{0} on {1} at {2} percent: a series leaves a cubby out only when it cannot run on even alone in an empty cabinet, but {3}",
-                    name, profile, share, string.Join("; ", LayoutAssertions.SeriesGaps(layout, items, design!)));
+                    name, profile, share, string.Join("; ", LayoutAssertions.SeriesGaps(layout, items)));
                 forced.Add(name);
             }
 

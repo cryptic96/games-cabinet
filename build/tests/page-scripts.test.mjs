@@ -1294,6 +1294,10 @@ class FakeElement {
     return this.attributes.has(name) ? this.attributes.get(name) : null;
   }
 
+  hasAttribute(name) {
+    return this.attributes.has(name);
+  }
+
   removeAttribute(name) {
     this.attributes.delete(name);
   }
@@ -1380,6 +1384,7 @@ function createFakeDocument() {
   page.createElementNS = (namespace, tagName) => new FakeElement(page, tagName);
   page.createTextNode = (text) => Object.assign(new FakeElement(page, '#text'), { ownText: String(text) });
   page.body = page.createElement('body');
+  page.documentElement = page.createElement('html');
   page.activeElement = page.body;
 
   return page;
@@ -1781,7 +1786,7 @@ test('a generated cover of a game with a colour takes it, and one without keeps 
 });
 
 test('the page scripts never write a style attribute or an inline handler', () => {
-  for (const name of ['render.js', 'cabinet.js', 'sync.js', 'status.js', 'live.js', 'copy.js']) {
+  for (const name of ['render.js', 'cabinet.js', 'sync.js', 'status.js', 'live.js', 'copy.js', 'look.js', 'evening.js', 'look-switch.js']) {
     const source = readFileSync(new URL('../../Cabinet.Service/wwwroot/js/' + name, import.meta.url), 'utf8');
 
     assert.doesNotMatch(source, /setAttribute\(\s*['"]style['"]/);
@@ -1794,6 +1799,73 @@ test('the page scripts never write a style attribute or an inline handler', () =
 
   for (const node of [cover, ...cover.descendants()]) {
     assert.equal(node.attributes.has('style'), false);
+  }
+});
+
+/**
+ * Draws a layout into a fresh mount on a fake document and returns the drawn sections.
+ * @param {object} layout The layout to draw.
+ * @returns {FakeElement[]} The section elements in drawing order.
+ */
+function drawSections(layout) {
+  const previous = globalThis.document;
+  const page = createFakeDocument();
+  const mount = page.createElement('div');
+
+  globalThis.document = page;
+
+  try {
+    renderCabinet(mount, layout, COPY);
+  } finally {
+    globalThis.document = previous;
+  }
+
+  return mount.children;
+}
+
+test('a drawn section holds a floor hook, its body, its furniture and one hidden light layer with one pool per cubby', () => {
+  const cubby = (xMm, yMm, widthMm, heightMm) => ({ xMm, yMm, widthMm, heightMm, placements: [] });
+  const cubbies = [cubby(0, 0, 290, 300), cubby(310, 0, 290, 300), cubby(0, 320, 600, 300)];
+  const [section] = drawSections({ palette: [], sections: [{ index: 0, widthMm: 600, heightMm: 640, frameMm: 20, cubbies }] });
+
+  assert.deepEqual(
+    section.children.map((child) => child.className),
+    ['section-floor', 'section-body', 'section-top', 'section-trim', 'section-base', 'section-light'],
+  );
+
+  const light = section.children.at(-1);
+  const drawnCubbies = section.children[1].children;
+
+  assert.equal(light.getAttribute('aria-hidden'), 'true');
+  assert.equal(section.children[0].getAttribute('aria-hidden'), 'true');
+  assert.equal(light.children.length, cubbies.length);
+
+  light.children.forEach((pool, index) => {
+    assert.equal(pool.className, 'light-pool');
+    assert.equal(pool.getAttribute('aria-hidden'), 'true');
+    assert.equal(pool.children.length, 0);
+    assert.equal(pool.attributes.has('style'), false);
+
+    for (const name of ['--x', '--y', '--w', '--h']) {
+      assert.notEqual(pool.properties.get(name), undefined, name);
+      assert.equal(pool.properties.get(name), drawnCubbies[index].properties.get(name), `${name} of pool ${index}`);
+    }
+  });
+});
+
+test('a section with no cubbies still carries an empty light layer', () => {
+  const [section] = drawSections({ palette: [], sections: [{ index: 0, widthMm: 600, heightMm: 300, frameMm: 20, cubbies: [] }] });
+  const light = section.children.at(-1);
+
+  assert.equal(light.className, 'section-light');
+  assert.equal(light.children.length, 0);
+});
+
+test('the renderer never reads or names any of the five look attributes', () => {
+  const source = readFileSync(new URL('../../Cabinet.Service/wwwroot/js/render.js', import.meta.url), 'utf8');
+
+  for (const name of ['data-design', 'data-wood', 'data-backs', 'data-lights', 'data-depth', 'dataset.design', 'dataset.wood', 'dataset.backs', 'dataset.lights', 'dataset.depth']) {
+    assert.equal(source.includes(name), false, name);
   }
 });
 
@@ -1878,6 +1950,11 @@ async function startCabinetPage({ firstLayout, status, cards = [], withList = fa
     ...clock.timers,
     matchMedia: () => ({ matches: false, addEventListener: () => undefined }),
     addEventListener: (type, handler) => (windowHandlers[type] ??= []).push(handler),
+    requestAnimationFrame: (callback) => {
+      callback(0);
+
+      return 0;
+    },
   };
   globalThis.document = page;
   globalThis.CSS = { escape: (value) => value };
@@ -2226,7 +2303,9 @@ test('a drawn marker shows only its count and carries the full name as its acces
   assert.equal(marker.title, '+4 more expansions for Invented Harbour');
 });
 
-const STYLESHEET = readFileSync(new URL('../../Cabinet.Service/wwwroot/css/cabinet.css', import.meta.url), 'utf8');
+const STYLESHEET = ['cabinet.css', 'cabinet-design.css', 'cabinet-wood.css', 'cabinet-modifiers.css']
+  .map((name) => readFileSync(new URL(`../../Cabinet.Service/wwwroot/css/${name}`, import.meta.url), 'utf8'))
+  .join('\n');
 
 test('the stylesheet carries the apron arch tokens, the length registration of the unit and the cover line steps', () => {
   assert.equal(STYLESHEET.includes('--arch-shade-alpha'), false);
@@ -2569,4 +2648,280 @@ test('the Edit line reads Bewerken in Dutch and the not-placed name follows the 
   assert.equal(dutch.notPlacedName('Invented Orchard'), 'Invented Orchard, niet geplaatst');
   assert.equal(COPY.editLink, 'Edit');
   assert.equal(COPY.notPlacedName('Invented Orchard'), 'Invented Orchard, not placed');
+});
+
+const { applyLookStatus } = await import(pathToFileURL(join(PAGE_FOLDER, 'look-switch.js')).href);
+const BASE_LOOK = { design: 'classic', wood: 'brown', backs: 'wood', lights: 'off', depth: 'shaded', lightWall: false };
+const LOOK_ATTRIBUTES = [['design', 'data-design'], ['wood', 'data-wood'], ['backs', 'data-backs'], ['lights', 'data-lights'], ['depth', 'data-depth']];
+const WHITE_LOGO = '/img/powered-by-bgg.svg?v=white';
+const DARK_LOGO = '/img/powered-by-bgg-dark.svg?v=dark';
+
+/**
+ * Builds a fake page that keeps the attributes written on its root and its footer logo, records every view transition and every script
+ * appended to the head, and lets the test finish a transition when it chooses.
+ * @param {object} [options] The look the page starts with, whether the browser has view transitions, whether the lamp script is
+ * loaded and whether the visitor prefers less motion.
+ * @returns {object} The root, the logo, the recorded transitions and scripts, and the options.
+ */
+function lookPage({ look = BASE_LOOK, transitions = true, lampScriptLoaded = true, reducedMotion = false } = {}) {
+  const attributes = new Map(LOOK_ATTRIBUTES.map(([field, name]) => [name, look[field]]));
+  const logoAttributes = new Map([['src', look.lightWall ? DARK_LOGO : WHITE_LOGO], ['data-logo-light', WHITE_LOGO], ['data-logo-dark', DARK_LOGO]]);
+  const started = [];
+  const appended = [];
+  const logo = { getAttribute: (name) => logoAttributes.get(name) ?? null, setAttribute: (name, value) => logoAttributes.set(name, value) };
+  const doc = {
+    head: { append: (script) => appended.push(script) },
+    createElement: () => {
+      const script = { listeners: {}, attributes: new Map() };
+
+      script.addEventListener = (type, handler) => {
+        script.listeners[type] = handler;
+      };
+      script.setAttribute = (name, value) => script.attributes.set(name, value);
+
+      return script;
+    },
+    querySelector: (selector) => (selector.startsWith('meta') ? { getAttribute: () => '/js/evening.js?v=abc' } : logo),
+    visibilityState: 'visible',
+    addEventListener: () => {},
+  };
+
+  if (transitions) {
+    doc.startViewTransition = (update) => {
+      let finish;
+      const finished = new Promise((resolve) => {
+        finish = resolve;
+      });
+
+      started.push({ finish });
+      Promise.resolve().then(update);
+
+      return { ready: Promise.resolve(), updateCallbackDone: Promise.resolve(), finished };
+    };
+  }
+
+  const root = {
+    ownerDocument: doc,
+    getAttribute: (name) => (attributes.has(name) ? attributes.get(name) : null),
+    setAttribute: (name, value) => attributes.set(name, String(value)),
+    removeAttribute: (name) => attributes.delete(name),
+    hasAttribute: (name) => attributes.has(name),
+    get dataset() {
+      return { lights: attributes.get('data-lights') };
+    },
+  };
+
+  doc.documentElement = root;
+
+  return { root, logo, started, appended, reducedMotion, lampScriptLoaded };
+}
+
+/**
+ * Runs a test body with the page globals the look switch reads, and puts the previous globals back afterwards.
+ * @param {object} page The fake page.
+ * @param {() => Promise<void>} body The test body.
+ * @returns {Promise<void>}
+ */
+async function withLookPage(page, body) {
+  const previous = globalThis.window;
+
+  globalThis.window = {
+    matchMedia: () => ({ matches: page.reducedMotion }),
+    cabinetEvening: page.lampScriptLoaded ? { key: 'cabinet-lit' } : undefined,
+    setTimeout: () => 0,
+    clearTimeout: () => {},
+    setInterval: () => 0,
+  };
+
+  try {
+    await body();
+  } finally {
+    globalThis.window = previous;
+  }
+}
+
+/**
+ * Builds a status that carries a look.
+ * @param {object} changes The look values that differ from the base look.
+ * @param {number} [secondsLater] How many seconds after the base time the server stamped the status.
+ * @returns {object} The status.
+ */
+function lookStatus(changes, secondsLater = 10) {
+  return { serverTimeUtc: isoAt(secondsLater * 1000), look: { ...BASE_LOOK, ...changes } };
+}
+
+const settle = () => new Promise((resolve) => setImmediate(resolve));
+
+test('a status with the look the page already shows changes nothing and starts no transition', async () => {
+  const page = lookPage();
+
+  await withLookPage(page, async () => {
+    await applyLookStatus(lookStatus({}), page.root);
+    await settle();
+
+    assert.equal(page.started.length, 0);
+    assert.equal(page.root.hasAttribute('data-look-switch'), false);
+    assert.equal(page.root.hasAttribute('data-lit'), false);
+    assert.equal(page.root.getAttribute('data-wood'), 'brown');
+  });
+});
+
+test('a change of the lights alone sets the attributes at once, starts no transition and lights the lamp', async () => {
+  const page = lookPage();
+
+  await withLookPage(page, async () => {
+    await applyLookStatus(lookStatus({ lights: 'on' }), page.root);
+
+    assert.equal(page.started.length, 0);
+    assert.equal(page.root.getAttribute('data-lights'), 'on');
+    assert.equal(page.root.hasAttribute('data-lit'), true);
+
+    await applyLookStatus(lookStatus({ lights: 'off' }, 20), page.root);
+
+    assert.equal(page.root.getAttribute('data-lights'), 'off');
+    assert.equal(page.root.hasAttribute('data-lit'), false);
+  });
+});
+
+test('a status older than the newest one seen never changes the look', async () => {
+  const page = lookPage();
+
+  await withLookPage(page, async () => {
+    await applyLookStatus(lookStatus({ lights: 'on' }, 30), page.root);
+    await applyLookStatus(lookStatus({ lights: 'off' }, 20), page.root);
+
+    assert.equal(page.root.getAttribute('data-lights'), 'on');
+  });
+});
+
+test('a status without a look, and a status with an unusable one, is ignored', async () => {
+  const page = lookPage();
+
+  await withLookPage(page, async () => {
+    await applyLookStatus({ serverTimeUtc: isoAt(1000), cooldownEndsUtc: isoAt(5000) }, page.root);
+    await applyLookStatus({ serverTimeUtc: isoAt(2000), look: null }, page.root);
+    await applyLookStatus({ serverTimeUtc: isoAt(3000), look: { ...BASE_LOOK, wood: 7 } }, page.root);
+    await applyLookStatus({ serverTimeUtc: isoAt(4000), look: { ...BASE_LOOK, wood: 'x'.repeat(33) } }, page.root);
+    await applyLookStatus({ serverTimeUtc: isoAt(5000), look: { design: 'modern' } }, page.root);
+    await applyLookStatus(null, page.root);
+    await settle();
+
+    assert.equal(page.started.length, 0);
+    assert.equal(page.root.getAttribute('data-design'), 'classic');
+    assert.equal(page.root.getAttribute('data-wood'), 'brown');
+  });
+});
+
+test('any other change is applied inside one view transition that marks the root until it has finished', async () => {
+  const page = lookPage();
+
+  await withLookPage(page, async () => {
+    await applyLookStatus(lookStatus({ design: 'modern', wood: 'oak' }), page.root);
+
+    assert.equal(page.started.length, 1);
+    assert.equal(page.root.hasAttribute('data-look-switch'), true);
+
+    await settle();
+
+    assert.equal(page.root.getAttribute('data-design'), 'modern');
+    assert.equal(page.root.getAttribute('data-wood'), 'oak');
+    assert.equal(page.root.hasAttribute('data-look-switch'), true);
+
+    page.started[0].finish();
+    await settle();
+
+    assert.equal(page.root.hasAttribute('data-look-switch'), false);
+  });
+});
+
+test('a change the browser cannot cross-fade, or a visitor who prefers less motion, is applied at once', async () => {
+  for (const options of [{ transitions: false }, { reducedMotion: true }]) {
+    const page = lookPage(options);
+
+    await withLookPage(page, async () => {
+      await applyLookStatus(lookStatus({ design: 'library' }), page.root);
+
+      assert.equal(page.started.length, 0);
+      assert.equal(page.root.getAttribute('data-design'), 'library');
+      assert.equal(page.root.hasAttribute('data-look-switch'), false);
+    });
+  }
+});
+
+test('the update still runs when starting the view transition throws', async () => {
+  const page = lookPage();
+
+  page.root.ownerDocument.startViewTransition = () => {
+    throw new Error('not allowed now');
+  };
+
+  await withLookPage(page, async () => {
+    await applyLookStatus(lookStatus({ depth: 'deep' }), page.root);
+
+    assert.equal(page.root.getAttribute('data-depth'), 'deep');
+    assert.equal(page.root.hasAttribute('data-look-switch'), false);
+  });
+});
+
+test('the footer logo follows the wall tone and keeps its other attributes', async () => {
+  const page = lookPage();
+
+  await withLookPage(page, async () => {
+    await applyLookStatus(lookStatus({ wood: 'birch', lightWall: true }, 10), page.root);
+    await settle();
+
+    assert.equal(page.logo.getAttribute('src'), DARK_LOGO);
+
+    await applyLookStatus(lookStatus({ wood: 'oak', lightWall: false }, 20), page.root);
+    await settle();
+
+    assert.equal(page.logo.getAttribute('src'), WHITE_LOGO);
+    assert.equal(page.logo.getAttribute('data-logo-dark'), DARK_LOGO);
+  });
+});
+
+test('turning the lights on from a page that never loaded the lamp script loads it first and applies the look once it has run', async () => {
+  const page = lookPage({ lampScriptLoaded: false });
+
+  await withLookPage(page, async () => {
+    const applying = applyLookStatus(lookStatus({ lights: 'on' }), page.root);
+    await settle();
+
+    assert.equal(page.appended.length, 1);
+    assert.equal(page.appended[0].attributes.get('src'), '/js/evening.js?v=abc');
+    assert.equal(page.root.getAttribute('data-lights'), 'off');
+
+    globalThis.window.cabinetEvening = { key: 'cabinet-lit' };
+    page.appended[0].listeners.load();
+    await applying;
+
+    assert.equal(page.root.getAttribute('data-lights'), 'on');
+    assert.equal(page.root.hasAttribute('data-lit'), true);
+    assert.equal(page.started.length, 0);
+  });
+});
+
+test('turning the lights off drops the evening marker and the lit marker', async () => {
+  const page = lookPage({ look: { ...BASE_LOOK, lights: 'evenings' } });
+
+  page.root.setAttribute('data-evening', '');
+  page.root.setAttribute('data-lit', '');
+
+  await withLookPage(page, async () => {
+    await applyLookStatus(lookStatus({ lights: 'off' }), page.root);
+
+    assert.equal(page.root.getAttribute('data-lights'), 'off');
+    assert.equal(page.root.hasAttribute('data-evening'), false);
+    assert.equal(page.root.hasAttribute('data-lit'), false);
+  });
+});
+
+test('a lamp script that is already on the page is not loaded again', async () => {
+  const page = lookPage({ lampScriptLoaded: true });
+
+  await withLookPage(page, async () => {
+    await applyLookStatus(lookStatus({ lights: 'on' }), page.root);
+
+    assert.equal(page.appended.length, 0);
+  });
 });

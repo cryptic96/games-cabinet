@@ -35,7 +35,7 @@ public static class OwnerResponses
             "nothing-selected",
             "confirm-needed",
             "id-clash",
-            "unknown-finish",
+            "unknown-look",
             "save-failed",
             .. Enum.GetValues<LinkProblem>().Select(OwnerStrings.LinkKey),
         ],

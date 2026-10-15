@@ -115,6 +115,18 @@ After a successful install the installer prunes old release directories,
 keeping the running release, the previous release and the newest few (three
 by default).
 
+### Rolling back after a format change
+
+When a release changes the format of the owner data, it keeps a copy of the
+old file in `owner-data-versions/` before its first save. Once it has saved,
+the file is in the new format and the previous release cannot read it. A
+rollback to that release therefore opens the recovery panel on every owner
+page. Restore the copy from just before the upgrade from the earlier versions
+there (pick the version dated at the moment of the upgrade). The data comes
+back as it was then; anything changed after the upgrade is not in it, and the
+cabinet look returns to the default until it is chosen again. A downloaded
+file from before the upgrade restores the same way.
+
 ## Manual commands
 
 Run these as root on the server.
@@ -193,7 +205,7 @@ firewall setup, prove the owner host two ways:
 ## Backing up owner data
 
 Everything the owner enters on the owner pages (picture choices, the list of
-storage locations, where each game is kept, the cabinet finish and the change
+storage locations, where each game is kept, the cabinet look and the change
 log) lives only on the server, in the state directory (`/var/lib/cabinet` by
 default) as `owner-data.json`. It cannot be rebuilt from BoardGameGeek, so it
 is backed up by hand, by download.
@@ -210,6 +222,11 @@ is backed up by hand, by download.
   change once the newest copy is more than an hour old and before every
   restore. They help after a wrong edit; they live on the same disk, so they
   are not a backup.
+- **A release that changes the data format.** Before its first save the new
+  release always keeps a copy of the old file, whatever the hour rule says,
+  so the last file an earlier release can read is among the earlier versions.
+  After that save the file is in the new format and the previous release
+  cannot read it. See "Rolling back after a format change" below.
 - **Restoring from a file.** On the Settings page, choose the file and press
   "Check file". The page shows what the file holds next to what the server
   holds, and nothing changes until "Restore file" is pressed. The current data
@@ -224,6 +241,10 @@ is backed up by hand, by download.
 - **If the stored file cannot be read.** Every owner page then says so and
   offers "Restore from a file" and the earlier versions by date. Nothing is
   overwritten until one is restored.
+
+The look of the cabinet is part of the owner data, so it is in every download
+and every restore; see [Cabinet looks](cabinet-looks.md) for what it holds and
+what an older file restores to.
 
 Releases, rollbacks and re-provisioning leave the state directory untouched:
 the owner data is not part of a release archive and no install step writes to

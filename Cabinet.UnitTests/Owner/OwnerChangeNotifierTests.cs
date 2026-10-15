@@ -1,3 +1,4 @@
+using Cabinet.Domain.Owner;
 using Cabinet.Service.Live;
 using Cabinet.Service.Owner;
 using Cabinet.Service.Sync;
@@ -78,7 +79,69 @@ public sealed class OwnerChangeNotifierTests
     }
 
     [Fact]
-    public async Task A_failing_notification_is_not_fatal_and_the_next_burst_is_announced()
+    public async Task A_look_change_alone_notifies_once_after_the_quiet_period_and_carries_the_new_look()
+    {
+        var rig = await StartAsync();
+
+        await rig.SetLookAsync("modern", "oak");
+        rig.Harness.Clock.Advance(TimeSpan.FromSeconds(2.9));
+        rig.Live.Calls.Should().BeEmpty("the quiet period of three seconds has not passed");
+        rig.Harness.Clock.Advance(TimeSpan.FromSeconds(0.1));
+
+        var call = rig.Live.Calls.Should().ContainSingle().Which;
+        call.Status.Look.Should().Be(new LookStatus("modern", "oak", "wood", "off", "shaded", false));
+        call.Status.SnapshotVersion.Should().Be(rig.Harness.Version);
+        rig.Harness.Clock.Advance(TimeSpan.FromMinutes(1));
+        rig.Live.Calls.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task Changing_the_look_and_back_within_the_quiet_period_notifies_nobody()
+    {
+        var rig = await StartAsync();
+
+        await rig.SetLookAsync("modern", "oak");
+        rig.Harness.Clock.Advance(TimeSpan.FromSeconds(1));
+        await rig.SetLookAsync(CabinetLook.Default.Design, CabinetLook.Default.Wood);
+        rig.Harness.Clock.Advance(TimeSpan.FromMinutes(1));
+
+        rig.Live.Calls.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_look_change_and_a_collection_change_in_one_burst_notify_once_with_both()
+    {
+        var rig = await StartAsync();
+
+        await rig.SetLookAsync("library", "birch");
+        rig.Harness.Clock.Advance(TimeSpan.FromSeconds(1));
+        await rig.PlaceNextGameAsync();
+        rig.Harness.Clock.Advance(TimeSpan.FromMinutes(1));
+
+        var call = rig.Live.Calls.Should().ContainSingle().Which;
+        call.Status.Look.Design.Should().Be("library");
+        call.Status.Look.LightWall.Should().BeTrue("birch has a light wall");
+        call.Status.SnapshotVersion.Should().Be(rig.Harness.Version);
+    }
+
+    [Fact]
+    public async Task A_failed_look_notification_is_tried_again_on_the_next_change()
+    {
+        var rig = await StartAsync();
+        rig.Live.FailNext = true;
+
+        await rig.SetLookAsync("modern", "oak");
+        rig.Harness.Clock.Advance(TimeSpan.FromSeconds(3));
+        rig.Live.Attempts.Should().Be(1);
+        rig.Live.Calls.Should().BeEmpty();
+        await rig.SetLookAsync("modern", "oak", lights: "on");
+        rig.Harness.Clock.Advance(TimeSpan.FromSeconds(3));
+
+        rig.Live.Calls.Should().ContainSingle().Which.Status.Look.Should().Be(new LookStatus("modern", "oak", "wood", "on", "shaded", false));
+    }
+
+    [Fact]
+    public async Task A_failed_notification_is_not_fatal_and_the_next_burst_is_announced()
     {
         var rig = await StartAsync();
         rig.Live.FailNext = true;
@@ -134,7 +197,7 @@ public sealed class OwnerChangeNotifierTests
         await harness.AddAsync(CabinetA);
         await harness.AddAsync(ShelfB);
         var coordinator = new SyncCoordinator(new InMemorySyncStateStore(), Options, harness.Clock);
-        var status = new SyncStatusService(coordinator, harness.Collection, Options, harness.Clock);
+        var status = new SyncStatusService(coordinator, harness.Collection, Options, harness.Clock, new SiteLook(harness.Service));
         var live = new RecordingLiveNotifier(harness.Clock);
         var notifier = new OwnerChangeNotifier(harness.Service, status, live, harness.Clock, NullLogger<OwnerChangeNotifier>.Instance);
         await notifier.StartAsync(CancellationToken.None);
@@ -153,6 +216,12 @@ public sealed class OwnerChangeNotifierTests
         public OwnerChangeNotifier Notifier { get; } = notifier;
 
         public Task<OwnerResult> PlaceNextGameAsync() => Harness.PlaceAsync(_next++, CabinetA);
+
+        public Task<OwnerResult> SetLookAsync(string design, string wood, string lights = "off") =>
+            Harness.Service.MutateAsync(
+                Harness.Service.Revision,
+                data => CabinetLooks.SetLook(data, design, wood, CabinetLook.Default.Backs, lights, CabinetLook.Default.Depth),
+                CancellationToken.None);
     }
 
     private sealed class RecordingLiveNotifier(TimeProvider clock) : ILiveNotifier

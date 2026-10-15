@@ -336,7 +336,7 @@ public class SeriesLayoutTests
         var layout = CabinetLayoutEngine.Build(items, design, options);
 
         LayoutAssertions.AssertValid(layout, items);
-        LayoutAssertions.SeriesGaps(layout, items, design).Should().BeEmpty();
+        LayoutAssertions.SeriesGaps(layout, items).Should().BeEmpty();
         layout.Sections.Should().ContainSingle("the series fits the existing section once the family keeps its stack in one column");
         Cubby(layout, 0).Should().OnlyContain(placement => placement.FamilyId == 1, "the family stands whole in the first cubby");
         Cubby(layout, 0).Single(placement => placement.Kind == PlacementKind.MoreMarker).MoreCount.Should().Be(3, "the family keeps the expansions that do not fit under its shelf behind its marker");
@@ -358,7 +358,7 @@ public class SeriesLayoutTests
         LayoutAssertions.AssertValid(layout, items);
         InStandingOrder(layout, 0).Should().Equal([1], "only the tall cubby takes either box, and not both");
         InStandingOrder(layout, 0, sectionIndex: 1).Should().Equal([2], "the second game goes on to the next tall cubby, past the short one");
-        LayoutAssertions.SeriesGaps(layout, items, design).Should().ContainSingle("the one gap no arrangement of this design can avoid");
+        LayoutAssertions.SeriesGaps(layout, items).Should().ContainSingle("the one gap no arrangement of this design can avoid");
     }
 
     [Fact]
@@ -371,7 +371,7 @@ public class SeriesLayoutTests
         var layout = CabinetLayoutEngine.Build(items, SectionDesigns.Desktop, options);
 
         LayoutAssertions.AssertValid(layout, items);
-        LayoutAssertions.SeriesGaps(layout, items, SectionDesigns.Desktop).Should().BeEmpty("every game of a series stands in the cubby of the game before it or the very next one");
+        LayoutAssertions.SeriesGaps(layout, items).Should().BeEmpty("every game of a series stands in the cubby of the game before it or the very next one");
     }
 
     [Fact]

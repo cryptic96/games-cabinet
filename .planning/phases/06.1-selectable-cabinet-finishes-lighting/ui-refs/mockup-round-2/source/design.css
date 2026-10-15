@@ -1,0 +1,889 @@
+@layer design {
+
+/**
+ * Classic furniture, the frozen default. Every size is a millimetre value on the cabinet; every colour is read from
+ * the wood tokens. One light comes from above and slightly to the left, so top and left edges are lit and shadows fall
+ * down and slightly right. Gradients only, and everything stays inside the section box.
+ */
+.cabinet {
+  --side-allowance: 32;
+  --side-trim: 12;
+  --overhang: 14;
+  --top-height: 34;
+  --base-height: 80;
+  --floor-margin: 24;
+  --base-inset: 0;
+  --base-overhang: 0;
+  --radius: 0;
+  --foot-width: 70;
+  --arch-rise: 40;
+  --arch-radius: 110;
+  --arch-lit: 0.14;
+  --plank-width: 110;
+  --depth-inset: 16;
+  --depth-floor: 24;
+  --depth-ceil: 8;
+  --top-face: 6;
+}
+
+.section > * {
+  --grain-fine: 1;
+  --lw: max(1px, calc(0.8 * var(--u)));
+  --gd: rgb(var(--grain-dark-rgb) / calc(0.08 * var(--grain-k)));
+  --gd-fine: rgb(var(--grain-dark-rgb) / calc(0.08 * var(--grain-k) * var(--grain-fine)));
+  --gl: rgb(var(--arris-light-rgb) / calc(0.04 * var(--grain-k)));
+  --ga: rgb(var(--grain-dark-rgb) / calc(0.05 * var(--grain-k)));
+  --grain-h:
+    repeating-linear-gradient(to bottom, var(--gd-fine) 0 var(--lw), transparent var(--lw) calc(15 * var(--u))),
+    repeating-linear-gradient(to bottom, var(--gd) 0 var(--lw), transparent var(--lw) calc(23 * var(--u))),
+    repeating-linear-gradient(to bottom, var(--gl) 0 calc(2 * var(--lw)), transparent calc(2 * var(--lw)) calc(37 * var(--u)));
+  --grain-v:
+    repeating-linear-gradient(to right, var(--gd-fine) 0 var(--lw), transparent var(--lw) calc(15 * var(--u))),
+    repeating-linear-gradient(to right, var(--gd) 0 var(--lw), transparent var(--lw) calc(23 * var(--u))),
+    repeating-linear-gradient(to right, var(--gl) 0 calc(2 * var(--lw)), transparent calc(2 * var(--lw)) calc(37 * var(--u)));
+  --sweep-h: linear-gradient(to right, rgb(var(--neutral-dark-rgb) / 0.07), transparent 30%, rgb(var(--neutral-light-rgb) / 0.04) 55%, rgb(var(--neutral-dark-rgb) / 0.06));
+  --sweep-v: linear-gradient(to bottom, rgb(var(--neutral-dark-rgb) / 0.07), transparent 30%, rgb(var(--neutral-light-rgb) / 0.04) 55%, rgb(var(--neutral-dark-rgb) / 0.06));
+  --span: calc(var(--section-w) * var(--u));
+}
+
+@container (max-width: 400px) {
+  .section > * {
+    --grain-fine: 0;
+    --arch-lit: 0.22;
+  }
+}
+
+.section-body {
+  background-color: var(--wood);
+  background-image:
+    var(--grain-v),
+    repeating-radial-gradient(
+      ellipse 70% 420% at 160% 40%,
+      transparent 0 calc(9 * var(--u)),
+      var(--ga) calc(9 * var(--u)) calc(9 * var(--u) + var(--lw))
+    ),
+    var(--sweep-v);
+}
+
+.cubby {
+  --ox: calc(-1 * (var(--frame) + var(--x)) * var(--u));
+  --groove: max(1px, calc(1 * var(--u)));
+  --plank: max(1px, calc(var(--plank-width) * var(--u)));
+  --seam-eff: calc(var(--seam-k) * min(1, var(--plank-width)));
+  --deep-img: none;
+  --deep-size: auto;
+  --deep-pos: 0 0;
+  background-color: var(--back);
+  background-image:
+    var(--deep-img),
+    linear-gradient(to bottom, rgb(var(--shade-deep-rgb) / calc(0.55 * var(--depth-k) * var(--back-shade-k))), transparent 24%),
+    linear-gradient(to right, rgb(var(--shade-deep-rgb) / calc(0.30 * var(--depth-k))), transparent 7%, transparent 93%, rgb(var(--shade-deep-rgb) / calc(0.30 * var(--depth-k)))),
+    repeating-linear-gradient(
+      to right,
+      rgb(var(--neutral-dark-rgb) / calc(0.45 * var(--seam-eff))) 0 var(--groove),
+      rgb(var(--plank-lift-rgb) / calc(0.08 * var(--seam-eff))) var(--groove) calc(var(--groove) + 1px),
+      transparent calc(var(--groove) + 1px) var(--plank)
+    ),
+    repeating-linear-gradient(
+      to right,
+      transparent 0 var(--plank),
+      rgb(var(--plank-lift-rgb) / calc(0.04 * var(--seam-k))) var(--plank) calc(2 * var(--plank))
+    ),
+    repeating-linear-gradient(to right, rgb(var(--plank-lift-rgb) / calc(0.025 * var(--seam-k))) 0 1px, transparent 1px calc(17 * var(--u)));
+  background-size: var(--deep-size), auto, auto, var(--span) 100%, var(--span) 100%, var(--span) 100%;
+  background-position: var(--deep-pos), 0 0, 0 0, var(--ox) 0, var(--ox) 0, var(--ox) 0;
+  background-repeat: no-repeat;
+  box-shadow: 1px 0 0 var(--edge-up-6);
+}
+
+.cubby::before {
+  --board-tone: var(--wood);
+  --figure-x: 18%;
+  --grain-y: 0px;
+  --top-face-img: none;
+  --top-face-size: auto;
+  background-color: var(--board-tone);
+  background-image:
+    var(--top-face-img),
+    linear-gradient(
+      to bottom,
+      var(--wood-lit) 0 1px,
+      rgb(var(--sheen-rgb) / 0.06) 1px,
+      transparent 45%,
+      rgb(var(--shade-rgb) / 0.30) 100%
+    ),
+    var(--grain-h),
+    repeating-radial-gradient(
+      ellipse 420% 70% at var(--figure-x) 160%,
+      transparent 0 calc(9 * var(--u)),
+      var(--ga) calc(9 * var(--u)) calc(9 * var(--u) + var(--lw))
+    ),
+    var(--sweep-h);
+  background-size: var(--top-face-size), auto, auto, auto, auto, var(--span) 100%, var(--span) 100%;
+  background-position: 0 0, 0 0, 0 var(--grain-y), 0 var(--grain-y), 0 var(--grain-y), var(--ox) 0, var(--ox) 0;
+  background-repeat: no-repeat, no-repeat, repeat, repeat, repeat, no-repeat, no-repeat;
+}
+
+.cubby[data-board="0"]::before {
+  --board-tone: var(--wood);
+  --figure-x: 18%;
+  --grain-y: 0px;
+}
+
+.cubby[data-board="1"]::before {
+  --board-tone: var(--wood-up-4);
+  --figure-x: 64%;
+  --grain-y: calc(7 * var(--u));
+}
+
+.cubby[data-board="2"]::before {
+  --board-tone: var(--wood-dn-4);
+  --figure-x: 37%;
+  --grain-y: calc(3 * var(--u));
+}
+
+.cubby[data-board="3"]::before {
+  --board-tone: var(--wood-up-2);
+  --figure-x: 82%;
+  --grain-y: calc(11 * var(--u));
+}
+
+.cubby[data-board="4"]::before {
+  --board-tone: var(--wood-dn-6);
+  --figure-x: 9%;
+  --grain-y: calc(5 * var(--u));
+}
+
+.cubby[data-board="5"]::before {
+  --board-tone: var(--wood-up-6);
+  --figure-x: 51%;
+  --grain-y: calc(9 * var(--u));
+}
+
+.section-trim::before,
+.section-trim::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: calc((var(--side-trim) + var(--frame)) * var(--u));
+  height: 100%;
+  background-color: var(--wood);
+  background-image:
+    var(--edge),
+    var(--grain-v),
+    repeating-radial-gradient(
+      ellipse 70% 420% at 160% 40%,
+      transparent 0 calc(9 * var(--u)),
+      var(--ga) calc(9 * var(--u)) calc(9 * var(--u) + var(--lw))
+    ),
+    var(--sweep-v);
+}
+
+.section-trim::before {
+  --edge: linear-gradient(
+    to right,
+    rgb(var(--arris-light-rgb) / 0.30) 0 1px,
+    transparent 1px calc(100% - 1px),
+    rgb(var(--shade-rgb) / 0.40) calc(100% - 1px)
+  );
+  left: 0;
+}
+
+.section-trim::after {
+  --edge: linear-gradient(
+    to right,
+    rgb(var(--arris-light-rgb) / 0.10) 0 1px,
+    rgb(var(--shade-rgb) / 0.12) 1px,
+    rgb(var(--shade-rgb) / 0.18) calc(100% - 1px),
+    rgb(var(--shade-rgb) / 0.45) calc(100% - 1px)
+  );
+  right: 0;
+  background-color: var(--wood-dn-6);
+  box-shadow: calc(2 * var(--u)) 0 calc(6 * var(--u)) calc(-1 * var(--u)) rgb(var(--shade-deep-rgb) / 0.38);
+}
+
+.section-top {
+  border-radius: 2px;
+  background-color: var(--wood);
+  background-image:
+    linear-gradient(
+      to bottom,
+      var(--edge-up-12) 0 1px,
+      rgb(var(--arris-light-rgb) / 0.10) 1px 14%,
+      rgb(var(--shade-rgb) / 0.38) 14% calc(14% + 1px),
+      rgb(var(--shade-rgb) / 0.30) calc(14% + 1px) 20%,
+      rgb(var(--arris-light-rgb) / 0.12) 52%,
+      rgb(var(--shade-rgb) / 0.40) 52% calc(52% + 1px),
+      rgb(var(--arris-light-rgb) / 0.14) calc(52% + 1px) 62%,
+      transparent 82%,
+      rgb(var(--shade-rgb) / 0.30) 96%,
+      rgb(var(--shade-rgb) / 0.55) calc(100% - 1px)
+    ),
+    var(--grain-h),
+    repeating-radial-gradient(
+      ellipse 420% 70% at 44% 160%,
+      transparent 0 calc(9 * var(--u)),
+      var(--ga) calc(9 * var(--u)) calc(9 * var(--u) + var(--lw))
+    ),
+    var(--sweep-h);
+  box-shadow: 0 calc(3 * var(--u)) calc(4 * var(--u)) calc(-1.5 * var(--u)) rgb(var(--shade-deep-rgb) / 0.45);
+}
+
+.section-top::before {
+  content: "";
+  position: absolute;
+  left: calc((var(--side-trim) + var(--overhang) + var(--frame)) * var(--u));
+  top: 100%;
+  width: calc((var(--section-w) - 2 * var(--frame)) * var(--u));
+  height: calc(var(--frame) * var(--u));
+  background-color: var(--wood);
+  background-image:
+    linear-gradient(to bottom, rgb(var(--shade-rgb) / 0.45) 0 1px, transparent 1px 60%, rgb(var(--shade-rgb) / 0.20) 100%),
+    var(--grain-h),
+    var(--sweep-h);
+}
+
+.section-base {
+  background-color: var(--wood-dn-22);
+  background-image:
+    linear-gradient(to bottom, rgb(var(--shade-deep-rgb) / 0.70) 0 1px, rgb(var(--shade-deep-rgb) / 0.45) 1px, transparent 22%),
+    var(--grain-h),
+    var(--sweep-h);
+}
+
+.section-base::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--foot-width) * var(--u));
+  right: calc(var(--foot-width) * var(--u));
+  bottom: 0;
+  height: calc(var(--arch-rise) * var(--u));
+  border-radius: calc(var(--arch-radius) * var(--u)) calc(var(--arch-radius) * var(--u)) 0 0 / 100% 100% 0 0;
+  background: linear-gradient(to bottom, rgb(var(--arch-top-rgb) / var(--arch-alpha-top)), rgb(var(--arch-bottom-rgb) / var(--arch-alpha-bottom)));
+  box-shadow:
+    inset 0 calc(6 * var(--u)) calc(8 * var(--u)) rgb(var(--neutral-dark-rgb) / 0.45),
+    calc(-1 * var(--lw)) calc(-1 * var(--lw)) 0 0 rgb(var(--plank-lift-rgb) / var(--arch-lit)),
+    inset calc(-1 * var(--lw)) calc(-1 * var(--lw)) 0 rgb(var(--shade-deep-rgb) / 0.5);
+}
+
+.section-base::after {
+  content: "";
+  position: absolute;
+  left: calc(-14 * var(--u));
+  top: 100%;
+  width: calc(100% + 28 * var(--u));
+  height: calc(var(--floor-margin) * var(--u));
+  background-image:
+    linear-gradient(to bottom, rgb(var(--room-shade-deep-rgb) / 0.85), transparent),
+    linear-gradient(to bottom, rgb(var(--room-shade-deep-rgb) / 0.85), transparent),
+    radial-gradient(ellipse 50% 85% at 50% 0%, rgb(var(--room-shade-deep-rgb) / 0.55), rgb(var(--room-shade-deep-rgb) / 0.25) 55%, transparent 100%);
+  background-size:
+    calc(var(--foot-width) * var(--u)) calc(2 * var(--u)),
+    calc(var(--foot-width) * var(--u)) calc(2 * var(--u)),
+    auto;
+  background-position:
+    left calc(14 * var(--u)) top 0,
+    right calc(14 * var(--u)) top 0,
+    0 0;
+  background-repeat: no-repeat;
+}
+
+/**
+ * The six designs that are not the classic. Each one is a block of millimetre sizes on the cabinet plus the recipe of its
+ * members. A recipe only reads wood tokens, so any wood can be drawn on any design. Soft members have a lit arris, fine
+ * grain, long streaks and a tonal wander; ply members show the glued layers on every front edge; the library adds the
+ * brass line. A face is always four background layers: arris, fine detail, a second detail and a tonal wander.
+ */
+
+:is([data-design="modern"], [data-design="display"], [data-design="legs"], [data-design="library"]) .section > * {
+  --hair: max(1px, calc(1.2 * var(--u)));
+  --gs: rgb(var(--grain-dark-rgb) / calc(0.30 * var(--grain-k) * var(--grain-fine)));
+  --gls: rgb(var(--arris-light-rgb) / calc(0.09 * var(--grain-k) * var(--grain-fine)));
+  --streak: rgb(var(--grain-dark-rgb) / calc(0.08 * var(--grain-k)));
+  --gst: rgb(var(--grain-dark-rgb) / calc(0.15 * var(--grain-k) * var(--grain-fine)));
+  --lit-a: 0.34;
+  --lit-end-h: 24%;
+  --lit-end-v: 26%;
+  --dark-start-h: 68%;
+  --dark-start-v: 66%;
+  --dark-a: 0.50;
+  --h-face-tall:
+    linear-gradient(to bottom, rgb(var(--arris-light-rgb) / var(--lit-a)) 0, transparent var(--lit-end-h), transparent var(--dark-start-h), rgb(var(--arris-dark-rgb) / var(--dark-a)) 100%),
+    repeating-linear-gradient(to bottom, transparent 0 calc(3.1 * var(--u)), var(--gst) calc(3.1 * var(--u)) calc(3.1 * var(--u) + var(--lw)), transparent calc(3.1 * var(--u) + var(--lw)) calc(7 * var(--u))),
+    repeating-linear-gradient(to bottom, transparent 0 calc(5.3 * var(--u)), var(--gst) calc(5.3 * var(--u)) calc(5.3 * var(--u) + var(--lw)), transparent calc(5.3 * var(--u) + var(--lw)) calc(11 * var(--u))),
+    repeating-linear-gradient(to bottom, transparent 0 calc(8.9 * var(--u)), var(--gst) calc(8.9 * var(--u)) calc(8.9 * var(--u) + var(--lw)), transparent calc(8.9 * var(--u) + var(--lw)) calc(17 * var(--u)));
+  --h-face:
+    linear-gradient(to bottom, rgb(var(--arris-light-rgb) / var(--lit-a)) 0, transparent var(--lit-end-h), transparent var(--dark-start-h), rgb(var(--arris-dark-rgb) / var(--dark-a)) 100%),
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0 calc(2.3 * var(--u)),
+      var(--gs) calc(2.3 * var(--u)) calc(2.3 * var(--u) + var(--lw)),
+      transparent calc(2.3 * var(--u) + var(--lw)) calc(6.1 * var(--u)),
+      var(--gls) calc(6.1 * var(--u)) calc(6.1 * var(--u) + 2 * var(--lw)),
+      transparent calc(6.1 * var(--u) + 2 * var(--lw)) calc(10.7 * var(--u))
+    ),
+    repeating-linear-gradient(to right, transparent 0 calc(41 * var(--u)), var(--streak) calc(70 * var(--u)), transparent calc(113 * var(--u)) calc(263 * var(--u))),
+    repeating-linear-gradient(
+      to right,
+      transparent 0,
+      rgb(var(--shade-rgb) / 0.10) calc(90 * var(--u)),
+      transparent calc(170 * var(--u)),
+      rgb(var(--highlight-rgb) / 0.06) calc(260 * var(--u)),
+      transparent calc(360 * var(--u))
+    );
+  --v-arris: linear-gradient(to right, rgb(var(--arris-light-rgb) / var(--lit-a)) 0, transparent var(--lit-end-v), transparent var(--dark-start-v), rgb(var(--arris-dark-rgb) / var(--dark-a)) 100%);
+  --v-face: var(--v-arris), var(--v-grain);
+  --leg-splay: 8.4deg;
+  --leg-stripes-left:
+    repeating-linear-gradient(
+      calc(90deg + var(--leg-splay)),
+      transparent 0 calc(2.7 * var(--u)),
+      var(--gs) calc(2.7 * var(--u)) calc(2.7 * var(--u) + var(--lw)),
+      transparent calc(2.7 * var(--u) + var(--lw)) calc(7.3 * var(--u)),
+      var(--gls) calc(7.3 * var(--u)) calc(7.3 * var(--u) + 2 * var(--lw)),
+      transparent calc(7.3 * var(--u) + 2 * var(--lw)) calc(11.9 * var(--u))
+    );
+  --leg-stripes-right:
+    repeating-linear-gradient(
+      calc(90deg - var(--leg-splay)),
+      transparent 0 calc(2.7 * var(--u)),
+      var(--gs) calc(2.7 * var(--u)) calc(2.7 * var(--u) + var(--lw)),
+      transparent calc(2.7 * var(--u) + var(--lw)) calc(7.3 * var(--u)),
+      var(--gls) calc(7.3 * var(--u)) calc(7.3 * var(--u) + 2 * var(--lw)),
+      transparent calc(7.3 * var(--u) + 2 * var(--lw)) calc(11.9 * var(--u))
+    );
+  --v-grain: var(--v-stripes), var(--v-rest);
+  --v-stripes:
+    repeating-linear-gradient(
+      to right,
+      transparent 0 calc(2.7 * var(--u)),
+      var(--gs) calc(2.7 * var(--u)) calc(2.7 * var(--u) + var(--lw)),
+      transparent calc(2.7 * var(--u) + var(--lw)) calc(7.3 * var(--u)),
+      var(--gls) calc(7.3 * var(--u)) calc(7.3 * var(--u) + 2 * var(--lw)),
+      transparent calc(7.3 * var(--u) + 2 * var(--lw)) calc(11.9 * var(--u))
+    );
+  --v-rest:
+    repeating-linear-gradient(to bottom, transparent 0 calc(57 * var(--u)), var(--streak) calc(92 * var(--u)), transparent calc(131 * var(--u)) calc(307 * var(--u))),
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      rgb(var(--highlight-rgb) / 0.06) calc(110 * var(--u)),
+      transparent calc(210 * var(--u)),
+      rgb(var(--shade-rgb) / 0.10) calc(300 * var(--u)),
+      transparent calc(400 * var(--u))
+    );
+}
+
+[data-design="modern"] .section > * {
+  --lit-a: 0.30;
+  --lit-end-h: 12%;
+  --lit-end-v: 12%;
+  --dark-start-h: 85%;
+  --dark-start-v: 85%;
+  --dark-a: 0.45;
+}
+
+[data-design="library"] .section > * {
+  --h-face:
+    linear-gradient(to bottom, rgb(var(--arris-light-rgb) / 0.34) 0, transparent 24%, transparent 68%, rgb(var(--arris-dark-rgb) / 0.50) 100%),
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0 calc(2.3 * var(--u)),
+      var(--gs) calc(2.3 * var(--u)) calc(2.3 * var(--u) + var(--lw)),
+      transparent calc(2.3 * var(--u) + var(--lw)) calc(6.1 * var(--u)),
+      var(--gls) calc(6.1 * var(--u)) calc(6.1 * var(--u) + 2 * var(--lw)),
+      transparent calc(6.1 * var(--u) + 2 * var(--lw)) calc(10.7 * var(--u))
+    ),
+    linear-gradient(
+      to bottom,
+      transparent calc(50% - max(0.5px, calc(1 * var(--u)))),
+      var(--inlay) calc(50% - max(0.5px, calc(1 * var(--u)))) calc(50% + max(0.5px, calc(1 * var(--u)))),
+      transparent calc(50% + max(0.5px, calc(1 * var(--u))))
+    ),
+    repeating-linear-gradient(
+      to right,
+      transparent 0,
+      rgb(var(--shade-rgb) / 0.10) calc(90 * var(--u)),
+      transparent calc(170 * var(--u)),
+      rgb(var(--highlight-rgb) / 0.06) calc(260 * var(--u)),
+      transparent calc(360 * var(--u))
+    );
+}
+
+:is([data-design="plywood"], [data-design="plywood-legs"]) .section > * {
+  --ply-p: max(3px, calc(4 * var(--u)));
+  --ply-g: max(1px, calc(0.15 * var(--ply-p)));
+  --pa: var(--ply-a);
+  --pb: var(--ply-b);
+  --pg: var(--ply-glue);
+  --h-face:
+    linear-gradient(to bottom, rgb(var(--arris-light-rgb) / 0.50) 0, transparent 14%, transparent 82%, rgb(var(--arris-dark-rgb) / 0.30) 100%),
+    repeating-linear-gradient(
+      to bottom,
+      var(--pa) 0 calc(0.625 * var(--ply-p)),
+      var(--pb) calc(0.625 * var(--ply-p)) calc(var(--ply-p) - var(--ply-g)),
+      var(--pg) calc(var(--ply-p) - var(--ply-g)) var(--ply-p)
+    ),
+    none,
+    none;
+  --v-face:
+    linear-gradient(to right, rgb(var(--arris-light-rgb) / 0.50) 0, transparent 14%, transparent 82%, rgb(var(--arris-dark-rgb) / 0.30) 100%),
+    repeating-linear-gradient(
+      to right,
+      var(--pa) 0 calc(0.625 * var(--ply-p)),
+      var(--pb) calc(0.625 * var(--ply-p)) calc(var(--ply-p) - var(--ply-g)),
+      var(--pg) calc(var(--ply-p) - var(--ply-g)) var(--ply-p)
+    ),
+    none,
+    none;
+}
+
+@container (max-width: 400px) {
+  :is([data-design="plywood"], [data-design="plywood-legs"]) .section > * {
+    --pb: var(--pa);
+    --pg: var(--pa);
+  }
+}
+
+@container (max-width: 200px) {
+  :is([data-design="plywood"], [data-design="plywood-legs"]) .section > * {
+    --ply-p: max(4px, calc(4 * var(--u)));
+    --ply-g: 0px;
+    --pb: var(--ply-b);
+    --pg: var(--ply-b);
+  }
+}
+
+:is(
+  [data-design="modern"],
+  [data-design="display"],
+  [data-design="legs"],
+  [data-design="library"],
+  [data-design="plywood"],
+  [data-design="plywood-legs"]
+) {
+  --cab: 1;
+}
+
+[data-design="modern"] .cabinet {
+  --side-trim: 0;
+  --overhang: 10;
+  --top-height: 28;
+  --base-height: 60;
+  --base-inset: 28;
+  --base-overhang: 0;
+  --floor-margin: 24;
+  --radius: 4;
+  --plank-width: 150;
+  --kick-a: 0.45;
+  --fs-h: 40;
+  --fs-a: 0.50;
+  --fs-ext: 20;
+}
+
+[data-design="display"] .cabinet {
+  --side-trim: 0;
+  --overhang: 12;
+  --top-height: 44;
+  --base-height: 72;
+  --base-inset: 90;
+  --base-overhang: 0;
+  --floor-margin: 38;
+  --radius: 0;
+  --plank-width: 0;
+  --kick-a: 0.85;
+  --fs-h: 46;
+  --fs-a: 0.80;
+  --fs-ext: 110;
+}
+
+[data-design="legs"] .cabinet {
+  --side-trim: 0;
+  --overhang: 0;
+  --top-height: 0;
+  --base-height: 166;
+  --base-inset: 0;
+  --base-overhang: 0;
+  --floor-margin: 24;
+  --radius: 8;
+  --plank-width: 200;
+}
+
+[data-design="library"] .cabinet {
+  --side-trim: 0;
+  --overhang: 20;
+  --top-height: 84;
+  --base-height: 104;
+  --base-inset: 0;
+  --base-overhang: 14;
+  --floor-margin: 24;
+  --radius: 0;
+  --plank-width: 110;
+}
+
+[data-design="plywood"] .cabinet {
+  --side-trim: 0;
+  --overhang: 0;
+  --top-height: 0;
+  --base-height: 46;
+  --base-inset: 40;
+  --base-overhang: 0;
+  --floor-margin: 24;
+  --radius: 2;
+  --plank-width: 0;
+  --kick-a: 0;
+  --fs-h: 36;
+  --fs-a: 0.45;
+  --fs-ext: 20;
+}
+
+[data-design="plywood-legs"] .cabinet {
+  --side-trim: 0;
+  --overhang: 0;
+  --top-height: 0;
+  --base-height: 140;
+  --base-inset: 0;
+  --base-overhang: 0;
+  --floor-margin: 32;
+  --radius: 5;
+  --plank-width: 0;
+}
+
+:is(
+  [data-design="modern"],
+  [data-design="display"],
+  [data-design="legs"],
+  [data-design="library"],
+  [data-design="plywood"],
+  [data-design="plywood-legs"]
+) {
+  & .section-body {
+    background-color: var(--wood);
+    background-image: var(--v-face);
+    border-radius: calc(var(--radius) * var(--u));
+  }
+
+  & .cubby {
+    box-shadow: 1px 0 0 var(--edge-up-6), -1px 0 0 rgb(var(--arris-dark-rgb) / 0.55);
+  }
+
+  & .cubby::before {
+    background-color: var(--board-tone);
+    background-image:
+      var(--top-face-img),
+      linear-gradient(to bottom, var(--wood-lit) 0 1px, transparent 1px, rgb(var(--shade-rgb) / 0.30) 100%),
+      var(--h-face);
+    background-size: var(--top-face-size), auto, auto, auto, var(--span) 100%, var(--span) 100%;
+    background-position: 0 0, 0 0, 0 0, 0 0, var(--ox) 0, var(--ox) 0;
+    background-repeat: no-repeat;
+  }
+
+  & .section-trim::before,
+  & .section-trim::after {
+    background-image: var(--edge), var(--v-face);
+  }
+
+  & .section-trim::before {
+    border-radius: calc(var(--radius) * var(--u)) 0 0 calc(var(--radius) * var(--u));
+  }
+
+  & .section-trim::after {
+    border-radius: 0 calc(var(--radius) * var(--u)) calc(var(--radius) * var(--u)) 0;
+  }
+
+  & .section-top::before {
+    background-image:
+      linear-gradient(to bottom, rgb(var(--shade-rgb) / 0.45) 0 1px, transparent 1px 60%, rgb(var(--shade-rgb) / 0.20) 100%),
+      var(--h-face);
+  }
+}
+
+:is([data-design="legs"], [data-design="plywood"], [data-design="plywood-legs"]) .section-top {
+  border-radius: 0;
+  background-image: none;
+  background-color: transparent;
+  box-shadow: none;
+}
+
+:is([data-design="modern"], [data-design="display"], [data-design="plywood"]) .section-base {
+  background-color: transparent;
+  background-image: none;
+}
+
+:is([data-design="modern"], [data-design="display"], [data-design="plywood"]) .section-base::before {
+  left: calc(var(--base-inset) * var(--u));
+  right: calc(var(--base-inset) * var(--u));
+  top: 0;
+  bottom: auto;
+  height: 100%;
+  border-radius: 0;
+  background-image:
+    linear-gradient(to bottom, rgb(var(--shade-deep-rgb) / var(--kick-a)) 0, rgb(var(--shade-deep-rgb) / calc(var(--kick-a) * 0.3)) 45%, rgb(var(--shade-deep-rgb) / calc(var(--kick-a) * 0.1))),
+    linear-gradient(to bottom, var(--recess), var(--recess-low));
+  box-shadow: none;
+}
+
+:is([data-design="modern"], [data-design="display"], [data-design="plywood"]) .section-base::after {
+  left: calc((var(--base-inset) - var(--fs-ext)) * var(--u));
+  right: calc((var(--base-inset) - var(--fs-ext)) * var(--u));
+  width: auto;
+  top: calc(100% - var(--fs-h) * 0.5 * var(--u));
+  height: calc(var(--fs-h) * var(--u));
+  background-image: radial-gradient(
+    ellipse 50% 50% at 50% 50%,
+    rgb(var(--room-shade-rgb) / var(--fs-a)),
+    rgb(var(--room-shade-rgb) / calc(var(--fs-a) * 0.45)) 55%,
+    transparent 100%
+  );
+  background-size: auto;
+  background-position: 0 0;
+}
+
+[data-design="modern"] .section-top {
+  border-radius: calc(4 * var(--u));
+  background-color: var(--wood);
+  background-image:
+    linear-gradient(
+      to bottom,
+      rgb(var(--arris-light-rgb) / 0.55) 0 var(--hair),
+      transparent var(--hair) 30%,
+      transparent 68%,
+      rgb(var(--arris-dark-rgb) / 0.45) 100%
+    ),
+    var(--h-face);
+  box-shadow: 0 max(1px, calc(1.5 * var(--u))) 0 rgb(var(--shade-rgb) / 0.45);
+}
+
+[data-design="display"] .section-top {
+  border-radius: 0;
+  background-color: var(--wood);
+  background-image:
+    linear-gradient(
+      to bottom,
+      rgb(var(--highlight-rgb) / 0.22) 0,
+      rgb(var(--highlight-rgb) / 0.30) 26%,
+      rgb(var(--highlight-rgb) / 0.60) 26% calc(26% + var(--hair)),
+      rgb(var(--highlight-rgb) / 0.10) calc(26% + var(--hair)) 40%,
+      transparent 60%,
+      rgb(var(--shade-rgb) / 0.20) 86%,
+      rgb(var(--shade-rgb) / 0.60) 88% 100%
+    ),
+    var(--h-face-tall);
+  box-shadow: 0 calc(4 * var(--u)) calc(8 * var(--u)) rgb(var(--shade-rgb) / 0.55);
+}
+
+[data-design="legs"] .section-base,
+[data-design="plywood-legs"] .section-base {
+  background-color: transparent;
+}
+
+[data-design="legs"] .section-base {
+  background-image:
+    radial-gradient(closest-side, rgb(var(--room-shade-rgb) / 0.70), transparent),
+    radial-gradient(closest-side, rgb(var(--room-shade-rgb) / 0.70), transparent),
+    radial-gradient(closest-side, rgb(var(--room-shade-rgb) / 0.45), rgb(var(--room-shade-rgb) / 0.18) 60%, transparent);
+  background-size:
+    calc(46 * var(--u)) calc(12 * var(--u)),
+    calc(46 * var(--u)) calc(12 * var(--u)),
+    calc((var(--section-w) + 40) * var(--u)) calc(40 * var(--u));
+  background-repeat: no-repeat;
+  background-position:
+    left calc(30 * var(--u)) top calc(160 * var(--u)),
+    right calc(30 * var(--u)) top calc(160 * var(--u)),
+    center top calc(146 * var(--u));
+}
+
+[data-design="plywood-legs"] .section-base {
+  background-image:
+    radial-gradient(closest-side, rgb(var(--room-shade-rgb) / 0.70), transparent),
+    radial-gradient(closest-side, rgb(var(--room-shade-rgb) / 0.70), transparent),
+    radial-gradient(closest-side, rgb(var(--room-shade-rgb) / 0.45), rgb(var(--room-shade-rgb) / 0.18) 60%, transparent);
+  background-size:
+    calc(46 * var(--u)) calc(12 * var(--u)),
+    calc(46 * var(--u)) calc(12 * var(--u)),
+    calc((var(--section-w) + 40) * var(--u)) calc(48 * var(--u));
+  background-repeat: no-repeat;
+  background-position:
+    left calc(33 * var(--u)) top calc(134 * var(--u)),
+    right calc(33 * var(--u)) top calc(134 * var(--u)),
+    center top calc(116 * var(--u));
+}
+
+[data-design="legs"] .section-base::before,
+[data-design="plywood-legs"] .section-base::before {
+  left: 0;
+  right: auto;
+  top: 0;
+  bottom: auto;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  box-shadow: none;
+  background-color: var(--wood);
+  background-repeat: no-repeat;
+}
+
+[data-design="legs"] .section-base::before {
+  clip-path: polygon(
+    calc(60 * var(--u)) calc(30 * var(--u)),
+    calc(112 * var(--u)) calc(30 * var(--u)),
+    calc(66 * var(--u)) calc(166 * var(--u)),
+    calc(40 * var(--u)) calc(166 * var(--u)),
+    calc(60 * var(--u)) calc(30 * var(--u)),
+    calc(100% - 112 * var(--u)) calc(30 * var(--u)),
+    calc(100% - 60 * var(--u)) calc(30 * var(--u)),
+    calc(100% - 40 * var(--u)) calc(166 * var(--u)),
+    calc(100% - 66 * var(--u)) calc(166 * var(--u)),
+    calc(100% - 112 * var(--u)) calc(30 * var(--u))
+  );
+  background-image:
+    linear-gradient(to right, rgb(var(--arris-light-rgb) / 0.35) 0, transparent 38%, rgb(var(--arris-dark-rgb) / 0.55) 100%),
+    linear-gradient(to right, rgb(var(--arris-light-rgb) / 0.35) 0, transparent 38%, rgb(var(--arris-dark-rgb) / 0.55) 100%),
+    linear-gradient(to bottom, rgb(var(--shade-rgb) / 0.45) 0, transparent calc(30 * var(--u))),
+    var(--leg-stripes-left),
+    var(--leg-stripes-right),
+    var(--v-rest);
+  background-size: calc(72 * var(--u)) 100%, calc(72 * var(--u)) 100%, auto, 50% 100%, 50% 100%, auto, auto;
+  background-position: calc(40 * var(--u)) 0, calc(100% - 40 * var(--u)) 0, 0 0, 0 0, 100% 0, 0 0, 0 0;
+}
+
+[data-design="plywood-legs"] .section-base::before {
+  clip-path: polygon(
+    calc(59 * var(--u)) 0,
+    calc(104 * var(--u)) 0,
+    calc(67 * var(--u)) calc(140 * var(--u)),
+    calc(45 * var(--u)) calc(140 * var(--u)),
+    calc(59 * var(--u)) 0,
+    calc(100% - 104 * var(--u)) 0,
+    calc(100% - 59 * var(--u)) 0,
+    calc(100% - 45 * var(--u)) calc(140 * var(--u)),
+    calc(100% - 67 * var(--u)) calc(140 * var(--u)),
+    calc(100% - 104 * var(--u)) 0
+  );
+  background-image:
+    linear-gradient(to right, rgb(var(--arris-light-rgb) / 0.40) 0, transparent 40%, rgb(var(--arris-dark-rgb) / 0.55) 100%),
+    linear-gradient(to right, rgb(var(--arris-light-rgb) / 0.40) 0, transparent 40%, rgb(var(--arris-dark-rgb) / 0.55) 100%),
+    linear-gradient(to bottom, rgb(var(--shade-rgb) / 0.45) 0, transparent calc(14 * var(--u))),
+    linear-gradient(to right, var(--pa), var(--pa));
+  background-size: calc(64 * var(--u)) 100%, calc(64 * var(--u)) 100%, auto, auto;
+  background-position: calc(40 * var(--u)) 0, calc(100% - 40 * var(--u)) 0, 0 0, 0 0;
+}
+
+[data-design="legs"] .section-base::after {
+  left: calc(14 * var(--u));
+  right: calc(14 * var(--u));
+  width: auto;
+  top: calc(-14 * var(--u));
+  height: calc(48 * var(--u));
+  border-radius: calc(2 * var(--u));
+  background-color: var(--wood);
+  background-image:
+    linear-gradient(to bottom, rgb(var(--arris-light-rgb) / 0.50) 0 var(--hair), transparent var(--hair) 24%, transparent 66%, rgb(var(--arris-dark-rgb) / 0.55) 100%),
+    var(--h-face-tall);
+  background-size: auto;
+  background-position: 0 0;
+  background-repeat: no-repeat;
+  box-shadow: 0 calc(3 * var(--u)) calc(4 * var(--u)) calc(-1 * var(--u)) rgb(var(--shade-rgb) / 0.55);
+}
+
+[data-design="plywood-legs"] .section-base::after {
+  content: none;
+}
+
+[data-design="library"] .section-top {
+  border-radius: 0;
+  background-color: transparent;
+  background-image:
+    linear-gradient(to bottom, rgb(var(--highlight-rgb) / 0.45) 0, var(--wood-up-6) var(--hair), var(--wood) 70%, rgb(var(--shade-deep-rgb) / 0.85) 100%),
+    repeating-linear-gradient(to right, rgb(var(--shade-deep-rgb) / 0.55) 0 calc(5 * var(--u)), transparent calc(5 * var(--u)) calc(12 * var(--u))),
+    linear-gradient(to bottom, rgb(var(--shade-deep-rgb)) 0, var(--wood-dn-22) 25%, var(--wood) 70%, var(--wood-up-6) 100%),
+    linear-gradient(to bottom, var(--wood-dn-22) 0, var(--wood-up-6) 45%, rgb(var(--highlight-rgb) / 0.55) 55%, var(--wood) 75%, rgb(var(--shade-deep-rgb)) 100%),
+    linear-gradient(to bottom, var(--wood-up-6) 0, var(--wood) 60%, rgb(var(--shade-deep-rgb)) 100%);
+  background-size:
+    100% calc(16 * var(--u)),
+    calc(100% - 12 * var(--u)) calc(14 * var(--u)),
+    calc(100% - 12 * var(--u)) calc(36 * var(--u)),
+    calc(100% - 24 * var(--u)) calc(14 * var(--u)),
+    calc(100% - 34 * var(--u)) calc(18 * var(--u));
+  background-position:
+    50% 0,
+    50% calc(38 * var(--u)),
+    50% calc(16 * var(--u)),
+    50% calc(52 * var(--u)),
+    50% calc(66 * var(--u));
+  background-repeat: no-repeat;
+  box-shadow: none;
+}
+
+[data-design="library"] .section-base {
+  background-color: transparent;
+  background-image:
+    linear-gradient(to bottom, rgb(var(--highlight-rgb) / 0.45) 0, var(--wood-up-6) var(--hair), var(--wood) 70%, rgb(var(--shade-deep-rgb) / 0.85) 100%),
+    linear-gradient(to bottom, rgb(var(--arris-light-rgb) / 0.40) 0, transparent 12%, transparent 80%, rgb(var(--arris-dark-rgb) / 0.50) 100%),
+    repeating-linear-gradient(to bottom, transparent 0 calc(3.1 * var(--u)), var(--gst) calc(3.1 * var(--u)) calc(3.1 * var(--u) + var(--lw)), transparent calc(3.1 * var(--u) + var(--lw)) calc(7 * var(--u))),
+    repeating-linear-gradient(to bottom, transparent 0 calc(5.3 * var(--u)), var(--gst) calc(5.3 * var(--u)) calc(5.3 * var(--u) + var(--lw)), transparent calc(5.3 * var(--u) + var(--lw)) calc(11 * var(--u))),
+    repeating-linear-gradient(to bottom, transparent 0 calc(8.9 * var(--u)), var(--gst) calc(8.9 * var(--u)) calc(8.9 * var(--u) + var(--lw)), transparent calc(8.9 * var(--u) + var(--lw)) calc(17 * var(--u))),
+    linear-gradient(var(--wood), var(--wood)),
+    linear-gradient(to bottom, rgb(var(--shade-deep-rgb) / 0.55), transparent 70%),
+    linear-gradient(to bottom, var(--recess), var(--recess-low));
+  background-size:
+    calc(100% - 6 * var(--u)) calc(18 * var(--u)),
+    calc(100% - 18 * var(--u)) calc(70 * var(--u)),
+    calc(100% - 18 * var(--u)) calc(70 * var(--u)),
+    calc(100% - 18 * var(--u)) calc(70 * var(--u)),
+    calc(100% - 18 * var(--u)) calc(70 * var(--u)),
+    calc(100% - 18 * var(--u)) calc(70 * var(--u)),
+    calc(100% - 60 * var(--u)) calc(16 * var(--u)),
+    calc(100% - 60 * var(--u)) calc(16 * var(--u));
+  background-position:
+    50% 0,
+    50% calc(18 * var(--u)),
+    50% calc(18 * var(--u)),
+    50% calc(18 * var(--u)),
+    50% calc(18 * var(--u)),
+    50% calc(18 * var(--u)),
+    50% calc(88 * var(--u)),
+    50% calc(88 * var(--u));
+  background-repeat: no-repeat;
+}
+
+[data-design="library"] .section-base::before {
+  content: none;
+}
+
+[data-design="library"] .section-base::after {
+  left: calc(-10 * var(--u));
+  width: calc(100% + 20 * var(--u));
+  top: calc(100% - 12 * var(--u));
+  height: calc(24 * var(--u));
+  background-image: radial-gradient(ellipse 50% 50% at 50% 50%, rgb(var(--room-shade-rgb) / 0.60), rgb(var(--room-shade-rgb) / 0.25) 55%, transparent 100%);
+  background-size: auto;
+  background-position: 0 0;
+}
+
+/**
+ * The floor patch of one piece: a skirting band behind the base and a floor tone in front of it, both fading to the
+ * wall before the section box ends. The floor line is where the feet or the base meet the floor; the skirting ends
+ * 14 mm above it, so it shows beside the base and between legs. Everything stays inside the section box.
+ */
+.section > .section-floor {
+  --floor-y: calc((var(--bh) - var(--floor-margin) - 14) * var(--u));
+  background-image:
+    linear-gradient(to right, transparent, rgb(var(--room-shade-rgb) / calc(0.16 * var(--room-k))) 22%, rgb(var(--room-shade-rgb) / calc(0.16 * var(--room-k))) 78%, transparent),
+    linear-gradient(to right, transparent, rgb(var(--highlight-rgb) / calc(0.12 * var(--room-k))) 22%, rgb(var(--highlight-rgb) / calc(0.12 * var(--room-k))) 78%, transparent),
+    linear-gradient(to right, transparent, var(--skirting) 22%, var(--skirting) 78%, transparent),
+    radial-gradient(ellipse 52% 100% at 50% 0%, var(--floor) 0, var(--floor) 30%, transparent 96%);
+  background-repeat: no-repeat;
+  background-size:
+    100% max(1px, calc(2 * var(--u))),
+    100% max(1px, calc(1 * var(--u))),
+    100% calc(36 * var(--u)),
+    100% calc((var(--floor-margin) + 14) * var(--u));
+  background-position:
+    0 var(--floor-y),
+    0 calc((var(--bh) - var(--floor-margin) - 50) * var(--u)),
+    0 calc((var(--bh) - var(--floor-margin) - 50) * var(--u)),
+    0 var(--floor-y);
+}
+
+}

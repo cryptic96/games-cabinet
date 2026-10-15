@@ -1,0 +1,150 @@
+/**
+ * Option B, classic cabinet. Keeps the contract's colours (frame in --wood-mid, back near --ink) and adds
+ * what makes a frame of boards read as a piece of traditional furniture: grain along every board, lit
+ * front edges, a moulded top that overhangs, tongue-and-groove back planks, and a plinth with an arched
+ * apron standing on the floor. One light, from above and slightly left.
+ */
+.section {
+  --side-mm: 30;
+  --overhang-mm: 16;
+  --top-mm: 36;
+  --base-mm: 120;
+  --plinth-mm: 88;
+  --plank-mm: 105;
+  --wood: var(--wood-mid);
+  --back: #2f1d12;
+  --grain: rgb(28 12 4 / 0.22);
+  --grain-soft: rgb(28 12 4 / 0.11);
+  --sheen: rgb(255 226 186 / 0.07);
+  --arris: rgb(255 232 200 / 0.34);
+  --seam: rgb(22 9 3 / 0.55);
+  --shade: 12 5 1;
+}
+
+/** Side panels and dividers: vertical boards, so the grain runs top to bottom. */
+.carcass {
+  background-color: var(--wood);
+  background-image:
+    repeating-linear-gradient(to right, var(--grain) 0 calc(0.55 * var(--u)), transparent calc(0.55 * var(--u)) calc(4.3 * var(--u))),
+    repeating-linear-gradient(to right, var(--grain-soft) 0 calc(0.9 * var(--u)), transparent calc(0.9 * var(--u)) calc(6.7 * var(--u))),
+    repeating-linear-gradient(to right, var(--sheen) 0 calc(1.6 * var(--u)), transparent calc(1.6 * var(--u)) calc(11.3 * var(--u))),
+    linear-gradient(to bottom, rgb(255 236 210 / 0.05), transparent 40%, rgb(0 0 0 / 0.10));
+  box-shadow:
+    inset 1px 0 0 var(--arris),
+    inset -1px 0 0 var(--seam),
+    calc(3 * var(--u)) calc(8 * var(--u)) calc(16 * var(--u)) calc(-2 * var(--u)) rgb(var(--shade) / 0.6);
+}
+
+/** The top rail of the carcass, between the side panels, in the shadow of the overhanging top. */
+.carcass::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--frame) * var(--u));
+  right: calc(var(--frame) * var(--u));
+  top: 0;
+  height: calc(var(--frame) * var(--u));
+  background-color: var(--wood);
+  background-image:
+    linear-gradient(to bottom, rgb(var(--shade) / 0.55), rgb(var(--shade) / 0.15) 45%, transparent 70%, rgb(var(--shade) / 0.3) 100%),
+    repeating-linear-gradient(to bottom, var(--grain) 0 calc(0.55 * var(--u)), transparent calc(0.55 * var(--u)) calc(3.1 * var(--u))),
+    repeating-linear-gradient(to bottom, var(--sheen) 0 calc(1.2 * var(--u)), transparent calc(1.2 * var(--u)) calc(7.3 * var(--u)));
+  box-shadow: -1px 0 0 var(--seam), 1px 0 0 var(--seam);
+}
+
+/** Back panel: vertical tongue-and-groove planks that continue behind every cubby, in shade. */
+.cubby {
+  --off: calc((var(--side-mm) + var(--frame) + var(--x)) * var(--u) * -1);
+  --wide: calc(30 * var(--plank-mm) * var(--u));
+  background-color: var(--back);
+  background-image:
+    linear-gradient(to bottom, rgb(var(--shade) / 0.72), rgb(var(--shade) / 0.32) calc(16 * var(--u)), transparent calc(75 * var(--u))),
+    linear-gradient(to right, rgb(var(--shade) / 0.5), transparent calc(26 * var(--u)), transparent calc(100% - 26 * var(--u)), rgb(var(--shade) / 0.42)),
+    linear-gradient(to top, rgb(var(--shade) / 0.3), transparent calc(12 * var(--u))),
+    repeating-linear-gradient(to right, rgb(8 3 0 / 0.6) 0 calc(1.4 * var(--u)), rgb(255 214 170 / 0.07) calc(1.4 * var(--u)) calc(2.6 * var(--u)), transparent calc(2.6 * var(--u)) calc(var(--plank-mm) * var(--u))),
+    repeating-linear-gradient(to right, rgb(255 214 170 / 0.04) 0 calc(var(--plank-mm) * var(--u)), transparent calc(var(--plank-mm) * var(--u)) calc(2 * var(--plank-mm) * var(--u)), rgb(0 0 0 / 0.07) calc(2 * var(--plank-mm) * var(--u)) calc(3 * var(--plank-mm) * var(--u))),
+    repeating-linear-gradient(to right, rgb(0 0 0 / 0.16) 0 calc(0.5 * var(--u)), transparent calc(0.5 * var(--u)) calc(3.7 * var(--u))),
+    repeating-linear-gradient(to right, rgb(255 214 170 / 0.035) 0 calc(1 * var(--u)), transparent calc(1 * var(--u)) calc(7.9 * var(--u)));
+  background-size: 100% 100%, 100% 100%, 100% 100%, var(--wide) 100%, var(--wide) 100%, var(--wide) 100%, var(--wide) 100%;
+  background-position: 0 0, 0 0, 0 0, var(--off) 0, var(--off) 0, var(--off) 0, var(--off) 0;
+  box-shadow: 1px 0 0 rgb(255 232 200 / 0.18), -1px 0 0 var(--seam);
+}
+
+/** Shade from the shelf above, falling on the boxes as well as the back. */
+.cubby::before {
+  background-image:
+    linear-gradient(to bottom, rgb(var(--shade) / 0.4), rgb(var(--shade) / 0.12) calc(30 * var(--u)), transparent calc(85 * var(--u))),
+    linear-gradient(to right, rgb(var(--shade) / 0.16), transparent calc(30 * var(--u)), transparent calc(100% - 30 * var(--u)), rgb(var(--shade) / 0.12));
+}
+
+/** Shelves: horizontal boards with a lit front arris, grain along the length and a slight tone per shelf. */
+.cubby::after {
+  --tone: calc(sin(var(--y) * 0.731) * 0.035);
+  background-color: oklch(from var(--wood) calc(l + var(--tone)) c h);
+  background-image:
+    linear-gradient(to bottom, var(--arris) 0 1px, rgb(255 232 200 / 0.11) 1px 22%, transparent 55%, rgb(var(--shade) / 0.3) 100%),
+    repeating-linear-gradient(to bottom, var(--grain) 0 calc(0.55 * var(--u)), transparent calc(0.55 * var(--u)) calc(3.1 * var(--u))),
+    repeating-linear-gradient(to bottom, var(--grain-soft) 0 calc(0.9 * var(--u)), transparent calc(0.9 * var(--u)) calc(4.9 * var(--u))),
+    repeating-linear-gradient(to bottom, var(--sheen) 0 calc(1.2 * var(--u)), transparent calc(1.2 * var(--u)) calc(7.3 * var(--u))),
+    linear-gradient(to right, rgb(0 0 0 / 0.09), transparent 30%, rgb(255 240 220 / 0.06) 55%, rgb(0 0 0 / 0.08));
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, calc(var(--section-w) * var(--u)) 100%;
+  background-position: 0 0, 0 calc(sin(var(--y)) * 2 * var(--u)), 0 calc(cos(var(--y)) * 2 * var(--u)), 0 0, calc(var(--x) * var(--u) * -1) 0;
+  box-shadow: inset 0 -1px 0 var(--seam);
+}
+
+/** Moulded top: rounded front edge, a groove, a flat face and a bead, overhanging the sides. */
+.cabinet-top {
+  border-radius: calc(2 * var(--u)) calc(2 * var(--u)) calc(1 * var(--u)) calc(1 * var(--u));
+  background-color: oklch(from var(--wood) calc(l + 0.02) c h);
+  background-image:
+    linear-gradient(to bottom,
+      rgb(255 236 210 / 0.5) 0 1px,
+      rgb(255 236 210 / 0.2) 1px 8%,
+      transparent 20%,
+      rgb(var(--shade) / 0.25) 30%,
+      rgb(var(--shade) / 0.6) 32% 35%,
+      rgb(255 232 200 / 0.12) 37%,
+      transparent 50%,
+      rgb(var(--shade) / 0.12) 76%,
+      rgb(var(--shade) / 0.5) 78% 80%,
+      rgb(255 232 200 / 0.22) 83%,
+      rgb(var(--shade) / 0.4) 100%),
+    repeating-linear-gradient(to bottom, var(--grain) 0 calc(0.55 * var(--u)), transparent calc(0.55 * var(--u)) calc(3.1 * var(--u))),
+    linear-gradient(to right, rgb(0 0 0 / 0.1), transparent 25%, rgb(255 240 220 / 0.07) 60%, rgb(0 0 0 / 0.1));
+  box-shadow: 0 calc(3 * var(--u)) calc(6 * var(--u)) rgb(var(--shade) / 0.55);
+  z-index: 1;
+}
+
+/** Soft shadow on the floor under the plinth. */
+.cabinet-base::before {
+  content: "";
+  position: absolute;
+  left: calc((var(--side-mm) - 22) * var(--u));
+  right: calc((var(--side-mm) - 22) * var(--u));
+  top: calc((var(--plinth-mm) - 14) * var(--u));
+  height: calc(34 * var(--u));
+  background: radial-gradient(closest-side, rgb(var(--shade) / 0.7), rgb(var(--shade) / 0.3) 60%, transparent);
+}
+
+/** Plinth: a base moulding over an apron with a shallow arch between two feet. */
+.cabinet-base::after {
+  content: "";
+  position: absolute;
+  left: calc(var(--side-mm) * var(--u));
+  width: calc(var(--section-w) * var(--u));
+  top: 0;
+  height: calc(var(--plinth-mm) * var(--u));
+  background-color: oklch(from var(--wood) calc(l - 0.03) c h);
+  background-image:
+    linear-gradient(to bottom,
+      rgb(var(--shade) / 0.55) 0 calc(2 * var(--u)),
+      rgb(255 236 210 / 0.32) calc(2 * var(--u)) calc(3 * var(--u)),
+      rgb(255 236 210 / 0.1) calc(3 * var(--u)) calc(9 * var(--u)),
+      rgb(var(--shade) / 0.5) calc(12 * var(--u)) calc(14 * var(--u)),
+      rgb(255 232 200 / 0.12) calc(15 * var(--u)),
+      transparent calc(24 * var(--u)),
+      rgb(var(--shade) / 0.25) 100%),
+    repeating-linear-gradient(to bottom, var(--grain) 0 calc(0.55 * var(--u)), transparent calc(0.55 * var(--u)) calc(3.1 * var(--u))),
+    linear-gradient(to right, rgb(0 0 0 / 0.12), transparent 25%, rgb(255 240 220 / 0.05) 60%, rgb(0 0 0 / 0.12));
+  -webkit-mask-image: radial-gradient(ellipse calc(50% - 120 * var(--u)) calc(44 * var(--u)) at 50% 100%, transparent 98%, #000 100%);
+  mask-image: radial-gradient(ellipse calc(50% - 120 * var(--u)) calc(44 * var(--u)) at 50% 100%, transparent 98%, #000 100%);
+}
