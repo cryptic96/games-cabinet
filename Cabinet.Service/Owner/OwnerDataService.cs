@@ -458,9 +458,13 @@ public sealed class OwnerDataService : IOwnerArtReferences
     /// <param name="now">The moment the copy is stamped with.</param>
     private void KeepEarlierVersionWhenDue(DateTimeOffset now)
     {
+        var olderFormat = false;
+
         try
         {
-            if (_store.StoredSchemaVersion() < OwnerData.CurrentSchemaVersion
+            olderFormat = _store.StoredSchemaVersion() < OwnerData.CurrentSchemaVersion;
+
+            if (olderFormat
                 || _store.NewestEarlierVersionAt() is not { } newest
                 || now - newest > VersionInterval)
             {
@@ -469,7 +473,10 @@ public sealed class OwnerDataService : IOwnerArtReferences
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            _logger.LogWarning("An earlier version of the owner data could not be kept: {ExceptionType}", exception.GetType().Name);
+            _logger.LogWarning(
+                "An earlier version of the owner data could not be kept ({Kind}): {ExceptionType}. The save goes on.",
+                olderFormat ? "file in an older format, no copy of it exists" : "routine copy",
+                exception.GetType().Name);
         }
     }
 
