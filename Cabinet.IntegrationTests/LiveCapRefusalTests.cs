@@ -38,6 +38,7 @@ public class LiveCapRefusalTests
         var limiter = factory.ServingServices.GetRequiredService<LiveConnectionLimiter>();
         await using var first = new ReconnectingPage(factory, firstTransport);
         await first.StartAsync();
+        await first.WaitUntilHeldAsync(factory);
         await using var refused = new ReconnectingPage(factory, refusedTransport);
 
         await refused.StartAsync();
@@ -64,16 +65,20 @@ public class LiveCapRefusalTests
         var settings = new Dictionary<string, string?> { ["Live:MaxConnections"] = "1" };
         await using var factory = CreateCountingFactory(handler, settings, new AttemptCounter());
         var limiter = factory.ServingServices.GetRequiredService<LiveConnectionLimiter>();
+        using var upgrades = new KestrelUpgradeWatch(factory.PublicPort);
         await using var first = new ReconnectingPage(factory, HttpTransportType.WebSockets);
         await first.StartAsync();
+        await first.WaitUntilHeldAsync(factory);
         await using var refused = new ReconnectingPage(factory, HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents);
         await refused.StartAsync();
         await refused.Closed.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         await first.Connection.StopAsync(TestContext.Current.CancellationToken);
         await SyncHarness.WaitUntil(() => Task.FromResult(limiter.Count == 0));
+        await upgrades.WaitForOpenAsync(0);
         await using var admitted = new ReconnectingPage(factory, HttpTransportType.WebSockets);
         await admitted.StartAsync();
+        await admitted.WaitUntilHeldAsync(factory);
         await SyncHarness.WaitUntil(() => Task.FromResult(limiter.Count == 1));
 
         admitted.Closed.IsCompleted.Should().BeFalse("a place was free, so the connection is held open");
@@ -88,6 +93,7 @@ public class LiveCapRefusalTests
         await using var factory = CreateCountingFactory(handler, settings, new AttemptCounter());
         await using var first = new ReconnectingPage(factory, HttpTransportType.ServerSentEvents);
         await first.StartAsync();
+        await first.WaitUntilHeldAsync(factory);
 
         var frames = await ReadFramesOfRefusedWebSocketAsync(factory);
 
@@ -175,6 +181,13 @@ public class LiveCapRefusalTests
         public int ReceivedCount => _received.Count;
 
         public Task StartAsync() => Connection.StartAsync(TestContext.Current.CancellationToken);
+
+        public Task WaitUntilHeldAsync(CabinetWebApplicationFactory factory)
+        {
+            var limiter = factory.ServingServices.GetRequiredService<LiveConnectionLimiter>();
+
+            return SyncHarness.WaitUntil(() => Task.FromResult(limiter.IsAdmitted(Connection.ConnectionId!)));
+        }
 
         public ValueTask DisposeAsync() => Connection.DisposeAsync();
     }

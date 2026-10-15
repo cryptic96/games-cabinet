@@ -2,8 +2,10 @@ using System.Text.RegularExpressions;
 using Cabinet.BrowserTests.Infrastructure;
 using Cabinet.FakeBgg;
 using Cabinet.IntegrationTests.Infrastructure;
+using Cabinet.Service.Live;
 using Cabinet.Service.Owner;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using Microsoft.Playwright;
 
@@ -227,7 +229,7 @@ public sealed class LiveLookTests : CabinetPageTest
     public async Task With_the_live_channel_blocked_the_page_keeps_its_look_and_follows_on_the_next_catch_up_or_load()
     {
         await Page.RouteAsync("**/cabinet/live**", route => route.AbortAsync());
-        await StartCabinetAsync();
+        await StartCabinetAsync(waitForLiveChannel: false);
 
         await PublishAsync(("wood", "oak"));
         await Task.Delay(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
@@ -328,7 +330,7 @@ public sealed class LiveLookTests : CabinetPageTest
         ConsoleErrors.Should().BeEmpty();
     }
 
-    private async Task StartCabinetAsync(int gameCount = 5, string? browserTime = null)
+    private async Task StartCabinetAsync(int gameCount = 5, string? browserTime = null, bool waitForLiveChannel = true)
     {
         var bgg = new SyncRounds.SwitchableBgg(SyntheticBggCollection.Create(gameCount));
         var factory = SyncHarness.CreateFactory(
@@ -347,6 +349,12 @@ public sealed class LiveLookTests : CabinetPageTest
         }
 
         await GotoCabinetAsync("/");
+
+        if (waitForLiveChannel)
+        {
+            var limiter = factory.ServingServices.GetRequiredService<LiveConnectionLimiter>();
+            await SyncHarness.WaitUntil(() => Task.FromResult(limiter.Count == 1));
+        }
     }
 
     private async Task PublishAsync(params (string Field, string Value)[] choices)

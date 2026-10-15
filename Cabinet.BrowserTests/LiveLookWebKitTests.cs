@@ -1,7 +1,9 @@
 using Cabinet.FakeBgg;
 using Cabinet.IntegrationTests.Infrastructure;
+using Cabinet.Service.Live;
 using Cabinet.Service.Owner;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using Microsoft.Playwright;
 
@@ -47,6 +49,8 @@ public sealed class LiveLookWebKitTests
         await page.AddInitScriptAsync(LiveLookTests.AnchorSpy);
         await page.GotoAsync($"http://127.0.0.1:{factory.PublicPort}/");
         await Assertions.Expect(page.Locator("#cabinet .section").Nth(2)).ToBeVisibleAsync();
+        var limiter = factory.ServingServices.GetRequiredService<LiveConnectionLimiter>();
+        await SyncHarness.WaitUntil(() => Task.FromResult(limiter.Count == 1));
         await page.EvaluateAsync(LiveLookTests.ScrollToThirdSectionScript);
         var before = await page.EvaluateAsync<double[]>(LiveLookTests.PlaceScript);
         var index = (int)before[0];

@@ -39,6 +39,16 @@ public sealed class LiveConnectionLimiter(LiveOptions options)
         return true;
     }
 
+    /// <summary>Tells whether a connection holds a place now.</summary>
+    /// <param name="connectionId">The identifier of the connection to look up.</param>
+    /// <returns>True when the connection was admitted and has not closed.</returns>
+    public bool IsAdmitted(string connectionId)
+    {
+        ArgumentNullException.ThrowIfNull(connectionId);
+
+        return _admitted.ContainsKey(connectionId);
+    }
+
     /// <summary>Frees the place of a connection that has closed. A connection that was never admitted frees nothing.</summary>
     /// <param name="connectionId">The identifier of the connection that closed.</param>
     public void Release(string connectionId)
