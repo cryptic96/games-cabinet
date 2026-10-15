@@ -72,6 +72,45 @@ public class LiveSettingsTests
     }
 
     [Fact]
+    public void A_connection_that_already_holds_a_place_is_admitted_again_at_the_cap_without_taking_a_second_place()
+    {
+        var limiter = new LiveConnectionLimiter(new LiveOptions(2));
+        limiter.TryAdmit("a").Should().BeTrue();
+        limiter.TryAdmit("b").Should().BeTrue();
+
+        limiter.TryAdmit("a").Should().BeTrue();
+        limiter.TryAdmit("b").Should().BeTrue();
+
+        limiter.Count.Should().Be(2);
+        limiter.TryAdmit("c").Should().BeFalse();
+        limiter.Release("a");
+        limiter.Count.Should().Be(1);
+    }
+
+    [Fact]
+    public void Concurrent_attempts_admit_exactly_the_cap_and_never_turn_away_a_connection_that_has_a_place()
+    {
+        const int cap = 20;
+        var limiter = new LiveConnectionLimiter(new LiveOptions(cap));
+        var admitted = new System.Collections.Concurrent.ConcurrentBag<string>();
+
+        Parallel.For(0, 200, number =>
+        {
+            var id = $"connection-{number}";
+
+            if (limiter.TryAdmit(id))
+            {
+                admitted.Add(id);
+            }
+        });
+
+        admitted.Should().HaveCount(cap);
+        limiter.Count.Should().Be(cap);
+        Parallel.ForEach(admitted, id => limiter.TryAdmit(id).Should().BeTrue());
+        limiter.Count.Should().Be(cap);
+    }
+
+    [Fact]
     public void The_limiter_tells_which_connections_hold_a_place()
     {
         var limiter = new LiveConnectionLimiter(new LiveOptions(1));
