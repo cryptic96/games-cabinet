@@ -293,7 +293,7 @@ public sealed class OwnerDataServiceTests : IDisposable
     {
         var oldFile = FirstFormatFile();
         var store = CreateStore();
-        store.KeepEarlierVersion(OwnerTestKit.Start.AddMinutes(-10));
+        KeepRecentCopy();
         var keptBefore = store.ReadEarlierVersion(0);
         var service = CreateService(store, out _);
 
@@ -311,7 +311,7 @@ public sealed class OwnerDataServiceTests : IDisposable
     {
         FirstFormatFile();
         var store = CreateStore();
-        store.KeepEarlierVersion(OwnerTestKit.Start.AddMinutes(-10));
+        KeepRecentCopy();
         var service = CreateService(store, out var clock);
         await service.MutateAsync(service.Revision, data => LocationEdits.Add(data, CabinetA, OwnerDataService.NewId), CancellationToken.None);
 
@@ -326,7 +326,7 @@ public sealed class OwnerDataServiceTests : IDisposable
     {
         var oldFile = FirstFormatFile(gameId: 100);
         var store = CreateStore();
-        store.KeepEarlierVersion(OwnerTestKit.Start.AddMinutes(-10));
+        KeepRecentCopy();
         var service = CreateService(store, out _);
 
         await service.ReconcileAsync(new HashSet<int>(), CancellationToken.None);
@@ -388,6 +388,13 @@ public sealed class OwnerDataServiceTests : IDisposable
         File.WriteAllBytes(FilePath, bytes);
 
         return bytes;
+    }
+
+    private void KeepRecentCopy()
+    {
+        var versions = Path.Combine(_directory.FullPath, "owner-data-versions");
+        Directory.CreateDirectory(versions);
+        File.WriteAllText(Path.Combine(versions, "owner-data.20300115T115000Z.json"), "{\"an\":\"earlier copy\"}");
     }
 
     private OwnerDataStore CreateStore() => new(_directory.FullPath, NullLogger<OwnerDataStore>.Instance);

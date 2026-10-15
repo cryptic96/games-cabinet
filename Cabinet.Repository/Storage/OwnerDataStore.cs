@@ -18,13 +18,15 @@ public sealed class OwnerDataStore : IOwnerDataStore
     /// <summary>The name of the stored file.</summary>
     public const string FileName = "owner-data.json";
 
-    /// <summary>How many earlier copies of the file are kept; older ones are removed.</summary>
+    /// <summary>How many ordinary earlier copies of the file are kept; older ones are removed. The copies of a file in an older format are never counted or removed.</summary>
     public const int KeptVersions = 10;
 
     private const string VersionsDirectoryName = "owner-data-versions";
     private const string VersionNamePrefix = "owner-data.";
     private const string VersionNameSuffix = ".json";
+    private const string OlderFormatMark = "format-";
     private const string VersionTimeFormat = "yyyyMMdd'T'HHmmss'Z'";
+    private const string OlderFormatTimeFormat = "yyyyMMdd'T'HHmmssfff'Z'";
 
     private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
 
@@ -80,6 +82,11 @@ public sealed class OwnerDataStore : IOwnerDataStore
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// A copy of a file in an older format is kept under its own name, which carries the format and a millisecond stamp: it is
+    /// never replaced by a later copy, never counted against <see cref="KeptVersions"/> and never removed, because it is the
+    /// only copy a release that can read that format is able to use. A file already copied byte for byte is not copied again.
+    /// </remarks>
     public void KeepEarlierVersion(DateTimeOffset now)
     {
         if (!File.Exists(_path))
@@ -89,9 +96,17 @@ public sealed class OwnerDataStore : IOwnerDataStore
 
         var content = File.ReadAllBytes(_path);
         Directory.CreateDirectory(_versionsDirectory);
+
+        if (ReadHeader(content) is { SchemaVersion: var format } && format >= 1 && format < OwnerData.CurrentSchemaVersion)
+        {
+            KeepOlderFormatCopy(content, format, now);
+
+            return;
+        }
+
         AtomicJsonFile.WriteAtomically(Path.Combine(_versionsDirectory, VersionFileName(now)), content);
 
-        foreach (var (path, _) in ListVersionFiles().Skip(KeptVersions))
+        foreach (var (path, _) in ListVersionFiles().Where(version => !IsOlderFormatCopy(version.Path)).Skip(KeptVersions))
         {
             File.Delete(path);
         }
@@ -140,6 +155,31 @@ public sealed class OwnerDataStore : IOwnerDataStore
             .ThenByDescending(version => version.Path, StringComparer.Ordinal)];
     }
 
+    private void KeepOlderFormatCopy(byte[] content, int format, DateTimeOffset now)
+    {
+        var mark = OlderFormatMark + format.ToString(CultureInfo.InvariantCulture) + ".";
+
+        if (Directory.EnumerateFiles(_versionsDirectory)
+            .Where(path => System.IO.Path.GetFileName(path).StartsWith(VersionNamePrefix + mark, StringComparison.Ordinal))
+            .Any(path => File.ReadAllBytes(path).AsSpan().SequenceEqual(content)))
+        {
+            return;
+        }
+
+        var moment = now;
+        string target;
+
+        while (File.Exists(target = System.IO.Path.Combine(_versionsDirectory, VersionNamePrefix + mark + moment.UtcDateTime.ToString(OlderFormatTimeFormat, CultureInfo.InvariantCulture) + VersionNameSuffix)))
+        {
+            moment = moment.AddMilliseconds(1);
+        }
+
+        AtomicJsonFile.WriteAtomically(target, content);
+    }
+
+    private static bool IsOlderFormatCopy(string path) =>
+        System.IO.Path.GetFileName(path).StartsWith(VersionNamePrefix + OlderFormatMark, StringComparison.Ordinal);
+
     private static string VersionFileName(DateTimeOffset moment) =>
         VersionNamePrefix + moment.UtcDateTime.ToString(VersionTimeFormat, CultureInfo.InvariantCulture) + VersionNameSuffix;
 
@@ -151,8 +191,22 @@ public sealed class OwnerDataStore : IOwnerDataStore
         }
 
         var stamp = fileName[VersionNamePrefix.Length..^VersionNameSuffix.Length];
+        var timeFormat = VersionTimeFormat;
 
-        return DateTimeOffset.TryParseExact(stamp, VersionTimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var moment)
+        if (stamp.StartsWith(OlderFormatMark, StringComparison.Ordinal))
+        {
+            var dot = stamp.IndexOf('.', StringComparison.Ordinal);
+
+            if (dot < 0)
+            {
+                return null;
+            }
+
+            stamp = stamp[(dot + 1)..];
+            timeFormat = OlderFormatTimeFormat;
+        }
+
+        return DateTimeOffset.TryParseExact(stamp, timeFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var moment)
             ? moment
             : null;
     }
