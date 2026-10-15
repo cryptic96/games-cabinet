@@ -451,24 +451,25 @@ public sealed class OwnerDataService : IOwnerArtReferences
     }
 
     /// <summary>
-    /// Keeps a copy of the stored file before a save when the newest copy is more than an hour old or there is none. A file in
-    /// an older format is always copied, whatever the interval says, so the release that wrote it can be rolled back to: after
-    /// the save no earlier release can read the file, and the copy is the only one it can. So a copy of a file in an older format
-    /// that fails is thrown on, and the save that called this is refused with the file untouched; a routine copy of a file already
-    /// in the current format that fails is logged and the save goes on.
+    /// Keeps a copy of the stored file before a save when the newest copy is more than an hour old or there is none. A file that
+    /// is not known to be in the current format is always copied, whatever the interval says: a file in an older format, so the
+    /// release that wrote it can be rolled back to (after the save no earlier release can read the file, and the copy is the only
+    /// one it can), and a file whose format cannot be read now, which might be such a file. A copy of either that fails is
+    /// thrown on, and the save that called this is refused with the file untouched; a routine copy of a file known to be in the
+    /// current format that fails is logged and the save goes on. When there is no file there is nothing to copy and nothing fails.
     /// </summary>
     /// <param name="now">The moment the copy is stamped with.</param>
-    /// <exception cref="IOException">The file is in an older format and its copy could not be made.</exception>
-    /// <exception cref="UnauthorizedAccessException">The file is in an older format and its copy was not allowed.</exception>
+    /// <exception cref="IOException">The file is not known to be in the current format and its copy could not be made.</exception>
+    /// <exception cref="UnauthorizedAccessException">The file is not known to be in the current format and its copy was not allowed.</exception>
     private void KeepEarlierVersionWhenDue(DateTimeOffset now)
     {
-        var olderFormat = false;
+        var copyRequired = true;
 
         try
         {
-            olderFormat = _store.StoredSchemaVersion() < OwnerData.CurrentSchemaVersion;
+            copyRequired = _store.StoredSchemaVersion() is not { } format || format < OwnerData.CurrentSchemaVersion;
 
-            if (olderFormat
+            if (copyRequired
                 || _store.NewestEarlierVersionAt() is not { } newest
                 || now - newest > VersionInterval)
             {
@@ -477,9 +478,9 @@ public sealed class OwnerDataService : IOwnerArtReferences
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            if (olderFormat)
+            if (copyRequired)
             {
-                _logger.LogWarning("The file in an older format could not be copied, so the save is refused: {ExceptionType}", exception.GetType().Name);
+                _logger.LogWarning("The stored file is not known to be in the current format and could not be copied, so the save is refused: {ExceptionType}", exception.GetType().Name);
 
                 throw;
             }

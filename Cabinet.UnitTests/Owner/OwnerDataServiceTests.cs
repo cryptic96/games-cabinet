@@ -18,6 +18,7 @@ public sealed class OwnerDataServiceTests : IDisposable
 {
     private const string CabinetA = "Cabinet A";
     private const string ShelfB = "Shelf B";
+    private const string FileModesDoNotApply = "file modes do not stop this user from reading the file, so it cannot be made unreadable here";
 
     private readonly TemporaryDirectory _directory = new();
 
@@ -466,6 +467,147 @@ public sealed class OwnerDataServiceTests : IDisposable
         result.Outcome.Should().Be(OwnerOutcome.Saved);
         store.StoredSchemaVersion().Should().Be(OwnerData.CurrentSchemaVersion);
         ((OwnerDataState.Ready)service.State).Data.Locations.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task A_change_is_refused_and_the_old_format_file_left_alone_when_the_file_cannot_be_read_at_the_save()
+    {
+        var oldFile = FirstFormatFile();
+        var service = CreateService(CreateStore(), out _);
+        Assert.SkipUnless(MakeStoredFileUnreadable(), FileModesDoNotApply);
+
+        var result = await service.MutateAsync(service.Revision, data => LocationEdits.Add(data, CabinetA, OwnerDataService.NewId), CancellationToken.None);
+
+        result.Outcome.Should().Be(OwnerOutcome.Refused);
+        result.StatusKey.Should().Be("save-failed");
+        ReadStoredFileBack().Should().Equal(oldFile);
+        service.Revision.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task A_download_is_not_recorded_and_the_old_format_file_left_alone_when_the_file_cannot_be_read_at_the_save()
+    {
+        var oldFile = FirstFormatFile();
+        var service = CreateService(CreateStore(), out _);
+        Assert.SkipUnless(MakeStoredFileUnreadable(), FileModesDoNotApply);
+
+        var download = await service.RecordDownloadAsync(CancellationToken.None);
+
+        download.Should().BeNull();
+        ReadStoredFileBack().Should().Equal(oldFile);
+        ((OwnerDataState.Ready)service.State).Data.LastDownloadAtUtc.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task A_change_is_refused_when_the_format_of_the_stored_file_cannot_be_read_and_its_copy_fails()
+    {
+        var store = new InMemoryOwnerDataStore { FileExists = true };
+        var harness = OwnerTestKit.Harness(store);
+        await harness.AddAsync(CabinetA);
+        var saves = store.Saved.Count;
+        store.FormatUnknown = true;
+        store.FailCopies = true;
+
+        var result = await harness.AddAsync(ShelfB);
+
+        result.Outcome.Should().Be(OwnerOutcome.Refused);
+        result.StatusKey.Should().Be("save-failed");
+        store.Saved.Should().HaveCount(saves);
+    }
+
+    [Fact]
+    public async Task A_first_save_with_no_stored_file_yet_is_not_treated_as_an_older_format()
+    {
+        var store = new InMemoryOwnerDataStore { FailCopies = true };
+        var harness = OwnerTestKit.Harness(store);
+
+        var result = await harness.AddAsync(CabinetA);
+
+        result.Outcome.Should().Be(OwnerOutcome.Saved);
+        store.KeptAt.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_restore_is_refused_and_the_old_format_file_left_alone_when_its_copy_cannot_be_made()
+    {
+        var oldFile = FirstFormatFile();
+        BlockVersionsFolder();
+        var service = CreateService(CreateStore(), out _);
+        var document = OwnerData.Empty with { Revision = 1, Locations = [new OwnerLocation("0a1b2c3d", CabinetA)] };
+
+        var result = await service.RestoreAsync(document, RestoreSource.File, null, CancellationToken.None);
+
+        result.Outcome.Should().Be(OwnerOutcome.Refused);
+        result.StatusKey.Should().Be("save-failed");
+        File.ReadAllBytes(FilePath).Should().Equal(oldFile);
+        ((OwnerDataState.Ready)service.State).Data.Locations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_download_after_an_upgrade_keeps_the_old_format_file_where_the_earlier_release_lists_it()
+    {
+        var oldFile = FirstFormatFile();
+        var store = CreateStore();
+        KeepRecentCopy();
+        var service = CreateService(store, out _);
+
+        var download = await service.RecordDownloadAsync(CancellationToken.None);
+
+        download.Should().NotBeNull();
+        store.ReadEarlierVersion(0).Should().Equal(oldFile);
+        store.StoredSchemaVersion().Should().Be(OwnerData.CurrentSchemaVersion);
+        var listed = EarlierReleaseVersionReader.List(Path.Combine(_directory.FullPath, "owner-data-versions"));
+        listed.Should().HaveCount(2);
+        File.ReadAllBytes(listed[0].Path).Should().Equal(oldFile);
+        listed[0].SavedAtUtc.Should().Be(OwnerTestKit.Start);
+    }
+
+    [Fact]
+    public async Task A_change_after_an_upgrade_keeps_the_old_format_file_where_the_earlier_release_lists_it()
+    {
+        var oldFile = FirstFormatFile();
+        var service = CreateService(CreateStore(), out _);
+
+        var result = await service.MutateAsync(service.Revision, data => LocationEdits.Add(data, CabinetA, OwnerDataService.NewId), CancellationToken.None);
+
+        result.Outcome.Should().Be(OwnerOutcome.Saved);
+        var listed = EarlierReleaseVersionReader.List(Path.Combine(_directory.FullPath, "owner-data-versions"));
+        listed.Should().ContainSingle().Which.SavedAtUtc.Should().Be(OwnerTestKit.Start);
+        File.ReadAllBytes(listed[0].Path).Should().Equal(oldFile);
+    }
+
+    /// <summary>Takes every permission off the stored file; false when the file can still be read, as it can for a user that file modes do not bind.</summary>
+    private bool MakeStoredFileUnreadable()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return false;
+        }
+
+        File.SetUnixFileMode(FilePath, UnixFileMode.None);
+
+        try
+        {
+            using (File.OpenRead(FilePath))
+            {
+                return false;
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return true;
+        }
+    }
+
+    /// <summary>Gives the stored file its permissions back and reads it.</summary>
+    private byte[] ReadStoredFileBack()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(FilePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+
+        return File.ReadAllBytes(FilePath);
     }
 
     /// <summary>Puts a plain file where the versions folder belongs, so that no copy can be made.</summary>
