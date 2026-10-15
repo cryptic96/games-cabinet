@@ -118,7 +118,11 @@ by default).
 ### Rolling back after a format change
 
 When a release changes the format of the owner data, it keeps a copy of the
-old file in `owner-data-versions/` before its first save. Once it has saved,
+old file in `owner-data-versions/` before its first save, under its own name
+(`owner-data.format-<n>.<timestamp>.json`). That copy is never replaced, never
+counted against the ten kept copies and never removed. If the copy cannot be
+made, the save is refused and the old file is left as it is, so the upgrade
+never replaces the only file an earlier release can read. Once it has saved,
 the file is in the new format and the previous release cannot read it. A
 rollback to that release therefore opens the recovery panel on every owner
 page. Restore the copy from just before the upgrade from the earlier versions
@@ -224,7 +228,9 @@ is backed up by hand, by download.
   are not a backup.
 - **A release that changes the data format.** Before its first save the new
   release always keeps a copy of the old file, whatever the hour rule says,
-  so the last file an earlier release can read is among the earlier versions.
+  under a name of its own that is never replaced or removed, and refuses the
+  save if that copy cannot be made. The last file an earlier release can read
+  is therefore always among the earlier versions.
   After that save the file is in the new format and the previous release
   cannot read it. See "Rolling back after a format change" below.
 - **Restoring from a file.** On the Settings page, choose the file and press

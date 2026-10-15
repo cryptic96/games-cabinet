@@ -453,9 +453,13 @@ public sealed class OwnerDataService : IOwnerArtReferences
     /// <summary>
     /// Keeps a copy of the stored file before a save when the newest copy is more than an hour old or there is none. A file in
     /// an older format is always copied, whatever the interval says, so the release that wrote it can be rolled back to: after
-    /// the save no earlier release can read the file, and the copy is the only one it can. A copy that fails is logged and the save goes on.
+    /// the save no earlier release can read the file, and the copy is the only one it can. So a copy of a file in an older format
+    /// that fails is thrown on, and the save that called this is refused with the file untouched; a routine copy of a file already
+    /// in the current format that fails is logged and the save goes on.
     /// </summary>
     /// <param name="now">The moment the copy is stamped with.</param>
+    /// <exception cref="IOException">The file is in an older format and its copy could not be made.</exception>
+    /// <exception cref="UnauthorizedAccessException">The file is in an older format and its copy was not allowed.</exception>
     private void KeepEarlierVersionWhenDue(DateTimeOffset now)
     {
         var olderFormat = false;
@@ -473,10 +477,14 @@ public sealed class OwnerDataService : IOwnerArtReferences
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            _logger.LogWarning(
-                "An earlier version of the owner data could not be kept ({Kind}): {ExceptionType}. The save goes on.",
-                olderFormat ? "file in an older format, no copy of it exists" : "routine copy",
-                exception.GetType().Name);
+            if (olderFormat)
+            {
+                _logger.LogWarning("The file in an older format could not be copied, so the save is refused: {ExceptionType}", exception.GetType().Name);
+
+                throw;
+            }
+
+            _logger.LogWarning("An earlier version of the owner data could not be kept: {ExceptionType}. The save goes on.", exception.GetType().Name);
         }
     }
 
