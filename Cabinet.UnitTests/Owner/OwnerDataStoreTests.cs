@@ -225,18 +225,159 @@ public sealed class OwnerDataStoreTests : IDisposable
     }
 
     [Fact]
-    public void A_file_in_an_older_format_is_kept_under_its_own_name_and_is_listed_and_readable_like_any_other_copy()
+    public void A_file_in_an_older_format_is_kept_under_the_name_earlier_releases_list_and_is_listed_and_readable_like_any_other_copy()
     {
         var bytes = FirstFormatFile();
         var store = CreateStore();
 
         store.KeepEarlierVersion(OwnerTestKit.Start);
 
-        Directory.EnumerateFiles(VersionsPath).Select(Path.GetFileName).Should().Equal("owner-data.format-1.20300115T120000000Z.json");
+        Directory.EnumerateFiles(VersionsPath).Select(Path.GetFileName).Should().Equal("owner-data.20300115T120000Z.json");
         store.EarlierVersions().Should().Equal(new EarlierVersion(0, OwnerTestKit.Start));
         store.ReadEarlierVersion(0).Should().Equal(bytes);
         store.NewestEarlierVersionAt().Should().Be(OwnerTestKit.Start);
         File.ReadAllBytes(FilePath).Should().Equal(bytes);
+    }
+
+    [Fact]
+    public void The_earlier_release_lists_the_copy_of_a_file_in_an_older_format_under_the_moment_it_was_taken_with_the_original_bytes()
+    {
+        var bytes = FirstFormatFile();
+        var store = CreateStore();
+
+        store.KeepEarlierVersion(OwnerTestKit.Start);
+
+        var listed = EarlierReleaseVersionReader.List(VersionsPath);
+        listed.Should().ContainSingle().Which.SavedAtUtc.Should().Be(OwnerTestKit.Start);
+        File.ReadAllBytes(listed[0].Path).Should().Equal(bytes);
+        Directory.EnumerateFiles(VersionsPath)
+            .Select(path => EarlierReleaseVersionReader.ParseVersionTime(Path.GetFileName(path)))
+            .Should().AllSatisfy(moment => moment.Should().NotBeNull());
+    }
+
+    [Fact]
+    public void A_copy_of_an_older_format_written_under_the_dedicated_name_is_still_listed_and_readable()
+    {
+        var bytes = FirstFormatFile();
+        Directory.CreateDirectory(VersionsPath);
+        File.WriteAllBytes(Path.Combine(VersionsPath, "owner-data.format-1.20300115T110000000Z.json"), bytes);
+
+        var store = CreateStore();
+
+        store.EarlierVersions().Should().Equal(new EarlierVersion(0, OwnerTestKit.Start.AddHours(-1)));
+        store.ReadEarlierVersion(0).Should().Equal(bytes);
+    }
+
+    [Fact]
+    public void A_file_already_copied_under_the_dedicated_name_is_not_copied_again()
+    {
+        var bytes = FirstFormatFile();
+        Directory.CreateDirectory(VersionsPath);
+        File.WriteAllBytes(Path.Combine(VersionsPath, "owner-data.format-1.20300115T110000000Z.json"), bytes);
+        var store = CreateStore();
+
+        store.KeepEarlierVersion(OwnerTestKit.Start);
+
+        Directory.EnumerateFiles(VersionsPath).Should().ContainSingle();
+    }
+
+    [Theory]
+    [InlineData("owner-data.20300115T110000Z.json")]
+    [InlineData("owner-data.format-1.20300115T110000000Z.json")]
+    public void More_than_ten_newer_ordinary_copies_never_remove_a_copy_in_an_older_format_whatever_its_name(string olderCopyName)
+    {
+        var olderBytes = FirstFormatFile();
+        Directory.CreateDirectory(VersionsPath);
+        var olderCopy = Path.Combine(VersionsPath, olderCopyName);
+        File.WriteAllBytes(olderCopy, olderBytes);
+        var store = CreateStore();
+
+        for (var number = 1; number <= OwnerDataStore.KeptVersions + 3; number++)
+        {
+            store.Save(OwnerData.Empty with { Revision = number });
+            store.KeepEarlierVersion(OwnerTestKit.Start.AddHours(number));
+        }
+
+        File.ReadAllBytes(olderCopy).Should().Equal(olderBytes);
+        Directory.EnumerateFiles(VersionsPath).Should().HaveCount(OwnerDataStore.KeptVersions + 1);
+        store.EarlierVersions().Should().HaveCount(OwnerDataStore.KeptVersions + 1);
+    }
+
+    [Fact]
+    public void A_copy_whose_header_cannot_be_read_is_never_removed_while_ordinary_copies_are_still_kept_to_ten()
+    {
+        Directory.CreateDirectory(VersionsPath);
+        var damaged = Path.Combine(VersionsPath, "owner-data.20300115T110000Z.json");
+        File.WriteAllText(damaged, "{ this is not json");
+        var store = CreateStore();
+
+        for (var number = 1; number <= OwnerDataStore.KeptVersions + 3; number++)
+        {
+            store.Save(OwnerData.Empty with { Revision = number });
+            store.KeepEarlierVersion(OwnerTestKit.Start.AddHours(number));
+        }
+
+        File.Exists(damaged).Should().BeTrue();
+        store.EarlierVersions().Select(version => version.SavedAtUtc).Should().Equal(
+            Enumerable.Range(4, OwnerDataStore.KeptVersions).Reverse().Select(number => OwnerTestKit.Start.AddHours(number))
+                .Append(OwnerTestKit.Start.AddHours(-1)));
+    }
+
+    [Fact]
+    public void An_ordinary_copy_whose_header_starts_past_a_long_first_member_is_kept_rather_than_removed()
+    {
+        Directory.CreateDirectory(VersionsPath);
+        var unusual = Path.Combine(VersionsPath, "owner-data.20300115T110000Z.json");
+        File.WriteAllText(unusual, $"{{\"note\":\"{new string('x', 8000)}\",\"kind\":\"games-cabinet-owner-data\",\"schemaVersion\":{OwnerData.CurrentSchemaVersion}}}");
+        var store = CreateStore();
+
+        for (var number = 1; number <= OwnerDataStore.KeptVersions + 1; number++)
+        {
+            store.Save(OwnerData.Empty with { Revision = number });
+            store.KeepEarlierVersion(OwnerTestKit.Start.AddHours(number));
+        }
+
+        File.Exists(unusual).Should().BeTrue();
+    }
+
+    [Fact]
+    public void A_copy_of_an_older_format_moves_past_every_taken_second_and_overwrites_none_of_them()
+    {
+        Directory.CreateDirectory(VersionsPath);
+        var first = Path.Combine(VersionsPath, "owner-data.20300115T120000Z.json");
+        var second = Path.Combine(VersionsPath, "owner-data.20300115T120001Z.json");
+        var store = CreateStore();
+        store.Save(OwnerData.Empty with { Revision = 1 });
+        var firstBytes = File.ReadAllBytes(FilePath);
+        File.WriteAllBytes(first, firstBytes);
+        var secondBytes = FirstFormatFile(revision: 2);
+        File.WriteAllBytes(second, secondBytes);
+        var olderBytes = FirstFormatFile(revision: 3);
+
+        store.KeepEarlierVersion(OwnerTestKit.Start);
+
+        File.ReadAllBytes(first).Should().Equal(firstBytes);
+        File.ReadAllBytes(second).Should().Equal(secondBytes);
+        File.ReadAllBytes(Path.Combine(VersionsPath, "owner-data.20300115T120002Z.json")).Should().Equal(olderBytes);
+        EarlierReleaseVersionReader.List(VersionsPath).Should().HaveCount(3);
+    }
+
+    [Fact]
+    public void An_ordinary_copy_in_the_same_second_as_a_copy_of_an_older_format_moves_on_and_replaces_only_an_ordinary_copy()
+    {
+        var olderBytes = FirstFormatFile();
+        var store = CreateStore();
+        store.KeepEarlierVersion(OwnerTestKit.Start);
+        store.Save(OwnerData.Empty with { Revision = 4 });
+        store.KeepEarlierVersion(OwnerTestKit.Start);
+        store.Save(OwnerData.Empty with { Revision = 5 });
+        var newest = File.ReadAllBytes(FilePath);
+
+        store.KeepEarlierVersion(OwnerTestKit.Start);
+
+        File.ReadAllBytes(Path.Combine(VersionsPath, "owner-data.20300115T120000Z.json")).Should().Equal(olderBytes);
+        File.ReadAllBytes(Path.Combine(VersionsPath, "owner-data.20300115T120001Z.json")).Should().Equal(newest);
+        Directory.EnumerateFiles(VersionsPath).Should().HaveCount(2);
     }
 
     [Fact]
