@@ -200,6 +200,24 @@ footer {
   max-width: 100%;
 }
 
+/**
+ * In forced colours the page's own background is replaced, so the white wordmark would sit on a white page and vanish. The logo is
+ * drawn on a plate of its own that matches the wordmark it carries (dark plate for the white logo, light plate for the dark one),
+ * and opts out of recolouring so the plate keeps its colour. The logo file itself is unchanged; nothing changes in normal colours.
+ */
+@media (forced-colors: active) {
+  .bgg-credit img {
+    forced-color-adjust: none;
+    padding: 4px 6px;
+    border-radius: 2px;
+    background-color: #3b2416;
+  }
+
+  .bgg-credit img[src*="-dark"] {
+    background-color: #fbf8f0;
+  }
+}
+
 main .cabinet-message {
   font-size: 16px;
   color: var(--room-text, var(--wall-text));

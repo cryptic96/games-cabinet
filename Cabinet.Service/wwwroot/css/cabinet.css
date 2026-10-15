@@ -704,4 +704,21 @@
   z-index: 2;
 }
 
+/**
+ * In forced colours every fill and shadow is dropped, which would leave the shelves as bare bars and the boxes with no edges. A
+ * thin outline in the system text colour restores the outer shape of the piece and the edge of each box. Outlines take no space,
+ * and the box's focus ring is more specific, so it still wins on the focused box.
+ */
+@media (forced-colors: active) {
+  .placement {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+
+  .section-trim {
+    outline: 2px solid CanvasText;
+    outline-offset: -2px;
+  }
+}
+
 }
