@@ -171,6 +171,11 @@ public sealed class OwnerDataStore : IOwnerDataStore
             return Unreadable("newer format");
         }
 
+        if (known.SchemaVersion < 1)
+        {
+            return Unreadable("malformed");
+        }
+
         var upgraded = UpgradeToCurrent(content, known.SchemaVersion);
 
         if (upgraded is null)
@@ -189,7 +194,7 @@ public sealed class OwnerDataStore : IOwnerDataStore
             return Unreadable("malformed");
         }
 
-        return data is null || data.SchemaVersion < 1 || HasNullMember(data)
+        return data is null || HasNullMember(data)
             ? Unreadable("malformed")
             : new OwnerDataState.Ready(data with { Look = data.Look.Normalized() });
     }
