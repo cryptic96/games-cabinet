@@ -39,6 +39,9 @@ export function scrollAfterSwitch(cabinetTop, barBottom, scrollY) {
 /** How long, in milliseconds, the box that was asked for stays outlined after Show on shelf took the visitor to it. */
 export const FOUND_HOLD_MS = 2000;
 
+/** The most times the page measures and scrolls again while it settles on the box Show on shelf is taking the visitor to. */
+const LANDING_PASSES = 3;
+
 /** The attribute that outlines the box Show on shelf landed on. */
 const FOUND_MARKER = 'data-found';
 
@@ -340,6 +343,33 @@ export function initLocationsView({
   }
 
   /**
+   * Scrolls the page at once to where the box of Show on shelf belongs. A scroll can change what is above the box, as shelves that
+   * come into view are laid out for real, so the page measures again after each scroll and scrolls once more until the box is where
+   * it should be, a few times at most.
+   * @param {Element} box The box to land on.
+   * @param {Element} heading The heading of the box's location, or the box itself when it has none.
+   */
+  function settleOn(box, heading) {
+    for (let pass = 0; pass < LANDING_PASSES; pass += 1) {
+      const boxRect = box.getBoundingClientRect();
+      const target = shelfScrollTarget({
+        headingTop: heading.getBoundingClientRect().top,
+        boxTop: boxRect.top,
+        boxBottom: boxRect.bottom,
+        barBottom: pinnedBarBottom(),
+        viewportHeight: window.innerHeight,
+        scrollY: window.scrollY,
+      });
+
+      if (Math.abs(target - window.scrollY) < 1) {
+        return;
+      }
+
+      window.scrollTo({ top: target, behavior: 'instant' });
+    }
+  }
+
+  /**
    * Scrolls the page at once to the box of an entry and outlines it. The outline stays for a short while and goes at the next press
    * of the pointer or a key, never by moving the pointer. Without the box the page only makes sure the cabinet is not above the bar.
    * @param {string} entryId The entry id as text.
@@ -354,26 +384,19 @@ export function initLocationsView({
     }
 
     const heading = box.closest('.location-group')?.querySelector('.location-heading') ?? box;
-    const boxRect = box.getBoundingClientRect();
 
-    window.scrollTo({
-      top: shelfScrollTarget({
-        headingTop: heading.getBoundingClientRect().top,
-        boxTop: boxRect.top,
-        boxBottom: boxRect.bottom,
-        barBottom: pinnedBarBottom(),
-        viewportHeight: window.innerHeight,
-        scrollY: window.scrollY,
-      }),
-      behavior: 'instant',
-    });
-
+    settleOn(box, heading);
     clearFound();
     found = box;
     box.setAttribute(FOUND_MARKER, '');
     foundTimer = window.setTimeout(clearFound, FOUND_HOLD_MS);
     document.addEventListener('pointerdown', clearFound, true);
     document.addEventListener('keydown', clearFoundOnKey, true);
+    window.requestAnimationFrame(() => {
+      if (found === box) {
+        settleOn(box, heading);
+      }
+    });
   }
 
   /**
