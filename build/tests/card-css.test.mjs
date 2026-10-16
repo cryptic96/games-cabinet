@@ -110,6 +110,19 @@ test('the card has no punched hole', () => {
   assert.doesNotMatch(stripped, /card-hole/);
 });
 
+test('switching the view names the cabinet area, keeps the root still and fades over the look token', () => {
+  assert.ok(declares('html[data-switching-view] #cabinet', 'view-transition-name: cabinet-area'));
+  assert.ok(declares('html[data-switching-view]::view-transition-group(root)', 'animation: none'));
+  assert.ok(declares('html[data-switching-view]::view-transition-group(cabinet-area)', 'animation-duration: var(--look-fade)'));
+});
+
+test('the cabinet area takes its view-transition name only while a switch is under way', () => {
+  const names = rules().filter((rule) => /view-transition-name:\s*cabinet-area/.test(rule.body));
+
+  assert.equal(names.length, 1);
+  assert.deepEqual(names[0].selectors, ['html[data-switching-view] #cabinet']);
+});
+
 test('the chip takes its colour from the row, and the text and paper never take an art colour', () => {
   assert.ok(declares('.exp-chip', 'background: var(--chip)'));
   assert.doesNotMatch(stripped, /\.card(-ruled|-head|-titles|-title|-year)?\s*\{[^{}]*var\(--(bg|fg|chip)\)/);

@@ -13,7 +13,7 @@ import { initRoving } from './keys.js';
 import { initGamesList } from './games-list.js';
 import { initFilters, NO_FILTERS } from './filters.js';
 import { isActive } from './filter-rules.js';
-import { readFilters } from './filter-state.js';
+import { readFilters, readView } from './filter-state.js';
 import { initLocationsView } from './locations-view.js';
 import { initLook } from './look.js';
 import { applyLookStatus } from './look-switch.js';
@@ -42,6 +42,7 @@ let cardRecords = new Map();
 let drawnPlacements = new Map();
 let drawnPalette = [];
 let cardsFailed = false;
+let cardLocations = [];
 let drawnLayout = null;
 let drawnEtag = null;
 
@@ -76,7 +77,20 @@ function tabStorage() {
   }
 }
 
+/**
+ * Gives the device's local storage, where the chosen view is remembered, or null when the browser does not let the page have it.
+ * @returns {Storage | null}
+ */
+function deviceStorage() {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 const tabStore = tabStorage();
+const deviceStore = deviceStorage();
 
 const filters = filterBar === null || mount === null
   ? NO_FILTERS
@@ -211,6 +225,7 @@ async function requestCards(epoch, etag, started = null, beforeDraw = false) {
     }
 
     cardRecords = new Map(body.cards.map((record) => [String(record.entryId), record]));
+    cardLocations = body.locations ?? [];
     filters.enableCardFilters();
     gamesList?.showCards(body.cards);
     filters.rebuild(filterRecords(), body.locations ?? [], { layoutEtag: etag, quiet: beforeDraw });
@@ -287,11 +302,12 @@ function layoutOfLocations(doc) {
 
 /**
  * Tells whether a draw has to wait for the card data: any filter set, the search included, needs the details to be judged, so the
- * first frame is already in shadow instead of showing every box in the light first.
+ * first frame is already in shadow instead of showing every box in the light first. The location view waits too, because only the card
+ * data says whether the owner still has any location to show a cabinet for.
  * @returns {boolean}
  */
 function drawWaitsForCards() {
-  return isActive(filters.state);
+  return isActive(filters.state) || currentView() === 'location';
 }
 
 /**
@@ -360,34 +376,44 @@ const locationsView = viewToggle === null || mount === null
     getSample: currentSample,
     getLayoutEtag: () => drawnEtag,
     onSwitch: switchView,
+    initialView: readView(deviceStore),
+    storage: deviceStore,
+    closeCard: () => (cardControls === null ? Promise.resolve() : cardControls.closeCard({ path: 'fade' })),
+    cabinet: mount,
+    bar: filterBar,
   });
 
 /**
- * Gives the by-location document a draw needs while the location view is on, or null in the other view. When the document cannot be
- * had the view falls back to all together and the visitor is told.
- * @param {string | null} etag The entity tag of the layout the document must belong to.
- * @param {boolean} quiet Whether to say nothing and leave the view alone when the document cannot be had.
- * @returns {Promise<{ doc: object | null, usable: boolean }>} The document, and whether the draw can go on: false only when a quiet
- * request failed.
+ * Puts the page back on the all-together view without a word and without touching what the device remembers, when the location view
+ * is on but the card data lists no location: the owner has none, or deleted the last one. The switch is hidden by the filters.
  */
-async function documentForView(etag, quiet) {
+function leaveLocationViewWithoutLocations() {
+  if (currentView() === 'location' && cardLocations.length === 0) {
+    locationsView.setView('all');
+  }
+}
+
+/**
+ * Gives the by-location document a draw needs while the location view is on, or null in the other view. When the document cannot be
+ * had the draw goes on with the all-together cabinet and the caller says so after drawing, unless the request was quiet.
+ * @param {string | null} etag The entity tag of the layout the document must belong to.
+ * @param {boolean} quiet Whether to leave the view alone and draw nothing when the document cannot be had.
+ * @param {Promise<object | null> | null} [started] A request for the document that is already under way.
+ * @returns {Promise<{ doc: object | null, usable: boolean, failed: boolean }>} The document, whether the draw can go on (false only
+ * when a quiet request failed), and whether the location view could not be had and the all-together cabinet is drawn instead.
+ */
+async function documentForView(etag, quiet, started = null) {
   if (currentView() !== 'location') {
-    return { doc: null, usable: true };
+    return { doc: null, usable: true, failed: false };
   }
 
-  const doc = await locationsView.fetchDocument(etag);
+  const doc = await locationsView.fetchDocument(etag, started);
 
   if (doc !== null) {
-    return { doc, usable: true };
+    return { doc, usable: true, failed: false };
   }
 
-  if (quiet) {
-    return { doc: null, usable: false };
-  }
-
-  locationsView.fallBack();
-
-  return { doc: null, usable: true };
+  return { doc: null, usable: !quiet, failed: !quiet };
 }
 
 /**
@@ -454,12 +480,14 @@ async function load() {
   latestLoad += 1;
   const thisLoad = latestLoad;
   cardRecords = new Map();
+  cardLocations = [];
   cardsFailed = false;
   drawnLayout = null;
   showLoading();
 
   try {
     const startedCards = drawWaitsForCards() ? startCardsRequest() : null;
+    const startedDocument = currentView() === 'location' ? locationsView.requestDocument() : null;
     const response = await fetch(layoutUrl());
 
     if (thisLoad !== latestLoad) {
@@ -484,13 +512,19 @@ async function load() {
       return;
     }
 
-    const { doc } = await documentForView(etag, false);
+    leaveLocationViewWithoutLocations();
+
+    const { doc, failed } = await documentForView(etag, false, startedDocument);
 
     if (thisLoad !== latestLoad) {
       return;
     }
 
     drawCabinet(layout, etag, settled, doc);
+
+    if (failed) {
+      locationsView.fallBack();
+    }
   } catch {
     if (thisLoad === latestLoad) {
       showError();
@@ -553,6 +587,8 @@ async function redraw() {
     if (settled === 'superseded') {
       return false;
     }
+
+    leaveLocationViewWithoutLocations();
 
     const { doc, usable } = await documentForView(etag, true);
 
