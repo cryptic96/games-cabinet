@@ -30,12 +30,15 @@ namespace Cabinet.Domain.Layout;
 /// spread of drawn rows within one, the plain arrangement stays.
 /// Without balancing, and in a design that never balances, such as the phone design, every section is drawn whole except
 /// the last, which is drawn only down to its last used shelf row (at least <see cref="MinTrimmedRows"/> rows); that is a
-/// matter of drawing alone, so no placement depends on it, and adding a game changes only the cubby it lands in.
+/// matter of drawing alone, so no placement depends on it, and adding a game changes only the cubby it lands in. When that
+/// last section is sparse, because a shelf row without a game lies above or between rows that hold one, it keeps only its
+/// rows that hold a game, at least <see cref="MinTrimmedRows"/> by adding the nearest row above or else below, drops the
+/// empty rows, and its boxes stand on its bottom shelf; a last section filled from the top is drawn as before.
 /// </summary>
 public static class CabinetLayoutEngine
 {
     /// <summary>Bumped whenever the algorithm or a design changes on purpose, so a rearrangement is always a conscious change.</summary>
-    public const int LayoutVersion = 16;
+    public const int LayoutVersion = 17;
 
     /// <summary>
     /// The fewest shelf rows the last section is drawn with, so a nearly empty cabinet still reads as a piece of furniture.
@@ -92,7 +95,7 @@ public static class CabinetLayoutEngine
         }
 
         var layoutSections = sections
-            .Select((section, sectionIndex) => ToLayoutSection(sectionIndex, section, context, balanced || sectionIndex == sections.Count - 1))
+            .Select((section, sectionIndex) => ToLayoutSection(sectionIndex, section, context, balanced || sectionIndex == sections.Count - 1, !balanced && sectionIndex == sections.Count - 1))
             .ToList();
 
         return new CabinetLayout(LayoutVersion, design.Name, options.Fingerprint, SpinePalette.Tones, layoutSections);
@@ -709,13 +712,26 @@ public static class CabinetLayoutEngine
         int sectionIndex,
         List<List<LayoutMember>> section,
         BuildContext context,
-        bool trimUnusedRows)
+        bool trimUnusedRows,
+        bool keepOnlyFilledRows)
     {
-        var rowCount = trimUnusedRows ? DrawnRowCount(section, context) : context.Design.Rows.Count;
-        var drawnBottom = context.Design.Rows.Take(rowCount).Sum(row => row.HeightMm) + (context.Design.FrameMm * (rowCount - 1));
+        var rowTops = context.Cubbies.Select(cubby => cubby.YMm).Distinct().Order().ToList();
+        var keptRows = keepOnlyFilledRows && SparseKeptRows(section, context, rowTops) is { } sparse
+            ? sparse
+            : [.. Enumerable.Range(0, trimUnusedRows ? DrawnRowCount(section, context) : context.Design.Rows.Count)];
+        var drawnTops = new Dictionary<int, int>();
+        var drawnBottom = 0;
+
+        foreach (var row in keptRows)
+        {
+            drawnBottom += drawnTops.Count > 0 ? context.Design.FrameMm : 0;
+            drawnTops[row] = drawnBottom;
+            drawnBottom += context.Design.Rows[row].HeightMm;
+        }
+
         var cubbies = section
             .Select((members, cubbyIndex) => (members, cubbyIndex))
-            .Where(entry => context.Cubbies[entry.cubbyIndex].YMm < drawnBottom)
+            .Where(entry => drawnTops.ContainsKey(rowTops.IndexOf(context.Cubbies[entry.cubbyIndex].YMm)))
             .Select(entry =>
             {
                 var cubby = context.Cubbies[entry.cubbyIndex];
@@ -728,7 +744,7 @@ public static class CabinetLayoutEngine
                     ?? throw new InvalidOperationException(
                         $"Cubby {cubby.Index} of section {sectionIndex} of the '{context.Design.Name}' design accepted its games during placement but cannot arrange them.");
 
-                return new LayoutCubby(cubby.Index, cubby.XMm, cubby.YMm, cubby.WidthMm, cubby.HeightMm, placements);
+                return new LayoutCubby(cubby.Index, cubby.XMm, drawnTops[rowTops.IndexOf(cubby.YMm)], cubby.WidthMm, cubby.HeightMm, placements);
             })
             .ToList();
 
@@ -738,6 +754,36 @@ public static class CabinetLayoutEngine
             drawnBottom,
             context.Design.FrameMm,
             cubbies);
+    }
+
+    /// <summary>
+    /// The shelf rows a sparse last section keeps, top to bottom: every row that holds a game, and when fewer than
+    /// <see cref="MinTrimmedRows"/> rows hold one, the nearest row above the topmost of them or else the next row below the
+    /// lowest. Returns null when the section is not sparse, that is when those rows are exactly the first rows down to the
+    /// lowest one drawn by <see cref="DrawnRowCount"/>, or when no row holds a game, so such a section is drawn as it always was.
+    /// </summary>
+    private static List<int>? SparseKeptRows(List<List<LayoutMember>> section, BuildContext context, List<int> rowTops)
+    {
+        var kept = section
+            .Select((members, cubbyIndex) => (members, cubbyIndex))
+            .Where(entry => entry.members.Count > 0)
+            .Select(entry => rowTops.IndexOf(context.Cubbies[entry.cubbyIndex].YMm))
+            .Distinct()
+            .Order()
+            .ToList();
+
+        if (kept.Count == 0)
+        {
+            return null;
+        }
+
+        if (kept.Count < MinTrimmedRows && rowTops.Count > kept.Count)
+        {
+            kept.Add(kept[0] > 0 ? kept[0] - 1 : kept[^1] + 1);
+            kept.Sort();
+        }
+
+        return kept.SequenceEqual(Enumerable.Range(0, DrawnRowCount(section, context))) ? null : kept;
     }
 
     /// <summary>
