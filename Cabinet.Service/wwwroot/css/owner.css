@@ -822,6 +822,10 @@ header > .header-aside {
   min-width: 0;
 }
 
+.picker-hint {
+  margin: 0;
+}
+
 .picker-label {
   color: var(--paper-label);
   font-size: 14px;

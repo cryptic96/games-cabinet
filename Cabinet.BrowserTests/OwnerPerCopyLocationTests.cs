@@ -23,6 +23,7 @@ public sealed class OwnerPerCopyLocationTests : CabinetPageTest
     private const string CardsPath = "/cabinet/cards?profile=desktop";
     private const string GameTitle = "Example Game 1";
 
+    private readonly TemporaryDirectory _storage = new();
     private HttpClient? _publicClient;
 
     [Fact]
@@ -69,7 +70,71 @@ public sealed class OwnerPerCopyLocationTests : CabinetPageTest
         after.Single(card => card.EntryId == copies[1].EntryId).Location.Should().Be("Shelf B");
     }
 
+    [Fact]
+    public async Task Counts_hint_and_search_work_per_copy()
+    {
+        const string cabinetId = "a1b2c3d4";
+        const string shelfId = "e5f6a7b8";
+        CopiesCollectionSeed.Write(_storage.FullPath, null, new OwnerLocation(cabinetId, "Cabinet A"), new OwnerLocation(shelfId, "Shelf B"));
+        var factory = await StartAsync(new Dictionary<string, string?> { ["Storage:Directory"] = _storage.FullPath });
+        var owner = factory.ServingServices.GetRequiredService<OwnerDataService>();
+        var copies = CopiesCollectionSeed.ThreeCopyEntries;
+        await AssignCopyAsync(owner, copies, copies[0], cabinetId);
+        await AssignCopyAsync(owner, copies, copies[1], shelfId);
+        await Page.SetViewportSizeAsync(1440, 900);
+        await GotoOwnerAsync(LocationsPath);
+        await Page.WaitForSelectorAsync(".game-list[data-enhanced]", new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached });
+        var expansion = Page.Locator($".game-row[data-entry-id='{CopiesCollectionSeed.ExpansionEntry}']");
+        var hint = expansion.Locator("[data-follow-hint]");
+
+        await Expect(Page.Locator("#unplaced-label")).ToHaveTextAsync("Not placed yet (2)");
+        await Expect(hint).ToBeVisibleAsync();
+        await Expect(hint).ToHaveTextAsync("Follows the first copy of Quiet Quarry.");
+        await Expect(expansion.Locator(".game-where")).ToHaveTextAsync("Cabinet A");
+
+        await expansion.Locator("select").SelectOptionAsync(new SelectOptionValue { Label = "Shelf B" });
+
+        await Expect(expansion.Locator(".row-status")).ToContainTextAsync("Saved");
+        await Expect(hint).ToBeHiddenAsync();
+
+        await expansion.Locator("select").SelectOptionAsync(new SelectOptionValue { Label = "Same as Quiet Quarry" });
+
+        await Expect(hint).ToBeVisibleAsync();
+        await Page.Locator("#game-find").FillAsync("quarry");
+
+        await Expect(Page.Locator(".game-row:not([hidden])")).ToHaveCountAsync(3);
+        await Expect(Page.Locator($".game-row[data-game-id='{CopiesCollectionSeed.ThreeCopiesGameId}']:not([hidden])")).ToHaveCountAsync(3);
+        await Expect(Page.Locator("#games-count")).ToBeVisibleAsync();
+
+        await Page.Locator("#game-find").FillAsync(string.Empty);
+        await Page.Locator("#unplaced-switch").CheckAsync();
+
+        await Expect(Page.Locator(".game-row:not([hidden])")).ToHaveCountAsync(2);
+        await Expect(Page.Locator($".game-row[data-entry-id='{copies[2]}']:not([hidden])")).ToHaveCountAsync(1);
+        await Expect(Page.Locator($".game-row[data-entry-id='{CopiesCollectionSeed.OneCopyEntry}']:not([hidden])")).ToHaveCountAsync(1);
+        ConsoleErrors.Should().BeEmpty();
+    }
+
     private static string Id(CardReading card) => card.EntryId.ToString(CultureInfo.InvariantCulture);
+
+    private static async Task AssignCopyAsync(OwnerDataService owner, IReadOnlyList<long> copies, long copy, string locationId)
+    {
+        var result = await owner.MutateAsync(
+            owner.Revision,
+            data => LocationEdits.Assign(data, CopiesCollectionSeed.ThreeCopiesGameId, copy, copies, locationId, CopiesCollectionSeed.ThreeCopiesTitle),
+            TestContext.Current.CancellationToken);
+
+        result.Outcome.Should().Be(OwnerOutcome.Saved);
+    }
+
+    /// <inheritdoc />
+    public override async ValueTask DisposeAsync()
+    {
+        _publicClient?.Dispose();
+        await base.DisposeAsync();
+        _storage.Dispose();
+        GC.SuppressFinalize(this);
+    }
 
     private async Task<IReadOnlyList<CardReading>> ReadCardsAsync()
     {

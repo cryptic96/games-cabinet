@@ -266,56 +266,52 @@ public static class LocationEdits
             }
         }
 
-        var current = OwnerGames.Find(data, gameId, collectionId);
-        var currentLocation = current?.LocationId is { } held && data.Locations.Any(location => location.Id == held) ? held : null;
-
-        if (string.Equals(currentLocation, target?.Id, StringComparison.Ordinal))
+        if (PlacedCopy(data, gameId, collectionId, copies, target?.Id) is not { } placed)
         {
             return OwnerChange.None;
         }
 
-        var split = OwnerGames.SplitForEdit(data, gameId, [.. copies.Append(collectionId)]);
-        var own = split.Games.FirstOrDefault(game => game.GameId == gameId && game.CollectionId == collectionId);
-        var updated = (own ?? new OwnerGame(gameId, null, null, null, collectionId)) with { LocationId = target?.Id };
-        var others = split.Games.Where(game => !ReferenceEquals(game, own));
-        var games = IsEmpty(updated) ? others : others.Append(updated);
-
         return new OwnerChange(
-            split with { Games = OwnerGames.Ordered(games) },
+            placed,
             LogLine(title, target, followsBase),
             target is null ? "game-unplaced" : "game-moved");
     }
 
     /// <summary>
-    /// Moves several games at once: into one location, to no location of their own, or, for the expansions that have an owned base
-    /// game, back to following it. The whole move is one change with one log line, so one Undo takes all of it back.
+    /// Moves several copies at once: into one location, to no location of their own, or, for the copies of expansions that have an
+    /// owned base game, back to following it. Only the listed copies move; a decision that holds for every copy of a touched game
+    /// is first turned into one decision per copy, so the copies that were not listed keep their place. The whole move is one
+    /// change with one log line, so one Undo takes all of it back.
     /// </summary>
     /// <param name="data">The data to change.</param>
-    /// <param name="gameIds">The games to move; a game listed twice counts once.</param>
+    /// <param name="copies">The copies to move, each as its game and its collection entry; a copy listed twice counts once.</param>
     /// <param name="target">Where they go.</param>
     /// <param name="titleOf">Gives the title of an owned game, or null when the game is not in the collection; any such game refuses the whole move.</param>
     /// <param name="followsBase">Whether a game is an expansion with an owned base game, so that no location of its own means it follows the base.</param>
+    /// <param name="copiesOf">Gives the collection entries a game has now; a listed copy that is not among them refuses the whole move.</param>
     public static OwnerChange MoveMany(
         OwnerData data,
-        IReadOnlyList<int> gameIds,
+        IReadOnlyCollection<(int GameId, long CollectionId)> copies,
         MoveTarget target,
         Func<int, string?> titleOf,
-        Func<int, bool> followsBase)
+        Func<int, bool> followsBase,
+        Func<int, IReadOnlyList<long>> copiesOf)
     {
         ArgumentNullException.ThrowIfNull(data);
-        ArgumentNullException.ThrowIfNull(gameIds);
+        ArgumentNullException.ThrowIfNull(copies);
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(titleOf);
         ArgumentNullException.ThrowIfNull(followsBase);
+        ArgumentNullException.ThrowIfNull(copiesOf);
 
-        var ids = gameIds.Distinct().ToList();
+        var listed = copies.Distinct().ToList();
 
-        if (ids.Count == 0)
+        if (listed.Count == 0)
         {
             return OwnerChange.Refused(data, "nothing-selected");
         }
 
-        if (ids.Any(id => titleOf(id) is null))
+        if (listed.Any(copy => titleOf(copy.GameId) is null || !copiesOf(copy.GameId).Contains(copy.CollectionId)))
         {
             return OwnerChange.Refused(data, "unknown-game");
         }
@@ -329,15 +325,15 @@ public static class LocationEdits
             return OwnerChange.Refused(data, "unknown-location");
         }
 
-        var affected = target.Kind == MoveTargetKind.SameAsBase ? ids.Where(followsBase).ToList() : ids;
-        var games = data.Games;
+        var affected = target.Kind == MoveTargetKind.SameAsBase ? listed.Where(copy => followsBase(copy.GameId)).ToList() : listed;
+        var moved = data;
         var changed = false;
 
-        foreach (var id in affected)
+        foreach (var copy in affected)
         {
-            if (PlacedEverywhere(data with { Games = games }, id, destination?.Id) is { } next)
+            if (PlacedCopy(moved, copy.GameId, copy.CollectionId, copiesOf(copy.GameId), destination?.Id) is { } next)
             {
-                games = next;
+                moved = next;
                 changed = true;
             }
         }
@@ -348,8 +344,8 @@ public static class LocationEdits
         }
 
         return new OwnerChange(
-            data with { Games = games },
-            MoveManyLog(destination, affected, followsBase),
+            moved,
+            MoveManyLog(destination, affected.Count, affected.Count(copy => followsBase(copy.GameId))),
             destination is null ? "game-unplaced" : "game-moved");
     }
 
@@ -475,6 +471,34 @@ public static class LocationEdits
     }
 
     /// <summary>
+    /// The data after one copy is put in a location, or out of every location when the target is null; null when the copy is there
+    /// already. A decision that holds for every copy of the game is first turned into one decision per copy, so no other copy moves.
+    /// </summary>
+    /// <param name="data">The data to change.</param>
+    /// <param name="gameId">The game the copy belongs to.</param>
+    /// <param name="collectionId">The copy.</param>
+    /// <param name="copies">The collection entries of the game that exist now.</param>
+    /// <param name="targetId">The location identifier, already known to exist, or null.</param>
+    private static OwnerData? PlacedCopy(OwnerData data, int gameId, long collectionId, IReadOnlyList<long> copies, string? targetId)
+    {
+        var current = OwnerGames.Find(data, gameId, collectionId);
+        var currentLocation = current?.LocationId is { } held && data.Locations.Any(location => location.Id == held) ? held : null;
+
+        if (string.Equals(currentLocation, targetId, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var split = OwnerGames.SplitForEdit(data, gameId, [.. copies.Append(collectionId)]);
+        var own = split.Games.FirstOrDefault(game => game.GameId == gameId && game.CollectionId == collectionId);
+        var updated = (own ?? new OwnerGame(gameId, null, null, null, collectionId)) with { LocationId = targetId };
+        var others = split.Games.Where(game => !ReferenceEquals(game, own));
+        var games = IsEmpty(updated) ? others : others.Append(updated);
+
+        return split with { Games = OwnerGames.Ordered(games) };
+    }
+
+    /// <summary>
     /// The decisions after every copy of a game is put in a location, or out of every location when the target is null; null when
     /// every copy is there already. Every decision of the game gets the location, and a target location adds the decision that
     /// holds for every copy when the game has none.
@@ -501,15 +525,14 @@ public static class LocationEdits
         return OwnerGames.Ordered(others.Concat(placed.Concat(added).Where(game => !IsEmpty(game))));
     }
 
-    private static string MoveManyLog(OwnerLocation? destination, IReadOnlyList<int> affected, Func<int, bool> followsBase)
+    private static string MoveManyLog(OwnerLocation? destination, int moved, int following)
     {
         if (destination is not null)
         {
-            return $"Moved {affected.Count} {(affected.Count == 1 ? "game" : "games")} to {destination.Name}";
+            return $"Moved {moved} {(moved == 1 ? "game" : "games")} to {destination.Name}";
         }
 
-        var following = affected.Count(followsBase);
-        var notPlaced = affected.Count - following;
+        var notPlaced = moved - following;
         var parts = new List<string>();
 
         if (notPlaced > 0)

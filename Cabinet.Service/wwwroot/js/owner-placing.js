@@ -1,6 +1,6 @@
 /**
  * The script side of the games list on the locations page: ticking rows, the selection dock that slides up while any row is
- * ticked, and the dialog of buttons that asks where the ticked games go. A move is one request for every ticked game and one
+ * ticked, and the dialog of buttons that asks where the ticked games go. A move is one request for every ticked copy and one
  * change on the server, so one Undo takes all of it back. The dock then shows what happened, with Undo and Dismiss, until the
  * owner ticks a row again. Every name and title is written with `textContent`, never as markup.
  */
@@ -134,6 +134,20 @@ export function initPlacing(doc, hooks) {
   }
 
   /**
+   * Tells whether the copies of the base game an expansion row follows are shown in more than one place.
+   * @param {HTMLElement} row The expansion's row.
+   * @param {Map<string, string>} shown Where each copy is shown now, by collection entry.
+   * @returns {boolean}
+   */
+  function baseCopiesDiffer(row, shown) {
+    const places = gameRows()
+      .filter((candidate) => candidate.dataset.gameId === row.dataset.baseId)
+      .map((candidate) => shown.get(candidate.dataset.entryId) ?? '');
+
+    return new Set(places).size > 1;
+  }
+
+  /**
    * Shows the dock. A dock that was hidden first takes its place below the screen, then slides up.
    * @param {string} state `selecting`, `done` or `error`.
    */
@@ -250,8 +264,14 @@ export function initPlacing(doc, hooks) {
         where.dataset.unplaced = 'true';
       }
 
+      const hint = row.querySelector('[data-follow-hint]');
+
       if (follow) {
         follow.hidden = pickerOf(row).value !== '';
+      }
+
+      if (hint) {
+        hint.hidden = pickerOf(row).value !== '' || !baseCopiesDiffer(row, shown);
       }
     }
   }
@@ -325,7 +345,7 @@ export function initPlacing(doc, hooks) {
     const previous = moving.map((row) => ({ row, own: pickerOf(row).value }));
 
     hooks.enqueue(async () => {
-      const result = await postOwner(HANDLERS.bulkMove, { gameIds: moving.map((row) => row.dataset.gameId), target });
+      const result = await postOwner(HANDLERS.bulkMove, { collectionIds: moving.map((row) => row.dataset.entryId), target });
 
       if (result.outcome === 'noChange') {
         showDone(OWNER_TEXT.nothingToChange, null);
