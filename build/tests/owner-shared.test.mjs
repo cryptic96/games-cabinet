@@ -591,7 +591,7 @@ test('search folding ignores case and accents', () => {
 function gameRow(id, title, baseId = null) {
   return {
     hidden: false,
-    dataset: { gameId: id, baseId: baseId ?? '', nested: baseId === null ? 'false' : 'true' },
+    dataset: { gameId: id, entryId: id, baseEntryId: baseId ?? '', nested: baseId === null ? 'false' : 'true' },
     querySelector: (selector) => (selector === '.game-title' ? { textContent: title } : null),
   };
 }
@@ -649,7 +649,7 @@ test('a base game stays visible as context when only one of its expansions match
 test('an extra rule narrows the rows and a base that matches is not marked as context', () => {
   const rows = [gameRow('1', 'Harbour'), gameRow('2', 'Harbour: Lanterns', '1'), gameRow('3', 'Quarry')];
   const input = fakeInput('');
-  const finder = createFinder(input, () => rows, { accepts: (row) => row.dataset.gameId !== '3' });
+  const finder = createFinder(input, () => rows, { accepts: (row) => row.dataset.entryId !== '3' });
   const report = finder.apply({ announce: false });
 
   assert.deepEqual(rows.map((row) => row.hidden), [false, false, true]);
@@ -693,4 +693,53 @@ test('the rows are put in collator order with each base game followed by its exp
     container.children.map((row) => row.querySelector('.game-title').textContent),
     ['Ápple Orchard', 'Café Quarter', 'Game 2', 'Game 2: Apple', 'Game 2: Zebra', 'Game 10', 'Orphan: Pack'],
   );
+});
+
+/**
+ * Makes a stand-in for the row of one copy of a game, the way the page marks copies and the nesting of an expansion.
+ * @param {string} entry The collection entry of the copy.
+ * @param {string} game The game id.
+ * @param {string} title The title.
+ * @param {string | null} [baseEntry] The collection entry of the first copy of the base game an expansion follows.
+ * @returns {object}
+ */
+function copyRow(entry, game, title, baseEntry = null) {
+  return {
+    hidden: false,
+    dataset: { gameId: game, entryId: entry, baseEntryId: baseEntry ?? '', nested: baseEntry === null ? 'false' : 'true' },
+    querySelector: (selector) => (selector === '.game-title' ? { textContent: title } : null),
+  };
+}
+
+test('an expansion is put under the first copy of its base game and the copies stay in collection order', () => {
+  const rows = [
+    copyRow('71', '7', 'Quiet Quarry'),
+    copyRow('72', '7', 'Quiet Quarry'),
+    copyRow('73', '7', 'Quiet Quarry'),
+    copyRow('90', '9', 'Quiet Quarry: Lanterns', '71'),
+  ];
+  const container = {
+    children: [...rows],
+    append(...nodes) {
+      container.children = nodes;
+    },
+  };
+
+  sortByCollator(container);
+
+  assert.deepEqual(
+    container.children.map((row) => row.dataset.entryId),
+    ['71', '90', '72', '73'],
+    'the expansion follows the first copy it names and the other copies keep their order',
+  );
+});
+
+test('a copy of a base game stays visible as context when only its expansion matches', () => {
+  const rows = [copyRow('71', '7', 'Quiet Quarry'), copyRow('72', '7', 'Quiet Quarry'), copyRow('90', '9', 'Quiet Quarry: Lanterns', '71')];
+  const finder = createFinder(fakeInput('lantern'), () => rows, {});
+
+  finder.apply({ announce: false });
+
+  assert.deepEqual(rows.map((row) => row.hidden), [false, true, false]);
+  assert.equal(rows[0].dataset.context, 'true');
 });

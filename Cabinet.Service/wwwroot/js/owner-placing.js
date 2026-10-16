@@ -33,9 +33,9 @@ const LOCATION_TARGET = 'location:';
  */
 export function gameStates(doc) {
   return Array.from(doc.querySelectorAll('.game-row')).map((row) => ({
-    id: row.dataset.gameId,
+    id: row.dataset.entryId,
     own: row.querySelector('select[name="locationId"]')?.value ?? '',
-    baseId: row.dataset.baseId || null,
+    baseId: row.dataset.baseEntryId || null,
   }));
 }
 
@@ -121,7 +121,7 @@ export function initPlacing(doc, hooks) {
    * @returns {boolean}
    */
   function followsBase(row) {
-    return Boolean(row.dataset.baseId);
+    return Boolean(row.dataset.baseEntryId);
   }
 
   /**
@@ -238,7 +238,7 @@ export function initPlacing(doc, hooks) {
     const names = new Map(hooks.locations().map((location) => [location.id, location.name]));
 
     for (const row of gameRows()) {
-      const id = shown.get(row.dataset.gameId) ?? '';
+      const id = shown.get(row.dataset.entryId) ?? '';
       const where = row.querySelector('.game-where');
       const follow = row.querySelector('.game-follow');
 

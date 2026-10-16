@@ -20,23 +20,30 @@ public sealed record LocationPickerOption(string Value, string Text, bool Select
 /// <param name="Revision">The revision of the owner data the form was built from.</param>
 /// <param name="VisibleLabel">A visible label to draw above the select, or null when the surrounding row already names the game.</param>
 /// <param name="ReturnTo">Which page a form posted without script goes back to, one of the fixed words the assign handler knows; null for the locations page.</param>
+/// <param name="CollectionId">The collection entry of the copy the picker places.</param>
+/// <param name="CopyLabel">The tag that tells the copy apart from the other copies of its game, or null for a game owned once.</param>
 public sealed record LocationPickerModel(
     int GameId,
     string Title,
     IReadOnlyList<LocationPickerOption> Options,
     long Revision,
     string? VisibleLabel = null,
-    string? ReturnTo = null)
+    string? ReturnTo = null,
+    long CollectionId = 0,
+    string? CopyLabel = null)
 {
+    /// <summary>The accessible name of the select: it names the copy when the game is owned more than once.</summary>
+    public string AccessibleName => CopyLabel is null ? OwnerStrings.PickerLabel(Title) : OwnerStrings.PickerLabelForCopy(Title, CopyLabel);
+
     /// <summary>The return word that sends a form posted without script back to the single-game view of the pictures page.</summary>
     public const string ReturnToPictures = "pictures";
 
     /// <summary>
-    /// Builds the picker of a game. The first choice is <c>Same as {base title}</c> for an expansion that stands beside an owned
+    /// Builds the picker of one copy of a game. The first choice is <c>Same as {base title}</c> for an expansion that stands beside an owned
     /// base game, because such an expansion has no not-placed state of its own, and <c>Not placed</c> for every other game; then
     /// come the locations in list order.
     /// </summary>
-    /// <param name="game">The game's row.</param>
+    /// <param name="game">The copy's row.</param>
     /// <param name="locations">The owner's locations in list order.</param>
     /// <param name="revision">The revision of the owner data the form is built from.</param>
     /// <param name="visibleLabel">A visible label for the select, or null for none.</param>
@@ -57,6 +64,6 @@ public sealed record LocationPickerModel(
         options.AddRange(locations.Select(location =>
             new LocationPickerOption(location.Id, location.Name, string.Equals(location.Id, game.OwnLocationId, StringComparison.Ordinal))));
 
-        return new LocationPickerModel(game.GameId, game.Title, options, revision, visibleLabel, returnTo);
+        return new LocationPickerModel(game.GameId, game.Title, options, revision, visibleLabel, returnTo, game.CollectionId, game.CopyLabel);
     }
 }
