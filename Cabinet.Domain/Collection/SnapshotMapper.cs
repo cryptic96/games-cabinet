@@ -166,8 +166,9 @@ public static class SnapshotMapper
     /// The identifier of a collection as <see cref="Version(IReadOnlyList{CabinetItem}, ArtRules)"/> works it out, with
     /// everything the detail card shows added to each item's line: the year, the location, the player counts, the play
     /// times, the minimum age, the weight and the average rating, the designers and mechanics, and the games an expansion
-    /// expands. It changes whenever anything drawn or shown on the card changes. The time the details were read, the ranked
-    /// rating, the details version and families that name no series are not shown and do not change it.
+    /// expands, and the game's alternate names, which visitors search by. It changes whenever anything drawn, shown or
+    /// searched changes. The time the details were read, the ranked rating, the details version and families that name no
+    /// series are not shown and do not change it.
     /// </summary>
     /// <param name="items">The mapped items, in mapped order.</param>
     /// <param name="rules">The rules the items were mapped with.</param>
@@ -224,7 +225,7 @@ public static class SnapshotMapper
 
         return string.Create(
             CultureInfo.InvariantCulture,
-            $"{entry?.Year}{FieldSeparator}{entry?.Location}{FieldSeparator}{details?.MinPlayers}{FieldSeparator}{details?.MaxPlayers}{FieldSeparator}{details?.PlayingTime}{FieldSeparator}{details?.MinPlayTime}{FieldSeparator}{details?.MaxPlayTime}{FieldSeparator}{details?.MinAge}{FieldSeparator}{details?.Weight}{FieldSeparator}{details?.Average}{FieldSeparator}{NamesText(details?.Designers)}{FieldSeparator}{NamesText(details?.Mechanics)}{FieldSeparator}{ExpansionIds(details?.ExpandsGames)}");
+            $"{entry?.Year}{FieldSeparator}{entry?.Location}{FieldSeparator}{details?.MinPlayers}{FieldSeparator}{details?.MaxPlayers}{FieldSeparator}{details?.PlayingTime}{FieldSeparator}{details?.MinPlayTime}{FieldSeparator}{details?.MaxPlayTime}{FieldSeparator}{details?.MinAge}{FieldSeparator}{details?.Weight}{FieldSeparator}{details?.Average}{FieldSeparator}{NamesText(details?.Designers)}{FieldSeparator}{NamesText(details?.Mechanics)}{FieldSeparator}{ExpansionIds(details?.ExpandsGames)}{FieldSeparator}{NamesText(details?.AlternateNames)}");
     }
 
     private static string PictureText(PictureOverride? setting) =>

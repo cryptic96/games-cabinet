@@ -21,6 +21,12 @@ public static class BggThingParser
     /// <summary>The most family links kept for one game.</summary>
     public const int MaxFamilyEntries = 40;
 
+    /// <summary>The most alternate names kept for one game.</summary>
+    public const int MaxAlternateNames = 30;
+
+    /// <summary>The longest alternate name that is kept; a longer one is dropped.</summary>
+    public const int MaxAlternateNameLength = 100;
+
     private const int MaxDocumentCharacters = 20_000_000;
     private const string DesignerLink = "boardgamedesigner";
     private const string MechanicLink = "boardgamemechanic";
@@ -96,8 +102,19 @@ public static class BggThingParser
             ReadExpandedGames(item),
             ArtUrl.Canonical(item.Element("image")?.Value?.Trim()),
             Families: ReadFamilies(item),
-            DetailsVersion: GameDetails.CurrentDetailsVersion);
+            DetailsVersion: GameDetails.CurrentDetailsVersion,
+            AlternateNames: ReadAlternateNames(item));
     }
+
+    private static IReadOnlyList<string> ReadAlternateNames(XElement item) =>
+        [
+            .. item.Elements("name")
+                .Where(name => (string?)name.Attribute("type") == "alternate")
+                .Select(name => BggCollectionParser.CleanTitle((string?)name.Attribute("value") ?? string.Empty))
+                .Where(name => name.Length is > 0 and <= MaxAlternateNameLength)
+                .Distinct(StringComparer.Ordinal)
+                .Take(MaxAlternateNames),
+        ];
 
     private static IReadOnlyList<FamilyLink> ReadFamilies(XElement item)
     {

@@ -26,6 +26,12 @@ public static class BggCollectionParser
     /// <summary>The longest location that is kept.</summary>
     public const int MaxLocationLength = 200;
 
+    /// <summary>
+    /// The longest edition name that is kept. A longer one is dropped, not cut, the same rule as an over-long alternate name,
+    /// so a label is never shown half.
+    /// </summary>
+    public const int MaxVersionNameLength = 100;
+
     private const int MaxDocumentCharacters = 20_000_000;
 
     /// <summary>
@@ -110,7 +116,18 @@ public static class BggCollectionParser
             ReadDimensions(item),
             includePrivateInfo ? ReadLocation(item) : null,
             ArtUrl.Canonical(item.Element("version") is { } version ? (version.Element("item") ?? version).Element("image")?.Value : null),
-            ArtUrl.Canonical(item.Element("image")?.Value));
+            ArtUrl.Canonical(item.Element("image")?.Value),
+            ReadVersionName(item));
+    }
+
+    private static string? ReadVersionName(XElement item)
+    {
+        var version = item.Element("version") is { } wrapper ? wrapper.Element("item") ?? wrapper : null;
+        var names = version?.Elements("name").ToList() ?? [];
+        var chosen = names.FirstOrDefault(name => (string?)name.Attribute("type") == "primary") ?? names.FirstOrDefault();
+        var cleaned = CleanTitle((string?)chosen?.Attribute("value") ?? string.Empty);
+
+        return cleaned.Length is > 0 and <= MaxVersionNameLength ? cleaned : null;
     }
 
     private static VersionDimensions? ReadDimensions(XElement item)
