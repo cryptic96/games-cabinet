@@ -409,6 +409,20 @@
 }
 
 /**
+ * The location group: its label and its select travel together between the bar and the sheet. In the bar the label is visually
+ * hidden and the select is the only visible part.
+ */
+.filter-location {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+}
+
+.filter-location[hidden] {
+  display: none;
+}
+
+/**
  * The location select: a native list in wall colours, as tall as a chip. The list it opens takes light or dark system colours from the
  * wall, so its options stay readable on either.
  */
@@ -521,5 +535,373 @@
   .filter-group > .filter-chip:last-child {
     margin-inline-start: 0;
     border-radius: 4px;
+  }
+}
+
+/**
+ * The Filters button of the slim bar, shown below 64rem only. It is as tall as every other control, never narrower than 88px, and
+ * its text carries the number of filters in use.
+ */
+.filter-open {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-width: 88px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid var(--room-line, var(--chrome-line));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--room-text, var(--wall-text));
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.filter-open:focus-visible,
+.filter-sheet-clear:focus-visible,
+.filter-done:focus-visible {
+  outline: 2px solid var(--room-ring, var(--wood-light));
+  outline-offset: 2px;
+}
+
+/**
+ * Below 64rem the bar is one slim row: the search field takes the spare width, then the Filters button, then the count and Clear
+ * while a filter is in use. The two rows dissolve so their remaining items join the one row, and the controls that are not in the
+ * bar live in the sheet.
+ */
+@media not all and (min-width: 64rem) {
+  .filter-bar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .filter-row {
+    display: contents;
+  }
+
+  .filter-search {
+    flex: 1 1 7rem;
+    min-width: 112px;
+  }
+
+  .filter-open {
+    display: inline-flex;
+  }
+
+  .filter-bar:not([data-active]) .filter-status {
+    display: none;
+  }
+}
+
+/**
+ * The Filters sheet. Its dialog is a transparent frame the size of the screen, like the card's, with a clear backdrop so the
+ * dimmed cabinet stays visible above the sheet; the sheet is wall-coloured, anchored to the bottom, as tall as its content up to
+ * seven tenths of the screen, and scrolls inside beyond that with its grip strip kept at the top.
+ */
+.filter-dialog {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--room-text, var(--wall-text));
+  inset: 0;
+  overflow: hidden;
+}
+
+.filter-dialog[open] {
+  display: grid;
+  place-items: end center;
+}
+
+.filter-dialog::backdrop {
+  background: transparent;
+}
+
+.filter-sheet {
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  inline-size: min(100%, 40rem);
+  max-block-size: 70vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 16px calc(16px + env(safe-area-inset-bottom));
+  border-radius: 12px 12px 0 0;
+  background: var(--room, var(--wood-dark));
+  color: var(--room-text, var(--wall-text));
+  box-shadow:
+    0 -12px 32px -12px rgb(var(--room-shade-rgb, 20 10 4) / 0.7),
+    inset 0 1px 0 var(--room-line, var(--chrome-line));
+  translate: 0 var(--sheet-dy, 0px);
+  transition: translate var(--fallback-open) var(--pull-ease-out);
+}
+
+@supports (max-height: 1dvh) {
+  .filter-sheet {
+    max-block-size: 70dvh;
+  }
+}
+
+/**
+ * The sheet rises from below on its own translate. A browser without starting styles simply shows it at once.
+ */
+@starting-style {
+  .filter-dialog[open] .filter-sheet {
+    translate: 0 100%;
+  }
+}
+
+/**
+ * Closing slides the sheet out the way the card's sheet goes; the script closes the dialog after the closing time. While it
+ * slides, nothing in it can be pressed.
+ */
+.filter-dialog[data-closing] .filter-sheet {
+  translate: 0 100%;
+  transition-duration: var(--fallback-close);
+  pointer-events: none;
+}
+
+.filter-sheet[data-moving] {
+  transition: none;
+  will-change: transform;
+}
+
+.filter-sheet[data-springing] {
+  transition: translate var(--sheet-spring) var(--pull-ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filter-sheet,
+  .filter-sheet[data-springing] {
+    transition: none;
+  }
+}
+
+.filter-grip {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  flex: none;
+  display: block;
+  block-size: var(--ruling);
+  margin-inline: -16px;
+  border-radius: 12px 12px 0 0;
+  background: var(--room, var(--wood-dark));
+  touch-action: none;
+}
+
+.filter-grip::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--room-line, var(--chrome-line));
+  translate: -50% 0;
+}
+
+/**
+ * The group host is a size container, so the chip grids read the width the groups really have, which is the sheet's width less its
+ * padding. Its groups carry no padding, border or margin of their own.
+ */
+.filter-sheet-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  container-type: inline-size;
+}
+
+.filter-sheet .filter-group,
+.filter-sheet .filter-view {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.filter-sheet .filter-note {
+  margin: 0;
+}
+
+/**
+ * In the sheet every group is named: the legends of the view switch and the players and time groups, and the label of the location
+ * select, are shown in the legend style, undoing what hides them in the bar.
+ */
+.filter-sheet .filter-view > legend,
+.filter-sheet .filter-group > legend,
+.filter-sheet label[for="filter-loc"] {
+  position: static;
+  display: block;
+  float: none;
+  width: auto;
+  height: auto;
+  margin: 0 0 8px;
+  padding: 0;
+  overflow: visible;
+  clip-path: none;
+  white-space: normal;
+  color: var(--room-text, var(--wall-text));
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.filter-sheet label[for="filter-loc"][hidden] {
+  display: none;
+}
+
+/**
+ * The chips of the sheet stand apart on equal-width grids that every thumb can hit: five columns for players and three for time,
+ * and one row of nine or one row of six once the group is wide enough.
+ */
+.filter-sheet .filter-group {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  align-items: stretch;
+}
+
+.filter-sheet .filter-group[data-filter="time"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.filter-sheet .filter-chip {
+  min-inline-size: 44px;
+  min-block-size: 44px;
+  margin: 0;
+  padding-inline: 4px;
+  border-radius: 4px;
+}
+
+@container (inline-size >= 19rem) {
+  .filter-sheet .filter-group[data-filter="time"] {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@container (inline-size >= 29rem) {
+  .filter-sheet .filter-group[data-filter="players"] {
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+  }
+}
+
+/**
+ * The view switch in the sheet: its two segments share the width, each with its own outline so the legend above is not enclosed.
+ */
+.filter-sheet .filter-view {
+  display: flex;
+  flex-wrap: wrap;
+  outline: none;
+  overflow: visible;
+}
+
+.filter-sheet .filter-view[hidden] {
+  display: none;
+}
+
+.filter-sheet .filter-view > legend {
+  flex: 0 0 100%;
+}
+
+.filter-sheet .filter-view-segment {
+  flex: 1 1 0;
+  border: 1px solid var(--room-line, var(--chrome-line));
+  border-radius: 4px 0 0 4px;
+}
+
+.filter-sheet .filter-view-segment + .filter-view-segment {
+  margin-inline-start: -1px;
+  border-radius: 0 4px 4px 0;
+}
+
+.filter-sheet .filter-view-segment:has(input:checked) {
+  position: relative;
+  z-index: 1;
+}
+
+.filter-sheet #filter-loc {
+  inline-size: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+.filter-sheet-actions {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.filter-sheet-clear {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--room-line, var(--chrome-line));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--room-text, var(--wall-text));
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.filter-sheet-clear[hidden] {
+  display: none;
+}
+
+.filter-sheet-clear[data-highlighted] {
+  background: var(--room-text, var(--wall-text));
+  color: var(--room, var(--wood-dark));
+  font-weight: 600;
+}
+
+/**
+ * The primary button closes the sheet and says how many games stay in the light. With nothing matching it is outlined, because
+ * the highlighted action is then Clear.
+ */
+.filter-done {
+  flex: 1 1 auto;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--room-text, var(--wall-text));
+  border-radius: 4px;
+  background: var(--room-text, var(--wall-text));
+  color: var(--room, var(--wood-dark));
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.filter-done[data-outlined] {
+  border-color: var(--room-line, var(--chrome-line));
+  background: transparent;
+  color: var(--room-text, var(--wall-text));
+}
+
+@media (forced-colors: active) {
+  .filter-sheet {
+    border: 1px solid CanvasText;
   }
 }

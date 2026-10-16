@@ -113,6 +113,7 @@
             <input id="filter-q" type="search" name="q" placeholder="@Model.Language.Text.SearchLabel" enterkeyhint="search" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" dir="auto" aria-keyshortcuts="/" />
             <kbd class="filter-hint" aria-hidden="true">/</kbd>
         </span>
+        <button type="button" class="filter-open" aria-haspopup="dialog"><span class="filter-open-text">@Model.Language.Text.FiltersButton</span><span class="visually-hidden filter-open-suffix"></span></button>
         <fieldset class="filter-group" data-filter="players">
             <legend>@Model.Language.Text.PlayersLegend</legend>
             <label class="filter-chip">
@@ -145,10 +146,12 @@
                 </label>
             }
         </fieldset>
-        <label class="visually-hidden" for="filter-loc" hidden>@Model.Language.Text.LocationLabel</label>
-        <select id="filter-loc" name="location" hidden>
-            <option value="">@Model.Language.Text.AnyLocation</option>
-        </select>
+        <div class="filter-location" hidden>
+            <label class="visually-hidden" for="filter-loc" hidden>@Model.Language.Text.LocationLabel</label>
+            <select id="filter-loc" name="location" hidden>
+                <option value="">@Model.Language.Text.AnyLocation</option>
+            </select>
+        </div>
         <div class="filter-status">
             <span class="filter-count" aria-hidden="true"></span>
             <button type="button" class="filter-clear" aria-label="@Model.Language.Text.ClearName">@Model.Language.Text.ClearVisible</button>
@@ -156,6 +159,17 @@
     </div>
 </div>
 <p class="filter-note" hidden></p>
+<dialog class="filter-dialog" aria-labelledby="filter-sheet-title">
+    <div class="filter-sheet">
+        <span class="filter-grip" aria-hidden="true"></span>
+        <h2 id="filter-sheet-title" class="visually-hidden">@Model.Language.Text.SheetTitle</h2>
+        <div class="filter-sheet-groups"></div>
+        <div class="filter-sheet-actions">
+            <button type="button" class="filter-sheet-clear" aria-label="@Model.Language.Text.ClearName" hidden>@Model.Language.Text.ClearVisible</button>
+            <button type="button" class="filter-done"></button>
+        </div>
+    </div>
+</dialog>
 <p id="filter-live" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
 <main>
     <section class="games-list" aria-labelledby="games-list-title">

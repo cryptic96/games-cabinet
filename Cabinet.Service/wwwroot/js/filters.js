@@ -21,6 +21,7 @@ import {
   withAlternates,
 } from './filter-rules.js';
 import { createFilterWriter } from './filter-state.js';
+import { initFilterSheet } from './filter-sheet.js';
 
 /** How long the count must stay unchanged before it is announced to a screen reader, in milliseconds. */
 export const FILTER_ANNOUNCE_MS = 600;
@@ -131,9 +132,12 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
   const count = bar.querySelector('.filter-count');
   const clear = bar.querySelector('.filter-clear');
   const live = document.getElementById('filter-live');
-  const place = bar.querySelector('#filter-loc');
-  const placeLabel = bar.querySelector('label[for="filter-loc"]');
-  const groups = CHIP_GROUPS.map((group) => ({ ...group, element: bar.querySelector(`.filter-group[data-filter="${group.name}"]`) })).filter((group) => group.element !== null);
+  const place = document.getElementById('filter-loc');
+  const placeLabel = document.querySelector('label[for="filter-loc"]');
+  const placeUnit = document.querySelector('.filter-location');
+  const groups = CHIP_GROUPS.map((group) => ({ ...group, element: document.querySelector(`.filter-group[data-filter="${group.name}"]`) })).filter((group) => group.element !== null);
+  const openButton = bar.querySelector('.filter-open');
+  const sheetDialog = document.querySelector('.filter-dialog');
 
   const note = document.querySelector('.filter-note');
   const writer = createFilterWriter({
@@ -226,11 +230,39 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
 
     place.hidden = !shown;
 
+    if (placeUnit !== null) {
+      placeUnit.hidden = !shown;
+    }
+
     if (placeLabel !== null) {
       placeLabel.hidden = !shown;
     }
 
     place.value = effectiveLocation(state.location, model) ?? '';
+  }
+
+  /**
+   * Counts the filters in use for the Filters button: the search, players, time and location. The view is not a filter.
+   * @returns {number}
+   */
+  function activeFilters() {
+    return [fold(state.q) !== '', state.players !== null, state.time !== null, state.location !== null].filter(Boolean).length;
+  }
+
+  /**
+   * Writes the Filters button of the slim bar: its text with the number of filters in use, and for assistive technology the word
+   * that tells what the number means.
+   */
+  function showFiltersButton() {
+    if (openButton === null) {
+      return;
+    }
+
+    const active = activeFilters();
+    const text = copy.filtersButton(active);
+
+    openButton.querySelector('.filter-open-text').textContent = text;
+    openButton.querySelector('.filter-open-suffix').textContent = copy.filtersButtonName(active).slice(text.length);
   }
 
   /**
@@ -242,6 +274,7 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
     count.textContent = !result.active ? '' : none ? copy.noMatch : copy.filterCount(tally.lit, tally.total);
     bar.toggleAttribute('data-active', result.active);
     clear.toggleAttribute('data-highlighted', none);
+    showFiltersButton();
     showHeadings();
   }
 
@@ -459,9 +492,11 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
   }
 
   /**
-   * Empties the search, puts every box back in the light and announces it at once. Focus ends in the search field.
+   * Empties the search, puts every box back in the light and announces it at once. Focus ends in the search field, or in the control
+   * the caller names, which the sheet uses so focus never stays on a Clear that has left the layout.
+   * @param {HTMLElement} [focusTarget] Where focus goes; the search field by default.
    */
-  function clearAll() {
+  function clearAll(focusTarget = field) {
     window.clearTimeout(announceTimer);
     announceTimer = null;
     field.value = '';
@@ -475,7 +510,7 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
     apply();
     writer.write(state);
     live.textContent = announcement();
-    field.focus();
+    focusTarget.focus();
   }
 
   /**
@@ -525,7 +560,7 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
     state = { ...state, players: null, time: null, location: null };
     resetChips();
 
-    for (const input of bar.querySelectorAll('.filter-group input')) {
+    for (const input of document.querySelectorAll('.filter-group input')) {
       input.disabled = true;
     }
 
@@ -553,7 +588,7 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
 
     cardFiltersOff = false;
 
-    for (const input of bar.querySelectorAll('.filter-group input')) {
+    for (const input of document.querySelectorAll('.filter-group input')) {
       input.disabled = false;
     }
 
@@ -601,7 +636,29 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
     }
   });
 
-  clear.addEventListener('click', clearAll);
+  clear.addEventListener('click', () => clearAll());
+
+  if (openButton !== null && sheetDialog !== null) {
+    initFilterSheet({
+      bar,
+      dialog: sheetDialog,
+      openButton,
+      cabinet: mount,
+      copy,
+      getCount: () => ({ lit: tally.lit, total: tally.total, active: result.active }),
+      units: {
+        view: document.querySelector('.filter-view'),
+        players: groups.find((group) => group.name === 'players')?.element ?? null,
+        time: groups.find((group) => group.name === 'time')?.element ?? null,
+        location: placeUnit,
+        note,
+      },
+    });
+
+    sheetDialog.querySelector('.filter-sheet-clear').addEventListener('click', () => clearAll(sheetDialog.querySelector('.filter-done')));
+  }
+
+  showFiltersButton();
 
   document.addEventListener('keydown', (event) => {
     const plain = !event.ctrlKey && !event.altKey && !event.metaKey;

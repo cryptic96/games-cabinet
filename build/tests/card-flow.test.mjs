@@ -442,3 +442,26 @@ test('a downward drag is followed one to one and an upward drag a quarter of the
   assert.equal(resist(0), 0);
   assert.equal(resist(-80), -20);
 });
+
+test('a step with its own marker pushes that marker and clears only a stale step of its own kind', () => {
+  const history = createFakeHistory();
+  const timers = createFakeTimers();
+  const step = createHistoryStep({ history, setTimer: timers.setTimer, clearTimer: timers.clearTimer, marker: 'filters' });
+
+  step.opened();
+  step.clearStale({ card: true });
+  step.clearStale({ filters: true });
+  step.clearStale(null);
+
+  assert.deepEqual(history.pushes, [[{ filters: true }, '']]);
+  assert.deepEqual(history.replaces, [[null, '']]);
+});
+
+test('the default marker stays card, so a card never clears a step of the sheet', () => {
+  const { step, history } = createStep();
+
+  step.clearStale({ filters: true });
+  step.clearStale({ card: true });
+
+  assert.deepEqual(history.replaces, [[null, '']]);
+});

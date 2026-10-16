@@ -37,11 +37,16 @@ public sealed class FilterLocationViewTests : CabinetPageTest
         var groups = ExpectedGroups(document);
 
         groups.Should().HaveCountGreaterThan(1);
-        await Expect(Page.Locator(Switch)).ToBeVisibleAsync();
-        (await Page.EvaluateAsync<bool>("() => document.querySelector('.filter-bar').firstElementChild.firstElementChild.classList.contains('filter-view')")).Should().BeTrue("the switch is first in the bar");
+        await ExpectViewSwitchAvailableAsync();
+
+        if (width >= 1024)
+        {
+            (await Page.EvaluateAsync<bool>("() => document.querySelector('.filter-bar').firstElementChild.firstElementChild.classList.contains('filter-view')")).Should().BeTrue("the switch is first in the bar");
+        }
+
         await Expect(Page.Locator("input[name=\"filter-view\"][value=\"all\"]")).ToBeCheckedAsync();
 
-        await Page.Locator(".filter-view-segment").Nth(1).ClickAsync();
+        await ChooseViewAsync(1);
 
         await Expect(Page.Locator(Groups)).ToHaveCountAsync(groups.Count);
         await Expect(Page.Locator("input[name=\"filter-view\"][value=\"location\"]")).ToBeCheckedAsync();
@@ -61,7 +66,7 @@ public sealed class FilterLocationViewTests : CabinetPageTest
         (await Page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth <= document.documentElement.clientWidth")).Should().BeTrue();
         await SaveScreenshotAsync($"filter-location-view-{profile}");
 
-        await Page.Locator(".filter-view-segment").Nth(0).ClickAsync();
+        await ChooseViewAsync(0);
 
         await Expect(Page.Locator(Groups)).ToHaveCountAsync(0);
         await Expect(Page.Locator("#cabinet .section")).ToHaveCountAsync(sectionsTogether);
@@ -78,7 +83,7 @@ public sealed class FilterLocationViewTests : CabinetPageTest
         var groups = ExpectedGroups(document);
         await Page.EvaluateAsync(RecordFiltered);
 
-        await Page.Locator(".filter-view-segment").Nth(1).ClickAsync();
+        await ChooseViewAsync(1);
 
         await Expect(Page.Locator(Groups)).ToHaveCountAsync(groups.Count);
         await Page.WaitForFunctionAsync("() => window.__filtered !== undefined && window.__filtered.view === 'location'");
@@ -120,7 +125,7 @@ public sealed class FilterLocationViewTests : CabinetPageTest
     public async Task Arrow_down_crosses_into_the_next_location(int width, int height)
     {
         await OpenSampleAsync(width, height);
-        await Page.Locator(".filter-view-segment").Nth(1).ClickAsync();
+        await ChooseViewAsync(1);
         await Expect(Page.Locator(Groups).First).ToBeAttachedAsync();
         await Page.WaitForFunctionAsync("() => document.querySelectorAll('#cabinet .location-group').length > 1");
 
@@ -150,7 +155,7 @@ public sealed class FilterLocationViewTests : CabinetPageTest
             return perGroup.Any(lit => lit == 0) && perGroup.Any(lit => lit > 0);
         });
         var litPerGroup = LitByGroup(document, FilterBarTests.ExpectedLit(cards, players, null));
-        await Page.Locator(".filter-view-segment").Nth(1).ClickAsync();
+        await ChooseViewAsync(1);
         await Expect(Page.Locator(Groups)).ToHaveCountAsync(groups.Count);
         var mutedColour = await ColourOfAsync("--room-muted");
         var textColour = await ColourOfAsync("--room-text");
@@ -183,7 +188,7 @@ public sealed class FilterLocationViewTests : CabinetPageTest
     public async Task Each_location_keeps_its_own_rows(int width, int height)
     {
         await OpenSampleAsync(width, height);
-        await Page.Locator(".filter-view-segment").Nth(1).ClickAsync();
+        await ChooseViewAsync(1);
         await Expect(Page.Locator(Groups).First).ToBeAttachedAsync();
         await Page.WaitForFunctionAsync("() => document.querySelectorAll('#cabinet .location-group').length > 1");
 
@@ -226,9 +231,9 @@ public sealed class FilterLocationViewTests : CabinetPageTest
         await host.PlaceAsync(games[1], places[1]);
         await GotoCabinetAsync("/");
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await Expect(Page.Locator(Switch)).ToBeVisibleAsync();
+        await ExpectViewSwitchAvailableAsync();
 
-        await Page.Locator(".filter-view-segment").Nth(1).ClickAsync();
+        await ChooseViewAsync(1);
 
         await Expect(Page.Locator(Headings).First).ToHaveTextAsync(new System.Text.RegularExpressions.Regex("^" + longName + @" · \d+ games?$"));
         (await Page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth <= document.documentElement.clientWidth")).Should().BeTrue();
@@ -256,8 +261,8 @@ public sealed class FilterLocationViewTests : CabinetPageTest
         await Page.RouteAsync("**/cabinet/search-names**", route => route.FulfillAsync(new RouteFulfillOptions { Status = 200, ContentType = "application/json", Body = "{\"names\":{}}" }));
         await GotoCabinetAsync("/");
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await Expect(Page.Locator(Switch)).ToBeVisibleAsync();
-        await Page.Locator(".filter-view-segment").Nth(1).ClickAsync();
+        await ExpectViewSwitchAvailableAsync();
+        await ChooseViewAsync(1);
         await Expect(Page.Locator(Groups)).ToHaveCountAsync(3);
         await Expect(Page.Locator(Headings).Nth(0)).ToContainTextAsync("Cabinet A · ");
         await Expect(Page.Locator(Headings).Nth(1)).ToContainTextAsync("Shelf B · ");
@@ -289,13 +294,13 @@ public sealed class FilterLocationViewTests : CabinetPageTest
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         var names = Enumerable.Range(0, 14).Select(index => $"Cabinet {(char)('A' + index)}").ToArray();
 
-        await Expect(Page.Locator(Switch)).ToBeVisibleAsync();
+        await ExpectViewSwitchAvailableAsync();
         await Expect(Page.Locator("#filter-loc option")).ToHaveTextAsync(["Any location", .. names]);
         await AssertNoSidewaysScrollAsync(1280);
         await AssertNoSidewaysScrollAsync(390);
 
         await Page.SetViewportSizeAsync(1280, 900);
-        await Page.Locator(".filter-view-segment").Nth(1).ClickAsync();
+        await ChooseViewAsync(1);
 
         await Expect(Page.Locator(Groups)).ToHaveCountAsync(14);
         await Expect(Page.Locator(Headings)).ToHaveTextAsync(names.Select(name => $"{name} · 2 games").ToArray());
@@ -317,10 +322,10 @@ public sealed class FilterLocationViewTests : CabinetPageTest
         var document = JsonSerializer.Deserialize<ViewDocument>(json.GetRawText(), WebOptions)!;
         var every = await EntryIdsAsync();
 
-        await Expect(Page.Locator(Switch)).ToBeVisibleAsync();
+        await ExpectViewSwitchAvailableAsync();
         await Expect(Page.Locator("#filter-loc option")).ToHaveTextAsync(["Any location", "Unknown location"]);
 
-        await Page.Locator(".filter-view-segment").Nth(1).ClickAsync();
+        await ChooseViewAsync(1);
 
         await Expect(Page.Locator(Groups)).ToHaveCountAsync(1);
         await Expect(Page.Locator(Headings)).ToHaveTextAsync($"Unknown location · {Games(TopLevel(document.Cards))}");
@@ -357,7 +362,7 @@ public sealed class FilterLocationViewTests : CabinetPageTest
     public async Task At_rest_only_the_current_view_segment_is_filled()
     {
         await OpenSampleAsync(1280, 900);
-        await Expect(Page.Locator(Switch)).ToBeVisibleAsync();
+        await ExpectViewSwitchAvailableAsync();
         await RestAsync();
 
         var atRest = await ReadBarAsync();
@@ -368,7 +373,7 @@ public sealed class FilterLocationViewTests : CabinetPageTest
         atRest.AnyChips.Should().OnlyContain(chip => chip.Alpha == 0 && chip.Weight == "600" && chip.Shadow.Contains("inset", StringComparison.Ordinal));
         atRest.Controls.Should().BeGreaterThan(10);
 
-        await Page.Locator(".filter-view-segment").Nth(1).ClickAsync();
+        await ChooseViewAsync(1);
         await Expect(Page.Locator(Groups).First).ToBeAttachedAsync();
         await RestAsync();
 

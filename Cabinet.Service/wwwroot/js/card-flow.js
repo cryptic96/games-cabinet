@@ -139,16 +139,18 @@ export function indexPlacements(layout) {
 const REOPEN_WAIT_MS = 150;
 
 /**
- * The one history step a card takes. Opening pushes a step with no address, so Back closes the card; closing in any other way
- * removes that step again with one Back, and the pop that causes is swallowed, so no dead step is left behind and a second Back
- * leaves the page as it would have before.
+ * The one history step a card, or any other dialog that Back closes, takes. Opening pushes a step with no address, so Back closes the
+ * dialog; closing in any other way removes that step again with one Back, and the pop that causes is swallowed, so no dead step is
+ * left behind and a second Back leaves the page as it would have before. The step carries a marker, so a dialog only ever clears
+ * a stale step of its own kind.
  * @param {object} parts What the step needs from the page.
  * @param {{ pushState: Function, back: Function, replaceState: Function }} parts.history The browser history.
  * @param {(callback: Function, delay: number) => unknown} parts.setTimer Starts a timer.
  * @param {(timer: unknown) => void} parts.clearTimer Stops a timer.
+ * @param {string} [parts.marker] The name of the boolean member the step's state holds; the card's is `card`.
  * @returns {{ opened: Function, closedHere: Function, popped: Function, beforeOpen: Function, clearStale: Function }} The controls.
  */
-export function createHistoryStep({ history, setTimer, clearTimer }) {
+export function createHistoryStep({ history, setTimer, clearTimer, marker = 'card' }) {
   let hasStep = false;
   let ignorePop = false;
   let waiting = [];
@@ -175,7 +177,7 @@ export function createHistoryStep({ history, setTimer, clearTimer }) {
         return;
       }
 
-      history.pushState({ card: true }, '');
+      history.pushState({ [marker]: true }, '');
       hasStep = true;
     },
 
@@ -236,11 +238,11 @@ export function createHistoryStep({ history, setTimer, clearTimer }) {
     },
 
     /**
-     * Removes a card step left in the history by a reload or a restore, which no card stands behind.
+     * Removes a step of this marker left in the history by a reload or a restore, which no dialog stands behind.
      * @param {object | null} state The history state found on load.
      */
     clearStale(state) {
-      if (state !== null && state !== undefined && state.card === true) {
+      if (state !== null && state !== undefined && state[marker] === true) {
         history.replaceState(null, '');
       }
     },
