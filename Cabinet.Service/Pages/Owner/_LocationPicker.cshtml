@@ -24,5 +24,9 @@
         </select>
         <button type="submit" class="owner-btn" data-save>@OwnerStrings.SaveButton</button>
     </form>
+    @if (Model.Hint is not null)
+    {
+        <p class="owner-hint picker-hint" data-follow-hint dir="auto" hidden="@(!Model.HintVisible)">@Model.Hint</p>
+    }
     <div class="row-status" role="status"></div>
 </div>

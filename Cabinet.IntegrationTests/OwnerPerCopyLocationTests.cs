@@ -120,6 +120,20 @@ public sealed class OwnerPerCopyLocationTests
     }
 
     [Fact]
+    public async Task Copies_of_the_same_edition_keep_their_copy_tags_so_they_stay_apart()
+    {
+        using var storage = Seed(editions: ["Quiet Quarry Deluxe edition", "quiet quarry deluxe edition", "Quiet Quarry Travel edition"]);
+        await using var factory = FactoryOn(storage);
+        using var session = new OwnerSession(factory);
+
+        var page = await session.GetAsync(LocationsPath);
+
+        Regex.Matches(page.Body, "<span class=\"pic-tag pic-tag-plain\" dir=\"auto\">([^<]+)</span>")
+            .Select(match => match.Groups[1].Value)
+            .Should().Equal("Copy 1 of 3", "Copy 2 of 3", "Quiet Quarry Travel edition");
+    }
+
+    [Fact]
     public async Task The_cabinet_page_counts_copies_that_are_not_placed()
     {
         using var storage = Seed();

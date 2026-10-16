@@ -134,6 +134,20 @@ export function initPlacing(doc, hooks) {
   }
 
   /**
+   * Tells whether the copies of the base game an expansion row follows are shown in more than one place.
+   * @param {HTMLElement} row The expansion's row.
+   * @param {Map<string, string>} shown Where each copy is shown now, by collection entry.
+   * @returns {boolean}
+   */
+  function baseCopiesDiffer(row, shown) {
+    const places = gameRows()
+      .filter((candidate) => candidate.dataset.gameId === row.dataset.baseId)
+      .map((candidate) => shown.get(candidate.dataset.entryId) ?? '');
+
+    return new Set(places).size > 1;
+  }
+
+  /**
    * Shows the dock. A dock that was hidden first takes its place below the screen, then slides up.
    * @param {string} state `selecting`, `done` or `error`.
    */
@@ -250,8 +264,14 @@ export function initPlacing(doc, hooks) {
         where.dataset.unplaced = 'true';
       }
 
+      const hint = row.querySelector('[data-follow-hint]');
+
       if (follow) {
         follow.hidden = pickerOf(row).value !== '';
+      }
+
+      if (hint) {
+        hint.hidden = pickerOf(row).value !== '' || !baseCopiesDiffer(row, shown);
       }
     }
   }

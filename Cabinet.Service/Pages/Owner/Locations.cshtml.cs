@@ -26,6 +26,7 @@ namespace Cabinet.Service.Pages.Owner;
 /// <param name="CopyLabel">The tag that tells this copy apart from the other copies of its game, or null for a game owned once.</param>
 /// <param name="BaseEntryId">The collection entry of the first copy of the owned base game an expansion stands beside, or null for any other game.</param>
 /// <param name="IsFirstCopy">Whether this is the copy with the lowest collection entry of its game.</param>
+/// <param name="BaseCopiesDiffer">Whether the copies of the owned base game an expansion stands beside are not all shown in the same place.</param>
 public sealed record LocationGameRow(
     int GameId,
     string Title,
@@ -42,7 +43,8 @@ public sealed record LocationGameRow(
     long CollectionId = 0,
     string? CopyLabel = null,
     long? BaseEntryId = null,
-    bool IsFirstCopy = true)
+    bool IsFirstCopy = true,
+    bool BaseCopiesDiffer = false)
 {
     /// <summary>Whether the game is an expansion that stands beside an owned base game, so that no location of its own means it follows the base.</summary>
     public bool FollowsBase => BaseGameId is not null;
@@ -549,17 +551,29 @@ public class LocationsModel : OwnerPage
         var firstEntries = snapshot.Items
             .GroupBy(item => item.GameId)
             .ToDictionary(group => group.Key, group => group.Min(item => item.CollectionId));
+        var splitGames = snapshot.Items
+            .GroupBy(item => item.GameId)
+            .Where(group => group.Select(item => overlay.EntryLocationId(item.CollectionId)).Distinct().Count() > 1)
+            .Select(group => group.Key)
+            .ToHashSet();
         var rows = new List<LocationGameRow>(snapshot.Items.Count);
 
         foreach (var group in snapshot.Items.GroupBy(item => item.GameId))
         {
             var copies = group.OrderBy(item => item.CollectionId).ToList();
+            var editions = copies
+                .Where(copy => copy.VersionName is not null)
+                .GroupBy(copy => copy.VersionName!, StringComparer.OrdinalIgnoreCase)
+                .Where(sameName => sameName.Count() == 1)
+                .Select(sameName => sameName.Key)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             for (var index = 0; index < copies.Count; index++)
             {
-                var label = copies.Count > 1 ? copies[index].VersionName ?? OwnerStrings.CopyTag(index + 1, copies.Count) : null;
+                var edition = copies[index].VersionName is { } name && editions.Contains(name) ? name : null;
+                var label = copies.Count > 1 ? edition ?? OwnerStrings.CopyTag(index + 1, copies.Count) : null;
 
-                rows.Add(RowOf(copies[index], overlay, titles, covers, firstEntries, label, index == 0));
+                rows.Add(RowOf(copies[index], overlay, titles, covers, firstEntries, splitGames, label, index == 0));
             }
         }
 
@@ -572,6 +586,7 @@ public class LocationsModel : OwnerPage
         IReadOnlyDictionary<int, string> titles,
         IReadOnlyDictionary<int, CabinetItem> covers,
         IReadOnlyDictionary<int, long> firstEntries,
+        IReadOnlySet<int> splitGames,
         string? copyLabel,
         bool isFirstCopy)
     {
@@ -597,7 +612,8 @@ public class LocationsModel : OwnerPage
             item.CollectionId,
             copyLabel,
             baseEntry,
-            isFirstCopy);
+            isFirstCopy,
+            baseId is { } following && splitGames.Contains(following));
     }
 
     /// <summary>The small stored picture an item is drawn from, at the width the owner pages show, or null when it has none.</summary>

@@ -22,6 +22,8 @@ public sealed record LocationPickerOption(string Value, string Text, bool Select
 /// <param name="ReturnTo">Which page a form posted without script goes back to, one of the fixed words the assign handler knows; null for the locations page.</param>
 /// <param name="CollectionId">The collection entry of the copy the picker places.</param>
 /// <param name="CopyLabel">The tag that tells the copy apart from the other copies of its game, or null for a game owned once.</param>
+/// <param name="Hint">The quiet line under the select that says which copy of its base game an expansion follows, or null for a picker that has none.</param>
+/// <param name="HintVisible">Whether the hint shows now: the expansion has no place of its own and the copies of its base game are in different places.</param>
 public sealed record LocationPickerModel(
     int GameId,
     string Title,
@@ -30,7 +32,9 @@ public sealed record LocationPickerModel(
     string? VisibleLabel = null,
     string? ReturnTo = null,
     long CollectionId = 0,
-    string? CopyLabel = null)
+    string? CopyLabel = null,
+    string? Hint = null,
+    bool HintVisible = false)
 {
     /// <summary>The accessible name of the select: it names the copy when the game is owned more than once.</summary>
     public string AccessibleName => CopyLabel is null ? OwnerStrings.PickerLabel(Title) : OwnerStrings.PickerLabelForCopy(Title, CopyLabel);
@@ -48,12 +52,14 @@ public sealed record LocationPickerModel(
     /// <param name="revision">The revision of the owner data the form is built from.</param>
     /// <param name="visibleLabel">A visible label for the select, or null for none.</param>
     /// <param name="returnTo">Which page a form posted without script goes back to; null for the locations page.</param>
+    /// <param name="withHint">Whether an expansion that follows a base game gets the hint line; only the page that keeps it up to date asks for it.</param>
     public static LocationPickerModel For(
         LocationGameRow game,
         IReadOnlyList<OwnerLocation> locations,
         long revision,
         string? visibleLabel = null,
-        string? returnTo = null)
+        string? returnTo = null,
+        bool withHint = false)
     {
         ArgumentNullException.ThrowIfNull(game);
         ArgumentNullException.ThrowIfNull(locations);
@@ -64,6 +70,9 @@ public sealed record LocationPickerModel(
         options.AddRange(locations.Select(location =>
             new LocationPickerOption(location.Id, location.Name, string.Equals(location.Id, game.OwnLocationId, StringComparison.Ordinal))));
 
-        return new LocationPickerModel(game.GameId, game.Title, options, revision, visibleLabel, returnTo, game.CollectionId, game.CopyLabel);
+        var hint = withHint && game.BaseTitle is not null ? OwnerStrings.FollowsFirstCopy(game.BaseTitle) : null;
+        var hintVisible = hint is not null && game.OwnLocationId is null && game.BaseCopiesDiffer;
+
+        return new LocationPickerModel(game.GameId, game.Title, options, revision, visibleLabel, returnTo, game.CollectionId, game.CopyLabel, hint, hintVisible);
     }
 }
