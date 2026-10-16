@@ -564,7 +564,7 @@ Browser features the UI contract relies on and that need a guard rather than a p
 | A9 | Waiting for cards for any stored filter (search included) is acceptable | Pattern 4 | Slightly later first draw for a reloaded tab with a filter |
 | A10 | Browser baseline for view transitions, `@starting-style`, `allow-discrete`, container queries | State of the Art | Fallbacks already specified |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 **Resolved with the owner on 2026-10-15 (`07-RESEARCH-QUESTIONS.md`), all as recommended.** Items below map to that document's labels: 1 = Q1, wait for the cards for any stored filter, search included (amends UI-SPEC A5); 2 = N1, tolerant parsers plus a counts-only access check; 3 = Q2, hand an absent per-copy entry's kept decisions to a newly listed copy of the same game that has none; 4 = Q3, sparse-section rule on the last section of an unbalanced build only; 5 = N2, no extraction from `detail.js`, reuse the pure helpers; 6 = N3, static labels in `SiteText`, dynamic strings in `copy.js`, one shared fixture.
 
@@ -573,23 +573,29 @@ Browser features the UI contract relies on and that need a guard rather than a p
    - What's unclear: an expansion owned for two bases needs the cards' `bases` to light correctly.
    - Recommendation: wait for the cards for any stored filter (one rule); confirm with the owner as a deviation from A5.
 
+   - **RESOLVED (Q1): wait for the cards for any stored filter, search included; amends UI-SPEC A5.**
 2. **What do real BGG answers look like for the owned edition's name and for alternate names?**
    - What we know: the repo's fake models both; no real answer was ever recorded, and the official wiki page was not fetchable here.
    - What's unclear: attribute names and how many alternates popular games carry.
    - Recommendation: build tolerant parsers, extend the existing BGG access check to report how often the version carries a name and how many alternate names games carry (counts only, no recorded responses), and confirm in the device round.
 
+   - **RESOLVED (N1): tolerant parsers plus a counts-only BGG access check; confirmed on the server, never recorded.**
 3. **Per-copy decisions when a game is re-added on BGG (new collection id).**
    - What we know: D-31 moves the 30-day rule to the collection-entry key.
    - What's unclear: whether the owner expects a re-added game to keep its location.
    - Recommendation: hand an absent per-copy entry's decisions to a newly listed copy of the same game that has none; unit-test it; otherwise state the behaviour in the owner pages' help text.
 
+   - **RESOLVED (Q2): hand an absent per-copy entry's kept decisions to a newly listed copy of the same game that has none.**
 4. **Scope of the sparse-section rule.**
    - Recommendation: last section of an unbalanced build only (covers phone, and every small location cabinet), leaving balanced desktop sections as they are. Confirm.
 
+   - **RESOLVED (Q3): last section of an unbalanced build only.**
 5. **Should the Filters sheet's drag be extracted from `detail.js`?**
    - Recommendation: no. Reuse the exported pure helpers and write the sheet's handlers; refactoring `initCardDialog` risks the card's tests for no gain.
 
+   - **RESOLVED (N2): no extraction from `detail.js`; reuse the exported pure helpers.**
 6. **Where do the control labels live?** Recommendation in Environment/Pattern 9: static labels in `SiteText` rendered by Razor; dynamic strings in `copy.js`; one shared fixture for strings present in both. Confirm with planner.
+   - **RESOLVED (N3): static labels in `SiteText`, dynamic strings in `copy.js`, one shared fixture.**
 
 ## Environment Availability
 

@@ -40,7 +40,7 @@ The UI decisions were reviewed through the owner's senior-frontend skill during 
   - It takes the current wood's wall colour (the finishes phase, D-19), so it follows all five walls.
   - A soft shadow under it appears only once it is stuck. An invisible marker element detects that, with no scroll handler.
   - `LookChromeContrastTests` is extended to the bar's text, button states and focus rings on every wall, in day and evening.
-- **D-03: On a phone: a slim bar plus a Filters sheet.**
+- **D-03: On a phone, a slim bar plus a Filters sheet.**
   - The slim bar holds the search field and a "Filters" button showing the number of active filters ("Filters · 2").
   - The button opens a bottom sheet with the view toggle at the top, then players, time and location.
   - The sheet reuses the card's sheet pattern (detail phase, D-04): drag from the handle, one height, sized to its content (about half the screen), so the top of the cabinet stays visible above it.
