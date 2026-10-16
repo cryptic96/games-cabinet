@@ -139,6 +139,67 @@ export function nextBox(rects, currentIndex, key) {
 }
 
 /**
+ * Picks the rectangle nearest to a starting rectangle with the same measure the arrow keys use: a rectangle that overlaps or touches
+ * it is at distance zero, any other is as far as the straight gap between the two, and the centres settle candidates that tie.
+ * @param {{ left: number, top: number, right: number, bottom: number }[]} rects The candidate rectangles.
+ * @param {{ left: number, top: number, right: number, bottom: number }} from The rectangle to measure from.
+ * @returns {number} The index of the nearest rectangle, or -1 when the list is empty.
+ */
+export function nearestBox(rects, from) {
+  const centreX = (from.left + from.right) / 2;
+  const centreY = (from.top + from.bottom) / 2;
+  let bestIndex = -1;
+  let best = null;
+
+  rects.forEach((to, index) => {
+    const gap = Math.hypot(gapBetween(from.left, from.right, to.left, to.right), gapBetween(from.top, from.bottom, to.top, to.bottom));
+    const centre = Math.hypot(centreX - (to.left + to.right) / 2, centreY - (to.top + to.bottom) / 2);
+
+    if (best === null || gap < best.gap - TOLERANCE || (gap <= best.gap + TOLERANCE && centre < best.centre - TOLERANCE)) {
+      best = { gap, centre };
+      bestIndex = index;
+    }
+  });
+
+  return bestIndex;
+}
+
+/**
+ * Lists the indices of the rectangles in on-screen reading order: by top edge, then by left edge, where tops within the tolerance of
+ * the first top of a row count as the same row. The order does not depend on the order of the input.
+ * @param {{ left: number, top: number }[]} rects The rectangles to order.
+ * @returns {number[]} The indices of the rectangles, first in reading order first.
+ */
+export function readingOrder(rects) {
+  const byTop = rects.map((rect, index) => index).sort((a, b) => rects[a].top - rects[b].top || rects[a].left - rects[b].left || a - b);
+  const ordered = [];
+  let row = [];
+  let rowTop = 0;
+
+  const closeRow = () => {
+    row.sort((a, b) => rects[a].left - rects[b].left || rects[a].top - rects[b].top || a - b);
+    ordered.push(...row);
+    row = [];
+  };
+
+  for (const index of byTop) {
+    if (row.length > 0 && rects[index].top > rowTop + TOLERANCE) {
+      closeRow();
+    }
+
+    if (row.length === 0) {
+      rowTop = rects[index].top;
+    }
+
+    row.push(index);
+  }
+
+  closeRow();
+
+  return ordered;
+}
+
+/**
  * Gives the section number a box stands in, read from its shelf value, or -1 when it has none.
  * @param {{ shelf: string }} rect A box's rectangle.
  * @returns {number}
@@ -197,6 +258,19 @@ function nextSectionBox(rects, currentIndex, key) {
  */
 function keyOf(element) {
   return element.dataset.entryId + '|' + element.dataset.kind;
+}
+
+/**
+ * Reads the rectangles of boxes as they sit on screen right now.
+ * @param {HTMLElement[]} boxes The boxes to measure.
+ * @returns {{ left: number, top: number, right: number, bottom: number, shelf: string }[]}
+ */
+function rectsOf(boxes) {
+  return boxes.map((candidate) => {
+    const rect = candidate.getBoundingClientRect();
+
+    return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, shelf: candidate.dataset.shelf };
+  });
 }
 
 /**
@@ -287,15 +361,25 @@ export function initRoving(mount) {
     event.preventDefault();
 
     const boxes = [...mount.querySelectorAll('.placement')];
-    const rects = boxes.map((candidate) => {
-      const rect = candidate.getBoundingClientRect();
+    const lit = boxes.filter((candidate) => !candidate.hasAttribute('data-dim'));
+    const filtering = lit.length > 0 && lit.length < boxes.length;
 
-      return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, shelf: candidate.dataset.shelf };
-    });
-    const target = nextBox(rects, boxes.indexOf(box), event.key);
+    if (filtering && (event.key === 'Home' || event.key === 'End')) {
+      const order = readingOrder(rectsOf(lit));
+      const edge = lit[event.key === 'Home' ? order[0] : order[order.length - 1]];
 
-    if (target >= 0 && boxes[target] !== box) {
-      boxes[target].focus();
+      if (edge !== box) {
+        edge.focus();
+      }
+
+      return;
+    }
+
+    const candidates = filtering ? boxes.filter((candidate) => candidate === box || !candidate.hasAttribute('data-dim')) : boxes;
+    const target = nextBox(rectsOf(candidates), candidates.indexOf(box), event.key);
+
+    if (target >= 0 && candidates[target] !== box) {
+      candidates[target].focus();
     }
   });
 
