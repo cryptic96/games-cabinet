@@ -308,8 +308,10 @@
   min-width: 0;
   margin: 0;
   padding: 0;
-  border: 1px solid var(--room-line, var(--chrome-line));
+  border: 0;
   border-radius: 4px;
+  outline: 1px solid var(--room-line, var(--chrome-line));
+  outline-offset: -1px;
   overflow: hidden;
 }
 
@@ -391,6 +393,10 @@
   color: var(--room-muted, var(--chrome-muted));
   text-wrap: balance;
   overflow-wrap: anywhere;
+}
+
+.location-heading[data-no-match] .location-name {
+  color: var(--room-muted, var(--chrome-muted));
 }
 
 .location-name {

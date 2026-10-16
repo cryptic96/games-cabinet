@@ -132,12 +132,19 @@ public static class FilterFixture
     /// game for three to four players, whose expansion follows it; Shelf B holds the second copy, the standalone game and the
     /// expansion stored apart from its base; Lent out holds nothing; the other games are not placed.
     /// </summary>
-    public static OwnerData Owner() =>
+    public static OwnerData Owner() => Owner(placeCopies: true);
+
+    /// <summary>
+    /// Builds the owner's data with the same three locations. With <paramref name="placeCopies"/> false the locations exist but no copy
+    /// is placed in any of them, so every game is not placed.
+    /// </summary>
+    /// <param name="placeCopies">Whether to place the copies as <see cref="Owner()"/> describes; false leaves every game unplaced.</param>
+    public static OwnerData Owner(bool placeCopies) =>
         OwnerData.Empty with
         {
             Revision = 1,
             Locations = Locations,
-            Games =
+            Games = placeCopies ?
             [
                 new OwnerGame(HarbourGameId, CabinetAId, null, null),
                 new OwnerGame(HarbourExpansionGameId, ShelfBId, null, null),
@@ -146,7 +153,7 @@ public static class FilterFixture
                 new OwnerGame(QuarryGameId, CabinetAId, null, null, QuarryEntries[2]),
                 new OwnerGame(TallyGameId, CabinetAId, null, null),
                 new OwnerGame(KettleGameId, ShelfBId, null, null),
-            ],
+            ] : [],
         };
 
     /// <summary>Stores the collection in the directory the way the host's own store would, with no owner data.</summary>
@@ -160,10 +167,68 @@ public static class FilterFixture
 
     /// <summary>Stores the collection and the owner's locations and placements in the directory.</summary>
     /// <param name="directory">The state directory the host will be given; it must exist.</param>
-    public static void Write(string directory)
+    public static void Write(string directory) => Write(directory, placeCopies: true);
+
+    /// <summary>Stores the collection and the owner's locations in the directory, with or without the placements.</summary>
+    /// <param name="directory">The state directory the host will be given; it must exist.</param>
+    /// <param name="placeCopies">Whether to store the placements; false stores the three locations and places no copy.</param>
+    public static void Write(string directory, bool placeCopies)
     {
         WriteCollection(directory);
-        OwnerDataSeed.Write(directory, Owner());
+        OwnerDataSeed.Write(directory, Owner(placeCopies));
+    }
+
+    /// <summary>
+    /// Builds a synthetic collection and the owner's data for many storage locations: <paramref name="count"/> invented locations named
+    /// Cabinet A, Cabinet B and onward by letter, in that owner order, each holding two invented games, and no game left unplaced.
+    /// The names are lettered furniture only. The collection and the placements are separate from the rest of this fixture.
+    /// </summary>
+    /// <param name="count">How many locations to invent, from 1 to 26.</param>
+    public static (CollectionSnapshot Snapshot, OwnerData Owner) ManyLocations(int count)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(count, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(count, 26);
+
+        var details = new GameDetails(Moment, 2, 4, 60, null, null, 10, 2.4, 7.4, 7.0, ["Invented Designer"], ["Drafting"], [], null);
+        var locations = new List<OwnerLocation>();
+        var items = new List<SnapshotItem>();
+        var games = new Dictionary<int, GameDetails>();
+        var placements = new List<OwnerGame>();
+
+        for (var index = 0; index < count; index++)
+        {
+            var locationId = (0xb0000000 + index).ToString("x8", System.Globalization.CultureInfo.InvariantCulture);
+            var letter = (char)('A' + index);
+
+            locations.Add(new OwnerLocation(locationId, $"Cabinet {letter}"));
+
+            for (var game = 0; game < 2; game++)
+            {
+                var gameId = 7000 + (index * 2) + game;
+
+                items.Add(Item(9000 + (index * 2) + game, gameId, $"Invented Game {letter}{game + 1}", ItemKind.Base));
+                games[gameId] = details;
+                placements.Add(new OwnerGame(gameId, locationId, null, null));
+            }
+        }
+
+        var snapshot = new CollectionSnapshot(CollectionSnapshot.CurrentSchemaVersion, Moment, items, null, games);
+        var owner = OwnerData.Empty with { Revision = 1, Locations = locations, Games = placements };
+
+        return (snapshot, owner);
+    }
+
+    /// <summary>Stores the many-locations collection and the owner's placements in the directory.</summary>
+    /// <param name="directory">The state directory the host will be given; it must exist.</param>
+    /// <param name="count">How many locations to invent, from 1 to 26.</param>
+    public static void WriteManyLocations(string directory, int count)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(directory);
+
+        var (snapshot, owner) = ManyLocations(count);
+
+        new SnapshotStore(directory, NullLogger<SnapshotStore>.Instance).Save(snapshot);
+        OwnerDataSeed.Write(directory, owner);
     }
 
     private static SnapshotItem Item(long entry, int gameId, string title, ItemKind kind) =>
