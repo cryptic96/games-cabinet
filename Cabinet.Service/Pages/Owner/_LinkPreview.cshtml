@@ -5,8 +5,9 @@
 @{
     var preview = Model.Preview;
     var gameId = Model.GameId;
-    var previewId = $"pic-preview-{gameId}";
-    var headingId = $"pic-preview-heading-{gameId}";
+    var entryId = Model.CollectionId;
+    var previewId = $"pic-preview-{entryId}";
+    var headingId = $"pic-preview-heading-{entryId}";
     var previewUrl = $"{OwnerEndpoints.PreviewPath}/{Model.Token}";
     var boxWidth = LinkPreviewModel.Pixels(preview.BoxWidthMm);
     var boxHeight = LinkPreviewModel.Pixels(preview.BoxHeightMm);
@@ -15,7 +16,7 @@
     var edge = preview.Edges?.Top ?? preview.Spine.Background;
     var note = OwnerStrings.PreviewNote(preview.Verdict);
 }
-<section class="pic-preview" id="@previewId" aria-labelledby="@headingId" data-token="@Model.Token" data-game-id="@gameId">
+<section class="pic-preview" id="@previewId" aria-labelledby="@headingId" data-token="@Model.Token" data-game-id="@gameId" data-entry-id="@entryId">
     <h4 id="@headingId" tabindex="-1">@OwnerStrings.PreviewHeading</h4>
     <p class="pic-preview-sub">@OwnerStrings.PreviewSub</p>
     <div class="preview-shelf" data-static>
@@ -49,12 +50,14 @@
         <form method="post" asp-page-handler="UseLink">
             <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
             <input type="hidden" name="gameId" value="@gameId" />
+            <input type="hidden" name="collectionId" value="@entryId" />
             <input type="hidden" name="token" value="@Model.Token" />
             <input type="hidden" name="game" value="@gameId" />
             <button type="submit" class="owner-btn-primary" data-use-preview>@OwnerStrings.UseThisButton</button>
         </form>
         <form method="post" asp-page-handler="DiscardPreview">
             <input type="hidden" name="gameId" value="@gameId" />
+            <input type="hidden" name="collectionId" value="@entryId" />
             <input type="hidden" name="token" value="@Model.Token" />
             <button type="submit" class="owner-btn" data-discard-preview>@OwnerStrings.DiscardPreviewButton</button>
         </form>

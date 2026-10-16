@@ -156,7 +156,7 @@ public sealed partial class OwnerLinkPreviewTests
         setting.Checked.Should().BeTrue();
         setting.Link!.Url.Should().Be(LinkUrl);
         setting.Link.Record!.Files.Should().NotBeEmpty().And.OnlyContain(file => File.Exists(host.ArtFile(file.Name)));
-        host.Changes[0].Text.Should().Be($"Picture of {host.Title}: your link");
+        host.Changes[0].Text.Should().Be($"Picture of {host.Title} (copy 1 of 2): your link");
         before.CoverUrl.Should().NotBe(after.CoverUrl);
         setting.Link.Record.Files!.Select(file => file.Name).Should().Contain(Path.GetFileName(after.CoverUrl));
         after.Colour.Should().Be(setting.Link.Record.Colour!.Background);
@@ -232,7 +232,7 @@ public sealed partial class OwnerLinkPreviewTests
 
         var reply = await host.Session.PostJsonAsync(
             UsePath,
-            [Field("gameId", host.OtherGameId.ToString(CultureInfo.InvariantCulture)), Field("token", token), Field("revision", host.Revision)]);
+            [Field("gameId", host.OtherGameId.ToString(CultureInfo.InvariantCulture)), Field("collectionId", host.OtherEntry.ToString(CultureInfo.InvariantCulture)), Field("token", token), Field("revision", host.Revision)]);
 
         reply.Status.Should().Be(HttpStatusCode.UnprocessableEntity);
         host.Service.Revision.Should().Be(revision);
@@ -246,7 +246,7 @@ public sealed partial class OwnerLinkPreviewTests
         var revision = host.Service.Revision;
         using var owner = host.Factory.CreateOwnerClient();
 
-        var reply = await host.Session.PostJsonAsync("/owner/pictures?handler=DiscardPreview", [Field("token", token)]);
+        var reply = await host.Session.PostJsonAsync("/owner/pictures?handler=DiscardPreview", [Field("gameId", host.GameId.ToString(CultureInfo.InvariantCulture)), Field("collectionId", host.FirstEntry.ToString(CultureInfo.InvariantCulture)), Field("token", token)]);
         using var served = await owner.GetAsync($"/owner/preview/{token}", TestContext.Current.CancellationToken);
 
         reply.Status.Should().Be(HttpStatusCode.OK);
@@ -273,7 +273,7 @@ public sealed partial class OwnerLinkPreviewTests
     {
         await using var host = await PreviewHost.StartAsync();
 
-        var reply = await host.Session.PostFormAsync(CheckPath, [Field("gameId", host.GameId.ToString(CultureInfo.InvariantCulture)), Field("link", LinkUrl)]);
+        var reply = await host.Session.PostFormAsync(CheckPath, [Field("gameId", host.GameId.ToString(CultureInfo.InvariantCulture)), Field("collectionId", host.FirstEntry.ToString(CultureInfo.InvariantCulture)), Field("link", LinkUrl)]);
         var token = TokenInText().Match(reply.Location ?? string.Empty).Value;
         using var owner = host.Factory.CreateOwnerClient();
         using var served = await owner.GetAsync($"/owner/preview/{token}", TestContext.Current.CancellationToken);
@@ -288,7 +288,7 @@ public sealed partial class OwnerLinkPreviewTests
     {
         await using var host = await PreviewHost.StartAsync();
 
-        var reply = await host.Session.PostFormAsync(CheckPath, [Field("gameId", host.GameId.ToString(CultureInfo.InvariantCulture)), Field("link", "not a link")]);
+        var reply = await host.Session.PostFormAsync(CheckPath, [Field("gameId", host.GameId.ToString(CultureInfo.InvariantCulture)), Field("collectionId", host.FirstEntry.ToString(CultureInfo.InvariantCulture)), Field("link", "not a link")]);
         var page = await host.Session.GetAsync(reply.Location!);
 
         reply.Status.Should().Be(HttpStatusCode.Found);
@@ -301,10 +301,10 @@ public sealed partial class OwnerLinkPreviewTests
     {
         await using var host = await PreviewHost.StartAsync();
 
-        var noToken = await host.Session.PostJsonAsync(CheckPath, [Field("gameId", host.GameId.ToString(CultureInfo.InvariantCulture)), Field("link", LinkUrl)], withToken: false);
+        var noToken = await host.Session.PostJsonAsync(CheckPath, [Field("gameId", host.GameId.ToString(CultureInfo.InvariantCulture)), Field("collectionId", host.FirstEntry.ToString(CultureInfo.InvariantCulture)), Field("link", LinkUrl)], withToken: false);
         using var publicPost = await host.PublicClient.PostAsync(
             CheckPath,
-            new FormUrlEncodedContent([Field("gameId", host.GameId.ToString(CultureInfo.InvariantCulture)), Field("link", LinkUrl)]),
+            new FormUrlEncodedContent([Field("gameId", host.GameId.ToString(CultureInfo.InvariantCulture)), Field("collectionId", host.FirstEntry.ToString(CultureInfo.InvariantCulture)), Field("link", LinkUrl)]),
             TestContext.Current.CancellationToken);
 
         noToken.Status.Should().Be(HttpStatusCode.BadRequest);
@@ -316,7 +316,7 @@ public sealed partial class OwnerLinkPreviewTests
     public async Task Removing_a_link_without_the_token_is_answered_400_and_the_page_does_not_exist_on_the_public_port()
     {
         await using var host = await PreviewHost.StartAsync();
-        var fields = new[] { Field("gameId", host.GameId.ToString(CultureInfo.InvariantCulture)), Field("revision", host.Service.Revision.ToString(CultureInfo.InvariantCulture)) };
+        var fields = new[] { Field("gameId", host.GameId.ToString(CultureInfo.InvariantCulture)), Field("collectionId", host.FirstEntry.ToString(CultureInfo.InvariantCulture)), Field("revision", host.Service.Revision.ToString(CultureInfo.InvariantCulture)) };
 
         var noToken = await host.Session.PostJsonAsync("/owner/pictures?handler=RemoveLink", fields, withToken: false);
         using var publicPost = await host.PublicClient.PostAsync("/owner/pictures?handler=RemoveLink", new FormUrlEncodedContent(fields), TestContext.Current.CancellationToken);
@@ -398,6 +398,8 @@ public sealed partial class OwnerLinkPreviewTests
 
         public long FirstEntry => Factory.ServingServices.GetRequiredService<CollectionStore>().Current.Snapshot!.Items.Where(item => item.GameId == _gameId).Min(item => item.CollectionId);
 
+        public long OtherEntry => Factory.ServingServices.GetRequiredService<CollectionStore>().Current.Snapshot!.Items.Where(item => item.GameId == _otherGameId).Min(item => item.CollectionId);
+
         public OwnerDataService Service => Factory.ServingServices.GetRequiredService<OwnerDataService>();
 
         public string Revision => Service.Revision.ToString(CultureInfo.InvariantCulture);
@@ -433,10 +435,10 @@ public sealed partial class OwnerLinkPreviewTests
         }
 
         public Task<OwnerReply> CheckAsync(string link) =>
-            Session.PostJsonAsync(CheckPath, [Field("gameId", _gameId.ToString(CultureInfo.InvariantCulture)), Field("link", link)]);
+            Session.PostJsonAsync(CheckPath, [Field("gameId", _gameId.ToString(CultureInfo.InvariantCulture)), Field("collectionId", FirstEntry.ToString(CultureInfo.InvariantCulture)), Field("link", link)]);
 
         public Task<OwnerReply> UseAsync(string token) =>
-            Session.PostJsonAsync(UsePath, [Field("gameId", _gameId.ToString(CultureInfo.InvariantCulture)), Field("token", token), Field("revision", Revision)]);
+            Session.PostJsonAsync(UsePath, [Field("gameId", _gameId.ToString(CultureInfo.InvariantCulture)), Field("collectionId", FirstEntry.ToString(CultureInfo.InvariantCulture)), Field("token", token), Field("revision", Revision)]);
 
         public string ArtFile(string name) => Path.Combine(_storage.FullPath, "art", name);
 

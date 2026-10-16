@@ -19,7 +19,7 @@ public enum PreviewShapeSource
 /// <summary>
 /// What the owner sees of a picture they linked before they use it: the face-out box with the picture and the spine, both at
 /// the size the cabinet would draw them, with the verdict of the picture and where the box's shape came from. It is made by
-/// the same mapping that draws the cabinet, with the link chosen for this one game, so the preview cannot drift from what
+/// the same mapping that draws the cabinet, with the link chosen for this one copy, so the preview cannot drift from what
 /// every visitor sees once the link is used.
 /// </summary>
 /// <param name="Title">The game's title.</param>
@@ -55,23 +55,24 @@ public sealed record LinkPreview(
     PaletteTone Spine)
 {
     /// <summary>
-    /// Builds the preview of a linked picture for one game. The game is mapped as the cabinet maps it with the link chosen, so
-    /// the box, its size source, the colours and the edges are the cabinet's own. Null when the game is not in the collection or
-    /// the record cannot be drawn.
+    /// Builds the preview of a linked picture for one copy of a game. The copy is mapped as the cabinet maps it with the link
+    /// chosen, so the box, its size source, the colours and the edges are the cabinet's own. Null when the copy is not in the
+    /// collection or the record cannot be drawn.
     /// </summary>
     /// <param name="snapshot">The stored collection.</param>
     /// <param name="gameId">The game the link is for.</param>
+    /// <param name="collectionId">The copy the link is for.</param>
     /// <param name="rules">The rules that turn stored measurements into a choice.</param>
     /// <param name="record">The processed record of the linked picture.</param>
-    public static LinkPreview? Build(CollectionSnapshot snapshot, int gameId, ArtRules rules, ImageRecord record)
+    public static LinkPreview? Build(CollectionSnapshot snapshot, int gameId, long collectionId, ArtRules rules, ImageRecord record)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(rules);
         ArgumentNullException.ThrowIfNull(record);
 
         var chosen = new PictureSetting(PictureChoice.Link, true, null, null, new PictureLink(record.SourceUrl, record, 0, null));
-        var overlay = OwnerOverlay.From(snapshot, OwnerData.Empty with { Games = [new OwnerGame(gameId, null, null, chosen)] });
-        var trace = SnapshotMapper.Explain(snapshot, rules, overlay).FirstOrDefault(candidate => candidate.Item.GameId == gameId);
+        var overlay = OwnerOverlay.From(snapshot, OwnerData.Empty with { Games = [new OwnerGame(gameId, null, null, chosen, collectionId)] });
+        var trace = SnapshotMapper.Explain(snapshot, rules, overlay).FirstOrDefault(candidate => candidate.Item.GameId == gameId && candidate.Item.CollectionId == collectionId);
 
         if (trace is not { PickedByOwner: true, Mapped.Art: { } art } || record.Features is not { } features || PictureRows.FileOf(record) is not { } file)
         {

@@ -5,9 +5,10 @@ namespace Cabinet.Service.Owner;
 
 /// <summary>A linked picture that was fetched and processed and waits for the owner to use or discard it.</summary>
 /// <param name="GameId">The game the owner checked the link for.</param>
+/// <param name="CollectionId">The copy of that game the owner checked the link for; the picture can be used for that copy alone.</param>
 /// <param name="Link">The processed picture: its address, its resized files and its record.</param>
 /// <param name="Preview">The small file the preview shows, served from the site's own origin until the owner decides.</param>
-public sealed record StagedLink(int GameId, ProcessedLink Link, EncodedArt Preview);
+public sealed record StagedLink(int GameId, long CollectionId, ProcessedLink Link, EncodedArt Preview);
 
 /// <summary>
 /// A small store in memory for things that wait for the owner's decision, such as a previewed picture. Each item is addressed

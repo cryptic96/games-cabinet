@@ -162,11 +162,15 @@ public sealed class OwnerCheckLinkSlotTests
             return host;
         }
 
+        private long CheckedEntry => Factory.ServingServices.GetRequiredService<CollectionStore>().Current.Snapshot!.Items
+            .Where(item => item.GameId == _checkedGameId).Min(item => item.CollectionId);
+
         public Task<OwnerReply> CheckAsync(string link) =>
             Session.PostJsonAsync(
                 CheckPath,
                 [
                     new KeyValuePair<string, string>("gameId", _checkedGameId.ToString(CultureInfo.InvariantCulture)),
+                    new KeyValuePair<string, string>("collectionId", CheckedEntry.ToString(CultureInfo.InvariantCulture)),
                     new KeyValuePair<string, string>("link", link),
                 ]);
 

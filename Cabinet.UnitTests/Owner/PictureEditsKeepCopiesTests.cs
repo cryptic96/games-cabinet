@@ -61,6 +61,50 @@ public sealed class PictureEditsKeepCopiesTests
     }
 
     [Fact]
+    public void Linking_a_picture_for_one_copy_keeps_both_copies_where_they_are_and_links_only_that_copy()
+    {
+        var change = PictureEdits.UseLink(CopiesInTwoPlaces(), GameId, SecondCopy, Copies, LinkUrl, WorkingRecord(), "Quiet Quarry", OwnedUrl, MainUrl);
+
+        change.Changed.Should().BeTrue();
+        AssertPlacesKept(change.Data);
+        change.Data.Games.Single(game => game.CollectionId == SecondCopy).Picture!.Link!.Url.Should().Be(LinkUrl);
+        change.Data.Games.Single(game => game.CollectionId == FirstCopy).Picture.Should().BeNull();
+    }
+
+    [Fact]
+    public void Linking_a_picture_for_one_copy_when_the_game_has_a_game_wide_entry_keeps_both_copies_where_they_are()
+    {
+        var change = PictureEdits.UseLink(GameWideInOnePlace(), GameId, SecondCopy, Copies, LinkUrl, WorkingRecord(), "Quiet Quarry", OwnedUrl, MainUrl);
+
+        change.Changed.Should().BeTrue();
+        change.Data.Games.Select(game => (game.CollectionId, game.LocationId)).Should().Equal((FirstCopy, CabinetA), (SecondCopy, CabinetA));
+        change.Data.Games.Single(game => game.CollectionId == SecondCopy).Picture!.Choice.Should().Be(PictureChoice.Link);
+    }
+
+    [Fact]
+    public void Linking_a_picture_for_one_copy_without_a_usable_record_is_refused()
+    {
+        var unusable = WorkingRecord() with { Status = ImageStatus.Failed };
+
+        var change = PictureEdits.UseLink(CopiesInTwoPlaces(), GameId, SecondCopy, Copies, LinkUrl, unusable, "Quiet Quarry", OwnedUrl, MainUrl);
+
+        change.Changed.Should().BeFalse();
+        change.StatusKey.Should().Be("no-link");
+    }
+
+    [Fact]
+    public void Removing_the_link_of_one_copy_keeps_both_copies_where_they_are()
+    {
+        var linked = PictureEdits.UseLink(CopiesInTwoPlaces(), GameId, SecondCopy, Copies, LinkUrl, WorkingRecord(), "Quiet Quarry", OwnedUrl, MainUrl).Data;
+
+        var change = PictureEdits.RemoveLink(linked, GameId, SecondCopy, Copies, "Quiet Quarry");
+
+        change.Changed.Should().BeTrue();
+        AssertPlacesKept(change.Data);
+        change.Data.Games.Should().OnlyContain(game => game.Picture == null);
+    }
+
+    [Fact]
     public void Removing_the_link_keeps_both_copies_where_they_are()
     {
         var linked = PictureEdits.UseLink(CopiesInTwoPlaces(), GameId, LinkUrl, WorkingRecord(), "Quiet Quarry", OwnedUrl, MainUrl).Data;

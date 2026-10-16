@@ -216,10 +216,11 @@ function buildShelf(doc, preview) {
  * came from, the note for a picture that is not a flat cover, the disclaimer, and the two buttons.
  * @param {Document} doc The document.
  * @param {string} gameId The game.
+ * @param {string} collectionId The copy of the game the link is for.
  * @param {object} preview The checked preview.
  * @returns {HTMLElement}
  */
-function buildPreview(doc, gameId, preview) {
+function buildPreview(doc, gameId, collectionId, preview) {
   const section = make(doc, 'section', 'pic-preview');
   const heading = make(doc, 'h4', '', OWNER_TEXT.previewHeading);
   const facts = make(doc, 'p', 'pic-preview-facts');
@@ -227,10 +228,11 @@ function buildPreview(doc, gameId, preview) {
   const use = make(doc, 'button', 'owner-btn-primary', OWNER_TEXT.useThis);
   const discard = make(doc, 'button', 'owner-btn', OWNER_TEXT.discardPreview);
 
-  section.id = `pic-preview-${gameId}`;
+  section.id = `pic-preview-${collectionId}`;
   section.dataset.token = preview.token;
   section.dataset.gameId = gameId;
-  heading.id = `pic-preview-heading-${gameId}`;
+  section.dataset.entryId = collectionId;
+  heading.id = `pic-preview-heading-${collectionId}`;
   heading.tabIndex = -1;
   section.setAttribute('aria-labelledby', heading.id);
   use.type = 'button';
@@ -378,6 +380,8 @@ export function initLinkBox(row, helpers) {
 
   const doc = row.ownerDocument;
   const gameId = form.elements.gameId.value;
+  const collectionId = form.elements.collectionId.value;
+  const target = { gameId, collectionId };
   const hint = field.getAttribute('aria-describedby') ?? '';
   let busy = false;
 
@@ -465,7 +469,7 @@ export function initLinkBox(row, helpers) {
 
   const undoUse = (restore) => (saved) =>
     helpers.enqueue(async () => {
-      const result = await postOwner(HANDLERS.undo, { gameId }, { revision: saved });
+      const result = await postOwner(HANDLERS.undo, target, { revision: saved });
 
       if (result.outcome === 'saved') {
         restore();
@@ -492,7 +496,7 @@ export function initLinkBox(row, helpers) {
 
     helpers.enqueue(async () => {
       const restore = captureRow();
-      const result = await postOwner(HANDLERS.use, { gameId, token: section.dataset.token });
+      const result = await postOwner(HANDLERS.use, { ...target, token: section.dataset.token });
 
       button.removeAttribute('aria-disabled');
 
@@ -527,7 +531,7 @@ export function initLinkBox(row, helpers) {
 
   const undoRemove = (previousChoice) => (saved) =>
     helpers.enqueue(async () => {
-      const result = await postOwner(HANDLERS.undo, { gameId }, { revision: saved });
+      const result = await postOwner(HANDLERS.undo, target, { revision: saved });
 
       if (result.outcome === 'saved') {
         renderLinkTile(linkTile(), result.linkTile ?? {}, helpers.watchPicture);
@@ -553,7 +557,7 @@ export function initLinkBox(row, helpers) {
 
       removeButton.setAttribute('aria-disabled', 'true');
 
-      const result = await postOwner(HANDLERS.remove, { gameId });
+      const result = await postOwner(HANDLERS.remove, target);
 
       removeButton.removeAttribute('aria-disabled');
 
@@ -584,7 +588,7 @@ export function initLinkBox(row, helpers) {
     });
 
   const discard = (section) => {
-    postOwner(HANDLERS.discard, { gameId, token: section.dataset.token });
+    postOwner(HANDLERS.discard, { ...target, token: section.dataset.token });
     section.remove();
     field.focus();
   };
@@ -618,7 +622,7 @@ export function initLinkBox(row, helpers) {
     let result;
 
     try {
-      result = await postOwner(HANDLERS.check, { gameId, link: field.value });
+      result = await postOwner(HANDLERS.check, { ...target, link: field.value });
     } finally {
       busy = false;
       button.textContent = OWNER_TEXT.checkLink;
@@ -634,7 +638,7 @@ export function initLinkBox(row, helpers) {
       return;
     }
 
-    const section = buildPreview(doc, gameId, preview);
+    const section = buildPreview(doc, gameId, collectionId, preview);
 
     box.append(section);
     wire(section);
