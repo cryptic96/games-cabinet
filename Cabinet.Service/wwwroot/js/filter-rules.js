@@ -370,25 +370,109 @@ export function evaluate(chosen, model) {
 }
 
 /**
- * Lists the top-level entries of the screen-reader list for the collection: base games, standalone games and expansions shown on
- * their own, each copy separately, with an expansion beside its base game folded into that base game's entry.
- * @param {ReturnType<typeof buildModel>} model The model of the collection.
- * @param {{ language: string }} options The page language, for the order of the entries.
- * @returns {{ entryId: string, boxes: string[] }[]} Each entry's own id and the ids of every entry nested under it, all as text.
+ * Turns ordered list nodes into the entries the count works on: each entry's own id and the ids of every entry nested under it.
+ * @param {ReturnType<typeof orderEntries>} nodes The ordered nodes of the list.
+ * @returns {{ entryId: string, boxes: string[] }[]}
  */
-export function listEntries(model, { language }) {
-  return orderEntries(model.records, language).map((node) => ({
+function entriesOf(nodes) {
+  return nodes.map((node) => ({
     entryId: String(node.entryId),
     boxes: [String(node.entryId), ...node.children.map((child) => String(child.entryId))],
   }));
 }
 
 /**
- * Counts the entries of the list that are lit: an entry counts when at least one of its own boxes is lit.
- * @param {{ entryId: string, boxes: string[] }[]} entries The top-level entries.
+ * Lists the entries each location cabinet of a by-location document holds. A box drawn in a location belongs to it; once the card
+ * data is held a record belongs to the location the record itself names, which also places the expansions that no box stands for. A
+ * record made of a drawn box alone is placed by the box. The group of games with no location carries no id and no name in the
+ * document and an id of null here.
+ * @param {{ locations: { id?: string, name?: string, sections: object[] }[] }} doc The by-location document.
+ * @param {ReturnType<typeof buildModel>} model The model of the collection.
+ * @returns {{ id: string | null, name: string | null, entryIds: Set<string> }[]} The groups in the document's order.
+ */
+export function groupsFromDocument(doc, model) {
+  return doc.locations.map((location) => {
+    const id = typeof location.id === 'string' ? location.id : null;
+    const drawn = new Set();
+
+    for (const section of location.sections ?? []) {
+      for (const cubby of section.cubbies ?? []) {
+        for (const placement of cubby.placements ?? []) {
+          if (placement.kind !== 'moreMarker') {
+            drawn.add(String(placement.entryId));
+          }
+        }
+      }
+    }
+
+    const entryIds = new Set(
+      model.records
+        .filter((record) => (record.incomplete === true ? drawn.has(String(record.entryId)) : locationOf(record) === id))
+        .map((record) => String(record.entryId)),
+    );
+
+    return { id, name: typeof location.name === 'string' ? location.name : null, entryIds };
+  });
+}
+
+/**
+ * Lists the top-level entries of the screen-reader list for the collection: base games, standalone games and expansions shown on
+ * their own, each copy separately, with an expansion beside its base game folded into that base game's entry. In the location view
+ * every location is listed on its own: an expansion is folded into a base game only when that base game stands in the same location,
+ * so an expansion stored apart is an entry of its own in its own location.
+ * @param {ReturnType<typeof buildModel>} model The model of the collection.
+ * @param {{ language: string, view?: string, groups?: { id: string | null, name: string | null, entryIds: Set<string> }[] | null }} options
+ * The page language, for the order of the entries, and for the location view the view and the groups from groupsFromDocument.
+ * @returns {{ entryId: string, boxes: string[] }[] | { view: 'location', groups: { id: string | null, name: string | null, entries: { entryId: string, boxes: string[] }[] }[] }}
+ * The entries in the all-together view, one list per group in the location view.
+ */
+export function listEntries(model, { language, view = 'all', groups = null }) {
+  if (view !== 'location' || groups === null) {
+    return entriesOf(orderEntries(model.records, language));
+  }
+
+  return {
+    view: 'location',
+    groups: groups.map((group) => ({
+      id: group.id,
+      name: group.name,
+      entries: entriesOf(orderEntries(model.records.filter((record) => group.entryIds.has(String(record.entryId))), language)),
+    })),
+  };
+}
+
+/**
+ * Gives every entry of a listing in one flat list, whichever view it was made for.
+ * @param {ReturnType<typeof listEntries>} listing The listing.
+ * @returns {{ entryId: string, boxes: string[] }[]}
+ */
+function flatEntries(listing) {
+  return Array.isArray(listing) ? listing : listing.groups.flatMap((group) => group.entries);
+}
+
+/**
+ * Counts the entries of the list that are lit: an entry counts when at least one of its own boxes is lit. In the location view the
+ * entries of every location are counted together.
+ * @param {ReturnType<typeof listEntries>} entries The top-level entries, or the listing of the location view.
  * @param {Set<string>} lit The ids of the lit entries, as text.
  * @returns {{ lit: number, total: number }} How many entries are lit and how many there are.
  */
 export function countLit(entries, lit) {
-  return { lit: entries.filter((entry) => entry.boxes.some((box) => lit.has(box))).length, total: entries.length };
+  const all = flatEntries(entries);
+
+  return { lit: all.filter((entry) => entry.boxes.some((box) => lit.has(box))).length, total: all.length };
+}
+
+/**
+ * Counts the lit entries of every location of the location view's listing, in the listing's order.
+ * @param {ReturnType<typeof listEntries>} listing The listing of the location view.
+ * @param {Set<string>} lit The ids of the lit entries, as text.
+ * @returns {{ id: string | null, lit: number, total: number }[]} One count per group; none for the all-together listing.
+ */
+export function countGroups(listing, lit) {
+  if (Array.isArray(listing)) {
+    return [];
+  }
+
+  return listing.groups.map((group) => ({ id: group.id, ...countLit(group.entries, lit) }));
 }

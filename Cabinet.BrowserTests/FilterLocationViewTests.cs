@@ -67,6 +67,73 @@ public sealed class FilterLocationViewTests : CabinetPageTest
     }
 
     [Fact]
+    public async Task The_count_adds_up_across_the_location_cabinets()
+    {
+        await OpenSampleAsync(1440, 900);
+        var document = await LoadCardsAsync("desktop");
+        var cards = await LoadFamilyCardsAsync("desktop");
+        var groups = ExpectedGroups(document);
+        await Page.EvaluateAsync(RecordFiltered);
+
+        await Page.Locator(".filter-view-segment").Nth(1).ClickAsync();
+
+        await Expect(Page.Locator(Groups)).ToHaveCountAsync(groups.Count);
+        await Page.WaitForFunctionAsync("() => window.__filtered !== undefined && window.__filtered.view === 'location'");
+        var resting = await ReadAsync<Filtered>("() => window.__filtered");
+        var headingTotal = (await HeadingNumbersAsync()).Sum(numbers => numbers.Total);
+
+        resting.Active.Should().BeFalse();
+        resting.Groups.Should().Be(groups.Count);
+        resting.HasLocations.Should().BeTrue();
+        resting.Total.Should().Be(headingTotal, "the count with no filter is the sum of the headings");
+        resting.Total.Should().Be(groups.Sum(group => group.Total));
+        resting.Lit.Should().Be(resting.Total);
+
+        const int players = 4;
+        var litIds = FilterBarTests.ExpectedLit(cards, players, null);
+        var expectedLit = LitEntries(document, litIds);
+        expectedLit.Should().BeGreaterThan(0).And.BeLessThan(resting.Total);
+
+        await Page.Locator($"fieldset[data-filter=\"players\"] input[value=\"{players.ToString(CultureInfo.InvariantCulture)}\"]").ClickAsync();
+
+        await Expect(Page.Locator(".filter-count")).ToHaveTextAsync($"{expectedLit} of {resting.Total} games");
+        var filtering = await ReadAsync<Filtered>("() => window.__filtered");
+        filtering.Active.Should().BeTrue();
+        filtering.View.Should().Be("location");
+        filtering.Lit.Should().Be(expectedLit);
+        filtering.Total.Should().Be(resting.Total);
+        filtering.Groups.Should().Be(groups.Count);
+
+        await Page.Locator(".filter-clear").ClickAsync();
+
+        await Expect(Page.Locator(".filter-count")).ToHaveTextAsync(string.Empty);
+        (await ReadAsync<Filtered>("() => window.__filtered")).Total.Should().Be(headingTotal);
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(1440, 900)]
+    [InlineData(390, 844)]
+    public async Task Arrow_down_crosses_into_the_next_location(int width, int height)
+    {
+        await OpenSampleAsync(width, height);
+        await Page.Locator(".filter-view-segment").Nth(1).ClickAsync();
+        await Expect(Page.Locator(Groups).First).ToBeAttachedAsync();
+        await Page.WaitForFunctionAsync("() => document.querySelectorAll('#cabinet .location-group').length > 1");
+
+        var index = await Page.EvaluateAsync<int>(LowestBoxOfFirstGroup);
+        var box = Page.Locator(Groups).First.Locator(".placement").Nth(index);
+        await box.FocusAsync();
+        await Page.Keyboard.PressAsync("ArrowDown");
+
+        var landed = await ReadAsync<Landing>(Landed);
+        landed.Group.Should().Be(1, "down from the last shelf of the first location continues in the next location");
+        landed.Shelf.Should().EndWith(":0", "it lands on the first shelf of a section");
+        landed.Section.Should().BeGreaterThan(landed.From, "the sections are numbered across the cabinets");
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Without_owner_locations_there_is_no_switch()
     {
         await Page.SetViewportSizeAsync(1440, 900);
@@ -107,6 +174,47 @@ public sealed class FilterLocationViewTests : CabinetPageTest
         byLocation.FilledColour.Should().Be(byLocation.BarColour);
         ConsoleErrors.Should().BeEmpty();
     }
+
+    private const string RecordFiltered = """
+        () => {
+          document.addEventListener('cabinet:filtered', (event) => {
+            const entries = event.detail.entries;
+            window.__filtered = {
+              view: event.detail.view,
+              active: event.detail.active,
+              lit: event.detail.count.lit,
+              total: event.detail.count.total,
+              groups: Array.isArray(entries) ? 0 : entries.groups.length,
+              hasLocations: event.detail.hasLocations,
+            };
+          });
+        }
+        """;
+
+    private const string LowestBoxOfFirstGroup = """
+        () => {
+          const boxes = [...document.querySelector('#cabinet .location-group').querySelectorAll('.placement')];
+          let best = 0;
+          boxes.forEach((box, index) => {
+            if (box.getBoundingClientRect().bottom > boxes[best].getBoundingClientRect().bottom) { best = index; }
+          });
+          return best;
+        }
+        """;
+
+    private const string Landed = """
+        () => {
+          const box = document.activeElement;
+          const groups = [...document.querySelectorAll('#cabinet .location-group')];
+          const first = groups[0].querySelectorAll('.placement');
+          return {
+            group: groups.indexOf(box.closest('.location-group')),
+            shelf: box.dataset.shelf,
+            section: Number.parseInt(box.dataset.shelf, 10),
+            from: Math.max(...[...first].map((candidate) => Number.parseInt(candidate.dataset.shelf, 10))),
+          };
+        }
+        """;
 
     private const string GroupOverlaps = """
         () => {
@@ -179,11 +287,13 @@ public sealed class FilterLocationViewTests : CabinetPageTest
         await Page.EvaluateAsync("() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
     }
 
-    private async Task<BarReading> ReadBarAsync()
-    {
-        var json = await Page.EvaluateAsync<JsonElement>(ReadBar);
+    private async Task<BarReading> ReadBarAsync() => await ReadAsync<BarReading>(ReadBar);
 
-        return JsonSerializer.Deserialize<BarReading>(json.GetRawText(), WebOptions)!;
+    private async Task<T> ReadAsync<T>(string script)
+    {
+        var json = await Page.EvaluateAsync<JsonElement>(script);
+
+        return JsonSerializer.Deserialize<T>(json.GetRawText(), WebOptions)!;
     }
 
     private async Task<List<string>> EntryIdsAsync() =>
@@ -195,6 +305,50 @@ public sealed class FilterLocationViewTests : CabinetPageTest
 
         return JsonSerializer.Deserialize<ViewDocument>(json.GetRawText(), WebOptions)!;
     }
+
+    private async Task<IReadOnlyList<FilterBarTests.CardData>> LoadFamilyCardsAsync(string profile)
+    {
+        var json = await Page.EvaluateAsync<JsonElement>("async address => (await (await fetch(address)).json()).cards", $"/cabinet/cards?profile={profile}&sample=65");
+
+        return JsonSerializer.Deserialize<List<FilterBarTests.CardData>>(json.GetRawText(), WebOptions)!;
+    }
+
+    private async Task<List<HeadingNumbers>> HeadingNumbersAsync()
+    {
+        var texts = await Page.Locator(Headings).EvaluateAllAsync<string[]>("(headings) => headings.map((heading) => heading.textContent)");
+
+        return [.. texts.Select(text =>
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(text, @"· (?:(\d+) of )?(\d+) games?$");
+            match.Success.Should().BeTrue(text);
+
+            return new HeadingNumbers(match.Groups[1].Success ? int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture) : -1, int.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture));
+        })];
+    }
+
+    private static int LitEntries(ViewDocument document, HashSet<string> lit)
+    {
+        var total = 0;
+        var places = (document.Locations ?? []).Where(place => place.Games > 0).Select(place => place.Id).Cast<string?>().Append(null);
+
+        foreach (var place in places)
+        {
+            var cards = document.Cards.Where(card => card.LocationId == place).ToList();
+            var inGroup = cards.Select(card => card.EntryId).ToHashSet();
+            var childrenOf = cards
+                .Where(card => !card.IsExpansion)
+                .ToDictionary(card => card.EntryId, card => card.Expansions.Where(link => link.EntryId is not null && inGroup.Contains(link.EntryId.Value)).Select(link => link.EntryId!.Value).ToList());
+            var nested = childrenOf.Values.SelectMany(children => children).ToHashSet();
+
+            total += cards
+                .Where(card => !nested.Contains(card.EntryId))
+                .Count(card => lit.Contains(Id(card.EntryId)) || (childrenOf.TryGetValue(card.EntryId, out var children) && children.Any(child => lit.Contains(Id(child)))));
+        }
+
+        return total;
+    }
+
+    private static string Id(long entryId) => entryId.ToString(CultureInfo.InvariantCulture);
 
     private static List<ExpectedGroup> ExpectedGroups(ViewDocument document)
     {
@@ -243,6 +397,12 @@ public sealed class FilterLocationViewTests : CabinetPageTest
     {
         public string Heading => $"{Name} · {Games(Total)}";
     }
+
+    private sealed record Filtered(string? View, bool Active, int Lit, int Total, int Groups, bool HasLocations);
+
+    private sealed record Landing(int Group, string Shelf, int Section, int From);
+
+    private sealed record HeadingNumbers(int Lit, int Total);
 
     private sealed record AnyChip(double Alpha, string Weight, string Shadow);
 

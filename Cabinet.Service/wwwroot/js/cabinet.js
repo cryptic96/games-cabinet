@@ -268,9 +268,11 @@ async function fetchCards(epoch, etag, started = null) {
  * Tells the filters what the layout about to be drawn holds, so the boxes are built already in the light or in shadow.
  * @param {object} layout The layout about to be drawn, or the sections of every location put together.
  * @param {string | null} etag The entity tag of the layout response, which tells the filters when the collection changed.
+ * @param {object | null} doc The by-location document about to be drawn, or null when the combined layout is.
  */
-function prepareFilters(layout, etag) {
+function prepareFilters(layout, etag, doc) {
   drawnPlacements = indexPlacements(layout);
+  filters.setView(doc === null ? 'all' : 'location', doc);
   filters.rebuild(filterRecords(), undefined, { layoutEtag: etag });
 }
 
@@ -306,12 +308,13 @@ function paint(layout, etag, doc) {
 
   drawnLayout = layout;
   drawnEtag = etag;
-  prepareFilters(drawn, etag);
+  prepareFilters(drawn, etag, doc);
 
   if (doc === null) {
     renderCabinet(mount, layout, COPY, filters.dimOf);
   } else {
     renderLocations(mount, doc, COPY, filters.dimOf);
+    filters.showHeadings();
   }
 
   filters.showBar(drawnPlacements.size > 0);
