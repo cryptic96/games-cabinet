@@ -23,6 +23,9 @@ public sealed class OwnerLinkWorkerTests : IDisposable
 {
     private const int GameId = 7;
     private const string Address = $"https://{ImageSettings.DefaultHost}/owner/worker.png";
+    private const string SecondAddress = $"https://{ImageSettings.DefaultHost}/owner/worker-second.png";
+    private const long FirstCopy = 7001;
+    private const long SecondCopy = 7002;
 
     private static readonly byte[] Cover = SyntheticArt.Encode(SyntheticArtKind.FlatCover);
 
@@ -223,6 +226,74 @@ public sealed class OwnerLinkWorkerTests : IDisposable
         await WaitUntilAsync(() => _source.Requests == 2);
     }
 
+    [Fact]
+    public async Task A_failing_link_is_recorded_on_its_own_copy()
+    {
+        var (owner, cache) = SeedCopies(
+            Copy(FirstCopy, Address, "shelf-a"),
+            Copy(SecondCopy, SecondAddress, "shelf-b"));
+        _source.Answer = uri => uri.AbsolutePath.EndsWith("worker-second.png", StringComparison.Ordinal)
+            ? ArtDownload.Failed("status", 404)
+            : ArtDownload.Downloaded(Cover);
+
+        await StartAsync(owner, cache);
+        await WaitUntilAsync(() => CopyLink(owner, SecondCopy).FailedChecks == 1);
+        await WaitUntilAsync(() => CopyLink(owner, FirstCopy).Record is not null);
+
+        _source.Requests.Should().Be(2, "each stored link is fetched once");
+        CopyLink(owner, FirstCopy).FailedChecks.Should().Be(0);
+        CopyLink(owner, FirstCopy).Url.Should().Be(Address);
+        CopyLink(owner, SecondCopy).Record.Should().BeNull();
+        CopyLink(owner, SecondCopy).Url.Should().Be(SecondAddress);
+        Entry(owner, FirstCopy).LocationId.Should().Be("shelf-a");
+        Entry(owner, SecondCopy).LocationId.Should().Be("shelf-b");
+    }
+
+    [Fact]
+    public async Task A_check_on_one_copy_leaves_the_other_copys_link_and_place_unchanged()
+    {
+        var current = Stored(analysisVersion: ArtProcessor.AnalysisVersion);
+        var kept = new PictureLink(Address, current, 0, null);
+        var (owner, cache) = SeedCopies(
+            Copy(FirstCopy, Address, "shelf-a", kept),
+            Copy(SecondCopy, SecondAddress, "shelf-b"));
+        foreach (var variant in ((ArtProcessing.Done)ArtProcessor.Process(Cover, Options().Limits)).Variants)
+        {
+            cache.Write(variant);
+        }
+
+        var firstBefore = Entry(owner, FirstCopy);
+        _source.Answer = _ => ArtDownload.Failed("status", 404);
+
+        await StartAsync(owner, cache);
+        await WaitUntilAsync(() => CopyLink(owner, SecondCopy).FailedChecks == 1);
+
+        _source.Requests.Should().Be(1, "only the copy without a usable picture is due");
+        Entry(owner, FirstCopy).Should().BeSameAs(firstBefore);
+
+        _clock.Advance(TimeSpan.FromDays(1));
+        await WaitUntilAsync(() => CopyLink(owner, SecondCopy).FailedChecks == 2);
+
+        _source.Requests.Should().Be(2, "the first copy's own schedule is a week");
+        Entry(owner, FirstCopy).Should().BeSameAs(firstBefore);
+    }
+
+    [Fact]
+    public async Task An_entry_for_every_copy_with_a_link_is_checked_once_and_its_health_recorded_on_that_entry()
+    {
+        var (owner, cache) = SeedCopies(
+            Copy(null, Address, "shelf-a"),
+            new OwnerGame(GameId, "shelf-b", null, null, SecondCopy));
+        _source.Answer = _ => ArtDownload.Failed("status", 404);
+
+        await StartAsync(owner, cache);
+        await WaitUntilAsync(() => EveryCopyEntry(owner).Picture!.Link!.FailedChecks == 1);
+        await Task.Delay(TimeSpan.FromMilliseconds(300), TestContext.Current.CancellationToken);
+
+        _source.Requests.Should().Be(1);
+        Data(owner).Games.Single(game => game.CollectionId == SecondCopy).Picture.Should().BeNull();
+    }
+
     private static TimeSpan RecheckEvery => OwnerLinkWorker.RecheckEvery;
 
     private static void AssertNothingLogged(OwnerData before, OwnerData after)
@@ -233,6 +304,16 @@ public sealed class OwnerLinkWorkerTests : IDisposable
     }
 
     private static PictureLink Link(OwnerDataService owner) => Data(owner).Games.Single().Picture!.Link!;
+
+    private static OwnerGame Entry(OwnerDataService owner, long collectionId) =>
+        Data(owner).Games.Single(game => game.CollectionId == collectionId);
+
+    private static PictureLink CopyLink(OwnerDataService owner, long collectionId) => Entry(owner, collectionId).Picture!.Link!;
+
+    private static OwnerGame EveryCopyEntry(OwnerDataService owner) => Data(owner).Games.Single(game => game.CollectionId is null);
+
+    private static OwnerGame Copy(long? collectionId, string address, string location, PictureLink? link = null) =>
+        new(GameId, location, null, new PictureSetting(PictureChoice.Link, true, null, null, link ?? new PictureLink(address, null, 0, null)), collectionId);
 
     private static OwnerData Data(OwnerDataService owner) => ((OwnerDataState.Ready)owner.State).Data;
 
@@ -262,6 +343,16 @@ public sealed class OwnerLinkWorkerTests : IDisposable
 
         var game = new OwnerGame(GameId, null, null, new PictureSetting(PictureChoice.Link, true, null, null, link));
         _store.State = new OwnerDataState.Ready(OwnerData.Empty with { Revision = 1, Games = [game] });
+        _store.FileExists = true;
+        _source.Answer = _ => ArtDownload.Downloaded(Cover);
+
+        return (new OwnerDataService(_store, _clock, NullLogger<OwnerDataService>.Instance), cache);
+    }
+
+    private (OwnerDataService Owner, ArtCache Cache) SeedCopies(params OwnerGame[] games)
+    {
+        var cache = new ArtCache(_storage.FullPath);
+        _store.State = new OwnerDataState.Ready(OwnerData.Empty with { Revision = 1, Games = [.. games] });
         _store.FileExists = true;
         _source.Answer = _ => ArtDownload.Downloaded(Cover);
 

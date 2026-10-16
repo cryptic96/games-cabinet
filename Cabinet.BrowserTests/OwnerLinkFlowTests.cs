@@ -184,6 +184,55 @@ public sealed class OwnerLinkFlowTests : CabinetPageTest
     }
 
     [Fact]
+    public async Task A_link_for_the_second_copy_lands_on_that_copy()
+    {
+        await Page.SetViewportSizeAsync(1440, 900);
+        await StartHostAsync(background: true, thirdCopy: true);
+        var before = await CoversByEntryAsync(RowTitle);
+        before.Should().HaveCount(3);
+        await GotoPicturesAsync();
+        var copies = Page.Locator(".pic-row", new PageLocatorOptions { Has = Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = RowTitle, Exact = true }) });
+        await Expect(copies).ToHaveCountAsync(3);
+        var entries = new List<long>();
+
+        for (var index = 0; index < 3; index++)
+        {
+            entries.Add(long.Parse(await copies.Nth(index).GetAttributeAsync("data-entry-id") ?? string.Empty, System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        var secondEntry = entries.Order().ElementAt(1);
+        var second = Page.Locator($".pic-row[data-entry-id='{secondEntry}']");
+        await second.Locator("summary").ClickAsync();
+        await second.GetByLabel("Picture link").FillAsync(LinkUrl);
+
+        await second.GetByRole(AriaRole.Button, new() { Name = "Check link" }).ClickAsync();
+        await Expect(second.Locator(".pic-preview")).ToBeVisibleAsync();
+        await second.GetByRole(AriaRole.Button, new() { Name = "Use this" }).ClickAsync();
+
+        await Expect(second.Locator("label.pic-tile[data-kind=Link] input")).ToBeCheckedAsync();
+        await Expect(second.Locator("[data-mark=yours]")).ToHaveTextAsync("Yours");
+
+        foreach (var other in entries.Where(entry => entry != secondEntry))
+        {
+            var row = Page.Locator($".pic-row[data-entry-id='{other}']");
+            await Expect(row.Locator("[data-mark=yours]")).ToHaveCountAsync(0);
+            await Expect(row.Locator("label.pic-tile[data-kind=Link] input")).Not.ToBeCheckedAsync();
+        }
+
+        var linked = Owner.State is OwnerDataState.Ready ready ? ready.Data.Games.Where(game => game.Picture?.Link is not null).ToList() : [];
+        linked.Should().ContainSingle().Which.CollectionId.Should().Be(secondEntry);
+        var after = await CoversByEntryAsync(RowTitle);
+        after[secondEntry].Should().NotBe(before[secondEntry]).And.StartWith("/art/");
+
+        foreach (var other in entries.Where(entry => entry != secondEntry))
+        {
+            after[other].Should().Be(before[other], "the other copies keep their own pictures");
+        }
+
+        AssertCleanConsole();
+    }
+
+    [Fact]
     public async Task Discarding_a_preview_removes_it_returns_focus_to_the_field_and_changes_nothing()
     {
         await Page.SetViewportSizeAsync(1440, 900);
@@ -756,9 +805,15 @@ public sealed class OwnerLinkFlowTests : CabinetPageTest
         Action<ScriptedImageHandler>? script = null,
         IReadOnlyDictionary<string, string?>? extraSettings = null,
         bool lanternWithoutSize = false,
-        bool background = false)
+        bool background = false,
+        bool thirdCopy = false)
     {
         var items = SyntheticBggCollection.Create(5);
+
+        if (thirdCopy)
+        {
+            items = [.. items, items[0] with { CollId = SyntheticBggCollection.FirstCollId + 90, Location = null }];
+        }
 
         if (lanternWithoutSize)
         {
@@ -826,6 +881,18 @@ public sealed class OwnerLinkFlowTests : CabinetPageTest
                 card.GetProperty("title").GetString()!,
                 card.TryGetProperty("cover", out var cover) && cover.ValueKind == JsonValueKind.Object ? cover.GetProperty("url").GetString() : null)),
         ];
+    }
+
+    private async Task<Dictionary<long, string?>> CoversByEntryAsync(string title)
+    {
+        var json = await _publicClient!.GetStringAsync(CardsPath, TestContext.Current.CancellationToken);
+        using var document = JsonDocument.Parse(json);
+
+        return document.RootElement.GetProperty("cards").EnumerateArray()
+            .Where(card => card.GetProperty("title").GetString() == title)
+            .ToDictionary(
+                card => card.GetProperty("entryId").GetInt64(),
+                card => card.TryGetProperty("cover", out var cover) && cover.ValueKind == JsonValueKind.Object ? cover.GetProperty("url").GetString() : null);
     }
 
     private async Task<string?> CoverOfAsync(string title) => (await CardsAsync()).First(card => card.Title == title).CoverUrl;
