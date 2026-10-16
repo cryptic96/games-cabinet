@@ -187,12 +187,12 @@ public sealed class OwnerPictureTilesTests : CabinetPageTest
         var page = await plain.NewPageAsync();
         await page.GotoAsync($"http://127.0.0.1:{OwnerPort}/owner/pictures?view=all");
 
-        var row = page.Locator(".pic-row", new PageLocatorOptions { Has = page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = RowTitle, Exact = true }) });
+        var row = page.Locator(".pic-row", new PageLocatorOptions { Has = page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = RowTitle, Exact = true }) }).First;
         await row.Locator("label.pic-tile", new LocatorLocatorOptions { HasText = "Main picture" }).ClickAsync();
         await row.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Save picture" }).ClickAsync();
 
         await Expect(page.Locator("#owner-notice")).ToHaveTextAsync("Saved.");
-        page.Url.Should().MatchRegex(@"/owner/pictures\?done=saved&view=all#game-\d+$");
+        page.Url.Should().MatchRegex(@"/owner/pictures\?done=saved&view=all#entry-\d+$");
         await Expect(row.Locator("input[value=MainPicture]")).ToBeCheckedAsync();
         (await CoverOfAsync(RowTitle)).Should().NotBe(before);
         await plain.CloseAsync();
@@ -227,7 +227,7 @@ public sealed class OwnerPictureTilesTests : CabinetPageTest
     }
 
     private ILocator RowOf(string title) =>
-        Page.Locator(".pic-row", new PageLocatorOptions { Has = Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = title, Exact = true }) });
+        Page.Locator(".pic-row", new PageLocatorOptions { Has = Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = title, Exact = true }) }).First;
 
     private static ILocator TileOf(ILocator row, string label) =>
         row.Locator("label.pic-tile", new LocatorLocatorOptions { Has = row.Page.Locator(".pic-label", new PageLocatorOptions { HasTextString = label }) });

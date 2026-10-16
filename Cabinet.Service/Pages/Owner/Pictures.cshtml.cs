@@ -40,6 +40,7 @@ public class PicturesModel : OwnerPage
     private readonly OwnerCheckFetcher _fetcher;
     private readonly StagedItems<StagedLink> _staged;
     private readonly ArtCache _cache;
+    private HashSet<long> _firstEntries = [];
 
     /// <summary>Creates the page.</summary>
     /// <param name="owner">The single writer of the owner data.</param>
@@ -116,6 +117,18 @@ public class PicturesModel : OwnerPage
 
     /// <summary>The token of the staged picture <see cref="Preview"/> was made from; it is only set when <see cref="Preview"/> is not null.</summary>
     public string? PreviewToken { get; private set; }
+
+    /// <summary>
+    /// Whether the row carries the form that sets a picture from a link. A link is stored for the whole game, so only the first
+    /// copy of each game offers it.
+    /// </summary>
+    /// <param name="row">The row.</param>
+    public bool OffersLink(PictureRow row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+
+        return _firstEntries.Contains(row.CollectionId);
+    }
 
     /// <summary>The value of the <c>view</c> query that selects the view of every game.</summary>
     public static string AllViewQuery => AllViewValue;
@@ -627,6 +640,7 @@ public class PicturesModel : OwnerPage
         var rows = PictureRows.Build(snapshot, _rules, ready.Data, _time.GetUtcNow());
 
         Counts = PictureRows.CountsOf(rows);
+        _firstEntries = [.. rows.GroupBy(row => row.GameId).Select(group => group.Min(row => row.CollectionId))];
         HasLocations = ready.Data.Locations.Count > 0;
 
         if (View == PicturesView.Single)

@@ -42,7 +42,7 @@ public sealed class OwnerPicturesPageTests : CabinetPageTest
         var targets = await Page.Locator(".pic-tile:not([data-state='missing']):not([data-state='none'])").EvaluateAllAsync<double[]>(
             "elements => elements.map(element => element.getBoundingClientRect().height)");
         targets.Should().OnlyContain(target => target >= MinimumTarget);
-        var game = Page.Locator(".pic-row", new PageLocatorOptions { Has = Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "Example Game 1", Exact = true }) });
+        var game = Page.Locator(".pic-row", new PageLocatorOptions { Has = Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "Example Game 1", Exact = true }) }).First;
         await Expect(game.Locator("input[value=OwnedEdition]")).ToBeEnabledAsync();
         await Expect(game.Locator("input[value=MainPicture]")).ToBeEnabledAsync();
         await Expect(game.Locator("input[value=Link]")).ToBeDisabledAsync();

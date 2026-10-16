@@ -256,15 +256,16 @@ else
                             <p class="owner-hint" id="no-locations-note">@OwnerStrings.AddLocationOnLocationsPage <a class="pic-link" href="~/owner/locations">@OwnerStrings.LocationsLink</a></p>
                         }
                     }
-                    @{
-                    var preview = Model.Preview is not null && Model.PreviewToken is not null && game.GameId == Model.SingleGameId && game.CollectionId == Model.Games[0].CollectionId
+                    @if (Model.OffersLink(game))
+                    {
+                    var preview = Model.Preview is not null && Model.PreviewToken is not null && game.GameId == Model.SingleGameId
                         ? new LinkPreviewModel(game.GameId, Model.PreviewToken, Model.Preview, Model.Revision)
                         : null;
                     var linkFieldId = $"pic-link-{game.CollectionId}";
                     var linkHintId = $"pic-link-hint-{game.CollectionId}";
                     var linkErrorId = $"pic-link-error-{game.CollectionId}";
                     var storedLink = game.Tile(PictureChoice.Link);
-                    }
+
                     <details class="pic-linkbox" open="@(preview is not null)">
                         <summary>@OwnerStrings.LinkSummary</summary>
                         <form method="post" class="pic-link-form" asp-page-handler="CheckLink" novalidate>
@@ -294,6 +295,7 @@ else
                             <partial name="_LinkPreview" model="preview" />
                         }
                     </details>
+                    }
                 </li>
             }
         </ul>

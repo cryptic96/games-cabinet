@@ -164,7 +164,7 @@ public sealed class OwnerSingleGameTests : CabinetPageTest
         await page.Locator(".game-picker").GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
 
         await Expect(page.Locator("#owner-notice")).ToHaveTextAsync("Saved.");
-        page.Url.Should().MatchRegex($@"/owner/pictures\?done=saved&game={game.GameId}#game-{game.GameId}$");
+        page.Url.Should().MatchRegex($@"/owner/pictures\?done=saved&game={game.GameId}#entry-\d+$");
         await Expect(page.Locator(".pic-row")).ToHaveCountAsync(1);
         await Expect(page.Locator($"#picker-{game.GameId}")).ToHaveValueAsync(ids[1]);
         (await ReadCardsAsync()).Single(card => card.GameId == game.GameId).Location.Should().Be("Shelf B");
@@ -195,7 +195,7 @@ public sealed class OwnerSingleGameTests : CabinetPageTest
         await page.GetByRole(AriaRole.Button, new() { Name = "Save picture" }).ClickAsync();
 
         await Expect(page.Locator("#owner-notice")).ToHaveTextAsync("Saved.");
-        page.Url.Should().MatchRegex($@"/owner/pictures\?done=saved&game={game.GameId}#game-{game.GameId}$");
+        page.Url.Should().MatchRegex($@"/owner/pictures\?done=saved&game={game.GameId}#entry-\d+$");
         await Expect(page.Locator(".pic-row")).ToHaveCountAsync(1);
         await Expect(page.Locator("input[value=MainPicture]")).ToBeCheckedAsync();
         await plain.CloseAsync();
