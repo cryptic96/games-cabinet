@@ -51,6 +51,13 @@ public sealed class CardContentTests : CabinetPageTest
         await Expect(Page.Locator(".card-where dd")).ToHaveTextAsync(record.Location!);
         await Expect(Page.Locator(".card-where dd")).ToHaveAttributeAsync("dir", "auto");
 
+        if (record.LocationId is not null)
+        {
+            await Expect(Page.Locator(".card-where dd button.card-where-link")).ToHaveAccessibleNameAsync($"Show on shelf: {record.Location}");
+            await Expect(Page.Locator(".card-where-name")).ToHaveAttributeAsync("dir", "auto");
+            await Expect(Page.Locator(".card-where-link svg[aria-hidden=\"true\"]")).ToHaveCountAsync(1);
+        }
+
         var rows = Page.Locator(".card-meta dt");
         await Expect(rows.Nth(0)).ToHaveTextAsync("BGG rating");
         (await Page.Locator(".card-meta dd").Nth(0).InnerTextAsync()).Should().MatchRegex(EnglishRating.ToString());
@@ -249,7 +256,8 @@ public sealed class CardContentTests : CabinetPageTest
         double? Rating,
         string? Location,
         List<string>? Designers,
-        List<string>? Mechanics)
+        List<string>? Mechanics,
+        string? LocationId = null)
     {
         private static readonly string[] EnglishWords = ["Light", "Medium-light", "Medium", "Medium-heavy", "Heavy"];
         private static readonly string[] DutchWords = ["Licht", "Vrij licht", "Gemiddeld", "Vrij zwaar", "Zwaar"];

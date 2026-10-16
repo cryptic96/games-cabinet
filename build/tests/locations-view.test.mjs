@@ -19,7 +19,7 @@ for (const name of readdirSync(new URL('../../Cabinet.Service/wwwroot/js/', impo
   copyFileSync(new URL('../../Cabinet.Service/wwwroot/js/' + name, import.meta.url), join(PAGE_FOLDER, name));
 }
 
-const { initLocationsView, scrollAfterSwitch, isLocationDocument } = await import(pathToFileURL(join(PAGE_FOLDER, 'locations-view.js')).href);
+const { initLocationsView, scrollAfterSwitch, isLocationDocument, shelfScrollTarget, FOUND_HOLD_MS } = await import(pathToFileURL(join(PAGE_FOLDER, 'locations-view.js')).href);
 
 const COPY = {
   viewAllAnnounce: 'all',
@@ -35,6 +35,28 @@ test('the page scrolls up to put the cabinet 16 px under the bar, and only when 
   assert.equal(scrollAfterSwitch(100, 112, 50), 22);
   assert.equal(scrollAfterSwitch(112, 112, 0), null);
   assert.equal(scrollAfterSwitch(300, 112, 0), null);
+});
+
+test('Show on shelf puts the heading 16 px under the bar when the heading and the box both fit below it', () => {
+  const target = shelfScrollTarget({ headingTop: 600, boxTop: 700, boxBottom: 800, barBottom: 112, viewportHeight: 900, scrollY: 1000 });
+
+  assert.equal(target, 1000 + 600 - 112 - 16);
+});
+
+test('Show on shelf centres the box below the bar when the heading and the box do not both fit', () => {
+  const target = shelfScrollTarget({ headingTop: -900, boxTop: 1200, boxBottom: 1300, barBottom: 112, viewportHeight: 900, scrollY: 2000 });
+  const room = 900 - 112;
+
+  assert.equal(target, 2000 + 1250 - (112 + room / 2));
+});
+
+test('Show on shelf puts the top of a box taller than the space below the bar under the bar, and never scrolls above the page', () => {
+  assert.equal(shelfScrollTarget({ headingTop: 0, boxTop: 500, boxBottom: 1500, barBottom: 0, viewportHeight: 600, scrollY: 100 }), 100 + 500 - 16);
+  assert.equal(shelfScrollTarget({ headingTop: -50, boxTop: 40, boxBottom: 140, barBottom: 112, viewportHeight: 900, scrollY: 30 }), 0);
+});
+
+test('the box that Show on shelf found stays outlined for two seconds', () => {
+  assert.equal(FOUND_HOLD_MS, 2000);
 });
 
 test('a scroll target is never below the current position', () => {

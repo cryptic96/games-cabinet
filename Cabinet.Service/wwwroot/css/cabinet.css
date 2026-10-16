@@ -619,16 +619,19 @@
 
 /**
  * The box of the card that is open, for a visitor who prefers less motion: it stays in its slot and is marked with a plain light
- * outline instead of flying out. The colour is the room's text colour, not the accent.
+ * outline instead of flying out. The box that Show on shelf has just scrolled to wears the same outline for a moment, with or
+ * without reduced motion, because it never moves. The colour is the room's text colour, not the accent.
  */
-.placement[data-open] {
+.placement[data-open],
+.placement[data-found] {
   z-index: 4;
   outline: 2px solid var(--room-text, var(--wall-text));
   outline-offset: 2px;
 }
 
 .placement:focus-visible,
-.placement[data-open] {
+.placement[data-open],
+.placement[data-found] {
   box-shadow:
     inset 1px 1px 0 rgb(255 255 255 / 0.2),
     0 1px 2px rgb(0 0 0 / 0.5),
@@ -636,7 +639,8 @@
 }
 
 .placement[data-art="true"]:focus-visible,
-.placement[data-art="true"][data-open] {
+.placement[data-art="true"][data-open],
+.placement[data-art="true"][data-found] {
   box-shadow:
     0 1px 2px rgb(0 0 0 / 0.5),
     0 0 0 6px var(--ring-halo);

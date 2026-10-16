@@ -36,6 +36,45 @@ export function scrollAfterSwitch(cabinetTop, barBottom, scrollY) {
   return cabinetTop < barBottom ? scrollY + cabinetTop - barBottom - BAR_GAP_PX : null;
 }
 
+/** How long, in milliseconds, the box that was asked for stays outlined after Show on shelf took the visitor to it. */
+export const FOUND_HOLD_MS = 2000;
+
+/** The most times the page measures and scrolls again while it settles on the box Show on shelf is taking the visitor to. */
+const LANDING_PASSES = 3;
+
+/** The attribute that outlines the box Show on shelf landed on. */
+const FOUND_MARKER = 'data-found';
+
+/**
+ * Tells where to scroll so the box of Show on shelf is in view below the bar. When the location's heading and the box both fit below
+ * the bar with a gap above and below, the heading is put a little under the bar so the visitor sees which cabinet it is. Otherwise
+ * the box is centred in the space below the bar, or put at its top when even that space is too small to hold it. All edges are
+ * measured in the viewport; the result is a scroll position, never below zero.
+ * @param {object} edges What was measured.
+ * @param {number} edges.headingTop The top edge of the location's heading.
+ * @param {number} edges.boxTop The top edge of the box.
+ * @param {number} edges.boxBottom The bottom edge of the box.
+ * @param {number} edges.barBottom The bottom edge of the bar while it is pinned, otherwise zero.
+ * @param {number} edges.viewportHeight The height of the viewport.
+ * @param {number} edges.scrollY The current vertical scroll position of the page.
+ * @returns {number} The scroll position to go to.
+ */
+export function shelfScrollTarget({ headingTop, boxTop, boxBottom, barBottom, viewportHeight, scrollY }) {
+  const room = viewportHeight - barBottom;
+  const boxHeight = boxBottom - boxTop;
+  let target;
+
+  if (boxBottom - headingTop <= room - 2 * BAR_GAP_PX) {
+    target = scrollY + headingTop - barBottom - BAR_GAP_PX;
+  } else if (boxHeight <= room - 2 * BAR_GAP_PX) {
+    target = scrollY + (boxTop + boxBottom) / 2 - (barBottom + room / 2);
+  } else {
+    target = scrollY + boxTop - barBottom - BAR_GAP_PX;
+  }
+
+  return Math.max(0, target);
+}
+
 /**
  * Tells whether a value is text or missing.
  * @param {unknown} value The value to test.
@@ -256,14 +295,120 @@ export function initLocationsView({
   }
 
   /**
+   * Tells where the bottom edge of the bar is when it is pinned to the top of the page, and zero when it scrolls away with the page.
+   * @returns {number}
+   */
+  function pinnedBarBottom() {
+    if (bar === null || window.getComputedStyle(bar).position !== 'sticky') {
+      return 0;
+    }
+
+    return Math.max(0, bar.getBoundingClientRect().bottom);
+  }
+
+  /**
+   * Finds the box of an entry in the cabinet on screen, never the marker that counts hidden expansions.
+   * @param {string} entryId The entry id as text.
+   * @returns {Element | null}
+   */
+  function findBox(entryId) {
+    return cabinet?.querySelector(`.placement[data-entry-id="${CSS.escape(entryId)}"]:not([data-kind="moreMarker"])`) ?? null;
+  }
+
+  let found = null;
+  let foundTimer = 0;
+
+  /**
+   * Takes the outline off the box Show on shelf landed on, if there is one, and stops listening for the press that would do it.
+   */
+  function clearFound() {
+    window.clearTimeout(foundTimer);
+    document.removeEventListener('pointerdown', clearFound, true);
+    document.removeEventListener('keydown', clearFoundOnKey, true);
+
+    if (found !== null) {
+      found.removeAttribute(FOUND_MARKER);
+      found = null;
+    }
+  }
+
+  /**
+   * Takes the outline off when a key is pressed, but not when the press is a key held down from the one that asked for Show on shelf.
+   * @param {KeyboardEvent} event The key press.
+   */
+  function clearFoundOnKey(event) {
+    if (!event.repeat) {
+      clearFound();
+    }
+  }
+
+  /**
+   * Scrolls the page at once to where the box of Show on shelf belongs. A scroll can change what is above the box, as shelves that
+   * come into view are laid out for real, so the page measures again after each scroll and scrolls once more until the box is where
+   * it should be, a few times at most.
+   * @param {Element} box The box to land on.
+   * @param {Element} heading The heading of the box's location, or the box itself when it has none.
+   */
+  function settleOn(box, heading) {
+    for (let pass = 0; pass < LANDING_PASSES; pass += 1) {
+      const boxRect = box.getBoundingClientRect();
+      const target = shelfScrollTarget({
+        headingTop: heading.getBoundingClientRect().top,
+        boxTop: boxRect.top,
+        boxBottom: boxRect.bottom,
+        barBottom: pinnedBarBottom(),
+        viewportHeight: window.innerHeight,
+        scrollY: window.scrollY,
+      });
+
+      if (Math.abs(target - window.scrollY) < 1) {
+        return;
+      }
+
+      window.scrollTo({ top: target, behavior: 'instant' });
+    }
+  }
+
+  /**
+   * Scrolls the page at once to the box of an entry and outlines it. The outline stays for a short while and goes at the next press
+   * of the pointer or a key, never by moving the pointer. Without the box the page only makes sure the cabinet is not above the bar.
+   * @param {string} entryId The entry id as text.
+   */
+  function landOn(entryId) {
+    const box = findBox(entryId);
+
+    if (box === null) {
+      keepCabinetInReach();
+
+      return;
+    }
+
+    const heading = box.closest('.location-group')?.querySelector('.location-heading') ?? box;
+
+    settleOn(box, heading);
+    clearFound();
+    found = box;
+    box.setAttribute(FOUND_MARKER, '');
+    foundTimer = window.setTimeout(clearFound, FOUND_HOLD_MS);
+    document.addEventListener('pointerdown', clearFound, true);
+    document.addEventListener('keydown', clearFoundOnKey, true);
+    window.requestAnimationFrame(() => {
+      if (found === box) {
+        settleOn(box, heading);
+      }
+    });
+  }
+
+  /**
    * Takes the visitor's choice. An open card is closed first. The location view waits for its document and the current view stays
    * until it arrives; a later choice made while one is waiting wins. Once the new view is drawn it is announced and, when the choice
    * is the visitor's own, remembered on the device.
    * @param {'all' | 'location'} next The view chosen.
    * @param {boolean} [remember] Whether to remember the view on the device after it is drawn.
+   * @param {(() => void) | null} [land] What to do inside the swap in place of keeping the cabinet in reach, once the view is drawn.
    * @returns {Promise<void>}
    */
-  async function choose(next, remember = true) {
+  async function choose(next, remember = true, land = null) {
     request += 1;
     const mine = request;
 
@@ -300,7 +445,12 @@ export function initLocationsView({
 
       view = next;
       onSwitch(next, doc);
-      keepCabinetInReach();
+
+      if (land === null) {
+        keepCabinetInReach();
+      } else {
+        land();
+      }
     });
 
     if (mine !== request || view !== next) {
@@ -321,6 +471,41 @@ export function initLocationsView({
       }
     });
   }
+
+  /**
+   * Takes the visitor to the box of an entry on its shelf: the open card is closed, the location view is shown when it is not on
+   * screen, and the page scrolls to the box and outlines it. A location view that cannot be had says so and outlines nothing. No
+   * filter is touched.
+   * @param {string} entryId The entry id as text.
+   * @returns {Promise<void>}
+   */
+  async function showOnShelf(entryId) {
+    clearFound();
+
+    if (view === 'location') {
+      request += 1;
+      const mine = request;
+
+      await closeCard();
+
+      if (mine === request && view === 'location') {
+        landOn(entryId);
+      }
+
+      return;
+    }
+
+    check('location');
+    await choose('location', true, () => landOn(entryId));
+  }
+
+  document.addEventListener('cabinet:show-on-shelf', (event) => {
+    const entryId = event.detail?.entryId;
+
+    if (typeof entryId === 'string' && entryId !== '') {
+      showOnShelf(entryId);
+    }
+  });
 
   document.addEventListener('cabinet:filtered', (event) => {
     const has = event.detail?.hasLocations === true;
