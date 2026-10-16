@@ -16,6 +16,7 @@ import {
   fold,
   listEntries,
   locationChoices,
+  withAlternates,
 } from './filter-rules.js';
 
 /** How long the count must stay unchanged before it is announced to a screen reader, in milliseconds. */
@@ -26,6 +27,9 @@ export const FILTER_ANNOUNCE_MS = 600;
  * them in shadow or in the light at once, so a cheap phone never runs hundreds of fades together.
  */
 export const BULK_VEIL_COUNT = 120;
+
+/** The address of the other titles of the owned games, which the search reads once on first use. */
+const NAMES_ROUTE = '/cabinet/search-names';
 
 /**
  * The chip groups of the bar: which state member each group sets, and the values it may take. A chip value outside the set, or an
@@ -103,9 +107,10 @@ function watchPinning(bar) {
  * @param {string} parts.language The page language, for the order of the games list the count follows.
  * @param {() => object[]} parts.getRecords Gives the records of the collection: the card data when it is held, otherwise records made
  * from the drawn boxes.
- * @returns {{ dimOf: (placement: object) => boolean, rebuild: (records: object[], locations?: object[]) => void, apply: () => void, state: object }}
+ * @returns {{ dimOf: (placement: object) => boolean, rebuild: (records: object[], locations?: object[], held?: { layoutEtag?: string | null }) => void, apply: () => void, state: object }}
  * The controls: whether a box is drawn in shadow, a new model of the collection (with the owner's locations when the card data brings
- * them), a fresh pass over the drawn boxes and the current state.
+ * them, and the entity tag of the layout the records belong to, so the other titles are read again when the collection changed), a
+ * fresh pass over the drawn boxes and the current state.
  */
 export function initFilters({ bar, mount, copy, language, getRecords }) {
   const field = bar.querySelector('#filter-q');
@@ -118,6 +123,10 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
 
   let state = { ...EMPTY_FILTERS };
   let locations = [];
+  let names = null;
+  let namesState = 'unasked';
+  let namesGeneration = 0;
+  let heldLayout = null;
   let model = buildModel(getRecords(), locations);
   let entries = listEntries(model, { language });
   let result = evaluate(state, model);
@@ -273,9 +282,64 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
   }
 
   /**
+   * Builds the model of the collection from the records given, with the other titles of its games when they are held.
+   * @param {object[]} records The records of the collection.
+   * @returns {ReturnType<typeof buildModel>}
+   */
+  function modelOf(records) {
+    return withAlternates(buildModel(records, locations), names);
+  }
+
+  /**
+   * Reads the other titles of the owned games, once, the first time the visitor uses the search field. The request is made at low
+   * priority, shows nothing while it runs and nothing when it fails: title search keeps working and is not asked again until the
+   * collection changes. When the titles arrive the families are matched again and the pass is applied; a count that changed is
+   * announced like any other change. An answer that belongs to a collection the page has since left is dropped.
+   */
+  async function fetchNames() {
+    if (namesState !== 'unasked') {
+      return;
+    }
+
+    namesState = 'asking';
+    const generation = namesGeneration;
+    const sample = mount.dataset.sample;
+
+    try {
+      const response = await fetch(NAMES_ROUTE + (sample ? '?sample=' + encodeURIComponent(sample) : ''), { priority: 'low' });
+      const body = response.ok ? await response.json() : null;
+
+      if (generation !== namesGeneration) {
+        return;
+      }
+
+      if (body === null || typeof body.names !== 'object' || body.names === null) {
+        namesState = 'failed';
+        return;
+      }
+
+      const before = tally.lit;
+
+      names = body.names;
+      namesState = 'held';
+      model = modelOf(getRecords());
+      apply();
+
+      if (tally.lit !== before) {
+        announceSoon();
+      }
+    } catch {
+      if (generation === namesGeneration) {
+        namesState = 'failed';
+      }
+    }
+  }
+
+  /**
    * Takes the search the visitor typed, shows its result at once and queues the announcement.
    */
   function search() {
+    fetchNames();
     state = { ...state, q: field.value };
     apply();
     announceSoon();
@@ -356,6 +420,7 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
   }
 
   field.addEventListener('input', search);
+  field.addEventListener('focus', fetchNames);
   place?.addEventListener('change', choosePlace);
   fillPlaces();
 
@@ -404,12 +469,26 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
   return {
     dimOf: (placement) => isDim(String(placement.entryId), placement.title),
 
-    rebuild(records, owned) {
+    rebuild(records, owned, held) {
+      const layoutEtag = typeof held?.layoutEtag === 'string' ? held.layoutEtag : null;
+
+      const collectionChanged = layoutEtag !== null && heldLayout !== null && layoutEtag !== heldLayout;
+
+      if (collectionChanged) {
+        namesState = 'unasked';
+        namesGeneration += 1;
+      }
+
+      heldLayout = layoutEtag ?? heldLayout;
       locations = Array.isArray(owned) ? owned : locations;
-      model = buildModel(records, locations);
+      model = modelOf(records);
       entries = listEntries(model, { language });
       fillPlaces();
       apply();
+
+      if (collectionChanged && field.value !== '') {
+        fetchNames();
+      }
     },
 
     apply,

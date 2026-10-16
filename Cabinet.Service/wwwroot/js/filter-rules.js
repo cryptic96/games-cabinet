@@ -151,8 +151,45 @@ export function buildModel(records, locations = []) {
 }
 
 /**
- * Tells whether a family passes the search: every family does while nothing is typed, otherwise one whose base title or any owned
- * expansion title contains the folded text.
+ * Adds the other titles of games to the text the search matches, without touching what the model shows. Every family that holds an
+ * entry of a game with other titles gains those titles, folded like the rest, so typing one of them lights the whole family. A game
+ * the collection does not hold, and anything that is not a list of texts, is ignored. The model given is not changed.
+ * @param {ReturnType<typeof buildModel>} model The model of the collection.
+ * @param {Record<string, string[]> | null | undefined} names The other titles of each game, keyed by game id as text.
+ * @returns {ReturnType<typeof buildModel>} A model whose haystacks also hold the other titles; the model itself when there are none.
+ */
+export function withAlternates(model, names) {
+  if (names === null || typeof names !== 'object') {
+    return model;
+  }
+
+  const haystacks = new Map();
+
+  for (const [family, haystack] of model.haystacks) {
+    const extra = [];
+
+    for (const entry of model.members.get(family) ?? []) {
+      const key = String(model.byEntry.get(entry)?.gameId);
+      const other = Object.hasOwn(names, key) ? names[key] : null;
+
+      for (const name of Array.isArray(other) ? other : []) {
+        const folded = fold(name);
+
+        if (folded !== '') {
+          extra.push(folded);
+        }
+      }
+    }
+
+    haystacks.set(family, extra.length === 0 ? haystack : [...haystack, ...extra]);
+  }
+
+  return { ...model, haystacks };
+}
+
+/**
+ * Tells whether a family passes the search: every family does while nothing is typed, otherwise one whose base title, any owned
+ * expansion title or any other title of those games contains the folded text.
  * @param {string} needle The folded search text.
  * @param {string[]} haystack The folded titles of the family.
  * @returns {boolean}

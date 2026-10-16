@@ -18,7 +18,7 @@ for (const name of readdirSync(new URL('../../Cabinet.Service/wwwroot/js/', impo
   copyFileSync(new URL('../../Cabinet.Service/wwwroot/js/' + name, import.meta.url), join(FOLDER, name));
 }
 
-const { EMPTY_FILTERS, fold, buildModel, isActive, evaluate, listEntries, countLit, familyRange, PLAYER_CHOICES, TIME_CHOICES, locationChoices, effectiveLocation, UNKNOWN_LOCATION } = await import(pathToFileURL(join(FOLDER, 'filter-rules.js')).href);
+const { EMPTY_FILTERS, fold, buildModel, withAlternates, isActive, evaluate, listEntries, countLit, familyRange, PLAYER_CHOICES, TIME_CHOICES, locationChoices, effectiveLocation, UNKNOWN_LOCATION } = await import(pathToFileURL(join(FOLDER, 'filter-rules.js')).href);
 
 /**
  * Builds an invented card record; fields not given are unknown.
@@ -355,4 +355,36 @@ test('with no owner locations nothing is offered and unknown is not a choice', (
   assert.deepEqual(choices.places, []);
   assert.equal(choices.unknown, false);
   assert.equal(effectiveLocation(UNKNOWN_LOCATION, model), null);
+});
+
+const litWith = (records, names, q) => [...evaluate(search(q), withAlternates(buildModel(records), names)).lit].sort();
+
+test('another title of a game lights the whole family that holds it, folded like a title', () => {
+  const names = { '30': ['De Stille Groeve'], '20': ['Café Élan Noir'] };
+
+  assert.deepEqual(litWith(COLLECTION, names, 'stille'), ['3']);
+  assert.deepEqual(litWith(COLLECTION, names, 'STILLE   groeve'), ['3']);
+  assert.deepEqual(litWith(COLLECTION, names, 'cafe elan'), ['1', '2']);
+  assert.deepEqual(litWith(COLLECTION, names, 'café élan'), ['1', '2']);
+});
+
+test('without other titles, with unusable ones, or for a game the collection lacks, nothing more matches', () => {
+  const model = buildModel(COLLECTION);
+
+  assert.equal(withAlternates(model, null), model);
+  assert.equal(withAlternates(model, undefined), model);
+  assert.deepEqual(litWith(COLLECTION, { '999': ['Phantom Title'] }, 'phantom'), []);
+  assert.deepEqual(litWith(COLLECTION, { '30': 'not a list', '10': [null, 7, '   '] }, 'not a list'), []);
+  assert.deepEqual(litWith(COLLECTION, { constructor: ['zzz'] }, 'zzz'), []);
+  assert.deepEqual(litWith(COLLECTION, {}, 'stille'), []);
+});
+
+test('adding other titles keeps titles matching and leaves the given model untouched', () => {
+  const model = buildModel(COLLECTION);
+  const before = JSON.stringify([...model.haystacks]);
+  const extended = withAlternates(model, { '30': ['De Stille Groeve'] });
+
+  assert.equal(JSON.stringify([...model.haystacks]), before);
+  assert.deepEqual([...evaluate(search('quiet'), extended).lit].sort(), ['3']);
+  assert.deepEqual([...evaluate(search('harbour'), extended).lit].sort(), ['1', '2']);
 });

@@ -35,6 +35,8 @@ public static class SampleCardDetails
     private const int AgeSteps = 5;
     private const int MinimumAge = 6;
     private const int AgeStep = 2;
+    private const int OtherTitleOneIn = 3;
+    private const int MaxOtherTitles = 2;
 
     private const int YearSalt = 201;
     private const int NoDetailsSalt = 202;
@@ -51,6 +53,9 @@ public static class SampleCardDetails
     private const int LocationPickSalt = 213;
     private const int ExtraPlayersSalt = 214;
     private const int StatedOnlySalt = 215;
+    private const int OtherTitlePresenceSalt = 216;
+    private const int OtherTitlePickSalt = 217;
+    private const int OtherTitleCountSalt = 218;
 
     private static readonly DateTimeOffset InventedTime = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
@@ -88,6 +93,18 @@ public static class SampleCardDetails
         "Route building",
         "Push your luck",
         "Tech trees",
+    ];
+
+    private static readonly string[] OtherTitles =
+    [
+        "De Stille Groeve",
+        "Café Élan Noir",
+        "Kasteel van Mist",
+        "Müller en de Marmotten",
+        "Zoë's Wonderlijke Vloot",
+        "Brouwerij Zonder Naam",
+        "Het Gedeelde Dak",
+        "Hôtel Zonsondergang",
     ];
 
     private static readonly string[] Locations =
@@ -225,8 +242,14 @@ public static class SampleCardDetails
             fixedDesigner is null ? Pick(Designers, id, DesignerStartSalt, 1 + StableHash.Bucket(id, DesignerCountSalt, MaxDesigners)) : [fixedDesigner],
             Pick(Mechanics, id, MechanicStartSalt, StableHash.Bucket(id, MechanicCountSalt, MaxMechanics + 1)),
             item.ExpansionOf,
-            null);
+            null,
+            AlternateNames: OtherTitlesOf(id));
     }
+
+    private static List<string>? OtherTitlesOf(int id) =>
+        StableHash.Bucket(id, OtherTitlePresenceSalt, OtherTitleOneIn) == 0
+            ? Pick(OtherTitles, id, OtherTitlePickSalt, 1 + StableHash.Bucket(id, OtherTitleCountSalt, MaxOtherTitles))
+            : null;
 
     private static List<string> Pick(string[] pool, int id, int startSalt, int count)
     {
