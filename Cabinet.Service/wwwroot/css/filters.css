@@ -10,60 +10,59 @@
   padding: 0;
 }
 
-/**
- * The bar stays pinned at the top while the cabinet scrolls. It runs edge to edge across the page padding so its fill, once stuck, covers the
- * full width. In the page flow it has no fill; the fill and the shadow live on one layer under the controls that fades in when the sentinel
- * above the bar has scrolled out of view.
- */
 .filter-bar {
-  --bar-pad: var(--page-pad, 24px);
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  isolation: isolate;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-inline: calc(-1 * var(--bar-pad));
   margin-block-end: 16px;
-  padding: 8px var(--bar-pad);
-  overflow: visible;
+  padding-block: 8px;
   color: var(--room-text, var(--wall-text));
   background: transparent;
 }
 
-.filter-bar::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: var(--room, var(--wood-dark));
-  box-shadow:
-    0 6px 12px -6px rgb(var(--room-shade-rgb, 20 10 4) / 0.55),
-    0 1px 0 color-mix(in srgb, var(--room-line, var(--chrome-line)) 40%, transparent);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--swap-fade);
-}
-
-@media (max-width: 40rem) {
+/**
+ * From 64rem the bar stays pinned at the top while the cabinet scrolls. It runs edge to edge across the page padding so its fill, once
+ * stuck, covers the full width. In the page flow it has no fill; the fill and the shadow live on one layer under the controls that
+ * fades in when the sentinel above the bar has scrolled out of view. Below 64rem the bar stays in the page flow.
+ */
+@media (min-width: 64rem) {
   .filter-bar {
-    --bar-pad: var(--page-pad, 8px);
+    --bar-pad: var(--page-pad, 24px);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    isolation: isolate;
+    margin-inline: calc(-1 * var(--bar-pad));
+    padding-inline: var(--bar-pad);
+  }
+
+  .filter-bar::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--room, var(--wood-dark));
+    box-shadow:
+      0 6px 12px -6px rgb(var(--room-shade-rgb, 20 10 4) / 0.55),
+      0 1px 0 color-mix(in srgb, var(--room-line, var(--chrome-line)) 40%, transparent);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--swap-fade);
+  }
+
+  .filter-bar[data-stuck]::after {
+    opacity: 1;
+  }
+
+  html {
+    scroll-padding-top: var(--filter-bar-h, 0px);
   }
 }
 
-.filter-bar[data-stuck]::after {
-  opacity: 1;
-}
-
-@media (prefers-reduced-motion: reduce) {
+@media (min-width: 64rem) and (prefers-reduced-motion: reduce) {
   .filter-bar::after {
     transition: none;
   }
-}
-
-html {
-  scroll-padding-top: var(--filter-bar-h, 0px);
 }
 
 .filter-row {

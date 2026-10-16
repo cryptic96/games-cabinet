@@ -50,7 +50,8 @@ export const NO_FILTERS = Object.freeze({
 /**
  * Keeps the page in step with the pinned bar without a scroll handler. One observer on the zero-height marker that sits right before
  * the bar sets the stuck attribute while the marker is above the top of the viewport, which is when the bar is pinned, and a second
- * observer writes the bar's height on the root so the page can keep focused and scrolled-to boxes clear of it.
+ * observer writes the bar's height on the root while the bar is pinned, and zero while it is not, so the page can keep focused and
+ * scrolled-to boxes clear of it.
  * @param {HTMLElement} bar The filter bar element.
  */
 function watchPinning(bar) {
@@ -68,9 +69,16 @@ function watchPinning(bar) {
   }
 
   if ('ResizeObserver' in window) {
-    new ResizeObserver(() => {
-      document.documentElement.style.setProperty('--filter-bar-h', `${bar.offsetHeight}px`);
-    }).observe(bar);
+    const publish = () => {
+      const pinned = window.getComputedStyle(bar).position === 'sticky';
+
+      document.documentElement.style.setProperty('--filter-bar-h', `${pinned ? bar.offsetHeight : 0}px`);
+    };
+
+    const observer = new ResizeObserver(publish);
+
+    observer.observe(bar);
+    observer.observe(document.documentElement);
   }
 }
 
