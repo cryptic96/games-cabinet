@@ -1,13 +1,9 @@
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using Cabinet.BrowserTests.Infrastructure;
-using Cabinet.Domain.Owner;
 using Cabinet.FakeBgg;
 using Cabinet.FakeBgg.Testing;
 using Cabinet.IntegrationTests.Infrastructure;
-using Cabinet.Service.Owner;
 using FluentAssertions;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Playwright;
 
 namespace Cabinet.BrowserTests;
@@ -30,8 +26,6 @@ public sealed class OwnerCabinetTests : CabinetPageTest
     private const string Boxes = "#cabinet .placement:not([data-kind=\"moreMarker\"])";
     private const string FailedToLoad = "Failed to load resource";
     private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
-
-    private HttpClient? _publicClient;
 
     [Fact]
     public async Task At_the_owner_address_an_unplaced_box_carries_the_tag_and_its_card_ends_with_an_Edit_link_to_its_pictures_view()
@@ -480,17 +474,7 @@ public sealed class OwnerCabinetTests : CabinetPageTest
         await Page.WaitForSelectorAsync("#cabinet .placement", new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached });
     }
 
-    private async Task<OwnerHost> StartHostAsync()
-    {
-        var clock = SyncHarness.NewClock();
-        var factory = SyncHarness.CreateFactory(ScriptedBggHandler.ForCollection(Collection()), clock);
-
-        await StartAsync(factory);
-        _publicClient = factory.CreatePublicClient();
-        await SyncRounds.PressAndWait(_publicClient, clock, advance: false);
-
-        return new OwnerHost(factory.ServingServices.GetRequiredService<OwnerDataService>(), await ReadCardsAsync());
-    }
+    private Task<OwnerHost> StartHostAsync() => OwnerHost.SyncAsync(factory => StartAsync(factory), Collection());
 
     private static IReadOnlyList<FakeBggItem> Collection()
     {
@@ -516,56 +500,4 @@ public sealed class OwnerCabinetTests : CabinetPageTest
             null,
             null,
             baseObjectId);
-
-    private async Task<IReadOnlyList<CardReading>> ReadCardsAsync()
-    {
-        using var response = await _publicClient!.GetAsync("/cabinet/cards?profile=desktop", TestContext.Current.CancellationToken);
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
-
-        return
-        [
-            .. document.RootElement.GetProperty("cards").EnumerateArray().Select(card => new CardReading(
-                card.GetProperty("gameId").GetInt32(),
-                card.GetProperty("title").GetString()!)),
-        ];
-    }
-
-    private sealed record CardReading(int GameId, string Title);
-
-    private sealed class OwnerHost(OwnerDataService owner, IReadOnlyList<CardReading> cards)
-    {
-        public OwnerDataService Owner { get; } = owner;
-
-        public IReadOnlyList<CardReading> Cards { get; } = cards;
-
-        public CardReading Card(string title) => Cards.First(card => string.Equals(card.Title, title, StringComparison.Ordinal));
-
-        public async Task PlaceAsync(CardReading card, string locationId)
-        {
-            var result = await Owner.MutateAsync(
-                Owner.Revision,
-                data => LocationEdits.Assign(data, card.GameId, locationId, card.Title),
-                TestContext.Current.CancellationToken);
-
-            result.Outcome.Should().Be(OwnerOutcome.Saved);
-        }
-
-        public async Task<IReadOnlyList<string>> SeedAsync(params string[] names)
-        {
-            var ids = new List<string>();
-
-            foreach (var name in names)
-            {
-                var result = await Owner.MutateAsync(
-                    Owner.Revision,
-                    data => LocationEdits.Add(data, name, OwnerDataService.NewId),
-                    TestContext.Current.CancellationToken);
-
-                result.Outcome.Should().Be(OwnerOutcome.Saved);
-                ids.Add(result.Data!.Locations[^1].Id);
-            }
-
-            return ids;
-        }
-    }
 }
