@@ -344,6 +344,10 @@ function drawCabinet(layout, etag, settled, doc = null) {
 function switchView(view, doc) {
   if (drawnLayout !== null) {
     paint(drawnLayout, drawnEtag, view === 'location' ? doc : null);
+
+    if (cardRecords.size === 0) {
+      gamesList?.showTitles(drawnPlacements);
+    }
   }
 }
 
