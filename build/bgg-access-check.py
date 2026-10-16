@@ -1174,14 +1174,22 @@ def summarise_things(root, requested_ids, collector, facts):
     inbound_per_expansion = []
     outbound_per_base = []
     returned = set()
+    with_alternates = 0
+    most_alternates = 0
     for item in items:
         kind = safe_category(item.get("type"))
         facts_for_type = per_type.setdefault(kind, collections.Counter())
         facts_for_type["items"] += 1
         returned.add(item.get("id") or "")
         collector.note_number(item.get("id"))
+        alternates = 0
         for name in item.findall("name"):
-            collector.note(name.get("value") or element_text(name))
+            collector.note(name_text(name))
+            if name.get("type") == "alternate" and name_text(name):
+                alternates += 1
+        if alternates:
+            with_alternates += 1
+        most_alternates = max(most_alternates, alternates)
         for tag in ("image", "thumbnail"):
             text = element_text(item.find(tag))
             if text:
@@ -1218,6 +1226,8 @@ def summarise_things(root, requested_ids, collector, facts):
         "  items: %d" % len(items),
         "  requested ids: %d, missing from the answer: %d" % (len(requested_ids), len(set(requested_ids) - returned)),
         format_counter("item types", collections.Counter({kind: counts["items"] for kind, counts in per_type.items()})),
+        "  games with at least one alternate name: %d of %d" % (with_alternates, len(items)),
+        "  most alternate names on one game: %d" % most_alternates,
     ]
     for kind in sorted(per_type):
         listing = ", ".join("%s %d" % (fact, per_type[kind][fact]) for fact in ART_ITEM_FACTS)
@@ -1742,7 +1752,9 @@ def synthetic_art_thing_body():
     """An invented details answer: one base game with expansion and other links, one expansion with an inbound link."""
     base = (
         '<item type="boardgame" id="100001"><thumbnail>%s</thumbnail><image>%s</image>'
-        '<name type="primary" sortindex="1" value="Example Game One"/><minage value="8"/>'
+        '<name type="primary" sortindex="1" value="Example Game One"/>'
+        '<name type="alternate" sortindex="1" value="Invented Alias One"/>'
+        '<name type="alternate" sortindex="1" value="Invented Alias Two"/><minage value="8"/>'
         '<link type="boardgamecategory" id="1" value="Invented Category"/>'
         '<link type="boardgamemechanic" id="2" value="Invented Mechanic"/>'
         '<link type="boardgamedesigner" id="3" value="Invented Designer"/>'
@@ -1867,6 +1879,8 @@ def art_self_test(check):
         "path": "/fixture/__original/img/aaa/pic100001.png",
         "title": "Example Game One",
         "version name": "Invented Edition",
+        "alternate game name": "Invented Alias One",
+        "second alternate game name": "Invented Alias Two",
         "primary version name": "Invented Primary Edition",
         "other version name": "Invented Other Edition",
         "id": "100001",
@@ -1914,6 +1928,8 @@ def art_self_test(check):
             "  items: 2",
             "  requested ids: 4, missing from the answer: 2",
             "  item types: boardgame 1, boardgameexpansion 1",
+            "  games with at least one alternate name: 1 of 2",
+            "  most alternate names on one game: 2",
             "  type boardgame: items 1, image 1, thumbnail 1, minage above zero 1, average present 1, bayesaverage above zero 1, averageweight above zero 1",
             "  type boardgameexpansion: items 1, image 1, thumbnail 0, minage above zero 0, average present 1, bayesaverage above zero 0, averageweight above zero 0",
             "  link counts by type: boardgamecategory 1, boardgamedesigner 2, boardgameexpansion inbound 1, boardgameexpansion outbound 2, boardgamemechanic 1",
@@ -1944,7 +1960,7 @@ def art_self_test(check):
     check("the art report holds no url marker", "http" not in report.lower())
     check("the art report holds no markup", "<" not in report)
     check("the collector remembered the invented addresses", {ART_VERSION_ONE, ART_VERSION_TWO, "/fixture/__original/img/aaa/pic100001.png"} <= collector.sensitive)
-    check("the collector remembered the invented titles", {"Example Game One", "Invented Edition", "Invented Primary Edition", "Invented Other Edition", "Example Expansion One"} <= collector.sensitive)
+    check("the collector remembered the invented titles", {"Example Game One", "Invented Edition", "Invented Primary Edition", "Invented Other Edition", "Example Expansion One", "Invented Alias One", "Invented Alias Two"} <= collector.sensitive)
     check("the collector remembered the invented ids", {"100001", "5000002", "900100001", "100006"} <= collector.numbers)
     credentials = guarded_credentials(token, contact)
     names = [username]

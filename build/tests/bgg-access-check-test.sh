@@ -290,6 +290,17 @@ if grep -q 'Invented Edition\|Invented Primary Edition\|Invented Other Edition' 
 else
   pass "the report prints no edition name"
 fi
+if grep -qx '  games with at least one alternate name: 1 of 2' "$WORK_DIR/out.txt" \
+  && grep -qx '  most alternate names on one game: 2' "$WORK_DIR/out.txt"; then
+  pass "the report counts the games with alternate names and the most on one game"
+else
+  fail "the report does not count alternate names as expected"
+fi
+if grep -q 'Invented Alias' "$WORK_DIR/out.txt"; then
+  fail "the report prints an alternate name"
+else
+  pass "the report prints no alternate name"
+fi
 
 echo "=== refused document forms ==="
 BODY_DRIVER='
