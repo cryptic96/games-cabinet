@@ -451,15 +451,59 @@ html:has(dialog[open]) {
   vertical-align: -2px;
 }
 
+/**
+ * The location in the stored-in row is a quiet button that finds the game on its shelf: no fill, no border, the name underlined and
+ * a small chevron after it. A button centres its content, which would push a one-line name half a ruling down where the row is two
+ * rulings tall, so it is a grid that packs its one line box to the start; the name wraps over whole rulings with the chevron at its end.
+ */
+.card-where-link {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: calc(var(--hit-rows) * var(--ruling));
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: var(--ruling);
+  text-align: start;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.card-where-text {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.card-where-chev {
+  display: inline;
+  width: 14px;
+  height: 14px;
+  margin-inline-start: 4px;
+  vertical-align: -2px;
+}
+
 @media (hover: hover) {
   .exp-row:hover,
-  .card-link a:hover {
+  .card-link a:hover,
+  .card-where-link:hover {
     background: rgb(42 26 16 / 0.06);
   }
 }
 
 .exp-row:active,
-.card-link a:active {
+.card-link a:active,
+.card-where-link:active {
   background: rgb(42 26 16 / 0.06);
 }
 

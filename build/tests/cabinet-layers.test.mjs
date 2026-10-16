@@ -317,7 +317,7 @@ test('the stacking map holds: light at 1, boxes and furniture at 2, the veil ins
     ['.section > :is(.section-top, .section-trim, .section-base)', '2'],
     ['.cubby::after', '3'],
     ['.placement:focus-visible', '4'],
-    ['.placement[data-open]', '4'],
+    ['.placement[data-open],\n.placement[data-found]', '4'],
     ['.section > .section-floor', '-1'],
   ]);
   const found = new Map();

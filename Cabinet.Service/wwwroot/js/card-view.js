@@ -415,20 +415,70 @@ function appendRow(label, value, list) {
 }
 
 /**
- * Builds the stored-in group, or returns null when the record has no usable location. The location is shown exactly as it was
- * given, with its own text direction and no language mark.
+ * Builds the quiet button in the stored-in row that takes the visitor to the game's box on its shelf: the location's name, underlined,
+ * with a small chevron after it so a long name wraps with the chevron at its end. Pressing it tells the page, through a document
+ * event that carries the entry id, to close the card and show the box in its location's cabinet.
  * @param {object} record The card record.
  * @param {object} copy The visitor-facing strings.
+ * @param {string} iconsUrl The address of the icon sprite.
+ * @returns {HTMLButtonElement}
+ */
+function buildShowOnShelf(record, copy, iconsUrl) {
+  const name = document.createElement('span');
+  name.className = 'card-where-name';
+  name.setAttribute('dir', 'auto');
+  name.textContent = record.location;
+
+  const chevron = buildIcon(iconsUrl, 'i-chev');
+  chevron.classList.add('card-where-chev');
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'card-where-link';
+  button.setAttribute('aria-label', copy.showOnShelfName(record.location));
+  const line = document.createElement('span');
+  line.className = 'card-where-text';
+  line.append(name, chevron);
+
+  button.append(line);
+  button.addEventListener('click', () => {
+    document.dispatchEvent(new CustomEvent('cabinet:show-on-shelf', { detail: { entryId: String(record.entryId) } }));
+  });
+
+  return button;
+}
+
+/**
+ * Tells whether a record can be shown on its shelf: it names the location it is kept in and says which entry it is.
+ * @param {object} record The card record.
+ * @returns {boolean}
+ */
+function canShowOnShelf(record) {
+  return isFilledText(record.locationId) && (Number.isInteger(record.entryId) || isFilledText(record.entryId));
+}
+
+/**
+ * Builds the stored-in group, or returns null when the record has no usable location. The location is shown exactly as it was
+ * given, with its own text direction and no language mark. A record that also names the location's identifier shows it as a button
+ * that finds the game on its shelf; one that does not shows the plain text.
+ * @param {object} record The card record.
+ * @param {object} copy The visitor-facing strings.
+ * @param {string} iconsUrl The address of the icon sprite.
  * @returns {HTMLDListElement | null}
  */
-function buildWhere(record, copy) {
+function buildWhere(record, copy, iconsUrl) {
   if (!isFilledText(record.location)) {
     return null;
   }
 
   const value = document.createElement('dd');
   value.setAttribute('dir', 'auto');
-  value.textContent = record.location;
+
+  if (canShowOnShelf(record)) {
+    value.append(buildShowOnShelf(record, copy, iconsUrl));
+  } else {
+    value.textContent = record.location;
+  }
 
   const list = document.createElement('dl');
   list.className = 'card-where';
@@ -725,7 +775,7 @@ export function buildCard(record, copy, options = {}) {
   const parts = [
     isExpansion ? buildBases(record, copy, iconsUrl, onSwap) : null,
     buildStripOrNote(record, copy, iconsUrl),
-    buildWhere(record, copy),
+    buildWhere(record, copy, iconsUrl),
     isExpansion ? null : buildOwnedExpansions(record, copy, iconsUrl, onSwap),
     buildMeta(record, copy),
   ];
