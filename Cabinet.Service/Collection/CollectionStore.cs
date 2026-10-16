@@ -21,6 +21,7 @@ public sealed class CollectionState
 
     private readonly ConcurrentDictionary<string, Lazy<CachedLayout>> _layouts = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, Lazy<CachedCards>> _cards = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, Lazy<CachedLayout>> _locationLayouts = new(StringComparer.Ordinal);
 
     /// <summary>Creates a view of a collection that has been synced.</summary>
     /// <param name="items">The items to draw.</param>
@@ -164,6 +165,35 @@ public sealed class CollectionState
         return _cards.GetOrAdd(design.Name, _ => new Lazy<CachedCards>(() => BuildCards(design, options))).Value;
     }
 
+    /// <summary>
+    /// The serialised cabinets of this collection, one per storage location that holds games, for one section design, built on
+    /// first use and kept with the view, so each design's location cabinets are built at most once per collection version
+    /// however many visitors ask. The document names the entity tag of the single big cabinet of the same collection and
+    /// design, and its own entity tag is that one marked as the by-location payload. A view without owner locations holds none.
+    /// </summary>
+    /// <param name="design">The section design for the requested profile.</param>
+    /// <param name="options">The layout settings the cabinet is built with.</param>
+    public CachedLayout LocationLayoutsFor(SectionDesign design, LayoutOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(design);
+        ArgumentNullException.ThrowIfNull(options);
+
+        return _locationLayouts.GetOrAdd(design.Name, _ => new Lazy<CachedLayout>(() => BuildLocationLayouts(design, options))).Value;
+    }
+
+    private CachedLayout BuildLocationLayouts(SectionDesign design, LayoutOptions options)
+    {
+        var tag = LayoutTag(design, options);
+        var locations = CardSnapshot is null
+            ? []
+            : LocationLayouts.Build(Items, CardSnapshot, Locations, design, options);
+
+        return new CachedLayout(LocationLayouts.Serialize(tag, locations), CachedLayout.ByLocationTag(tag));
+    }
+
+    private string LayoutTag(SectionDesign design, LayoutOptions options) =>
+        $"\"{CabinetLayoutEngine.LayoutVersion}-{options.Fingerprint}-collection-{Version ?? "empty"}-{design.Name}\"";
+
     private CachedCards BuildCards(SectionDesign design, LayoutOptions options)
     {
         var cards = CardRecords.Build(Items, CardSnapshot, design, Locations);
@@ -174,9 +204,8 @@ public sealed class CollectionState
     private CachedLayout Build(SectionDesign design, LayoutOptions options)
     {
         var layout = CabinetLayoutEngine.Build(Items, design, options);
-        var eTag = $"\"{CabinetLayoutEngine.LayoutVersion}-{options.Fingerprint}-collection-{Version ?? "empty"}-{design.Name}\"";
 
-        return new CachedLayout(LayoutJson.Serialize(layout), eTag);
+        return new CachedLayout(LayoutJson.Serialize(layout), LayoutTag(design, options));
     }
 }
 

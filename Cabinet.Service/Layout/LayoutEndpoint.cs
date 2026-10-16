@@ -42,12 +42,13 @@ public static class LayoutEndpoint
             .AddSingleton<CollectionStore>();
     }
 
-    /// <summary>Maps the layout route and the card route; each answers 404 for an unknown or missing profile name.</summary>
+    /// <summary>Maps the layout route, the by-location layout route and the card route; each answers 404 for an unknown or missing profile name.</summary>
     public static IEndpointRouteBuilder MapCabinetLayout(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
         endpoints.MapGet(Route, Handle);
+        endpoints.MapGet(LocationLayoutEndpoint.Route, LocationLayoutEndpoint.Handle);
         endpoints.MapGet(CardsEndpoint.Route, CardsEndpoint.Handle);
 
         return endpoints;
