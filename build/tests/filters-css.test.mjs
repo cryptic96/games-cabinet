@@ -401,6 +401,15 @@ function withoutFallbacks(value) {
   return value.replace(/var\((--[\w-]+)\s*,\s*(?:[^()]|\([^()]*(?:\([^()]*\)[^()]*)*\))*\)/g, 'var($1)');
 }
 
+test('the view switch clips nothing and draws its keyboard ring two pixels outside the segment', () => {
+  const clipping = filterRules.filter((rule) => selectorsOf(rule.selector).includes('.filter-view') && valueOf(rule, ['overflow']) === 'hidden');
+  const ring = filterRules.find((rule) => rule.selector === '.filter-view-segment:has(input:focus-visible)');
+
+  assert.deepEqual(clipping.map((rule) => rule.selector), []);
+  assert.ok(ring, 'the segment has a keyboard ring rule');
+  assert.equal(valueOf(ring, ['outline-offset']), '2px');
+});
+
 test('a state selector is matched to the element it styles', () => {
   assert.equal(baseSelector('.filter-chip:hover'), '.filter-chip');
   assert.equal(baseSelector('.filter-chip:has(input:checked:not([value=""]))'), '.filter-chip');
