@@ -295,10 +295,20 @@ public sealed class FilterSearchTests : CabinetPageTest
     private static bool Contains(string title, string fragment) =>
         title.Contains(fragment, StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Opens the cabinet with an empty index of other titles, so these tests judge the search on the titles alone and an index
+    /// arriving mid-typing cannot light extra games.
+    /// </summary>
     private async Task OpenAsync(string path, int width, int height)
     {
         await Page.SetViewportSizeAsync(width, height);
         await StartAsync(PrototypeOn);
+        await Page.RouteAsync("**/cabinet/search-names**", route => route.FulfillAsync(new RouteFulfillOptions
+        {
+            Status = 200,
+            ContentType = "application/json",
+            Body = "{\"names\":{}}",
+        }));
         await GotoCabinetAsync(path);
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
