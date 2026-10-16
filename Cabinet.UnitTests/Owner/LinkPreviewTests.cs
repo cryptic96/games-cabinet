@@ -125,6 +125,23 @@ public sealed class LinkPreviewTests
         LinkPreview.Build(snapshot, GameId, CollectionId, ArtRules.Default, unusable).Should().BeNull();
     }
 
+    [Fact]
+    public void The_preview_of_a_second_copy_is_that_copys_box_and_is_not_made_for_a_copy_the_game_does_not_have()
+    {
+        var twoCopies = Snapshot(
+            new SnapshotItem(1, GameId, "Invented Game", ItemKind.Base, 2019, new VersionDimensions(9.0, 12.0, 3.0), null),
+            new SnapshotItem(2, GameId, "Invented Game", ItemKind.Base, 2019, new VersionDimensions(6.0, 6.0, 2.0), null));
+        var record = Record(240, 320, FlatFeatures);
+
+        var first = LinkPreview.Build(twoCopies, GameId, 1, ArtRules.Default, record)!;
+        var second = LinkPreview.Build(twoCopies, GameId, 2, ArtRules.Default, record)!;
+
+        first.BoxWidthMm.Should().Be(229);
+        second.BoxWidthMm.Should().BeLessThan(first.BoxWidthMm);
+        second.BoxHeightMm.Should().BeLessThan(first.BoxHeightMm);
+        LinkPreview.Build(twoCopies, GameId, 3, ArtRules.Default, record).Should().BeNull();
+    }
+
     private static SnapshotItem Item(VersionDimensions? dimensions, string title = "Invented Game") =>
         new(1, GameId, title, ItemKind.Base, 2019, dimensions, null);
 
@@ -140,6 +157,6 @@ public sealed class LinkPreviewTests
             new ArtEdges("#336699", "#336699", "#336699", "#336699"),
             3);
 
-    private static CollectionSnapshot Snapshot(SnapshotItem item) =>
-        new(CollectionSnapshot.CurrentSchemaVersion, Moment, [item], new Dictionary<string, ImageRecord>(StringComparer.Ordinal));
+    private static CollectionSnapshot Snapshot(params SnapshotItem[] items) =>
+        new(CollectionSnapshot.CurrentSchemaVersion, Moment, items, new Dictionary<string, ImageRecord>(StringComparer.Ordinal));
 }
