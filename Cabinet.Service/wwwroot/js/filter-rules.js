@@ -8,6 +8,15 @@ import { orderEntries } from './games-list.js';
 /** The state of no filter at all: nothing typed and no group chosen. */
 export const EMPTY_FILTERS = Object.freeze({ q: '', players: null, time: null, location: null });
 
+/** The player counts the chips offer; the last one stands for that many or more. */
+export const PLAYER_CHOICES = Object.freeze([1, 2, 3, 4, 5, 6, 7, 8]);
+
+/** The play times the chips offer, in minutes; each one means "at most". */
+export const TIME_CHOICES = Object.freeze([30, 45, 60, 90, 120]);
+
+/** The player count that stands for "this many or more". */
+const OPEN_ENDED_PLAYERS = 8;
+
 /** Matches one combining mark, which folding removes after the text is decomposed. */
 const COMBINING_MARK = /\p{M}/gu;
 
@@ -147,9 +156,72 @@ function searchPasses(needle, haystack) {
 }
 
 /**
- * Decides which entries stand in the light. The search is judged per family, so every box of a family whose titles contain the typed
- * text is lit together; an expansion owned for several base games is lit when any family it belongs to is lit. With no filter active
- * every entry is lit.
+ * Gives a number back when it is a usable count or length of time, and null for anything else: a value that is missing, not a
+ * number, not finite or not above zero is unknown.
+ * @param {unknown} value The value of a card record.
+ * @returns {number | null}
+ */
+function known(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/**
+ * Works out how many players a family can seat: from the smallest known minimum to the largest known maximum over the base game and
+ * its owned expansions, so a gap or a touching range between members is joined. Values that are missing or not above zero are
+ * ignored. A family with no usable minimum, or no usable maximum, has no range.
+ * @param {object[]} members The card records of the family.
+ * @returns {{ min: number, max: number } | null} The span, or null when it cannot be judged.
+ */
+export function familyRange(members) {
+  const mins = members.map((card) => known(card?.minPlayers)).filter((value) => value !== null);
+  const maxes = members.map((card) => known(card?.maxPlayers)).filter((value) => value !== null);
+
+  return mins.length === 0 || maxes.length === 0 ? null : { min: Math.min(...mins), max: Math.max(...maxes) };
+}
+
+/**
+ * Tells whether a family can seat a chosen number of players. Nothing chosen passes every family; a family with no range never passes
+ * a chosen count. The chosen count and both ends are compared as whole numbers as given; the open-ended count passes when the largest
+ * maximum reaches it.
+ * @param {number | null} players The chosen count, or null for any.
+ * @param {{ min: number, max: number } | null} range The range of the family.
+ * @returns {boolean}
+ */
+function playersPass(players, range) {
+  if (players === null) {
+    return true;
+  }
+
+  if (range === null) {
+    return false;
+  }
+
+  return players >= OPEN_ENDED_PLAYERS ? range.max >= OPEN_ENDED_PLAYERS : range.min <= players && players <= range.max;
+}
+
+/**
+ * Tells whether a game is done within a chosen number of minutes. Nothing chosen passes every game; a stated playing time that is
+ * missing or not above zero never passes a chosen time. The stated playing time is the long end of a range, so a 45 to 90 minute
+ * game is judged as 90 minutes.
+ * @param {number | null} minutes The chosen limit, or null for any.
+ * @param {object | undefined} base The card record of the base game of the family, or of the expansion that is a family of one.
+ * @returns {boolean}
+ */
+function timePasses(minutes, base) {
+  if (minutes === null) {
+    return true;
+  }
+
+  const stated = known(base?.playTime);
+
+  return stated !== null && stated <= minutes;
+}
+
+/**
+ * Decides which entries stand in the light. Search, players and time are judged per family and combine with AND, so every box of a
+ * family that passes all of them is lit together; an expansion owned for several base games is lit when any family it belongs to is
+ * lit. The players test uses the span of the whole family; the time test uses the base game's own playing time, so an expansion never
+ * shortens it. With no filter active every entry is lit.
  * @param {{ q: string, players: unknown, time: unknown, location: unknown }} state The filter state.
  * @param {ReturnType<typeof buildModel>} model The model of the collection.
  * @returns {{ active: boolean, lit: Set<string> }} Whether anything is filtered and the entry ids, as text, of every lit entry.
@@ -163,10 +235,14 @@ export function evaluate(state, model) {
   }
 
   const needle = fold(state.q);
+  const players = typeof state.players === 'number' ? state.players : null;
+  const minutes = typeof state.time === 'number' ? state.time : null;
   const passing = new Set();
 
   for (const [family, haystack] of model.haystacks) {
-    if (searchPasses(needle, haystack)) {
+    const range = players === null ? null : familyRange((model.members.get(family) ?? []).map((entry) => model.byEntry.get(entry)));
+
+    if (searchPasses(needle, haystack) && playersPass(players, range) && timePasses(minutes, model.byEntry.get(family))) {
       passing.add(family);
     }
   }

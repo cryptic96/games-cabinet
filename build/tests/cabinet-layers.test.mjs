@@ -546,6 +546,13 @@ test('the veil of a box in shadow is the box shade at 0.6 over an invisible node
   assert.equal(modifierValue('.placement[data-found] > .placement-veil', 'opacity'), '0');
 });
 
+test('a pass that changes many veils at once switches the fade off on the cabinet and nothing else', () => {
+  assert.equal(modifierValue('.cabinet[data-bulk]', '--veil-fade'), '0ms');
+  const bulk = allRules.modifiers.find((rule) => rule.selector === '.cabinet[data-bulk]');
+
+  assert.deepEqual(bulk.declarations.map(({ name }) => name), ['--veil-fade']);
+});
+
 test('a box in shadow stays a solid box: no filter, blur or opacity is put on the box itself outside forced colours', () => {
   for (const [file, layer] of LAYER_FILES) {
     for (const rule of allRules[layer]) {
