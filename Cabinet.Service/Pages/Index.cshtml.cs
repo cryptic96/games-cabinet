@@ -140,7 +140,7 @@ public class IndexModel(SampleCatalog catalog, CollectionStore store, SyncStatus
         {
             var overlay = OwnerOverlay.From(snapshot, ready.Data);
 
-            UnplacedCount = snapshot.Items.Select(item => item.GameId).Distinct().Count(gameId => overlay.EffectiveLocationId(gameId) is null);
+            UnplacedCount = snapshot.Items.Count(item => overlay.EntryLocationId(item.CollectionId) is null);
         }
     }
 

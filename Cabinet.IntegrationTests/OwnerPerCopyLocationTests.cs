@@ -101,6 +101,30 @@ public sealed class OwnerPerCopyLocationTests
             .Should().BeEquivalentTo(["7001", "7002", "7003", "7101"]);
     }
 
+    [Fact]
+    public async Task The_cabinet_page_counts_copies_that_are_not_placed()
+    {
+        using var storage = Seed();
+        await using var factory = FactoryOn(storage);
+        using var session = new OwnerSession(factory);
+        var before = await session.GetAsync("/");
+        var page = await session.GetAsync(LocationsPath);
+
+        var cleared = await session.PostFormAsync(
+            $"{LocationsPath}?handler=Assign",
+            [
+                Field("gameId", QuarryGameId),
+                Field("collectionId", QuarryCopies[2]),
+                Field("locationId", string.Empty),
+                Field("revision", OwnerSession.FieldValue(page.Body, "revision")),
+            ]);
+        var after = await session.GetAsync("/");
+
+        cleared.Status.Should().Be(HttpStatusCode.Found);
+        before.Body.Should().Contain("1 game is not placed yet.");
+        after.Body.Should().Contain("2 games are not placed yet.");
+    }
+
     private static TemporaryDirectory Seed()
     {
         var storage = new TemporaryDirectory();

@@ -11,6 +11,7 @@ public sealed record PictureOverride(PictureChoice Choice, ImageRecord? LinkReco
 
 /// <summary>
 /// Works out where every owned copy of a game is kept from what the owner entered, and applies that to the synced collection.
+/// Locations are resolved per collection entry only, so no answer about a place is ever given for a game as a whole.
 /// A copy is in the location the owner gave that copy, else the one the owner gave every copy of its game; an expansion without
 /// one of its own follows the first copy of the base game it stands beside (the one <see cref="ExpansionPairing"/> pairs it
 /// with, when that base game is owned); every other copy has no location. The synced collection itself carries no location the
@@ -21,7 +22,6 @@ public sealed class OwnerOverlay
     private readonly IReadOnlyDictionary<long, Place> _places;
     private readonly IReadOnlyDictionary<int, long> _firstCopies;
     private readonly IReadOnlyDictionary<string, string> _names;
-    private readonly IReadOnlyDictionary<int, string> _gameWideLocations;
     private readonly IReadOnlyDictionary<long, int> _pairedBases;
     private readonly IReadOnlyDictionary<int, PictureOverride> _pictures;
 
@@ -30,7 +30,6 @@ public sealed class OwnerOverlay
         IReadOnlyDictionary<long, Place> places,
         IReadOnlyDictionary<int, long> firstCopies,
         IReadOnlyDictionary<string, string> names,
-        IReadOnlyDictionary<int, string> gameWideLocations,
         IReadOnlyDictionary<long, int> pairedBases,
         IReadOnlyDictionary<int, PictureOverride> pictures)
     {
@@ -38,7 +37,6 @@ public sealed class OwnerOverlay
         _places = places;
         _firstCopies = firstCopies;
         _names = names;
-        _gameWideLocations = gameWideLocations;
         _pairedBases = pairedBases;
         _pictures = pictures;
     }
@@ -49,7 +47,6 @@ public sealed class OwnerOverlay
         new Dictionary<long, Place>(),
         new Dictionary<int, long>(),
         new Dictionary<string, string>(),
-        new Dictionary<int, string>(),
         new Dictionary<long, int>(),
         new Dictionary<int, PictureOverride>());
 
@@ -129,7 +126,7 @@ public sealed class OwnerOverlay
                     return new PictureOverride(setting.Choice, setting.Link?.Record, setting.Link?.Url);
                 });
 
-        return new OwnerOverlay(locations, places, firstCopies, names, gameWide, pairedBases, pictures);
+        return new OwnerOverlay(locations, places, firstCopies, names, pairedBases, pictures);
     }
 
     /// <summary>The picture the owner chose for a game, or null when the game is left to the automatic pick.</summary>
@@ -153,28 +150,9 @@ public sealed class OwnerOverlay
     /// <param name="collectionId">The collection entry of the expansion.</param>
     public int? EntryFollowsBaseGameId(long collectionId) => _places.TryGetValue(collectionId, out var place) ? place.FollowsBaseGameId : null;
 
-    /// <summary>The identifier of the location the owner gave a game itself, resolved through the first copy of the game, or null when it has none of its own.</summary>
-    /// <param name="gameId">The game.</param>
-    public string? OwnLocationId(int gameId) =>
-        _firstCopies.TryGetValue(gameId, out var first)
-            ? EntryOwnLocationId(first)
-            : _gameWideLocations.GetValueOrDefault(gameId);
-
-    /// <summary>The identifier of the location a game is in, resolved through the first copy of the game and counting the base game an expansion follows, or null when it is not placed.</summary>
-    /// <param name="gameId">The game.</param>
-    public string? EffectiveLocationId(int gameId) => _firstCopies.TryGetValue(gameId, out var first) ? EntryLocationId(first) : null;
-
-    /// <summary>The name of the location a game is in, resolved through the first copy of the game, or null when it is not placed.</summary>
-    /// <param name="gameId">The game.</param>
-    public string? EffectiveLocationName(int gameId) => _firstCopies.TryGetValue(gameId, out var first) ? EntryLocationName(first) : null;
-
-    /// <summary>The game an expansion follows because it has no location of its own and an owned base game, resolved through the first copy of the expansion, or null when it follows none.</summary>
-    /// <param name="gameId">The game.</param>
-    public int? FollowsBaseGameId(int gameId) => _firstCopies.TryGetValue(gameId, out var first) ? EntryFollowsBaseGameId(first) : null;
-
     /// <summary>
-    /// The owned base game an expansion stands beside, or null for any other game. Unlike <see cref="FollowsBaseGameId"/> it
-    /// does not depend on whether the expansion has a location of its own.
+    /// The owned base game an expansion stands beside, or null for any other game. Unlike <see cref="EntryFollowsBaseGameId"/> it
+    /// does not depend on whether the expansion has a location of its own, and it answers for the game, not for one copy.
     /// </summary>
     /// <param name="gameId">The game.</param>
     public int? OwnedBaseGameId(int gameId) =>
