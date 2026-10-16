@@ -74,7 +74,7 @@ public static class OwnerDataExport
     /// <summary>The largest file a restore accepts, in bytes.</summary>
     public const int MaxRestoreBytes = 2 * 1024 * 1024;
 
-    /// <summary>The most games with decisions a restored file may hold.</summary>
+    /// <summary>The most decisions, for games and for single copies of games, a restored file may hold.</summary>
     public const int MaxGames = 5000;
 
     /// <summary>The deepest nesting of JSON a restored file may have.</summary>
@@ -113,8 +113,8 @@ public static class OwnerDataExport
     /// <summary>
     /// Checks the bytes of a file chosen for a restore. The file is accepted only whole: it has to be an owner-data file in the
     /// strict shape the site writes, within the size, count, name and link rules, with every reference pointing at something in
-    /// it. Its fetched records are left out so every linked picture is fetched again, and its games are put in order of
-    /// identifier. A file from an older format is upgraded here, in memory, and reports the format it came in.
+    /// it and no game and copy listed twice. Its fetched records are left out so every linked picture is fetched again, and its
+    /// decisions are put in order of game and copy. A file from an older format is upgraded here, in memory, and reports the format it came in.
     /// </summary>
     /// <param name="bytes">The content of the file, or null when none was chosen.</param>
     /// <param name="policy">Says which addresses a linked picture may be fetched from; every link of the file must meet it.</param>
@@ -266,12 +266,13 @@ public static class OwnerDataExport
     private static bool GamesAreAcceptable(OwnerData data, ArtSourcePolicy policy)
     {
         var locationIds = data.Locations.Select(location => location.Id).ToHashSet(StringComparer.Ordinal);
-        var seen = new HashSet<int>();
+        var seen = new HashSet<(int GameId, long? CollectionId)>();
 
         foreach (var game in data.Games)
         {
             if (game.GameId <= 0
-                || !seen.Add(game.GameId)
+                || game.CollectionId <= 0
+                || !seen.Add((game.GameId, game.CollectionId))
                 || (game.LocationId is not null && !locationIds.Contains(game.LocationId))
                 || !PictureIsAcceptable(game.Picture, policy))
             {
@@ -310,7 +311,7 @@ public static class OwnerDataExport
         data with
         {
             Look = data.Look.Normalized(),
-            Games = [.. data.Games.Select(WithoutFetchedRecord).OrderBy(game => game.GameId)],
+            Games = [.. data.Games.Select(WithoutFetchedRecord).OrderBy(game => game.GameId).ThenBy(game => game.CollectionId ?? long.MinValue)],
         };
 
     private static OwnerGame WithoutFetchedRecord(OwnerGame game) =>

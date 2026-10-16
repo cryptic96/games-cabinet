@@ -21,9 +21,9 @@ public sealed class OwnerOverlayTests
 
         var overlay = OwnerOverlay.From(snapshot, Data((100, CabinetA)));
 
-        overlay.EffectiveLocationName(100).Should().Be("Cabinet A");
-        overlay.OwnLocationId(100).Should().Be(CabinetA);
-        overlay.FollowsBaseGameId(100).Should().BeNull();
+        overlay.EntryLocationName(1).Should().Be("Cabinet A");
+        overlay.EntryOwnLocationId(1).Should().Be(CabinetA);
+        overlay.EntryFollowsBaseGameId(1).Should().BeNull();
     }
 
     [Fact]
@@ -33,10 +33,10 @@ public sealed class OwnerOverlayTests
 
         var overlay = OwnerOverlay.From(snapshot, Data((100, CabinetA)));
 
-        overlay.EffectiveLocationName(200).Should().Be("Cabinet A");
-        overlay.EffectiveLocationId(200).Should().Be(CabinetA);
-        overlay.OwnLocationId(200).Should().BeNull();
-        overlay.FollowsBaseGameId(200).Should().Be(100);
+        overlay.EntryLocationName(2).Should().Be("Cabinet A");
+        overlay.EntryLocationId(2).Should().Be(CabinetA);
+        overlay.EntryOwnLocationId(2).Should().BeNull();
+        overlay.EntryFollowsBaseGameId(2).Should().Be(100);
     }
 
     [Fact]
@@ -46,8 +46,8 @@ public sealed class OwnerOverlayTests
 
         var overlay = OwnerOverlay.From(snapshot, Data((100, CabinetA), (200, ShelfB)));
 
-        overlay.EffectiveLocationName(200).Should().Be("Shelf B");
-        overlay.FollowsBaseGameId(200).Should().BeNull();
+        overlay.EntryLocationName(2).Should().Be("Shelf B");
+        overlay.EntryFollowsBaseGameId(2).Should().BeNull();
     }
 
     [Fact]
@@ -58,7 +58,7 @@ public sealed class OwnerOverlayTests
         var overlay = OwnerOverlay.From(snapshot, Data((200, ShelfB)));
 
         overlay.OwnedBaseGameId(200).Should().Be(100);
-        overlay.FollowsBaseGameId(200).Should().BeNull();
+        overlay.EntryFollowsBaseGameId(2).Should().BeNull();
         overlay.OwnedBaseGameId(300).Should().BeNull();
         overlay.OwnedBaseGameId(100).Should().BeNull();
     }
@@ -70,9 +70,9 @@ public sealed class OwnerOverlayTests
 
         var overlay = OwnerOverlay.From(snapshot, Data((100, CabinetA)));
 
-        overlay.EffectiveLocationName(200).Should().BeNull();
-        overlay.EffectiveLocationId(200).Should().BeNull();
-        overlay.FollowsBaseGameId(200).Should().BeNull();
+        overlay.EntryLocationName(2).Should().BeNull();
+        overlay.EntryLocationId(2).Should().BeNull();
+        overlay.EntryFollowsBaseGameId(2).Should().BeNull();
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public sealed class OwnerOverlayTests
 
         var overlay = OwnerOverlay.From(snapshot, Data((200, ShelfB)));
 
-        overlay.EffectiveLocationName(200).Should().Be("Shelf B");
+        overlay.EntryLocationName(2).Should().Be("Shelf B");
     }
 
     [Fact]
@@ -94,8 +94,8 @@ public sealed class OwnerOverlayTests
 
         var overlay = OwnerOverlay.From(snapshot, Data((900, CabinetA), (100, ShelfB)));
 
-        overlay.FollowsBaseGameId(200).Should().Be(900);
-        overlay.EffectiveLocationName(200).Should().Be("Cabinet A");
+        overlay.EntryFollowsBaseGameId(9).Should().Be(900);
+        overlay.EntryLocationName(9).Should().Be("Cabinet A");
     }
 
     [Fact]
@@ -105,8 +105,8 @@ public sealed class OwnerOverlayTests
 
         var overlay = OwnerOverlay.From(snapshot, Data());
 
-        overlay.FollowsBaseGameId(200).Should().Be(100);
-        overlay.EffectiveLocationName(200).Should().BeNull();
+        overlay.EntryFollowsBaseGameId(2).Should().Be(100);
+        overlay.EntryLocationName(2).Should().BeNull();
     }
 
     [Fact]
@@ -121,14 +121,82 @@ public sealed class OwnerOverlayTests
     }
 
     [Fact]
+    public void Each_copy_of_a_game_has_its_own_place_when_the_owner_gave_one_copy_a_place_of_its_own()
+    {
+        var snapshot = Snapshot([Base(7001, 100), Base(7002, 100), Base(7003, 100)]);
+        var data = Data((100, CabinetA)) with
+        {
+            Games = [new OwnerGame(100, CabinetA, null, null), new OwnerGame(100, ShelfB, null, null, 7002)],
+        };
+
+        var overlay = OwnerOverlay.From(snapshot, data);
+
+        overlay.EntryLocationName(7001).Should().Be("Cabinet A");
+        overlay.EntryLocationName(7002).Should().Be("Shelf B");
+        overlay.EntryLocationName(7003).Should().Be("Cabinet A");
+        overlay.EntryOwnLocationId(7002).Should().Be(ShelfB);
+        overlay.Effective(snapshot).Items.Select(item => item.Location).Should().Equal("Cabinet A", "Shelf B", "Cabinet A");
+    }
+
+    [Fact]
+    public void A_copy_with_an_entry_of_its_own_and_no_place_is_not_placed_even_when_the_game_has_one()
+    {
+        var snapshot = Snapshot([Base(7001, 100), Base(7002, 100)]);
+        var data = Data() with
+        {
+            Games = [new OwnerGame(100, CabinetA, null, null), new OwnerGame(100, null, null, null, 7002)],
+        };
+
+        var overlay = OwnerOverlay.From(snapshot, data);
+
+        overlay.EntryLocationName(7001).Should().Be("Cabinet A");
+        overlay.EntryLocationName(7002).Should().BeNull();
+    }
+
+    [Fact]
+    public void An_expansion_without_a_place_follows_the_first_copy_of_its_base_game()
+    {
+        var snapshot = Snapshot(
+            [Base(7003, 100), Base(7001, 100), Base(7002, 100), Expansion(7010, 200)],
+            (200, [Ref(100)]));
+        var data = Data() with
+        {
+            Games = [new OwnerGame(100, ShelfB, null, null, 7002), new OwnerGame(100, CabinetA, null, null, 7001)],
+        };
+
+        var overlay = OwnerOverlay.From(snapshot, data);
+
+        overlay.EntryLocationName(7010).Should().Be("Cabinet A");
+        overlay.EntryFollowsBaseGameId(7010).Should().Be(100);
+        overlay.EntryOwnLocationId(7010).Should().BeNull();
+    }
+
+    [Fact]
+    public void The_overlay_lists_the_owners_locations_in_order_and_lists_none_while_the_data_cannot_be_read()
+    {
+        var snapshot = Snapshot([Base(1, 100)]);
+
+        OwnerOverlay.From(snapshot, Data()).Locations.Select(location => location.Name).Should().Equal("Cabinet A", "Shelf B");
+        OwnerOverlay.From(snapshot, null).Locations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_game_wide_entry_for_a_game_that_is_not_in_the_collection_places_nothing()
+    {
+        var snapshot = Snapshot([Base(1, 100)]);
+
+        OwnerOverlay.From(snapshot, Data((555, CabinetA))).EntryLocationName(1).Should().BeNull();
+    }
+
+    [Fact]
     public void A_location_the_owner_data_no_longer_lists_leaves_the_game_not_placed()
     {
         var snapshot = Snapshot([Base(1, 100)]);
 
         var overlay = OwnerOverlay.From(snapshot, Data((100, "gone")));
 
-        overlay.EffectiveLocationName(100).Should().BeNull();
-        overlay.OwnLocationId(100).Should().BeNull();
+        overlay.EntryLocationName(1).Should().BeNull();
+        overlay.EntryOwnLocationId(1).Should().BeNull();
     }
 
     [Fact]

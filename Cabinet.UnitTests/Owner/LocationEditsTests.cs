@@ -129,8 +129,8 @@ public sealed class LocationEditsTests
         deleted.GamesNotPlaced.Should().Be(2);
         deleted.LogText.Should().Be("Deleted location \"Shelf B\" (2 games now not placed)");
         deleted.Data.Games.Should().Equal(new OwnerGame(102, CabinetA, null, null));
-        OwnerOverlay.From(snapshot, deleted.Data).EffectiveLocationId(100).Should().BeNull();
-        OwnerOverlay.From(snapshot, deleted.Data).EffectiveLocationId(102).Should().Be(CabinetA);
+        OwnerOverlay.From(snapshot, deleted.Data).EntryLocationId(1).Should().BeNull();
+        OwnerOverlay.From(snapshot, deleted.Data).EntryLocationId(3).Should().Be(CabinetA);
     }
 
     [Fact]
@@ -151,7 +151,7 @@ public sealed class LocationEditsTests
         var deleted = LocationEdits.Delete(data, snapshot, ShelfB);
 
         deleted.GamesNotPlaced.Should().Be(2);
-        OwnerOverlay.From(snapshot, deleted.Data).EffectiveLocationId(200).Should().BeNull();
+        OwnerOverlay.From(snapshot, deleted.Data).EntryLocationId(2).Should().BeNull();
     }
 
     [Fact]
@@ -167,8 +167,8 @@ public sealed class LocationEditsTests
 
         deleted.GamesNotPlaced.Should().Be(0);
         deleted.Data.Games.Should().Equal(new OwnerGame(100, CabinetA, null, null));
-        OwnerOverlay.From(snapshot, deleted.Data).EffectiveLocationId(200).Should().Be(CabinetA);
-        OwnerOverlay.From(snapshot, deleted.Data).FollowsBaseGameId(200).Should().Be(100);
+        OwnerOverlay.From(snapshot, deleted.Data).EntryLocationId(2).Should().Be(CabinetA);
+        OwnerOverlay.From(snapshot, deleted.Data).EntryFollowsBaseGameId(2).Should().Be(100);
     }
 
     [Fact]
@@ -200,6 +200,130 @@ public sealed class LocationEditsTests
         LocationEdits.CountLeftNotPlaced(data, snapshot, ShelfB).Should().Be(LocationEdits.Delete(data, snapshot, ShelfB).GamesNotPlaced);
         LocationEdits.CountLeftNotPlaced(data, snapshot, CrateC).Should().Be(0);
         LocationEdits.CountLeftNotPlaced(data, null, ShelfB).Should().Be(0);
+    }
+
+    [Fact]
+    public void Finding_a_decision_prefers_the_copys_own_then_the_one_for_every_copy_then_none()
+    {
+        var everyCopy = new OwnerGame(100, CabinetA, null, null);
+        var own = new OwnerGame(100, ShelfB, null, null, 7002);
+        var data = ThreeLocations() with { Games = [everyCopy, own] };
+
+        OwnerGames.Find(data, 100, 7002).Should().Be(own);
+        OwnerGames.Find(data, 100, 7001).Should().Be(everyCopy);
+        OwnerGames.Find(data, 100, null).Should().Be(everyCopy);
+        OwnerGames.Find(data, 101, 7001).Should().BeNull();
+        OwnerGames.Find(ThreeLocations() with { Games = [own] }, 100, 7001).Should().BeNull();
+    }
+
+    [Fact]
+    public void Splitting_for_an_edit_turns_the_decision_for_every_copy_into_one_per_copy_keeping_what_it_held()
+    {
+        var picture = new PictureSetting(PictureChoice.MainPicture, true, null, null, null);
+        var absent = new DateTimeOffset(2030, 2, 1, 0, 0, 0, TimeSpan.Zero);
+        var data = ThreeLocations() with
+        {
+            Games =
+            [
+                new OwnerGame(99, CabinetA, null, null),
+                new OwnerGame(100, CabinetA, absent, picture),
+                new OwnerGame(100, ShelfB, null, null, 7002),
+            ],
+        };
+
+        var split = OwnerGames.SplitForEdit(data, 100, [7003, 7001, 7002]);
+
+        split.Games.Should().Equal(
+            new OwnerGame(99, CabinetA, null, null),
+            new OwnerGame(100, CabinetA, absent, picture, 7001),
+            new OwnerGame(100, ShelfB, null, null, 7002),
+            new OwnerGame(100, CabinetA, absent, picture, 7003));
+    }
+
+    [Fact]
+    public void Splitting_a_game_that_has_no_decision_for_every_copy_changes_nothing()
+    {
+        var data = ThreeLocations() with { Games = [new OwnerGame(100, ShelfB, null, null, 7002)] };
+
+        OwnerGames.SplitForEdit(data, 100, [7001, 7002]).Should().BeSameAs(data);
+    }
+
+    [Fact]
+    public void Placing_one_copy_of_a_game_that_has_a_game_wide_place_gives_every_copy_its_own_entry_and_moves_no_other_copy()
+    {
+        var data = ThreeLocations() with { Games = [new OwnerGame(100, CabinetA, null, null)] };
+
+        var change = LocationEdits.Assign(data, 100, 7002, [7001, 7002, 7003], ShelfB, "Quiet Quarry");
+
+        change.Changed.Should().BeTrue();
+        change.StatusKey.Should().Be("game-moved");
+        change.LogText.Should().Be("Moved Quiet Quarry to Shelf B");
+        change.Data.Games.Should().Equal(
+            new OwnerGame(100, CabinetA, null, null, 7001),
+            new OwnerGame(100, ShelfB, null, null, 7002),
+            new OwnerGame(100, CabinetA, null, null, 7003));
+    }
+
+    [Fact]
+    public void Placing_a_copy_of_a_game_with_no_entry_writes_one_entry_for_that_copy_only()
+    {
+        var change = LocationEdits.Assign(ThreeLocations(), 100, 7002, [7001, 7002], ShelfB, "Quiet Quarry");
+
+        change.Data.Games.Should().Equal(new OwnerGame(100, ShelfB, null, null, 7002));
+    }
+
+    [Fact]
+    public void Taking_one_copy_out_of_its_place_keeps_the_others_and_drops_an_entry_that_holds_nothing()
+    {
+        var data = ThreeLocations() with { Games = [new OwnerGame(100, CabinetA, null, null)] };
+
+        var change = LocationEdits.Assign(data, 100, 7001, [7001, 7002], null, "Quiet Quarry");
+
+        change.LogText.Should().Be("Quiet Quarry is now not placed");
+        change.Data.Games.Should().Equal(new OwnerGame(100, CabinetA, null, null, 7002));
+    }
+
+    [Fact]
+    public void Placing_a_copy_where_it_already_is_changes_nothing_and_an_unknown_place_is_refused()
+    {
+        var data = ThreeLocations() with { Games = [new OwnerGame(100, CabinetA, null, null)] };
+
+        LocationEdits.Assign(data, 100, 7001, [7001, 7002], CabinetA, "Quiet Quarry").IsNone.Should().BeTrue();
+        LocationEdits.Assign(ThreeLocations(), 100, 7001, [7001], null, "Quiet Quarry").IsNone.Should().BeTrue();
+        LocationEdits.Assign(data, 100, 7001, [7001, 7002], "missing", "Quiet Quarry").StatusKey.Should().Be("unknown-location");
+    }
+
+    [Fact]
+    public void Placing_the_whole_game_gives_every_entry_of_the_game_the_place_and_leaves_the_pictures_alone()
+    {
+        var picture = new PictureSetting(PictureChoice.MainPicture, true, null, null, null);
+        var data = ThreeLocations() with
+        {
+            Games = [new OwnerGame(100, CabinetA, null, picture, 7001), new OwnerGame(100, null, null, null, 7002), new OwnerGame(101, CabinetA, null, null)],
+        };
+
+        var change = LocationEdits.Assign(data, 100, ShelfB, "Quiet Quarry");
+
+        change.Data.Games.Should().Equal(
+            new OwnerGame(100, ShelfB, null, null),
+            new OwnerGame(100, ShelfB, null, picture, 7001),
+            new OwnerGame(100, ShelfB, null, null, 7002),
+            new OwnerGame(101, CabinetA, null, null));
+    }
+
+    [Fact]
+    public void Deleting_a_location_counts_the_copies_that_were_kept_there()
+    {
+        var snapshot = Snapshot([Base(7001, 100), Base(7002, 100), Base(7003, 100)]);
+        var data = ThreeLocations() with
+        {
+            Games = [new OwnerGame(100, CabinetA, null, null, 7001), new OwnerGame(100, ShelfB, null, null, 7002), new OwnerGame(100, ShelfB, null, null, 7003)],
+        };
+
+        var deleted = LocationEdits.Delete(data, snapshot, ShelfB);
+
+        deleted.GamesNotPlaced.Should().Be(2);
+        deleted.Data.Games.Should().Equal(new OwnerGame(100, CabinetA, null, null, 7001));
     }
 
     [Fact]
