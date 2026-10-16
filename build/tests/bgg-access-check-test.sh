@@ -251,6 +251,46 @@ SHORT_TOKEN_ENV="$WORK_DIR/short-token.env"
 write_env "$SHORT_TOKEN_ENV" "abc" "sentinel-user-name"
 expect_guard "a short token inside a longer word is still withheld" "$SHORT_TOKEN_ENV" "abcdef" 4
 
+echo "=== names are counted, never printed ==="
+NAMES_DRIVER='
+import importlib.util, sys
+
+script = sys.argv[1]
+spec = importlib.util.spec_from_file_location("bgg_access_check", script)
+module = importlib.util.module_from_spec(spec)
+sys.modules["bgg_access_check"] = module
+spec.loader.exec_module(module)
+api = module.ScriptedApiTransport([
+    (200, module.synthetic_art_base_body()),
+    (200, module.synthetic_art_expansion_body()),
+    (200, module.synthetic_art_thing_body()),
+])
+images = module.ScriptedImageTransport({})
+collector = module.Collector()
+lines, stopped = module.run_art_calls(api, images, "invented", collector)
+report = "\n".join(lines)
+print(report)
+leaks = module.report_leaks(report, [], collector.sensitive, [], collector.numbers)
+sys.exit(1 if stopped or leaks else 0)
+'
+
+if [ "$(status_of python3 -I -c "$NAMES_DRIVER" "$SCRIPT")" = "0" ]; then
+  pass "the synthetic art report passes the leak check"
+else
+  fail "the synthetic art report was stopped or leaked a value"
+fi
+if grep -qx '  edition name present for 2 of 4 copies' "$WORK_DIR/out.txt" \
+  && grep -qx '  edition name present for 0 of 2 copies' "$WORK_DIR/out.txt"; then
+  pass "the report counts the copies whose version carries a name"
+else
+  fail "the report does not count edition names as expected"
+fi
+if grep -q 'Invented Edition\|Invented Primary Edition\|Invented Other Edition' "$WORK_DIR/out.txt"; then
+  fail "the report prints an edition name"
+else
+  pass "the report prints no edition name"
+fi
+
 echo "=== refused document forms ==="
 BODY_DRIVER='
 import importlib.util, sys

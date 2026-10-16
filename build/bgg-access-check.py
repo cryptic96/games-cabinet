@@ -1083,6 +1083,23 @@ def summarise_image_addresses(addresses):
     ]
 
 
+def name_text(element):
+    """The text of a name element, read from its value attribute first and its text second."""
+    return (element.get("value") or element_text(element)).strip()
+
+
+def edition_name(version):
+    """The primary name of a version, else its first name; empty when it carries no name text."""
+    names = version.findall("name")
+    for element in names:
+        if element.get("type") == "primary" and name_text(element):
+            return name_text(element)
+    for element in names:
+        if name_text(element):
+            return name_text(element)
+    return ""
+
+
 def summarise_art_collection(label, root, collector, facts):
     """Report lines on where the owned version's image sits in a collection answer; remember addresses and ids."""
     items = root.findall("item")
@@ -1091,6 +1108,7 @@ def summarise_art_collection(label, root, collector, facts):
     item_images = []
     equal = 0
     version_thumbnails = 0
+    edition_named = 0
     base_ids = []
     for item in items:
         objectid = item.get("objectid") or ""
@@ -1104,7 +1122,9 @@ def summarise_art_collection(label, root, collector, facts):
             with_version += 1
             collector.note_number(version.get("id"))
             for name in version.findall("name"):
-                collector.note(name.get("value") or element_text(name))
+                collector.note(name_text(name))
+            if edition_name(version):
+                edition_named += 1
             version_image = element_text(version.find("image"))
             if element_text(version.find("thumbnail")):
                 version_thumbnails += 1
@@ -1133,6 +1153,7 @@ def summarise_art_collection(label, root, collector, facts):
         "  items with an item-level image: %d" % len(item_images),
         "  items where the version image equals the item-level image: %d" % equal,
         "  items whose version has a thumbnail: %d" % version_thumbnails,
+        "  edition name present for %d of %d copies" % (edition_named, len(items)),
     ]
     lines.extend(summarise_image_addresses(version_images + item_images))
     return lines
@@ -1672,8 +1693,11 @@ ART_ITEM_FOUR = "https://example.org/fixture/pic100004.png"
 ART_THING_IMAGE = CDN_ORIGIN + "/fixture/__original/img/ddd/pic100001.png"
 
 
-def synthetic_art_item(objectid, collid, subtype, title, version_image=None, version_thumbnail=None, item_image=None):
-    """Build one invented collection entry that carries the owned version's image, for the art self-test."""
+def synthetic_art_item(objectid, collid, subtype, title, version_image=None, version_thumbnail=None, item_image=None, version_names=('alternate:Invented Edition',)):
+    """Build one invented collection entry that carries the owned version's image, for the art self-test.
+
+    Each version name is written as 'type:text'; an empty list leaves the version without a name.
+    """
     parts = [
         '<item objecttype="thing" objectid="%s" subtype="%s" collid="%s">' % (objectid, subtype, collid),
         '<name sortindex="1">%s</name>' % title,
@@ -1685,7 +1709,11 @@ def synthetic_art_item(objectid, collid, subtype, title, version_image=None, ver
         parts.append('<version><item type="boardgameversion" id="900%s">' % objectid)
         if version_thumbnail is not None:
             parts.append("<thumbnail>%s</thumbnail>" % version_thumbnail)
-        parts.append('<image>%s</image><name value="Invented Edition"/></item></version>' % version_image)
+        parts.append("<image>%s</image>" % version_image)
+        for entry in version_names:
+            name_type, name_text = entry.split(":", 1)
+            parts.append('<name type="%s" value="%s"/>' % (name_type, name_text))
+        parts.append("</item></version>")
     parts.append("</item>")
     return "".join(parts)
 
@@ -1694,8 +1722,8 @@ def synthetic_art_base_body():
     """An invented base-game collection: four entries, three with a version image, one equal to its item image."""
     entries = [
         synthetic_art_item("100001", "5000001", "boardgame", "Example Game One", ART_VERSION_ONE, ART_VERSION_ONE, ART_VERSION_ONE),
-        synthetic_art_item("100002", "5000002", "boardgame", "Example Game Two", ART_VERSION_TWO, ART_VERSION_TWO, ART_ITEM_TWO),
-        synthetic_art_item("100003", "5000003", "boardgame", "Example Game Three", ART_VERSION_THREE, None, ART_ITEM_THREE),
+        synthetic_art_item("100002", "5000002", "boardgame", "Example Game Two", ART_VERSION_TWO, ART_VERSION_TWO, ART_ITEM_TWO, ("primary:Invented Primary Edition", "alternate:Invented Other Edition")),
+        synthetic_art_item("100003", "5000003", "boardgame", "Example Game Three", ART_VERSION_THREE, None, ART_ITEM_THREE, []),
         synthetic_art_item("100004", "5000004", "boardgame", "Example Game Four", None, None, ART_ITEM_FOUR),
     ]
     return synthetic_items_body(4, entries)
@@ -1839,6 +1867,8 @@ def art_self_test(check):
         "path": "/fixture/__original/img/aaa/pic100001.png",
         "title": "Example Game One",
         "version name": "Invented Edition",
+        "primary version name": "Invented Primary Edition",
+        "other version name": "Invented Other Edition",
         "id": "100001",
         "collection id": "5000002",
     }
@@ -1866,6 +1896,7 @@ def art_self_test(check):
             "  items with an item-level image: 4",
             "  items where the version image equals the item-level image: 1",
             "  items whose version has a thumbnail: 2",
+            "  edition name present for 2 of 4 copies",
             "  image address host classes: cdn 5, geekdo-other 1, other 1",
             "  image address path forms: legacy-pic 1, other 2, signed-original 3, sized-variant 1",
             "  image addresses written without a scheme: 1",
@@ -1876,6 +1907,7 @@ def art_self_test(check):
             "  items with a version element: 0",
             "  items whose version has an image: 0",
             "  items with an item-level image: 1",
+            "  edition name present for 0 of 2 copies",
             "  image address host classes: other 1",
         ),
         "L": (
@@ -1912,7 +1944,7 @@ def art_self_test(check):
     check("the art report holds no url marker", "http" not in report.lower())
     check("the art report holds no markup", "<" not in report)
     check("the collector remembered the invented addresses", {ART_VERSION_ONE, ART_VERSION_TWO, "/fixture/__original/img/aaa/pic100001.png"} <= collector.sensitive)
-    check("the collector remembered the invented titles", {"Example Game One", "Invented Edition", "Example Expansion One"} <= collector.sensitive)
+    check("the collector remembered the invented titles", {"Example Game One", "Invented Edition", "Invented Primary Edition", "Invented Other Edition", "Example Expansion One"} <= collector.sensitive)
     check("the collector remembered the invented ids", {"100001", "5000002", "900100001", "100006"} <= collector.numbers)
     credentials = guarded_credentials(token, contact)
     names = [username]
