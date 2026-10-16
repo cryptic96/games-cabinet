@@ -12,6 +12,8 @@ import { indexPlacements, recordFromPlacement } from './card-flow.js';
 import { initRoving } from './keys.js';
 import { initGamesList } from './games-list.js';
 import { initFilters, NO_FILTERS } from './filters.js';
+import { isActive } from './filter-rules.js';
+import { readFilters } from './filter-state.js';
 import { initLook } from './look.js';
 import { applyLookStatus } from './look-switch.js';
 
@@ -59,9 +61,23 @@ function filterRecords() {
   return records;
 }
 
+/**
+ * Gives the tab's session storage, where the filters are kept, or null when the browser does not let the page have it.
+ * @returns {Storage | null}
+ */
+function tabStorage() {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+const tabStore = tabStorage();
+
 const filters = filterBar === null || mount === null
   ? NO_FILTERS
-  : initFilters({ bar: filterBar, mount, copy: COPY, language: pageLanguage(), getRecords: filterRecords });
+  : initFilters({ bar: filterBar, mount, copy: COPY, language: pageLanguage(), getRecords: filterRecords, initial: readFilters(tabStore), storage: tabStore });
 
 /** The waits before the second and third request for the card data after a failed one, in milliseconds. */
 const CARD_RETRY_DELAYS_MS = [1500, 4000];
@@ -133,21 +149,33 @@ function pause(milliseconds) {
 }
 
 /**
+ * Starts a request for the card data at normal priority, for a draw that waits for it. A network failure gives null instead of an
+ * error, so a request nobody has asked about yet never ends as an unhandled rejection.
+ * @returns {Promise<Response | null>}
+ */
+function startCardsRequest() {
+  return fetch(cardsUrl()).catch(() => null);
+}
+
+/**
  * Asks for the card data once and keeps it when it belongs to the layout on screen.
  * @param {number} epoch The load counter when the layout was drawn.
  * @param {string | null} etag The entity tag of the layout on screen, when the response carried one.
+ * @param {Promise<Response | null> | null} [started] A request that is already under way, used instead of a new one.
+ * @param {boolean} [beforeDraw] Whether a draw follows, which applies the filters itself; the boxes on screen are then left alone
+ * until that draw swaps them.
  * @returns {Promise<'loaded' | 'superseded' | 'stale' | 'failed'>} Loaded when the data is kept, superseded when a newer load took
  * over, stale when the data belongs to a different layout, failed when the request or its answer was not usable.
  */
-async function requestCards(epoch, etag) {
+async function requestCards(epoch, etag, started = null, beforeDraw = false) {
   try {
-    const response = await fetch(cardsUrl(), { priority: 'low' });
+    const response = started === null ? await fetch(cardsUrl(), { priority: 'low' }) : await started;
 
     if (epoch !== latestLoad) {
       return 'superseded';
     }
 
-    if (!response.ok) {
+    if (response === null || !response.ok) {
       return 'failed';
     }
 
@@ -162,8 +190,9 @@ async function requestCards(epoch, etag) {
     }
 
     cardRecords = new Map(body.cards.map((record) => [String(record.entryId), record]));
+    filters.enableCardFilters();
     gamesList?.showCards(body.cards);
-    filters.rebuild(filterRecords(), body.locations ?? [], { layoutEtag: etag });
+    filters.rebuild(filterRecords(), body.locations ?? [], { layoutEtag: etag, quiet: beforeDraw });
     announce('cabinet:cards', { records: body.cards });
 
     return 'loaded';
@@ -176,23 +205,26 @@ async function requestCards(epoch, etag) {
  * Fetches the card data of the layout just drawn and keeps it in memory so a tap finds it ready. It tries again when the
  * data belongs to a different layout than the one on screen, and again after a short wait when the request failed. It never
  * shows anything: a card without its data still opens with what the drawn box knows, and says that the details could not be
- * loaded once every attempt has failed. A newer load or redraw supersedes it.
+ * loaded once every attempt has failed, which is also when the filters that need the details step aside. A newer load or redraw
+ * supersedes it.
  * @param {number} epoch The load counter when the layout was drawn.
  * @param {string | null} etag The entity tag of the layout on screen, when the response carried one.
- * @returns {Promise<void>}
+ * @param {Promise<Response | null> | null} [started] A request for the card data that is already under way; the first attempt uses it.
+ * @returns {Promise<'loaded' | 'superseded' | 'failed'>} How it ended.
  */
-async function fetchCards(epoch, etag) {
+async function fetchCards(epoch, etag, started = null) {
+  const beforeDraw = started !== null;
   let failures = 0;
 
   for (let attempt = 0; attempt < CARD_ATTEMPTS; attempt += 1) {
-    const outcome = await requestCards(epoch, etag);
+    const outcome = await requestCards(epoch, etag, attempt === 0 ? started : null, beforeDraw);
 
     if (outcome === 'superseded') {
-      return;
+      return 'superseded';
     }
 
     if (outcome === 'loaded') {
-      return;
+      return 'loaded';
     }
 
     if (outcome === 'failed' && attempt < CARD_ATTEMPTS - 1) {
@@ -200,12 +232,15 @@ async function fetchCards(epoch, etag) {
       failures += 1;
 
       if (epoch !== latestLoad) {
-        return;
+        return 'superseded';
       }
     }
   }
 
   cardsFailed = true;
+  filters.disableCardFilters();
+
+  return 'failed';
 }
 
 /**
@@ -219,24 +254,48 @@ function prepareFilters(layout, etag) {
 }
 
 /**
- * Shows the filter bar when the cabinet drew at least one box and hides it otherwise, in the same task as the draw, so the cabinet
- * never shifts under the reader.
+ * Tells whether a draw has to wait for the card data: any filter set, the search included, needs the details to be judged, so the
+ * first frame is already in shadow instead of showing every box in the light first.
+ * @returns {boolean}
  */
-function showFilterBarForDrawnCabinet() {
-  filterBar?.toggleAttribute('hidden', drawnPlacements.size === 0);
+function drawWaitsForCards() {
+  return isActive(filters.state);
 }
 
 /**
- * Remembers what the layout just drawn holds and starts fetching the card data that goes with it.
+ * Draws the layout in place of what is on screen and shows the bar in the same task, with no await between, so nothing shifts under
+ * the reader and no frame shows a box in the light that is about to go into shadow. The bar is shown when at least one box was drawn.
+ * @param {object} layout The layout to draw.
+ * @param {string | null} etag The entity tag of the layout response.
+ * @param {'loaded' | 'failed' | null} settled How the wait for the card data ended, or null when the draw did not wait for it.
+ */
+function drawCabinet(layout, etag, settled) {
+  prepareFilters(layout, etag);
+  renderCabinet(mount, layout, COPY, filters.dimOf);
+  filters.showBar(drawnPlacements.size > 0);
+  roving.refresh();
+  announce('cabinet:drawn');
+  afterDraw(layout, etag, settled);
+}
+
+/**
+ * Remembers what the layout just drawn holds and, unless the draw already waited for the card data, starts fetching it.
  * @param {object} layout The layout drawn.
  * @param {string | null} etag The entity tag of the layout response.
+ * @param {'loaded' | 'failed' | null} settled How the wait for the card data ended, or null when the draw did not wait for it.
  */
-function afterDraw(layout, etag) {
+function afterDraw(layout, etag, settled) {
   drawnPlacements = indexPlacements(layout);
   drawnPalette = layout.palette ?? [];
-  cardsFailed = false;
-  gamesList?.showTitles(drawnPlacements);
-  fetchCards(latestLoad, etag);
+  cardsFailed = settled === 'failed';
+
+  if (settled !== 'loaded') {
+    gamesList?.showTitles(drawnPlacements);
+  }
+
+  if (settled === null) {
+    fetchCards(latestLoad, etag);
+  }
 }
 
 /**
@@ -266,7 +325,7 @@ function showError() {
   retry.textContent = COPY.retry;
   retry.addEventListener('click', load);
 
-  filterBar?.setAttribute('hidden', '');
+  filters.showBar(false);
 
   const message = document.createElement('div');
   message.className = 'cabinet-message';
@@ -287,6 +346,7 @@ async function load() {
   showLoading();
 
   try {
+    const startedCards = drawWaitsForCards() ? startCardsRequest() : null;
     const response = await fetch(layoutUrl());
 
     if (thisLoad !== latestLoad) {
@@ -305,13 +365,13 @@ async function load() {
     }
 
     const etag = response.headers.get('ETag');
+    const settled = startedCards === null ? null : await fetchCards(thisLoad, etag, startedCards);
 
-    prepareFilters(layout, etag);
-    renderCabinet(mount, layout, COPY, filters.dimOf);
-    showFilterBarForDrawnCabinet();
-    roving.refresh();
-    announce('cabinet:drawn');
-    afterDraw(layout, etag);
+    if (settled === 'superseded') {
+      return;
+    }
+
+    drawCabinet(layout, etag, settled);
   } catch {
     if (thisLoad === latestLoad) {
       showError();
@@ -357,6 +417,7 @@ async function redraw() {
   const thisRedraw = latestLoad;
 
   try {
+    const startedCards = drawWaitsForCards() ? startCardsRequest() : null;
     const fetched = await fetchLayout();
 
     if (thisRedraw !== latestLoad) {
@@ -368,16 +429,18 @@ async function redraw() {
     }
 
     const { layout, etag } = fetched;
+    const settled = startedCards === null ? null : await fetchCards(thisRedraw, etag, startedCards);
+
+    if (settled === 'superseded') {
+      return false;
+    }
 
     const active = document.activeElement;
     const focused = mount.contains(active) ? { entryId: active.dataset.entryId, kind: active.dataset.kind } : undefined;
+    const scrolledTo = window.scrollY;
 
-    prepareFilters(layout, etag);
-    renderCabinet(mount, layout, COPY, filters.dimOf);
-    showFilterBarForDrawnCabinet();
-    roving.refresh();
-    announce('cabinet:drawn');
-    afterDraw(layout, etag);
+    drawCabinet(layout, etag, settled);
+    keepScroll(scrolledTo);
 
     const filling = document.querySelector('.cabinet-filling');
 
@@ -398,6 +461,18 @@ async function redraw() {
     return true;
   } catch {
     return thisRedraw === latestLoad ? abandonRedraw() : false;
+  }
+}
+
+/**
+ * Puts the page back where it was scrolled to after the cabinet was swapped, when the new page is tall enough to hold that place.
+ * @param {number} top The scroll position before the swap, in pixels.
+ */
+function keepScroll(top) {
+  const reachable = document.documentElement.scrollHeight - window.innerHeight >= top;
+
+  if (reachable && Math.abs(window.scrollY - top) > 1) {
+    window.scrollTo({ top, left: 0, behavior: 'instant' });
   }
 }
 

@@ -344,6 +344,7 @@ public sealed class FilterKeyboardTests : CabinetPageTest
 
     private async Task ReloadAsync()
     {
+        await Page.EvaluateAsync("() => document.querySelector('.filter-clear').click()");
         await GotoCabinetAsync(SamplePath);
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await Expect(Page.Locator(TabStops)).ToHaveCountAsync(1);

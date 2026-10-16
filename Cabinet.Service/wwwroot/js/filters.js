@@ -18,6 +18,7 @@ import {
   locationChoices,
   withAlternates,
 } from './filter-rules.js';
+import { createFilterWriter } from './filter-state.js';
 
 /** How long the count must stay unchanged before it is announced to a screen reader, in milliseconds. */
 export const FILTER_ANNOUNCE_MS = 600;
@@ -60,6 +61,9 @@ export const NO_FILTERS = Object.freeze({
   dimOf: () => false,
   rebuild: () => {},
   apply: () => {},
+  showBar: () => {},
+  disableCardFilters: () => {},
+  enableCardFilters: () => {},
   state: EMPTY_FILTERS,
 });
 
@@ -107,12 +111,18 @@ function watchPinning(bar) {
  * @param {string} parts.language The page language, for the order of the games list the count follows.
  * @param {() => object[]} parts.getRecords Gives the records of the collection: the card data when it is held, otherwise records made
  * from the drawn boxes.
- * @returns {{ dimOf: (placement: object) => boolean, rebuild: (records: object[], locations?: object[], held?: { layoutEtag?: string | null }) => void, apply: () => void, state: object }}
+ * @param {{ q: string, players: number | null, time: number | null, location: string | null }} [parts.initial] The filters the tab
+ * kept; the controls start from them while the bar is still hidden.
+ * @param {{ setItem: Function, removeItem: Function } | null} [parts.storage] Where the filters are kept for the tab; null keeps them
+ * in memory only.
+ * @returns {{ dimOf: (placement: object) => boolean, rebuild: (records: object[], locations?: object[], held?: { layoutEtag?: string | null, quiet?: boolean }) => void, apply: () => void, showBar: (visible: boolean) => void, disableCardFilters: () => void, enableCardFilters: () => void, state: object }}
  * The controls: whether a box is drawn in shadow, a new model of the collection (with the owner's locations when the card data brings
- * them, and the entity tag of the layout the records belong to, so the other titles are read again when the collection changed), a
- * fresh pass over the drawn boxes and the current state.
+ * them, and the entity tag of the layout the records belong to, so the other titles are read again when the collection changed; a
+ * quiet one only replaces the model and leaves the boxes on screen alone, for a draw that follows at once), a
+ * fresh pass over the drawn boxes, showing or hiding the bar, switching off and on the controls that need the card data, and the
+ * current state.
  */
-export function initFilters({ bar, mount, copy, language, getRecords }) {
+export function initFilters({ bar, mount, copy, language, getRecords, initial = EMPTY_FILTERS, storage = null }) {
   const field = bar.querySelector('#filter-q');
   const count = bar.querySelector('.filter-count');
   const clear = bar.querySelector('.filter-clear');
@@ -121,7 +131,15 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
   const placeLabel = bar.querySelector('label[for="filter-loc"]');
   const groups = CHIP_GROUPS.map((group) => ({ ...group, element: bar.querySelector(`.filter-group[data-filter="${group.name}"]`) })).filter((group) => group.element !== null);
 
-  let state = { ...EMPTY_FILTERS };
+  const note = document.querySelector('.filter-note');
+  const writer = createFilterWriter({
+    storage,
+    setTimer: (callback, delay) => window.setTimeout(callback, delay),
+    clearTimer: (timer) => window.clearTimeout(timer),
+  });
+
+  let state = { ...initial };
+  let cardFiltersOff = false;
   let locations = [];
   let names = null;
   let namesState = 'unasked';
@@ -230,6 +248,7 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
 
     if (location !== state.location) {
       state = { ...state, location };
+      writer.write(state);
     }
 
     result = evaluate(state, model);
@@ -342,6 +361,7 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
     fetchNames();
     state = { ...state, q: field.value };
     apply();
+    writer.write(state);
     announceSoon();
   }
 
@@ -360,6 +380,7 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
 
     state = { ...state, [group.name]: value };
     apply();
+    writer.write(state);
     announceSoon();
   }
 
@@ -375,6 +396,7 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
 
     state = { ...state, location: value };
     apply();
+    writer.write(state);
     announceSoon();
   }
 
@@ -406,6 +428,7 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
 
     state = { ...EMPTY_FILTERS };
     apply();
+    writer.write(state);
     live.textContent = announcement();
     field.focus();
   }
@@ -419,10 +442,91 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
     return target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
   }
 
+  /**
+   * Shows the state the tab kept in the controls: the text in the field and the chip each group stands on. The location select is
+   * filled from the card data, so it takes its value when that arrives.
+   */
+  function showRestoredState() {
+    field.value = state.q;
+
+    for (const group of groups) {
+      const chosen = state[group.name];
+      const chip = group.element.querySelector(`input[value="${chosen === null ? '' : chosen}"]`);
+
+      if (chip !== null) {
+        chip.checked = true;
+      }
+    }
+  }
+
+  /**
+   * Shows or hides the bar, and the note about the card details with it: the note only shows while the bar does.
+   * @param {boolean} visible Whether the bar is shown.
+   */
+  function showBar(visible) {
+    bar.toggleAttribute('hidden', !visible);
+
+    if (note !== null) {
+      note.hidden = !visible || !cardFiltersOff;
+    }
+  }
+
+  /**
+   * Switches off the players, time and location controls because the card data they need did not load: they are put to Any, disabled,
+   * and the note says why. Search keeps working on the titles alone.
+   */
+  function disableCardFilters() {
+    cardFiltersOff = true;
+    state = { ...state, players: null, time: null, location: null };
+    resetChips();
+
+    for (const input of bar.querySelectorAll('.filter-group input')) {
+      input.disabled = true;
+    }
+
+    if (place !== null) {
+      place.value = '';
+      place.disabled = true;
+    }
+
+    if (note !== null) {
+      note.textContent = copy.detailsFailed;
+      note.hidden = bar.hidden;
+    }
+
+    apply();
+    writer.write(state);
+  }
+
+  /**
+   * Switches the controls that need the card data back on once the data is held.
+   */
+  function enableCardFilters() {
+    if (!cardFiltersOff) {
+      return;
+    }
+
+    cardFiltersOff = false;
+
+    for (const input of bar.querySelectorAll('.filter-group input')) {
+      input.disabled = false;
+    }
+
+    if (place !== null) {
+      place.disabled = false;
+    }
+
+    if (note !== null) {
+      note.hidden = true;
+    }
+  }
+
   field.addEventListener('input', search);
   field.addEventListener('focus', fetchNames);
   place?.addEventListener('change', choosePlace);
+  showRestoredState();
   fillPlaces();
+  window.addEventListener('pagehide', writer.flush);
 
   for (const group of groups) {
     group.element.addEventListener('change', () => choose(group));
@@ -483,8 +587,11 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
       locations = Array.isArray(owned) ? owned : locations;
       model = modelOf(records);
       entries = listEntries(model, { language });
-      fillPlaces();
-      apply();
+
+      if (held?.quiet !== true) {
+        fillPlaces();
+        apply();
+      }
 
       if (collectionChanged && field.value !== '') {
         fetchNames();
@@ -492,6 +599,9 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
     },
 
     apply,
+    showBar,
+    disableCardFilters,
+    enableCardFilters,
 
     get state() {
       return state;

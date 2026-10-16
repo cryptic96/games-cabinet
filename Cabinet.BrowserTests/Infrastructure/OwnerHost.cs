@@ -6,6 +6,7 @@ using Cabinet.IntegrationTests.Infrastructure;
 using Cabinet.Service.Owner;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Cabinet.BrowserTests.Infrastructure;
 
@@ -21,10 +22,13 @@ public sealed record CardReading(int GameId, string Title);
 /// </summary>
 public sealed class OwnerHost
 {
-    private OwnerHost(OwnerDataService owner, IReadOnlyList<CardReading> cards)
+    private readonly FakeTimeProvider? _clock;
+
+    private OwnerHost(OwnerDataService owner, IReadOnlyList<CardReading> cards, FakeTimeProvider? clock)
     {
         Owner = owner;
         Cards = cards;
+        _clock = clock;
     }
 
     /// <summary>The owner's data as the host holds it.</summary>
@@ -50,7 +54,7 @@ public sealed class OwnerHost
         using var client = factory.CreatePublicClient();
         await SyncRounds.PressAndWait(client, clock, advance: false);
 
-        return await AttachAsync(factory);
+        return await AttachAsync(factory, clock);
     }
 
     /// <summary>
@@ -73,7 +77,8 @@ public sealed class OwnerHost
 
     /// <summary>Attaches to a running host: reads the games its public card data lists and takes hold of its owner data.</summary>
     /// <param name="factory">The running host.</param>
-    public static async Task<OwnerHost> AttachAsync(CabinetWebApplicationFactory factory)
+    /// <param name="clock">The host's clock when the test controls it; it lets <see cref="TellOpenPages"/> make the quiet period pass.</param>
+    public static async Task<OwnerHost> AttachAsync(CabinetWebApplicationFactory factory, FakeTimeProvider? clock = null)
     {
         ArgumentNullException.ThrowIfNull(factory);
 
@@ -84,7 +89,18 @@ public sealed class OwnerHost
             .Select(card => new CardReading(card.GetProperty("gameId").GetInt32(), card.GetProperty("title").GetString()!))
             .ToList();
 
-        return new OwnerHost(factory.ServingServices.GetRequiredService<OwnerDataService>(), cards);
+        return new OwnerHost(factory.ServingServices.GetRequiredService<OwnerDataService>(), cards, clock);
+    }
+
+    /// <summary>
+    /// Lets the quiet period after the owner's last save pass on the host's clock, so open pages are told the collection changed and
+    /// redraw. Only a host built by <see cref="SyncAsync"/> has a clock the test controls.
+    /// </summary>
+    public void TellOpenPages()
+    {
+        var clock = _clock ?? throw new InvalidOperationException("This host's clock is not under the test's control.");
+
+        clock.Advance(OwnerChangeNotifier.QuietPeriod);
     }
 
     /// <summary>Finds a game by its exact title.</summary>
