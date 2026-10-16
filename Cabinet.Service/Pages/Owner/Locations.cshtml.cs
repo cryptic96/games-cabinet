@@ -535,7 +535,7 @@ public class LocationsModel : OwnerPage
 
             for (var index = 0; index < copies.Count; index++)
             {
-                var label = copies.Count > 1 ? OwnerStrings.CopyTag(index + 1, copies.Count) : null;
+                var label = copies.Count > 1 ? copies[index].VersionName ?? OwnerStrings.CopyTag(index + 1, copies.Count) : null;
 
                 rows.Add(RowOf(copies[index], overlay, titles, covers, firstEntries, label, index == 0));
             }

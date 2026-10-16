@@ -102,6 +102,24 @@ public sealed class OwnerPerCopyLocationTests
     }
 
     [Fact]
+    public async Task Edition_names_label_the_copy_rows()
+    {
+        using var storage = Seed(editions: ["Quiet Quarry Deluxe edition", "Quiet Quarry Travel edition", null]);
+        await using var factory = FactoryOn(storage);
+        using var session = new OwnerSession(factory);
+
+        var page = await session.GetAsync(LocationsPath);
+
+        Regex.Matches(page.Body, "<span class=\"pic-tag pic-tag-plain\" dir=\"auto\">([^<]+)</span>")
+            .Select(match => match.Groups[1].Value)
+            .Should().Equal("Quiet Quarry Deluxe edition", "Quiet Quarry Travel edition", "Copy 3 of 3");
+        page.Body.Should().Contain("aria-label=\"Location for Quiet Quarry, Quiet Quarry Deluxe edition\"");
+        page.Body.Should().Contain("aria-label=\"Location for Quiet Quarry, Quiet Quarry Travel edition\"");
+        page.Body.Should().Contain("aria-label=\"Location for Quiet Quarry, copy 3 of 3\"");
+        page.Body.Should().Contain("aria-label=\"Location for Hollow Harbour\"");
+    }
+
+    [Fact]
     public async Task The_cabinet_page_counts_copies_that_are_not_placed()
     {
         using var storage = Seed();
@@ -125,11 +143,11 @@ public sealed class OwnerPerCopyLocationTests
         after.Body.Should().Contain("2 games are not placed yet.");
     }
 
-    private static TemporaryDirectory Seed()
+    private static TemporaryDirectory Seed(string?[]? editions = null)
     {
         var storage = new TemporaryDirectory();
         var items = QuarryCopies
-            .Select(copy => new SnapshotItem(copy, QuarryGameId, "Quiet Quarry", ItemKind.Base, 2015, null, null))
+            .Select((copy, index) => new SnapshotItem(copy, QuarryGameId, "Quiet Quarry", ItemKind.Base, 2015, null, null, VersionName: editions?[index]))
             .Append(new SnapshotItem(HarbourCopy, HarbourGameId, "Hollow Harbour", ItemKind.Base, 2018, null, null));
 
         new SnapshotStore(storage.FullPath, NullLogger<SnapshotStore>.Instance).Save(new CollectionSnapshot(
