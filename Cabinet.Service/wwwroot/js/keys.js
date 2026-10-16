@@ -275,13 +275,17 @@ function rectsOf(boxes) {
 
 /**
  * Makes the cabinet one tab stop with arrow-key movement. One box holds tabindex 0 and every other -1; the one that holds it is
- * the box that last had focus, or the first box when none has. A redraw replaces the boxes, so the page calls refresh afterwards.
+ * the box that last had focus, or the first box when none has. While a filter lights some boxes and shadows the rest, the stop follows
+ * the light: until the visitor places it, it sits on the first lit box in reading order, and a stop the visitor placed that falls into
+ * shadow moves to the nearest lit box without moving focus. A redraw replaces the boxes, so the page calls refresh afterwards.
  * @param {HTMLElement} mount The element that holds the boxes.
  * @returns {{ refresh: () => void, keyOf: (element: HTMLElement) => string, focusKey: (key: string) => boolean }} The controls.
  */
 export function initRoving(mount) {
   let currentKey = null;
   let currentBox = null;
+  let placedByVisitor = false;
+  let wasFiltering = false;
 
   /**
    * Gives the one tab stop to a box and takes it from the previous holder.
@@ -320,6 +324,32 @@ export function initRoving(mount) {
 
     currentBox = holder;
     currentKey = keyOf(holder);
+    followTheLight();
+  }
+
+  /**
+   * Moves the tab stop to a box in the light while a filter lights some boxes and shadows the rest. With zero matches or with no filter
+   * the stop stays where it is, so a keyboard user is never held away from any box.
+   */
+  function followTheLight() {
+    const boxes = [...mount.querySelectorAll('.placement')];
+    const lit = boxes.filter((box) => !box.hasAttribute('data-dim'));
+
+    if (lit.length === 0 || lit.length === boxes.length) {
+      return;
+    }
+
+    if (!placedByVisitor) {
+      hold(lit[readingOrder(rectsOf(lit))[0]]);
+
+      return;
+    }
+
+    const holder = boxes.find((box) => keyOf(box) === currentKey);
+
+    if (holder !== undefined && holder.hasAttribute('data-dim')) {
+      hold(lit[nearestBox(rectsOf(lit), rectsOf([holder])[0])]);
+    }
   }
 
   /**
@@ -343,8 +373,26 @@ export function initRoving(mount) {
     const box = event.target.closest?.('.placement') ?? null;
 
     if (box !== null && mount.contains(box)) {
+      placedByVisitor = true;
       hold(box);
     }
+  });
+
+  document.addEventListener('cabinet:filtered', (event) => {
+    const filtering = event.detail?.active === true;
+    const focused = document.activeElement?.closest?.('.placement') ?? null;
+
+    if (filtering && !wasFiltering) {
+      placedByVisitor = false;
+    }
+
+    wasFiltering = filtering;
+
+    if (focused !== null && mount.contains(focused)) {
+      placedByVisitor = true;
+    }
+
+    followTheLight();
   });
 
   mount.addEventListener('keydown', (event) => {
