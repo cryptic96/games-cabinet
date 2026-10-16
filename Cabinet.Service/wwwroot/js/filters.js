@@ -4,7 +4,19 @@
  * nothing moves and nothing is removed. The rules live in the pure filter-rules module; this module only reads the controls, toggles
  * an attribute on the boxes and writes text.
  */
-import { EMPTY_FILTERS, PLAYER_CHOICES, TIME_CHOICES, buildModel, countLit, evaluate, fold, listEntries } from './filter-rules.js';
+import {
+  EMPTY_FILTERS,
+  PLAYER_CHOICES,
+  TIME_CHOICES,
+  UNKNOWN_LOCATION,
+  buildModel,
+  countLit,
+  effectiveLocation,
+  evaluate,
+  fold,
+  listEntries,
+  locationChoices,
+} from './filter-rules.js';
 
 /** How long the count must stay unchanged before it is announced to a screen reader, in milliseconds. */
 export const FILTER_ANNOUNCE_MS = 600;
@@ -91,18 +103,22 @@ function watchPinning(bar) {
  * @param {string} parts.language The page language, for the order of the games list the count follows.
  * @param {() => object[]} parts.getRecords Gives the records of the collection: the card data when it is held, otherwise records made
  * from the drawn boxes.
- * @returns {{ dimOf: (placement: object) => boolean, rebuild: (records: object[]) => void, apply: () => void, state: object }} The
- * controls: whether a box is drawn in shadow, a new model of the collection, a fresh pass over the drawn boxes and the current state.
+ * @returns {{ dimOf: (placement: object) => boolean, rebuild: (records: object[], locations?: object[]) => void, apply: () => void, state: object }}
+ * The controls: whether a box is drawn in shadow, a new model of the collection (with the owner's locations when the card data brings
+ * them), a fresh pass over the drawn boxes and the current state.
  */
 export function initFilters({ bar, mount, copy, language, getRecords }) {
   const field = bar.querySelector('#filter-q');
   const count = bar.querySelector('.filter-count');
   const clear = bar.querySelector('.filter-clear');
   const live = document.getElementById('filter-live');
+  const place = bar.querySelector('#filter-loc');
+  const placeLabel = bar.querySelector('label[for="filter-loc"]');
   const groups = CHIP_GROUPS.map((group) => ({ ...group, element: bar.querySelector(`.filter-group[data-filter="${group.name}"]`) })).filter((group) => group.element !== null);
 
   let state = { ...EMPTY_FILTERS };
-  let model = buildModel(getRecords());
+  let locations = [];
+  let model = buildModel(getRecords(), locations);
   let entries = listEntries(model, { language });
   let result = evaluate(state, model);
   let tally = countLit(entries, result.lit);
@@ -126,11 +142,50 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
       return !result.lit.has(entry);
     }
 
-    if (state.players !== null || state.time !== null) {
+    if (state.players !== null || state.time !== null || state.location !== null) {
       return true;
     }
 
     return !fold(title).includes(fold(state.q));
+  }
+
+  /**
+   * Fills the location select from the model: the first option is Any, then the owner's locations that hold a game in the owner's
+   * order, then the unknown choice when some game has no location. Names go in as text. The select is shown only while the owner has
+   * locations. The list is only rewritten when it differs, so an open list is not closed by a refresh that changes nothing.
+   */
+  function fillPlaces() {
+    if (place === null) {
+      return;
+    }
+
+    const { places, unknown } = locationChoices(model);
+    const wanted = [['', copy.anyLocation], ...places.map((entry) => [entry.id, entry.name]), ...(unknown ? [[UNKNOWN_LOCATION, copy.unknownLocation]] : [])];
+    const present = [...place.options].map((option) => [option.value, option.textContent]);
+
+    if (JSON.stringify(wanted) !== JSON.stringify(present)) {
+      place.replaceChildren(
+        ...wanted.map(([value, text]) => {
+          const option = document.createElement('option');
+
+          option.value = value;
+          option.textContent = text;
+          option.dir = 'auto';
+
+          return option;
+        }),
+      );
+    }
+
+    const shown = model.locations.length > 0;
+
+    place.hidden = !shown;
+
+    if (placeLabel !== null) {
+      placeLabel.hidden = !shown;
+    }
+
+    place.value = effectiveLocation(state.location, model) ?? '';
   }
 
   /**
@@ -162,6 +217,12 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
    * changes more than BULK_VEIL_COUNT veils marks the mount first, so those veils change at once instead of fading.
    */
   function apply() {
+    const location = effectiveLocation(state.location, model);
+
+    if (location !== state.location) {
+      state = { ...state, location };
+    }
+
     result = evaluate(state, model);
 
     const changes = [];
@@ -239,6 +300,21 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
   }
 
   /**
+   * Takes the choice in the location select, shows its result at once and queues the announcement.
+   */
+  function choosePlace() {
+    const value = place.value === '' ? null : place.value;
+
+    if (state.location === value) {
+      return;
+    }
+
+    state = { ...state, location: value };
+    apply();
+    announceSoon();
+  }
+
+  /**
    * Returns every chip group to Any without telling anyone; the caller applies the state.
    */
   function resetChips() {
@@ -259,6 +335,11 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
     announceTimer = null;
     field.value = '';
     resetChips();
+
+    if (place !== null) {
+      place.value = '';
+    }
+
     state = { ...EMPTY_FILTERS };
     apply();
     live.textContent = announcement();
@@ -275,6 +356,8 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
   }
 
   field.addEventListener('input', search);
+  place?.addEventListener('change', choosePlace);
+  fillPlaces();
 
   for (const group of groups) {
     group.element.addEventListener('change', () => choose(group));
@@ -321,9 +404,11 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
   return {
     dimOf: (placement) => isDim(String(placement.entryId), placement.title),
 
-    rebuild(records) {
-      model = buildModel(records);
+    rebuild(records, owned) {
+      locations = Array.isArray(owned) ? owned : locations;
+      model = buildModel(records, locations);
       entries = listEntries(model, { language });
+      fillPlaces();
       apply();
     },
 

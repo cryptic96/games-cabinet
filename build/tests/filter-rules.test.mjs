@@ -18,7 +18,7 @@ for (const name of readdirSync(new URL('../../Cabinet.Service/wwwroot/js/', impo
   copyFileSync(new URL('../../Cabinet.Service/wwwroot/js/' + name, import.meta.url), join(FOLDER, name));
 }
 
-const { EMPTY_FILTERS, fold, buildModel, isActive, evaluate, listEntries, countLit, familyRange, PLAYER_CHOICES, TIME_CHOICES } = await import(pathToFileURL(join(FOLDER, 'filter-rules.js')).href);
+const { EMPTY_FILTERS, fold, buildModel, isActive, evaluate, listEntries, countLit, familyRange, PLAYER_CHOICES, TIME_CHOICES, locationChoices, effectiveLocation, UNKNOWN_LOCATION } = await import(pathToFileURL(join(FOLDER, 'filter-rules.js')).href);
 
 /**
  * Builds an invented card record; fields not given are unknown.
@@ -285,4 +285,74 @@ test('search, players and time combine with AND, and an entry is lit when one of
   assert.equal(isLit(records, { ...both, time: 45 }), false);
   assert.equal(isActive(withTime(45)), true);
   assert.equal(isActive(withPlayers(2)), true);
+});
+
+const PLACES = [
+  { id: 'aaaa0001', name: 'Cabinet A', games: 2 },
+  { id: 'bbbb0002', name: 'Shelf B', games: 1 },
+  { id: 'cccc0003', name: 'Lent out', games: 0 },
+];
+
+/**
+ * Builds a collection with a base on one place, its expansion on another, and games with no place.
+ * @returns {object[]}
+ */
+function placedCollection() {
+  const expansion = record(12, 'Harbour Lights', { isExpansion: true, locationId: 'bbbb0002' });
+  const base = record(11, 'Lantern & Harbour', { expansions: [link(expansion)], locationId: 'aaaa0001' });
+  expansion.bases = [link(base)];
+
+  return [base, expansion, record(13, 'Quiet Quarry', { locationId: 'aaaa0001' }), record(14, 'Salt Road')];
+}
+
+const placed = (location, more = {}) => ({ ...EMPTY_FILTERS, location, ...more });
+const litWhere = (state, records = placedCollection(), places = PLACES) => [...evaluate(state, buildModel(records, places)).lit].sort();
+
+test('a chosen location lights each box by its own place, so an expansion kept apart lights while its base dims', () => {
+  assert.deepEqual(litWhere(placed('bbbb0002')), ['12']);
+  assert.deepEqual(litWhere(placed('aaaa0001')), ['11', '13']);
+});
+
+test('unknown lights only the boxes with no location', () => {
+  assert.deepEqual(litWhere(placed(UNKNOWN_LOCATION)), ['14']);
+});
+
+test('a location combines with search by AND', () => {
+  assert.deepEqual(litWhere(placed('aaaa0001', { q: 'quarry' })), ['13']);
+  assert.deepEqual(litWhere(placed('bbbb0002', { q: 'quarry' })), []);
+});
+
+test('a location combines with players and time by AND', () => {
+  const records = placedCollection();
+
+  records[2] = { ...records[2], minPlayers: 2, maxPlayers: 4, playTime: 45 };
+  assert.deepEqual(litWhere(placed('aaaa0001', { players: 3 }), records), ['13']);
+  assert.deepEqual(litWhere(placed('aaaa0001', { players: 3, time: 30 }), records), []);
+});
+
+test('an id that is not offered falls back to Any and is not a filter', () => {
+  const model = buildModel(placedCollection(), PLACES);
+
+  assert.equal(effectiveLocation('cccc0003', model), null);
+  assert.equal(effectiveLocation('zzzz9999', model), null);
+  assert.equal(effectiveLocation(7, model), null);
+  assert.equal(evaluate(placed('zzzz9999'), model).active, false);
+  assert.deepEqual(litWhere(placed('zzzz9999')), ['11', '12', '13', '14']);
+});
+
+test('the choices are the owner places that hold a game in the owner order, and unknown only while some game has none', () => {
+  const choices = locationChoices(buildModel(placedCollection(), PLACES));
+
+  assert.deepEqual(choices.places.map((place) => place.name), ['Cabinet A', 'Shelf B']);
+  assert.equal(choices.unknown, true);
+  assert.equal(locationChoices(buildModel(placedCollection().slice(0, 3), PLACES)).unknown, false);
+});
+
+test('with no owner locations nothing is offered and unknown is not a choice', () => {
+  const model = buildModel(placedCollection());
+  const choices = locationChoices(model);
+
+  assert.deepEqual(choices.places, []);
+  assert.equal(choices.unknown, false);
+  assert.equal(effectiveLocation(UNKNOWN_LOCATION, model), null);
 });

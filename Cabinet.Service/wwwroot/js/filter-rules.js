@@ -5,6 +5,9 @@
  */
 import { orderEntries } from './games-list.js';
 
+/** The value the location select holds for boxes that have no location. */
+export const UNKNOWN_LOCATION = 'unknown';
+
 /** The state of no filter at all: nothing typed and no group chosen. */
 export const EMPTY_FILTERS = Object.freeze({ q: '', players: null, time: null, location: null });
 
@@ -85,10 +88,13 @@ function join(familiesOf, members, family, entry) {
  * of each of them. An expansion with no owned base game is a family of one. A record that carries no links but a family id joins the
  * family of every base record whose game id is that id.
  * @param {object[]} records The records of the collection.
- * @returns {{ records: object[], byEntry: Map<string, object>, familiesOf: Map<string, string[]>, members: Map<string, string[]>, haystacks: Map<string, string[]> }}
- * The records, each record by entry id, the families of every entry, the entries of every family and the folded titles of every family.
+ * @param {{ id: string, name: string, games: number }[]} [locations] The owner's locations in the owner's order, as the cards document
+ * lists them; empty or missing when the owner has none.
+ * @returns {{ records: object[], byEntry: Map<string, object>, familiesOf: Map<string, string[]>, members: Map<string, string[]>, haystacks: Map<string, string[]>, locations: object[] }}
+ * The records, each record by entry id, the families of every entry, the entries of every family, the folded titles of every family
+ * and the locations.
  */
-export function buildModel(records) {
+export function buildModel(records, locations = []) {
   const byEntry = new Map(records.map((record) => [String(record.entryId), record]));
   const familiesOf = new Map();
   const members = new Map();
@@ -141,7 +147,7 @@ export function buildModel(records) {
     [...members].map(([family, entries]) => [family, entries.map((entry) => fold(byEntry.get(entry)?.title))]),
   );
 
-  return { records, byEntry, familiesOf, members, haystacks };
+  return { records, byEntry, familiesOf, members, haystacks, locations: Array.isArray(locations) ? locations : [] };
 }
 
 /**
@@ -218,15 +224,83 @@ function timePasses(minutes, base) {
 }
 
 /**
+ * Gives the id of the location a record is stored in, or null when it has none.
+ * @param {object | undefined} record A card record.
+ * @returns {string | null}
+ */
+function locationOf(record) {
+  const id = record?.locationId;
+
+  return typeof id === 'string' && id !== '' ? id : null;
+}
+
+/**
+ * Lists what the location select offers: the owner's locations that hold at least one game, in the owner's order, and whether
+ * the unknown choice is offered, which is the case only while some game has no location and the owner has locations at all.
+ * @param {ReturnType<typeof buildModel>} model The model of the collection.
+ * @returns {{ places: { id: string, name: string }[], unknown: boolean }}
+ */
+export function locationChoices(model) {
+  const places = model.locations
+    .filter((place) => typeof place?.id === 'string' && place.id !== '' && Number(place.games) > 0)
+    .map((place) => ({ id: place.id, name: String(place.name ?? '') }));
+  const unknown = model.locations.length > 0 && model.records.some((record) => locationOf(record) === null);
+
+  return { places, unknown };
+}
+
+/**
+ * Narrows a chosen location to what is offered: an id that is not in the list, or the unknown choice while it is not offered, is
+ * Any. Ids are compared as text and never used for anything else.
+ * @param {unknown} chosen The location in the filter state.
+ * @param {ReturnType<typeof buildModel>} model The model of the collection.
+ * @returns {string | null} The location to judge by, or null for Any.
+ */
+export function effectiveLocation(chosen, model) {
+  if (typeof chosen !== 'string' || chosen === '') {
+    return null;
+  }
+
+  const { places, unknown } = locationChoices(model);
+
+  if (chosen === UNKNOWN_LOCATION) {
+    return unknown ? chosen : null;
+  }
+
+  return places.some((place) => place.id === chosen) ? chosen : null;
+}
+
+/**
+ * Tells whether a box is stored where the filter asks: any box when no location is chosen, otherwise a box whose own location is
+ * the chosen one, or a box with no location when unknown is chosen.
+ * @param {string | null} location The location to judge by, or null for Any.
+ * @param {object | undefined} record The card record of the box.
+ * @returns {boolean}
+ */
+function locationPasses(location, record) {
+  if (location === null) {
+    return true;
+  }
+
+  const own = locationOf(record);
+
+  return location === UNKNOWN_LOCATION ? own === null : own === location;
+}
+
+/**
  * Decides which entries stand in the light. Search, players and time are judged per family and combine with AND, so every box of a
  * family that passes all of them is lit together; an expansion owned for several base games is lit when any family it belongs to is
  * lit. The players test uses the span of the whole family; the time test uses the base game's own playing time, so an expansion never
- * shortens it. With no filter active every entry is lit.
- * @param {{ q: string, players: unknown, time: unknown, location: unknown }} state The filter state.
+ * shortens it. The location is the one rule judged per box: a box is lit only when it is itself stored in the chosen location, so an
+ * expansion kept apart from its base can be lit while the base is in shadow. A chosen location that is not offered counts as Any.
+ * With no filter active every entry is lit.
+ * @param {{ q: string, players: unknown, time: unknown, location: unknown }} chosen The filter state.
  * @param {ReturnType<typeof buildModel>} model The model of the collection.
  * @returns {{ active: boolean, lit: Set<string> }} Whether anything is filtered and the entry ids, as text, of every lit entry.
  */
-export function evaluate(state, model) {
+export function evaluate(chosen, model) {
+  const location = effectiveLocation(chosen.location, model);
+  const state = { ...chosen, location };
   const active = isActive(state);
   const lit = new Set();
 
@@ -250,7 +324,7 @@ export function evaluate(state, model) {
   for (const entry of model.byEntry.keys()) {
     const families = model.familiesOf.get(entry) ?? [entry];
 
-    if (families.some((family) => passing.has(family))) {
+    if (families.some((family) => passing.has(family)) && locationPasses(location, model.byEntry.get(entry))) {
       lit.add(entry);
     }
   }
