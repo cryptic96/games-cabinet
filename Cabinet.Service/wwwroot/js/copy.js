@@ -9,6 +9,11 @@ const SECONDS_PER_HOUR = 3600;
 const SECONDS_PER_DAY = 86400;
 const MILLISECONDS_PER_MINUTE = 60000;
 
+/**
+ * The players chip that stands for this many players or more.
+ */
+const MAX_PLAYERS_CHIP = 8;
+
 const englishRelative = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 const dutchRelative = new Intl.RelativeTimeFormat('nl', { numeric: 'always' });
 
@@ -336,6 +341,28 @@ const ENGLISH = Object.freeze({
   filtersCleared(total) {
     return `Filters cleared, ${total} ${total === 1 ? 'game' : 'games'}`;
   },
+
+  /**
+   * The spoken suffix of a players chip: singular for one, the open-ended form for the largest size, plural otherwise.
+   * @param {number} players The number of players the chip stands for.
+   * @returns {string}
+   */
+  playersSuffix(players) {
+    if (players === MAX_PLAYERS_CHIP) {
+      return `${players} or more players`;
+    }
+
+    return `${players} ${players === 1 ? 'player' : 'players'}`;
+  },
+
+  /**
+   * The spoken suffix of a time chip.
+   * @param {number} minutes The longest play time the chip allows, in minutes.
+   * @returns {string}
+   */
+  timeSuffix(minutes) {
+    return `${minutes} minutes or less`;
+  },
 });
 
 const DUTCH = Object.freeze({
@@ -597,6 +624,28 @@ const DUTCH = Object.freeze({
    */
   filtersCleared(total) {
     return `Filters gewist, ${total} ${total === 1 ? 'spel' : 'spellen'}`;
+  },
+
+  /**
+   * The spoken suffix of a players chip: singular for one, the open-ended form for the largest size, plural otherwise.
+   * @param {number} players The number of players the chip stands for.
+   * @returns {string}
+   */
+  playersSuffix(players) {
+    if (players === MAX_PLAYERS_CHIP) {
+      return `${players} of meer spelers`;
+    }
+
+    return `${players} ${players === 1 ? 'speler' : 'spelers'}`;
+  },
+
+  /**
+   * The spoken suffix of a time chip.
+   * @param {number} minutes The longest play time the chip allows, in minutes.
+   * @returns {string}
+   */
+  timeSuffix(minutes) {
+    return `${minutes} minuten of minder`;
   },
 });
 

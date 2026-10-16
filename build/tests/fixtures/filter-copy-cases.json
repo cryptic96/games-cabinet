@@ -1,0 +1,16 @@
+[
+  { "key": "playersSuffix", "language": "en", "args": [1], "text": "1 player", "stack": "both" },
+  { "key": "playersSuffix", "language": "en", "args": [2], "text": "2 players", "stack": "both" },
+  { "key": "playersSuffix", "language": "en", "args": [3], "text": "3 players", "stack": "both" },
+  { "key": "playersSuffix", "language": "en", "args": [7], "text": "7 players", "stack": "both" },
+  { "key": "playersSuffix", "language": "en", "args": [8], "text": "8 or more players", "stack": "both" },
+  { "key": "playersSuffix", "language": "nl", "args": [1], "text": "1 speler", "stack": "both" },
+  { "key": "playersSuffix", "language": "nl", "args": [2], "text": "2 spelers", "stack": "both" },
+  { "key": "playersSuffix", "language": "nl", "args": [3], "text": "3 spelers", "stack": "both" },
+  { "key": "playersSuffix", "language": "nl", "args": [7], "text": "7 spelers", "stack": "both" },
+  { "key": "playersSuffix", "language": "nl", "args": [8], "text": "8 of meer spelers", "stack": "both" },
+  { "key": "timeSuffix", "language": "en", "args": [30], "text": "30 minutes or less", "stack": "both" },
+  { "key": "timeSuffix", "language": "en", "args": [120], "text": "120 minutes or less", "stack": "both" },
+  { "key": "timeSuffix", "language": "nl", "args": [30], "text": "30 minuten of minder", "stack": "both" },
+  { "key": "timeSuffix", "language": "nl", "args": [120], "text": "120 minuten of minder", "stack": "both" }
+]
