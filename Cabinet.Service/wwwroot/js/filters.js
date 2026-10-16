@@ -32,6 +32,9 @@ export const FILTER_ANNOUNCE_MS = 600;
  */
 export const BULK_VEIL_COUNT = 120;
 
+/** The media query that says the full bar is in use; below it the bar is the slim bar, whose count is the short one. */
+const FULL_BAR = '(min-width: 64rem)';
+
 /** The address of the other titles of the owned games, which the search reads once on first use. */
 const NAMES_ROUTE = '/cabinet/search-names';
 
@@ -131,6 +134,7 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
   const field = bar.querySelector('#filter-q');
   const count = bar.querySelector('.filter-count');
   const clear = bar.querySelector('.filter-clear');
+  const clearIcon = bar.querySelector('.filter-clear-icon');
   const live = document.getElementById('filter-live');
   const place = document.getElementById('filter-loc');
   const placeLabel = document.querySelector('label[for="filter-loc"]');
@@ -271,9 +275,12 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
   function showTally() {
     const none = result.active && tally.lit === 0;
 
-    count.textContent = !result.active ? '' : none ? copy.noMatch : copy.filterCount(tally.lit, tally.total);
+    const slim = !window.matchMedia(FULL_BAR).matches;
+
+    count.textContent = !result.active ? '' : slim ? copy.filterCountShort(tally.lit, tally.total) : none ? copy.noMatch : copy.filterCount(tally.lit, tally.total);
     bar.toggleAttribute('data-active', result.active);
     clear.toggleAttribute('data-highlighted', none);
+    clearIcon?.toggleAttribute('data-highlighted', none);
     showFiltersButton();
     showHeadings();
   }
@@ -637,9 +644,13 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
   });
 
   clear.addEventListener('click', () => clearAll());
+  clearIcon?.addEventListener('click', () => clearAll());
+  window.matchMedia(FULL_BAR).addEventListener('change', showTally);
+
+  let showSlimBar = () => {};
 
   if (openButton !== null && sheetDialog !== null) {
-    initFilterSheet({
+    ({ showBar: showSlimBar } = initFilterSheet({
       bar,
       dialog: sheetDialog,
       openButton,
@@ -653,7 +664,7 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
         location: placeUnit,
         note,
       },
-    });
+    }));
 
     sheetDialog.querySelector('.filter-sheet-clear').addEventListener('click', () => clearAll(sheetDialog.querySelector('.filter-done')));
   }
@@ -668,6 +679,7 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
     }
 
     event.preventDefault();
+    showSlimBar();
     field.focus();
     field.select();
   });

@@ -55,8 +55,7 @@ public sealed partial class FilterSheetTests : CabinetPageTest
 
     private const string FindEmptyScroll = """
         () => {
-          const bar = document.querySelector('.filter-bar');
-          const band = Math.max(0, bar.getBoundingClientRect().bottom);
+          const band = document.querySelector('.filter-bar').offsetHeight;
           const lit = [...document.querySelectorAll('#cabinet .placement:not([data-dim]):not([data-kind="moreMarker"])')]
             .map((box) => { const rect = box.getBoundingClientRect(); return [rect.top + window.scrollY, rect.bottom + window.scrollY]; });
           const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
@@ -377,7 +376,7 @@ public sealed partial class FilterSheetTests : CabinetPageTest
         await Expect(Page.Locator(OpenSheet)).ToHaveCountAsync(0);
         await Page.Locator("#filter-q").FillAsync("zzzzqxqx");
 
-        await Expect(Page.Locator($"{Bar} .filter-count")).ToHaveTextAsync("No games match");
+        await Expect(Page.Locator($"{Bar} .filter-count")).ToHaveTextAsync(NothingLit());
         (await Page.Locator(Boxes + ":not([data-dim])").CountAsync()).Should().Be(0);
         (await Page.Locator(Boxes).CountAsync()).Should().BeGreaterThan(10);
     }
@@ -553,7 +552,7 @@ public sealed partial class FilterSheetTests : CabinetPageTest
 
         await Page.EvaluateAsync("() => window.scrollTo({ top: 0, behavior: 'instant' })");
         await Page.Locator("#filter-q").FillAsync("zzzzqxqx");
-        await Expect(Page.Locator($"{Bar} .filter-count")).ToHaveTextAsync("No games match");
+        await Expect(Page.Locator($"{Bar} .filter-count")).ToHaveTextAsync(NothingLit());
         await Page.EvaluateAsync("() => window.scrollTo({ top: 60, behavior: 'instant' })");
         await OpenTheSheetAsync(scrollIntoView: false);
 
@@ -665,6 +664,9 @@ public sealed partial class FilterSheetTests : CabinetPageTest
 
     [GeneratedRegex(@"^(none|0px|0px 0px|matrix\(1, 0, 0, 1, 0, 0\))$")]
     private static partial Regex AtRest();
+
+    [GeneratedRegex(@"^0 of \d+$")]
+    private static partial Regex NothingLit();
 
     [GeneratedRegex(@"^(\d+) of")]
     private static partial Regex LeadingCount();

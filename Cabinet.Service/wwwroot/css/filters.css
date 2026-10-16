@@ -21,37 +21,41 @@
 }
 
 /**
- * From 64rem the bar stays pinned at the top while the cabinet scrolls. It runs edge to edge across the page padding so its fill, once
- * stuck, covers the full width. In the page flow it has no fill; the fill and the shadow live on one layer under the controls that
- * fades in when the sentinel above the bar has scrolled out of view. Below 64rem the bar stays in the page flow.
+ * The bar stays pinned at the top while the cabinet scrolls. It runs edge to edge across the page padding so its fill, once stuck,
+ * covers the full width. In the page flow it has no fill; the fill and the shadow live on one layer under the controls that fades in
+ * when the sentinel above the bar has scrolled out of view. The padding of the page is 24px from 64rem and 8px below it.
  */
+.filter-bar {
+  --bar-pad: var(--page-pad, 8px);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  isolation: isolate;
+  margin-inline: calc(-1 * var(--bar-pad));
+  padding-inline: var(--bar-pad);
+}
+
+.filter-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--room, var(--wood-dark));
+  box-shadow:
+    0 6px 12px -6px rgb(var(--room-shade-rgb, 20 10 4) / 0.55),
+    0 1px 0 color-mix(in srgb, var(--room-line, var(--chrome-line)) 40%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--swap-fade);
+}
+
+.filter-bar[data-stuck]::after {
+  opacity: 1;
+}
+
 @media (min-width: 64rem) {
   .filter-bar {
     --bar-pad: var(--page-pad, 24px);
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    isolation: isolate;
-    margin-inline: calc(-1 * var(--bar-pad));
-    padding-inline: var(--bar-pad);
-  }
-
-  .filter-bar::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    background: var(--room, var(--wood-dark));
-    box-shadow:
-      0 6px 12px -6px rgb(var(--room-shade-rgb, 20 10 4) / 0.55),
-      0 1px 0 color-mix(in srgb, var(--room-line, var(--chrome-line)) 40%, transparent);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity var(--swap-fade);
-  }
-
-  .filter-bar[data-stuck]::after {
-    opacity: 1;
   }
 
   html {
@@ -59,7 +63,7 @@
   }
 }
 
-@media (min-width: 64rem) and (prefers-reduced-motion: reduce) {
+@media (prefers-reduced-motion: reduce) {
   .filter-bar::after {
     transition: none;
   }
@@ -113,6 +117,7 @@
 #filter-q:focus-visible,
 #filter-loc:focus-visible,
 .filter-clear:focus-visible,
+.filter-clear-icon:focus-visible,
 .filter-chip:has(input:focus-visible) {
   outline: 2px solid var(--room-ring, var(--wood-light));
   outline-offset: 2px;
@@ -187,10 +192,37 @@
 /**
  * When nothing matches, Clear is the action to take, so it is drawn as the inverted wall fill, the way a chosen value is.
  */
-.filter-clear[data-highlighted] {
+.filter-clear[data-highlighted],
+.filter-clear-icon[data-highlighted] {
   background: var(--room-text, var(--wall-text));
   color: var(--room, var(--wood-dark));
   font-weight: 600;
+}
+
+/**
+ * The slim bar's Clear: a 44px square with the close icon in the current colour, so the count and Clear fit the one row of a phone.
+ * It is shown below 64rem only, where the text Clear is not.
+ */
+.filter-clear-icon {
+  display: none;
+  flex: none;
+  place-items: center;
+  inline-size: 44px;
+  block-size: 44px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--room-line, var(--chrome-line));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--room-text, var(--wall-text));
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.filter-clear-icon svg {
+  inline-size: 20px;
+  block-size: 20px;
+  pointer-events: none;
 }
 
 /**
@@ -578,10 +610,22 @@
  */
 @media not all and (min-width: 64rem) {
   .filter-bar {
+    --bar-pad: var(--page-pad, 8px);
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
+    gap: 4px 8px;
+    transition:
+      transform var(--fallback-open) var(--pull-ease-out),
+      visibility 0s;
+  }
+
+  .filter-bar[data-away] {
+    transform: translateY(-100%);
+    visibility: hidden;
+    transition:
+      transform var(--fallback-close) var(--pull-ease-out),
+      visibility 0s linear var(--fallback-close);
   }
 
   .filter-row {
@@ -599,6 +643,21 @@
 
   .filter-bar:not([data-active]) .filter-status {
     display: none;
+  }
+
+  .filter-clear {
+    display: none;
+  }
+
+  .filter-clear-icon {
+    display: grid;
+  }
+}
+
+@media (width < 64rem) and (prefers-reduced-motion: reduce) {
+  .filter-bar,
+  .filter-bar[data-away] {
+    transition: none;
   }
 }
 

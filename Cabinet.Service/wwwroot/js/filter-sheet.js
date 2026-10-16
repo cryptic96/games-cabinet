@@ -16,6 +16,9 @@ const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
 /** The gap, in pixels, between the bottom of the bar and the top of the box the page scrolls to. */
 const REVEAL_GAP_PX = 16;
 
+/** How far, in pixels, the page must travel in one direction before the slim bar slides away or comes back. */
+export const SLIDE_TRAVEL_PX = 8;
+
 /** The boxes that can be lit: every box but the marker that counts hidden expansions. */
 const LIT_BOXES = '.placement:not([data-dim]):not([data-kind="moreMarker"])';
 
@@ -38,6 +41,32 @@ export function nextLitTarget(rects, scrollTop, barBottom) {
 }
 
 /**
+ * Decides what the slim bar does after the page scrolled: it slides away after more than a few pixels of travel down, comes back
+ * after more than a few pixels of travel up, and otherwise stays as it is. It never slides away while something blocks it, or while
+ * the page is within one bar height of the top, and a bar that is away comes back as soon as one of those holds.
+ * @param {object} state What the decision depends on.
+ * @param {number} state.lastY The scroll position the travel is measured from.
+ * @param {number} state.y The scroll position now.
+ * @param {boolean} state.away Whether the bar is away now.
+ * @param {boolean} state.blocked Whether a filter is in use, focus is in the bar, or the sheet or a card is open.
+ * @param {number} state.barHeight The height of the bar.
+ * @returns {'away' | 'back' | 'stay'} What the bar does next.
+ */
+export function slideDecision({ lastY, y, away, blocked, barHeight }) {
+  if (blocked || y < barHeight) {
+    return away ? 'back' : 'stay';
+  }
+
+  const travel = y - lastY;
+
+  if (travel > SLIDE_TRAVEL_PX) {
+    return 'away';
+  }
+
+  return travel < -SLIDE_TRAVEL_PX ? 'back' : 'stay';
+}
+
+/**
  * Starts the Filters sheet.
  * @param {object} parts What the sheet needs from the page.
  * @param {HTMLElement} parts.bar The filter bar.
@@ -49,8 +78,9 @@ export function nextLitTarget(rects, scrollTop, barBottom) {
  * @param {object} parts.copy The visitor-facing strings of the page language.
  * @param {() => { lit: number, total: number, active: boolean }} parts.getCount Gives how many games stand in the light, how many
  * there are, and whether a filter is in use.
- * @returns {{ open: () => Promise<void>, close: (how?: { instant?: boolean }) => void, isOpen: () => boolean, refresh: () => void }}
- * The controls: open the sheet, close it, whether it is open, and write its button and Clear for the current result.
+ * @returns {{ open: () => Promise<void>, close: (how?: { instant?: boolean }) => void, isOpen: () => boolean, refresh: () => void, showBar: () => void }}
+ * The controls: open the sheet, close it, whether it is open, write its button and Clear for the current result, and bring the slim
+ * bar back into view if it slid away.
  */
 export function initFilterSheet({ bar, dialog, units, openButton, cabinet, copy, getCount }) {
   const sheet = dialog.querySelector('.filter-sheet');
@@ -376,12 +406,67 @@ export function initFilterSheet({ bar, dialog, units, openButton, cabinet, copy,
     }
   }
 
+  let slideAnchor = 0;
+
+  /**
+   * Tells whether something keeps the slim bar in view: a filter in use, focus inside the bar, or a sheet or card on screen.
+   * @returns {boolean}
+   */
+  function slideBlocked() {
+    return getCount().active || bar.contains(document.activeElement) || document.querySelector('dialog[open]') !== null;
+  }
+
+  /**
+   * Brings the slim bar back into view and measures later travel from where the page is now.
+   */
+  function showBar() {
+    bar.removeAttribute('data-away');
+    slideAnchor = window.scrollY;
+  }
+
+  /**
+   * Slides the slim bar away or back after the page scrolled. Travel is measured from the highest point reached while the bar is in
+   * view and from the lowest while it is away, so many small scroll steps in one direction add up.
+   */
+  function followScroll() {
+    const y = Math.max(0, window.scrollY);
+    const away = bar.hasAttribute('data-away');
+    const decision = slideDecision({ lastY: slideAnchor, y, away, blocked: slideBlocked(), barHeight: bar.offsetHeight });
+
+    if (decision === 'stay') {
+      slideAnchor = away ? Math.max(slideAnchor, y) : Math.min(slideAnchor, y);
+
+      return;
+    }
+
+    slideAnchor = y;
+    bar.toggleAttribute('data-away', decision === 'away');
+  }
+
+  /**
+   * Listens for scrolling while the slim bar is in use, with the one passive listener, and lets go of it in the full bar, which stays
+   * pinned and never slides.
+   */
+  function watchScroll() {
+    if (full.matches) {
+      window.removeEventListener('scroll', followScroll);
+      bar.removeAttribute('data-away');
+
+      return;
+    }
+
+    slideAnchor = window.scrollY;
+    window.addEventListener('scroll', followScroll, { passive: true });
+  }
+
   place();
   refresh();
+  watchScroll();
 
   full.addEventListener('change', () => {
     close({ instant: true });
     place();
+    watchScroll();
   });
 
   openButton.addEventListener('click', open);
@@ -417,7 +502,13 @@ export function initFilterSheet({ bar, dialog, units, openButton, cabinet, copy,
     pressedOnFrame = false;
   });
 
-  document.addEventListener('cabinet:filtered', refresh);
+  document.addEventListener('cabinet:filtered', () => {
+    refresh();
 
-  return { open, close, isOpen: () => dialog.open, refresh };
+    if (getCount().active) {
+      showBar();
+    }
+  });
+
+  return { open, close, isOpen: () => dialog.open, refresh, showBar };
 }
