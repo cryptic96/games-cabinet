@@ -242,6 +242,64 @@ public sealed class OwnerRestoreParserTests
     }
 
     [Fact]
+    public void Two_entries_for_one_game_are_accepted_when_their_collection_entries_differ_including_one_for_every_copy()
+    {
+        var data = Valid() with
+        {
+            Games =
+            [
+                new OwnerGame(100, IdA, null, null),
+                new OwnerGame(100, IdB, null, null, 7002),
+                new OwnerGame(100, IdA, null, null, 7003),
+            ],
+        };
+
+        var check = Check(Export(data));
+
+        check.IsOk.Should().BeTrue();
+        check.Data!.Games.Select(game => game.CollectionId).Should().Equal((long?)null, 7002L, 7003L);
+    }
+
+    [Fact]
+    public void The_same_game_and_collection_entry_twice_is_over_the_limits()
+    {
+        var data = Valid() with { Games = [new OwnerGame(100, IdA, null, null, 7002), new OwnerGame(100, IdB, null, null, 7002)] };
+
+        Check(Export(data)).Refusal.Should().Be(RestoreProblem.OverLimits);
+    }
+
+    [Theory]
+    [InlineData(0L)]
+    [InlineData(-1L)]
+    [InlineData(long.MinValue)]
+    public void A_collection_entry_of_zero_or_below_is_over_the_limits(long collectionId)
+    {
+        var data = Valid() with { Games = [new OwnerGame(100, IdA, null, null, collectionId)] };
+
+        Check(Export(data)).Refusal.Should().Be(RestoreProblem.OverLimits);
+    }
+
+    [Fact]
+    public void A_copy_kept_in_a_location_the_file_does_not_list_is_over_the_limits()
+    {
+        var data = Valid() with { Games = [new OwnerGame(100, "ffffffff", null, null, 7002)] };
+
+        Check(Export(data)).Refusal.Should().Be(RestoreProblem.OverLimits);
+    }
+
+    [Fact]
+    public void A_file_of_the_second_format_with_two_entries_for_one_game_is_still_over_the_limits()
+    {
+        var text = Encoding.UTF8.GetString(Export(Valid() with { Games = [new OwnerGame(100, IdA, null, null)] }))
+            .Replace("\"schemaVersion\": 3", "\"schemaVersion\": 2", StringComparison.Ordinal)
+            .Replace("\"games\": [", $"\"games\": [{{\"gameId\":100,\"locationId\":\"{IdB}\"}},", StringComparison.Ordinal);
+
+        var check = Check(Text(text));
+
+        check.Refusal.Should().Be(RestoreProblem.OverLimits);
+    }
+
+    [Fact]
     public void Five_thousand_games_are_accepted_and_one_more_is_over_the_limits()
     {
         Check(Export(WithGames(OwnerDataExport.MaxGames))).IsOk.Should().BeTrue();

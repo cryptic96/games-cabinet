@@ -2,9 +2,11 @@ using System.Text;
 using Cabinet.Domain.Owner;
 using Cabinet.Repository.Images;
 using Cabinet.Repository.Storage;
+using Cabinet.Service.Owner;
 using Cabinet.UnitTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Cabinet.UnitTests.Owner;
 
@@ -124,6 +126,74 @@ public sealed class OwnerDataUpgradeTests : IDisposable
     }
 
     [Fact]
+    public void A_stored_file_of_the_second_format_with_game_wide_entries_loads_as_the_current_format_and_is_left_as_it_is()
+    {
+        var bytes = SecondFormat("{\"gameId\":100,\"locationId\":\"0a1b2c3d\"},{\"gameId\":101,\"locationId\":\"4e5f6a7b\"}");
+        File.WriteAllBytes(FilePath, bytes);
+        var listingBefore = Directory.EnumerateFileSystemEntries(_directory.FullPath).Order().ToList();
+
+        var state = CreateStore().Load();
+
+        var data = state.Should().BeOfType<OwnerDataState.Ready>().Which.Data;
+        data.SchemaVersion.Should().Be(OwnerData.CurrentSchemaVersion);
+        data.Games.Select(game => (game.GameId, game.LocationId, game.CollectionId))
+            .Should().Equal((100, "0a1b2c3d", (long?)null), (101, "4e5f6a7b", (long?)null));
+        data.Look.Should().Be(new CabinetLook("legs", "oak", "painted", "evenings", "deep"));
+        File.ReadAllBytes(FilePath).Should().Equal(bytes);
+        Directory.EnumerateFileSystemEntries(_directory.FullPath).Order().Should().Equal(listingBefore);
+    }
+
+    [Fact]
+    public async Task The_first_save_after_loading_a_second_format_file_keeps_a_copy_of_it_that_the_earlier_release_lists()
+    {
+        var bytes = SecondFormat("{\"gameId\":100,\"locationId\":\"0a1b2c3d\"}");
+        File.WriteAllBytes(FilePath, bytes);
+        var service = CreateService(CreateStore());
+
+        var result = await service.MutateAsync(
+            service.Revision,
+            data => LocationEdits.Assign(data, 100, 7002, [7001, 7002, 7003], "4e5f6a7b", "Quiet Quarry"),
+            TestContext.Current.CancellationToken);
+
+        result.Outcome.Should().Be(OwnerOutcome.Saved);
+        var kept = EarlierReleaseVersionReader.List(Path.Combine(_directory.FullPath, "owner-data-versions"));
+        kept.Should().ContainSingle();
+        File.ReadAllBytes(kept[0].Path).Should().Equal(bytes);
+        CreateStore().StoredSchemaVersion().Should().Be(OwnerData.CurrentSchemaVersion);
+        CreateStore().Load().Should().BeOfType<OwnerDataState.Ready>().Which.Data.Games
+            .Select(game => (game.CollectionId, game.LocationId))
+            .Should().Equal(((long?)7001, "0a1b2c3d"), ((long?)7002, "4e5f6a7b"), ((long?)7003, "0a1b2c3d"));
+    }
+
+    [Fact]
+    public async Task The_first_save_after_loading_a_second_format_file_is_refused_when_the_copy_cannot_be_kept()
+    {
+        var bytes = SecondFormat("{\"gameId\":100,\"locationId\":\"0a1b2c3d\"}");
+        File.WriteAllBytes(FilePath, bytes);
+        var service = CreateService(CreateStore());
+        File.WriteAllText(Path.Combine(_directory.FullPath, "owner-data-versions"), "in the way");
+
+        var result = await service.MutateAsync(
+            service.Revision,
+            data => LocationEdits.Assign(data, 100, 7002, [7001, 7002], "4e5f6a7b", "Quiet Quarry"),
+            TestContext.Current.CancellationToken);
+
+        result.Outcome.Should().Be(OwnerOutcome.Refused);
+        File.ReadAllBytes(FilePath).Should().Equal(bytes);
+    }
+
+    [Fact]
+    public void The_restore_check_of_a_second_format_file_is_accepted_as_format_two_and_gives_the_current_format()
+    {
+        var check = OwnerDataExport.Check(SecondFormat("{\"gameId\":100,\"locationId\":\"0a1b2c3d\"}"), Policy);
+
+        check.IsOk.Should().BeTrue();
+        check.FormatVersion.Should().Be(2);
+        check.Data!.SchemaVersion.Should().Be(OwnerData.CurrentSchemaVersion);
+        check.Data.Games.Should().ContainSingle().Which.CollectionId.Should().BeNull();
+    }
+
+    [Fact]
     public void The_look_a_save_writes_loads_back_the_same()
     {
         var look = new CabinetLook("plywood-legs", "birch", "painted", "on", "flat");
@@ -194,6 +264,16 @@ public sealed class OwnerDataUpgradeTests : IDisposable
         Encoding.UTF8.GetBytes(
             $"{{\"kind\":\"{Marker}\",\"schemaVersion\":3,\"revision\":3,\"look\":{{\"design\":\"{design}\",\"wood\":\"{wood}\",\"backs\":\"{backs}\",\"lights\":\"{lights}\",\"depth\":\"{depth}\"}},"
             + "\"locations\":[],\"games\":[],\"changesSinceDownload\":0,\"changes\":[]}");
+
+    private static byte[] SecondFormat(string gamesJson) =>
+        Encoding.UTF8.GetBytes(
+            $"{{\"kind\":\"{Marker}\",\"schemaVersion\":2,\"revision\":5,"
+            + "\"look\":{\"design\":\"legs\",\"wood\":\"oak\",\"backs\":\"painted\",\"lights\":\"evenings\",\"depth\":\"deep\"},"
+            + "\"locations\":[{\"id\":\"0a1b2c3d\",\"name\":\"Cabinet A\"},{\"id\":\"4e5f6a7b\",\"name\":\"Shelf B\"}],"
+            + $"\"games\":[{gamesJson}],\"changesSinceDownload\":0,\"changes\":[]}}");
+
+    private static OwnerDataService CreateService(OwnerDataStore store) =>
+        new(store, new FakeTimeProvider(new DateTimeOffset(2030, 1, 15, 12, 0, 0, TimeSpan.Zero)), NullLogger<OwnerDataService>.Instance);
 
     private OwnerDataStore CreateStore() => new(_directory.FullPath, NullLogger<OwnerDataStore>.Instance);
 }
