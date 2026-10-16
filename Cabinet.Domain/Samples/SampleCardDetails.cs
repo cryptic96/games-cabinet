@@ -1,5 +1,8 @@
+using System.Security.Cryptography;
+using System.Text;
 using Cabinet.Domain.Collection;
 using Cabinet.Domain.Layout;
+using Cabinet.Domain.Owner;
 
 namespace Cabinet.Domain.Samples;
 
@@ -89,13 +92,12 @@ public static class SampleCardDetails
 
     private static readonly string[] Locations =
     [
-        "Rack A, row 3",
-        "Crate 7",
-        "Rack B, left",
-        "Bin 2",
-        "Rack C, top",
-        "Crate 12",
-        "Bin 9",
+        "Cabinet A",
+        "Cabinet B",
+        "Shelf A",
+        "Shelf B",
+        "Shelf C",
+        "Lent out",
     ];
 
     private static readonly string[] EdgeDesigners =
@@ -140,7 +142,7 @@ public static class SampleCardDetails
                 item.Kind,
                 FirstYear + StableHash.Bucket(item.BggId, YearSalt, YearSpan),
                 null,
-                edge ? EdgeLocations[index % EdgeLocations.Length] : LocationOf(item),
+                LocationNameOf(edge, item, index),
                 null,
                 null))
             .ToList();
@@ -156,6 +158,41 @@ public static class SampleCardDetails
 
         return new CollectionSnapshot(CollectionSnapshot.CurrentSchemaVersion, InventedTime, stored, null, games);
     }
+
+    /// <summary>
+    /// The owner's locations of a sample, in a fixed order, and where each sample entry is kept. Every identifier is made from
+    /// the location's name, so a sample has the same identifiers on every run, and every entry's place is the location whose
+    /// name its stored item carries. The edge sample lists its long and right-to-left names; the other samples list the invented
+    /// lettered ones. About half the entries of a plain sample are not placed.
+    /// </summary>
+    /// <param name="sample">The sample name; only the edge sample is treated differently.</param>
+    /// <param name="items">The items of the sample.</param>
+    public static LocationBook LocationBookFor(string sample, IReadOnlyList<CabinetItem> items)
+    {
+        ArgumentNullException.ThrowIfNull(sample);
+        ArgumentNullException.ThrowIfNull(items);
+
+        var edge = string.Equals(sample, EdgeSampleName, StringComparison.Ordinal);
+        var order = (edge ? EdgeLocations : Locations).Select(name => new OwnerLocation(IdOf(name), name)).ToList();
+        var idOf = order.ToDictionary(location => location.Name, location => location.Id, StringComparer.Ordinal);
+        var entries = new Dictionary<long, string>();
+
+        foreach (var (item, index) in items.Select((item, index) => (item, index)))
+        {
+            if (LocationNameOf(edge, item, index) is { } name)
+            {
+                entries[item.CollectionId] = idOf[name];
+            }
+        }
+
+        return new LocationBook(order, entries);
+    }
+
+    private static string IdOf(string name) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(name)))[..OwnerLocation.IdLength];
+
+    private static string? LocationNameOf(bool edge, CabinetItem item, int index) =>
+        edge ? EdgeLocations[index % EdgeLocations.Length] : LocationOf(item);
 
     private static bool HasDetails(CabinetItem item) =>
         item.Kind == ItemKind.Expansion || StableHash.Bucket(item.BggId, NoDetailsSalt, NoDetailsOneIn) != 0;

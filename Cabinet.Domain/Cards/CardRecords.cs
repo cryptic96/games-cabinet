@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Cabinet.Domain.Collection;
 using Cabinet.Domain.Layout;
+using Cabinet.Domain.Owner;
 
 namespace Cabinet.Domain.Cards;
 
@@ -46,6 +47,7 @@ public sealed record CardLink(long? EntryId, int GameId, string Title, string? C
 /// <param name="Mechanics">The mechanics' names in the order the source gave them.</param>
 /// <param name="Expansions">The owned expansions of this game, in collection order.</param>
 /// <param name="Bases">For an expansion, the games it expands: the owned ones when any is owned, otherwise the named ones.</param>
+/// <param name="LocationId">The identifier of the location the entry is kept in, or null when it is not placed.</param>
 public sealed record CardRecord(
     long EntryId,
     int GameId,
@@ -69,12 +71,28 @@ public sealed record CardRecord(
     IReadOnlyList<string> Designers,
     IReadOnlyList<string> Mechanics,
     IReadOnlyList<CardLink> Expansions,
-    IReadOnlyList<CardLink> Bases);
+    IReadOnlyList<CardLink> Bases,
+    string? LocationId = null);
+
+/// <summary>One of the owner's locations as the page lists it.</summary>
+/// <param name="Id">The stable identifier of the location.</param>
+/// <param name="Name">The name every visitor sees.</param>
+/// <param name="Games">How many owned entries are kept there.</param>
+public sealed record LocationRef(string Id, string Name, int Games);
 
 /// <summary>The body of the card endpoint: the cards of one collection view and the layout they belong to.</summary>
 /// <param name="Layout">The entity tag of the layout of the same collection and profile, so the page can tell the two apart.</param>
 /// <param name="Cards">One card per owned entry, in layout item order.</param>
-public sealed record CardsDocument(string Layout, IReadOnlyList<CardRecord> Cards);
+/// <param name="Locations">The owner's locations in the owner's order, or null when the owner has none.</param>
+public sealed record CardsDocument(string Layout, IReadOnlyList<CardRecord> Cards, IReadOnlyList<LocationRef>? Locations = null)
+{
+    /// <summary>Lists the locations of a book with the number of entries each holds, or null when the book has no locations.</summary>
+    /// <param name="book">The locations of the collection, or null when there are none.</param>
+    public static IReadOnlyList<LocationRef>? ListLocations(LocationBook? book) =>
+        book is null || book.Order.Count == 0
+            ? null
+            : [.. book.Order.Select(location => new LocationRef(location.Id, location.Name, book.CopiesAt(location.Id)))];
+}
 
 /// <summary>Builds the card records of a collection: one per owned entry, from stored data only.</summary>
 public static class CardRecords
@@ -96,14 +114,15 @@ public static class CardRecords
     /// <param name="items">The items of the collection view.</param>
     /// <param name="snapshot">The stored collection the items came from, or null when there is none.</param>
     /// <param name="design">The section design of the requested profile; it decides the stored size of each cover.</param>
-    public static IReadOnlyList<CardRecord> Build(IReadOnlyList<CabinetItem> items, CollectionSnapshot? snapshot, SectionDesign design)
+    /// <param name="book">The owner's locations and where each entry is kept, or null when there are none.</param>
+    public static IReadOnlyList<CardRecord> Build(IReadOnlyList<CabinetItem> items, CollectionSnapshot? snapshot, SectionDesign design, LocationBook? book = null)
     {
         ArgumentNullException.ThrowIfNull(items);
         ArgumentNullException.ThrowIfNull(design);
 
         var context = new BuildContext(items, snapshot);
 
-        return items.Select(item => ToRecord(item, context, design)).ToList();
+        return items.Select(item => ToRecord(item, context, design, book)).ToList();
     }
 
     /// <summary>Serialises the document with the same options as the layout, so the same cards always give the same bytes.</summary>
@@ -115,7 +134,7 @@ public static class CardRecords
         return JsonSerializer.Serialize(document, LayoutJson.Options);
     }
 
-    private static CardRecord ToRecord(CabinetItem item, BuildContext context, SectionDesign design)
+    private static CardRecord ToRecord(CabinetItem item, BuildContext context, SectionDesign design, LocationBook? book)
     {
         var stored = context.StoredItem(item.CollectionId);
         var details = context.DetailsOf(item.BggId);
@@ -144,7 +163,8 @@ public static class CardRecords
             details?.Designers ?? [],
             details?.Mechanics ?? [],
             isExpansion ? [] : context.ExpansionsOf(item.BggId),
-            isExpansion ? context.BasesOf(details) : []);
+            isExpansion ? context.BasesOf(details) : [],
+            book?.LocationOf(item.CollectionId));
     }
 
     private static int? Positive(int? value) => value > 0 ? value : null;

@@ -28,7 +28,7 @@ public sealed class CardsEndpointTests
     [
         "entryId", "gameId", "title", "year", "isExpansion", "ratio", "cover", "colour", "toneIndex", "patternIndex",
         "location", "minPlayers", "maxPlayers", "playTime", "minPlayTime", "maxPlayTime", "minAge", "weight", "rating",
-        "designers", "mechanics", "expansions", "bases",
+        "designers", "mechanics", "expansions", "bases", "locationId",
     ];
 
     [Fact]
@@ -185,6 +185,99 @@ public sealed class CardsEndpointTests
     }
 
     [Fact]
+    public async Task Cards_carry_each_copys_location_id_and_the_owners_order()
+    {
+        using var storage = new TemporaryDirectory();
+        FilterFixture.Write(storage.FullPath);
+        await using var factory = new CabinetWebApplicationFactory(new Dictionary<string, string?> { ["Storage:Directory"] = storage.FullPath });
+        using var client = factory.CreatePublicClient();
+
+        using var response = await client.GetAsync("/cabinet/cards?profile=desktop", TestContext.Current.CancellationToken);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var cards = document.RootElement.GetProperty("cards").EnumerateArray().ToDictionary(record => record.GetProperty("entryId").GetInt64());
+        var locations = document.RootElement.GetProperty("locations").EnumerateArray().ToList();
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        LocationOf(cards[FilterFixture.QuarryEntries[0]]).Should().Be(("Cabinet A", FilterFixture.CabinetAId));
+        LocationOf(cards[FilterFixture.QuarryEntries[1]]).Should().Be(("Shelf B", FilterFixture.ShelfBId));
+        LocationOf(cards[FilterFixture.QuarryEntries[2]]).Should().Be(("Cabinet A", FilterFixture.CabinetAId));
+        LocationOf(cards[FilterFixture.HarbourEntry]).Should().Be(("Cabinet A", FilterFixture.CabinetAId));
+        LocationOf(cards[FilterFixture.HarbourExpansionEntry]).Should().Be(("Shelf B", FilterFixture.ShelfBId));
+        LocationOf(cards[FilterFixture.TallyExpansionEntry]).Should().Be(("Cabinet A", FilterFixture.CabinetAId));
+        LocationOf(cards[FilterFixture.MeadowEntry]).Should().Be((null, null));
+        LocationOf(cards[FilterFixture.MysteryEntry]).Should().Be((null, null));
+        cards.Values
+            .Select(record => record.TryGetProperty("locationId", out var id) ? id.GetString() : null)
+            .Where(id => id is not null)
+            .Should().OnlyContain(id => id!.Length == 8 && id.All(character => char.IsAsciiHexDigitLower(character)));
+        locations.Select(location => location.GetProperty("name").GetString()).Should().Equal("Cabinet A", "Shelf B", "Lent out");
+        locations.Select(location => location.GetProperty("id").GetString())
+            .Should().Equal(FilterFixture.CabinetAId, FilterFixture.ShelfBId, FilterFixture.LentOutId);
+        locations.Select(location => location.GetProperty("games").GetInt32()).Should().Equal(5, 3, 0);
+    }
+
+    [Fact]
+    public async Task The_sample_cards_carry_locations()
+    {
+        await using var factory = new CabinetWebApplicationFactory(PrototypeOn);
+        using var client = factory.CreatePublicClient();
+
+        using var response = await client.GetAsync("/cabinet/cards?sample=65&profile=desktop", TestContext.Current.CancellationToken);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var cards = document.RootElement.GetProperty("cards").EnumerateArray().ToList();
+        var locations = document.RootElement.GetProperty("locations").EnumerateArray().ToDictionary(
+            location => location.GetProperty("id").GetString()!,
+            location => location.GetProperty("name").GetString());
+        var placed = cards.Where(record => Has(record, "locationId")).ToList();
+
+        locations.Values.Should().Contain("Cabinet A").And.Contain("Lent out");
+        placed.Should().NotBeEmpty();
+        placed.Should().OnlyContain(record => locations[record.GetProperty("locationId").GetString()!] == record.GetProperty("location").GetString());
+        cards.Should().Contain(record => !Has(record, "locationId"));
+    }
+
+    [Fact]
+    public async Task Without_owner_locations_the_cards_have_no_location_list_and_no_location_id()
+    {
+        using var storage = new TemporaryDirectory();
+        FilterFixture.WriteCollection(storage.FullPath);
+        await using var factory = new CabinetWebApplicationFactory(new Dictionary<string, string?> { ["Storage:Directory"] = storage.FullPath });
+        using var client = factory.CreatePublicClient();
+
+        using var response = await client.GetAsync("/cabinet/cards?profile=desktop", TestContext.Current.CancellationToken);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var cards = document.RootElement.GetProperty("cards").EnumerateArray().ToList();
+
+        cards.Should().NotBeEmpty();
+        document.RootElement.TryGetProperty("locations", out _).Should().BeFalse();
+        cards.Should().OnlyContain(record => !Has(record, "locationId") && !Has(record, "location"));
+    }
+
+    [Fact]
+    public async Task The_location_members_keep_their_exact_json_names()
+    {
+        using var storage = new TemporaryDirectory();
+        FilterFixture.Write(storage.FullPath);
+        await using var factory = new CabinetWebApplicationFactory(new Dictionary<string, string?> { ["Storage:Directory"] = storage.FullPath });
+        using var client = factory.CreatePublicClient();
+
+        using var response = await client.GetAsync("/cabinet/cards?profile=desktop", TestContext.Current.CancellationToken);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var root = document.RootElement;
+        var cards = root.GetProperty("cards").EnumerateArray().ToList();
+        var placed = cards.Where(record => Has(record, "location")).ToList();
+        var refused = new[] { "LocationId", "Locations", "location_id", "locationID" };
+
+        root.GetProperty("locations").ValueKind.Should().Be(JsonValueKind.Array);
+        root.GetProperty("locations").EnumerateArray()
+            .Should().OnlyContain(location => location.EnumerateObject().Select(member => member.Name).OrderBy(name => name).SequenceEqual(new[] { "games", "id", "name" }));
+        placed.Should().NotBeEmpty();
+        placed.Should().OnlyContain(record => Has(record, "locationId"));
+        root.EnumerateObject().Select(member => member.Name).Should().NotContain(refused);
+        cards.SelectMany(record => record.EnumerateObject().Select(member => member.Name)).Should().NotContain(refused);
+    }
+
+    [Fact]
     public async Task A_sync_that_only_changes_the_designers_gives_new_cards_without_a_restart()
     {
         using var storage = new TemporaryDirectory();
@@ -302,6 +395,12 @@ public sealed class CardsEndpointTests
             null,
             new Dictionary<int, GameDetails> { [BaseGameId] = details, [ExpansionGameId] = expansionDetails });
     }
+
+    private static bool Has(JsonElement record, string name) => record.TryGetProperty(name, out _);
+
+    private static (string? Name, string? Id) LocationOf(JsonElement card) =>
+        (card.TryGetProperty("location", out var name) ? name.GetString() : null,
+            card.TryGetProperty("locationId", out var id) ? id.GetString() : null);
 
     private static HashSet<long> EntryIdsOf(JsonElement layout) =>
         layout.GetProperty("sections").EnumerateArray()
