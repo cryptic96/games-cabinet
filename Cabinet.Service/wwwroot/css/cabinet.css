@@ -176,6 +176,7 @@
   color: var(--fg, var(--box-fallback-fg));
   overflow: hidden;
   scroll-margin: 16px;
+  scroll-margin-top: calc(var(--filter-bar-h, 0px) + 16px);
   box-shadow:
     inset 1px 1px 0 rgb(255 255 255 / 0.2),
     0 1px 2px rgb(0 0 0 / 0.5),
