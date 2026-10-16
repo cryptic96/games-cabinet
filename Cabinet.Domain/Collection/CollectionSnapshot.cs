@@ -18,6 +18,7 @@ public sealed record VersionDimensions(double Width, double Length, double Depth
 /// <param name="Location">Where the owner keeps the item, or null when it is not known.</param>
 /// <param name="VersionImageUrl">The canonical address of the picture of the owned version, or null when the source gave none.</param>
 /// <param name="ImageUrl">The canonical address of the game's main picture, or null when the source gave none.</param>
+/// <param name="VersionName">The name of the owned edition the owner selected at the source, or null when it gave none.</param>
 public sealed record SnapshotItem(
     long CollectionId,
     int GameId,
@@ -27,7 +28,8 @@ public sealed record SnapshotItem(
     VersionDimensions? Dimensions,
     string? Location,
     string? VersionImageUrl = null,
-    string? ImageUrl = null);
+    string? ImageUrl = null,
+    string? VersionName = null);
 
 /// <summary>How the last attempt to fetch and store a picture ended.</summary>
 public enum ImageStatus

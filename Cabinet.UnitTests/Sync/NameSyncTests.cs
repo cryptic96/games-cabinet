@@ -80,17 +80,33 @@ public sealed class NameSyncTests : IDisposable
         source.Requested.Should().HaveCount(2, "nothing is read a second time inside the refresh time");
     }
 
-    private static IReadOnlyList<SnapshotItem> Items() =>
+    [Fact]
+    public async Task A_newly_read_edition_name_is_saved()
+    {
+        var source = new NamedDetails(["Other Title"]);
+        var owned = new List<SnapshotItem>(Items(versionName: null));
+        var runner = Runner(source, out var store, out _, items: owned);
+        await runner.RunAsync(null, TestContext.Current.CancellationToken);
+        store.Load()!.Items.Should().OnlyContain(item => item.VersionName == null);
+
+        owned.Clear();
+        owned.AddRange(Items(versionName: "Quiet Quarry Deluxe edition"));
+        await runner.RunAsync(null, TestContext.Current.CancellationToken);
+
+        store.Load()!.Items.Should().OnlyContain(item => item.VersionName == "Quiet Quarry Deluxe edition");
+    }
+
+    private static IReadOnlyList<SnapshotItem> Items(string? versionName) =>
         [
-            new(1, FirstGame, "Example 1", ItemKind.Base, null, null, null),
-            new(2, SecondGame, "Example 2", ItemKind.Base, null, null, null),
+            new(1, FirstGame, "Example 1", ItemKind.Base, null, null, null, VersionName: versionName),
+            new(2, SecondGame, "Example 2", ItemKind.Base, null, null, null, VersionName: versionName),
         ];
 
     private static GameDetails Details(IReadOnlyList<string>? names) =>
         new(Start, 2, 4, 60, null, null, null, 2.5, null, null, [], [], [], null, DetailsVersion: GameDetails.CurrentDetailsVersion, AlternateNames: names);
 
     private static CollectionSnapshot Snapshot() =>
-        new(CollectionSnapshot.CurrentSchemaVersion, Start, Items());
+        new(CollectionSnapshot.CurrentSchemaVersion, Start, Items(versionName: null));
 
     private SyncRunner Runner(
         NamedDetails details,
@@ -108,7 +124,7 @@ public sealed class NameSyncTests : IDisposable
             collection.Replace(CollectionState.FromSnapshot(existing));
         }
 
-        var owned = items ?? Items();
+        var owned = items ?? Items(versionName: null);
         var enrichment = new EnrichmentSync(() => details, EnrichmentOptions.Default, _clock, NullLogger<EnrichmentSync>.Instance);
 
         return new SyncRunner(

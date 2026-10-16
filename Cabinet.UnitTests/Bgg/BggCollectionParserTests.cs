@@ -239,6 +239,76 @@ public class BggCollectionParserTests
         notACollection.Should().Throw<BggAnswerException>();
     }
 
+    [Fact]
+    public void The_primary_name_of_the_selected_edition_is_kept_on_the_copy()
+    {
+        var parsed = Parse(Answer(Entry(900, 100, "Quiet Quarry", NamedVersion("<name type=\"primary\" value=\"Quiet Quarry Deluxe edition\" />"))));
+
+        parsed.Items.Single().VersionName.Should().Be("Quiet Quarry Deluxe edition");
+    }
+
+    [Fact]
+    public void An_edition_with_only_an_alternate_name_gives_that_name_and_the_primary_wins_when_both_are_there()
+    {
+        var onlyAlternate = Parse(Answer(Entry(900, 100, "Quiet Quarry", NamedVersion("<name type=\"alternate\" value=\"Stille Steengroeve\" />"))));
+        var both = Parse(Answer(Entry(900, 100, "Quiet Quarry", NamedVersion(
+            "<name type=\"alternate\" value=\"Stille Steengroeve\" /><name type=\"primary\" value=\"Quiet Quarry Second printing\" />"))));
+
+        onlyAlternate.Items.Single().VersionName.Should().Be("Stille Steengroeve");
+        both.Items.Single().VersionName.Should().Be("Quiet Quarry Second printing");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("<name type=\"primary\" value=\"   \" />")]
+    [InlineData("<name type=\"primary\" />")]
+    [InlineData("<name>Plain text instead of an attribute</name>")]
+    [InlineData("<name type=\"primary\" value=\"\u202e\u0085\" />")]
+    public void An_edition_with_no_usable_name_gives_no_name_and_the_item_still_parses(string nameElement)
+    {
+        var parsed = Parse(Answer(Entry(900, 100, "Quiet Quarry", NamedVersion(nameElement))));
+
+        parsed.Items.Should().ContainSingle().Which.VersionName.Should().BeNull();
+        parsed.SkippedItems.Should().Be(0);
+    }
+
+    [Fact]
+    public void A_copy_without_an_edition_has_no_edition_name_and_odd_shapes_never_fail_the_read()
+    {
+        var none = Parse(Answer(Entry(900, 100, "Quiet Quarry")));
+        var wrapperOnly = Parse(Answer(Entry(900, 100, "Quiet Quarry", "<version><name type=\"primary\" value=\"Wrapper Edition\" /></version>")));
+        var empty = Parse(Answer(Entry(900, 100, "Quiet Quarry", "<version />")));
+
+        none.Items.Single().VersionName.Should().BeNull();
+        wrapperOnly.Items.Single().VersionName.Should().Be("Wrapper Edition");
+        empty.Items.Single().VersionName.Should().BeNull();
+    }
+
+    [Fact]
+    public void Control_and_bidi_characters_are_removed_from_an_edition_name_as_for_titles()
+    {
+        var parsed = Parse(Answer(Entry(900, 100, "Quiet Quarry", NamedVersion("<name type=\"primary\" value=\"  Deluxe\u202e edition\u0085  \" />"))));
+
+        parsed.Items.Single().VersionName.Should().Be("Deluxe edition");
+    }
+
+    [Fact]
+    public void An_over_long_edition_name_is_dropped()
+    {
+        var longest = new string('e', BggCollectionParser.MaxVersionNameLength);
+        var tooLong = new string('e', BggCollectionParser.MaxVersionNameLength + 1);
+
+        var kept = Parse(Answer(Entry(900, 100, "Quiet Quarry", NamedVersion($"<name type=\"primary\" value=\"{longest}\" />"))));
+        var dropped = Parse(Answer(Entry(901, 101, "Other Quarry", NamedVersion($"<name type=\"primary\" value=\"{tooLong}\" />") + "<privateinfo inventorylocation=\"Shelf B\" />")), includePrivateInfo: true);
+
+        BggCollectionParser.MaxVersionNameLength.Should().Be(100);
+        kept.Items.Single().VersionName.Should().Be(longest);
+        var item = dropped.Items.Should().ContainSingle().Which;
+        item.VersionName.Should().BeNull();
+        item.Title.Should().Be("Other Quarry");
+        item.Location.Should().Be("Shelf B");
+    }
+
     private const string ProtocolRelative = "/" + "/cf.example.org/main.jpg";
 
     private static ParsedCollection Parse(string answer, bool includePrivateInfo = false) =>
@@ -251,6 +321,9 @@ public class BggCollectionParserTests
         $"<item objecttype=\"thing\" objectid=\"{gameId}\" subtype=\"boardgame\" collid=\"{collectionId}\">"
         + $"<name sortindex=\"1\">{System.Security.SecurityElement.Escape(name)}</name>{version}"
         + $"<status own=\"1\" />{privateInfo}</item>";
+
+    private static string NamedVersion(string nameElement) =>
+        $"<version><item type=\"boardgameversion\" id=\"1\">{nameElement}<width value=\"6.3\" /><length value=\"8.27\" /><depth value=\"2.09\" /></item></version>";
 
     private static string Version(string width, string length, string depth) =>
         $"<version><item type=\"boardgameversion\" id=\"1\"><width value=\"{width}\" /><length value=\"{length}\" /><depth value=\"{depth}\" /></item></version>";
