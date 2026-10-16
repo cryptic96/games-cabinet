@@ -124,6 +124,224 @@ public sealed class FilterShowOnShelfTests : CabinetPageTest
         ConsoleErrors.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task A_box_low_in_a_tall_phone_cabinet_is_centred()
+    {
+        var cards = await OpenSampleAsync(390, 844);
+        var pick = await PickBoxAsync(cards, tallest: true, lastGroupOnly: false);
+
+        await OpenCardAsync(pick.Id);
+        await Page.Locator("button.card-where-link").ClickAsync();
+
+        await Expect(Page.Locator(Found)).ToHaveAttributeAsync("data-entry-id", pick.Id);
+        var landing = (await ReadShownAsync()).Single();
+
+        landing.Fits.Should().BeFalse("the heading and the box do not both fit on a phone");
+        landing.Top.Should().BeGreaterThanOrEqualTo(landing.PinnedBarBottom);
+        landing.Bottom.Should().BeLessThanOrEqualTo(landing.Viewport);
+        var centre = (landing.Top + landing.Bottom) / 2;
+        var middle = landing.PinnedBarBottom + ((landing.Viewport - landing.PinnedBarBottom) / 2);
+        centre.Should().BeApproximately(middle, 2, "the box is centred in the space below the bar");
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task An_expansion_that_follows_its_base_lands_on_its_own_box()
+    {
+        FilterFixture.Write(_storage.FullPath);
+        await Page.SetViewportSizeAsync(1440, 900);
+        await OwnerHost.StoredAsync(factory => StartAsync(factory), _storage.FullPath);
+        await PrepareAsync();
+        await GotoCabinetAsync("/");
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
+        var baseEntry = FilterFixture.TallyEntry.ToString(CultureInfo.InvariantCulture);
+        var expansionEntry = FilterFixture.TallyExpansionEntry.ToString(CultureInfo.InvariantCulture);
+
+        await OpenCardAsync(baseEntry);
+        await Page.Locator($"button.exp-row[data-entry-id=\"{expansionEntry}\"]").ClickAsync();
+        await Expect(Page.Locator("#card-title")).ToHaveTextAsync("Tide Tally: Big Table");
+        await Expect(Page.Locator("button.card-where-link")).ToHaveAccessibleNameAsync("Show on shelf: Cabinet A");
+        await Page.Locator("button.card-where-link").ClickAsync();
+
+        await Expect(Page.Locator(Found)).ToHaveAttributeAsync("data-entry-id", expansionEntry);
+        var landing = (await ReadShownAsync()).Single();
+
+        landing.Location.Should().Be(FilterFixture.CabinetAId, "the expansion stands in its base's cabinet");
+        (await Page.Locator($"{Groups}[data-location-id=\"{FilterFixture.CabinetAId}\"] .placement[data-entry-id=\"{baseEntry}\"]").CountAsync()).Should().BeGreaterThan(0, "its base stands in the same cabinet");
+        landing.Top.Should().BeGreaterThanOrEqualTo(landing.PinnedBarBottom);
+        landing.Bottom.Should().BeLessThanOrEqualTo(landing.Viewport);
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_slow_or_failing_payload_is_handled()
+    {
+        var cards = await OpenSampleAsync(1440, 900);
+        var pick = await PickBoxAsync(cards, tallest: false, lastGroupOnly: false);
+        var mode = "fail";
+        var release = new TaskCompletionSource();
+        await Page.RouteAsync("**/cabinet/layout-by-location**", async route =>
+        {
+            if (mode == "fail")
+            {
+                await route.FulfillAsync(new RouteFulfillOptions { Status = 500, ContentType = "application/json", Body = "{}" });
+            }
+            else
+            {
+                await release.Task;
+                await route.ContinueAsync();
+            }
+        });
+
+        await Page.ReloadAsync();
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
+        await Expect(Page.Locator(AllRadio)).ToBeCheckedAsync();
+
+        await OpenCardAsync(pick.Id);
+        await Page.Locator("button.card-where-link").ClickAsync();
+
+        await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(0);
+        await Expect(Page.Locator("#filter-live")).ToHaveTextAsync(FailureCopy);
+        await Expect(Page.Locator(AllRadio)).ToBeCheckedAsync();
+        (await Page.Locator(Groups).CountAsync()).Should().Be(0, "the view stays All together");
+        (await Page.Locator("#cabinet [data-found]").CountAsync()).Should().Be(0, "a failed payload sets no outline");
+        (await ReadShownAsync()).Should().BeEmpty();
+
+        mode = "slow";
+        await OpenCardAsync(pick.Id);
+        await Page.Locator("button.card-where-link").ClickAsync();
+
+        await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(0);
+        await Task.Delay(500, TestContext.Current.CancellationToken);
+        (await Page.Locator(Groups).CountAsync()).Should().Be(0, "the current view stays until the payload arrives");
+        (await Page.Locator(Sections).CountAsync()).Should().BeGreaterThan(0);
+        (await Page.Locator("#cabinet [data-found]").CountAsync()).Should().Be(0);
+
+        release.SetResult();
+
+        await Expect(Page.Locator(Groups).First).ToBeAttachedAsync();
+        await Expect(Page.Locator(Found)).ToHaveAttributeAsync("data-entry-id", pick.Id);
+        var landing = (await ReadShownAsync()).Single();
+        landing.Top.Should().BeGreaterThanOrEqualTo(landing.PinnedBarBottom);
+        landing.Bottom.Should().BeLessThanOrEqualTo(landing.Viewport);
+        await Expect(Page.Locator(LocationRadio)).ToBeCheckedAsync();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task The_outline_ignores_mouse_moves_and_clears_on_a_press(bool reducedMotion)
+    {
+        var cards = await OpenSampleAsync(1440, 900);
+        var pick = await PickBoxAsync(cards, tallest: false, lastGroupOnly: false);
+        await Page.Locator("fieldset[data-filter=\"players\"] input[value=\"4\"]").ClickAsync();
+        await Page.WaitForFunctionAsync($"() => sessionStorage.getItem('{FiltersKey}') !== null");
+        await Expect(Page.Locator(".filter-count")).Not.ToHaveTextAsync(string.Empty);
+        var filters = await Page.EvaluateAsync<string?>($"() => sessionStorage.getItem('{FiltersKey}')");
+
+        if (reducedMotion)
+        {
+            await Page.EmulateMediaAsync(new PageEmulateMediaOptions { ReducedMotion = ReducedMotion.Reduce });
+        }
+
+        await ShowOnShelfAsync(pick.Id);
+        await Expect(Page.Locator(Found)).ToHaveAttributeAsync("data-entry-id", pick.Id);
+        var landing = (await ReadShownAsync()).Single();
+        landing.OutlineStyle.Should().Be("solid", "the outline is static with or without reduced motion");
+        landing.OutlineWidth.Should().Be("2px");
+
+        for (var step = 0; step < 6; step++)
+        {
+            await Page.Mouse.MoveAsync(100 + (step * 120), 300 + (step * 40));
+        }
+
+        await Task.Delay(300, TestContext.Current.CancellationToken);
+        await Expect(Page.Locator(Found)).ToHaveCountAsync(1);
+
+        await Page.Mouse.ClickAsync(4, 400);
+        await Expect(Page.Locator(Found)).ToHaveCountAsync(0);
+
+        await ShowOnShelfAsync(pick.Id);
+        await Expect(Page.Locator(Found)).ToHaveCountAsync(1);
+        await Page.Keyboard.PressAsync("Shift");
+        await Expect(Page.Locator(Found)).ToHaveCountAsync(0);
+
+        await ShowOnShelfAsync(pick.Id);
+        await Expect(Page.Locator(Found)).ToHaveCountAsync(1);
+        await Expect(Page.Locator(Found)).ToHaveCountAsync(0, new LocatorAssertionsToHaveCountOptions { Timeout = 6000 });
+
+        var recorded = await Page.EvaluateAsync<JsonElement>("() => window.__found");
+        var shown = recorded.GetProperty("shown").EnumerateArray().Select(item => item.GetProperty("at").GetDouble()).ToList();
+        var cleared = recorded.GetProperty("cleared").EnumerateArray().Select(item => item.GetProperty("at").GetDouble()).ToList();
+        shown.Should().HaveCount(3);
+        cleared.Should().HaveCount(3);
+        (cleared[2] - shown[2]).Should().BeInRange(1900, 4500, "the outline holds for two seconds when nothing is pressed");
+
+        (await Page.EvaluateAsync<string?>($"() => sessionStorage.getItem('{FiltersKey}')")).Should().Be(filters);
+        await Expect(Page.Locator("fieldset[data-filter=\"players\"] input[value=\"4\"]")).ToBeCheckedAsync();
+        await Expect(Page.Locator(".filter-count")).Not.ToHaveTextAsync(string.Empty);
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_game_with_no_place_has_no_link()
+    {
+        var cards = await OpenSampleAsync(1440, 900);
+        var unplaced = cards.First(card => !card.IsExpansion && card.Location is null);
+        var placed = cards.First(card => !card.IsExpansion && card.Location is not null && card.LocationId is not null);
+
+        await OpenCardAsync(unplaced.EntryId.ToString(CultureInfo.InvariantCulture));
+        await Expect(Page.Locator(".card-where")).ToHaveCountAsync(0);
+        await Expect(Page.Locator("button.card-where-link")).ToHaveCountAsync(0);
+        await Page.Keyboard.PressAsync("Escape");
+        await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(0);
+        await WaitUntilTheCardStepIsGoneAsync();
+
+        await OpenCardAsync(placed.EntryId.ToString(CultureInfo.InvariantCulture));
+        await Expect(Page.Locator("button.card-where-link")).ToHaveCountAsync(1);
+        await Expect(Page.Locator("button.card-where-link")).ToHaveAttributeAsync("type", "button");
+        await Expect(Page.Locator(".card-where dd")).ToHaveTextAsync(placed.Location!);
+    }
+
+    [Fact]
+    public async Task A_long_location_name_wraps_over_whole_rulings_with_the_chevron_at_its_end()
+    {
+        var cards = await OpenSampleAsync(390, 844);
+        var placed = cards.First(card => !card.IsExpansion && card.Location is not null && card.LocationId is not null);
+
+        await OpenCardAsync(placed.EntryId.ToString(CultureInfo.InvariantCulture));
+        await Page.Locator(".card-where-name").EvaluateAsync("(name) => { name.textContent = 'Lengthy'.repeat(9) + ' ' + 'Lengthy'.repeat(9); }");
+
+        var measured = await Page.Locator(".card-where-link").EvaluateAsync<JsonElement>("""
+            (link) => {
+              const ruling = Number.parseFloat(getComputedStyle(document.querySelector('.card-ruled')).lineHeight);
+              const rect = link.getBoundingClientRect();
+              const name = link.querySelector('.card-where-name').getBoundingClientRect();
+              const chevron = link.querySelector('.card-where-chev').getBoundingClientRect();
+              const card = document.querySelector('.card');
+              return {
+                ruling,
+                height: rect.height,
+                nameBottom: name.bottom,
+                chevronBottom: chevron.bottom,
+                chevronLeft: chevron.left,
+                nameRight: name.right,
+                linkRight: rect.right,
+                wide: card.scrollWidth > card.clientWidth,
+              };
+            }
+            """);
+        var ruling = measured.GetProperty("ruling").GetDouble();
+        var height = measured.GetProperty("height").GetDouble();
+
+        (height / ruling).Should().BeApproximately(Math.Round(height / ruling), 0.02, "the button is a whole number of rulings tall");
+        height.Should().BeGreaterThan(ruling * 1.5, "a long name wraps over several rulings");
+        measured.GetProperty("wide").GetBoolean().Should().BeFalse("the card never scrolls sideways");
+        measured.GetProperty("chevronBottom").GetDouble().Should().BeApproximately(measured.GetProperty("nameBottom").GetDouble(), ruling, "the chevron sits at the end of the last line");
+    }
+
     private async Task<IReadOnlyList<ViewCard>> OpenSampleAsync(int width, int height)
     {
         await Page.SetViewportSizeAsync(width, height);
@@ -194,6 +412,13 @@ public sealed class FilterShowOnShelfTests : CabinetPageTest
         await box.ScrollIntoViewIfNeededAsync();
         await box.ClickAsync();
         await Expect(Page.Locator(OpenCard)).ToBeVisibleAsync();
+    }
+
+    private async Task ShowOnShelfAsync(string entryId)
+    {
+        await OpenCardAsync(entryId);
+        await Page.Locator("button.card-where-link").ClickAsync();
+        await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(0);
     }
 
     private async Task<List<Landing>> ReadShownAsync()
