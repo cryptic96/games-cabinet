@@ -25,6 +25,30 @@ function textFor(table, entry) {
   return typeof value === 'function' ? value(...entry.args) : value;
 }
 
+test('the cases file holds at least 40 cases in both languages', () => {
+  assert.ok(cases.length >= 40);
+  assert.ok(cases.some((entry) => entry.language === 'en'));
+  assert.ok(cases.some((entry) => entry.language === 'nl'));
+});
+
+test('the unknown location heading is the name followed by the count, which is how the cabinet draws it', () => {
+  for (const entry of cases.filter((candidate) => candidate.key === 'unknownLocationHeading')) {
+    const table = copyFor(entry.language);
+
+    assert.equal(table.unknownLocation + table.locationHeadingCount(...entry.args), entry.text);
+  }
+});
+
+test('the games list group heading for no location follows the same form as the other group headings', () => {
+  for (const language of ['en', 'nl']) {
+    const table = copyFor(language);
+
+    for (const count of [1, 2, 14]) {
+      assert.equal(table.listUnknownGroupHeading(count), table.listGroupHeading(table.unknownLocation, count, count, true));
+    }
+  }
+});
+
 test('the cases file is not empty and every case names a stack and a language', () => {
   assert.ok(cases.length > 0);
 

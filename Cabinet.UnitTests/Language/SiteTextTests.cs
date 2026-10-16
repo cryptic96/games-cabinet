@@ -8,7 +8,14 @@ namespace Cabinet.UnitTests.Language;
 /// <summary>Verifies the English and Dutch label tables stay in step and follow the voice rules.</summary>
 public partial class SiteTextTests
 {
-    private static readonly string[] SameInBothLanguages = [nameof(SiteText.EnglishName), nameof(SiteText.DutchName), nameof(SiteText.LogoAlt)];
+    private static readonly string[] SameInBothLanguages =
+    [
+        nameof(SiteText.EnglishName),
+        nameof(SiteText.DutchName),
+        nameof(SiteText.LogoAlt),
+        nameof(SiteText.FiltersButton),
+        nameof(SiteText.SheetTitle),
+    ];
 
     [Fact]
     public void Every_label_in_both_tables_has_text()

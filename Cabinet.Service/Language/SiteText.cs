@@ -37,6 +37,18 @@ public sealed record SiteText
         PlayerSuffixManyFormat = "{0} players",
         PlayerSuffixMax = "8 or more players",
         TimeSuffixFormat = "{0} minutes or less",
+        ViewLegend = "View",
+        ViewAll = "All together",
+        ViewByLocation = "By location",
+        PlayersLegend = "Players",
+        TimeLegend = "Max. minutes",
+        AnyChoice = "Any",
+        LocationLabel = "Location",
+        AnyLocation = "Any location",
+        UnknownLocation = "Unknown location",
+        FiltersButton = "Filters",
+        FiltersActiveSuffix = "active",
+        SheetTitle = "Filters",
     };
 
     /// <summary>The Dutch labels, informal and in the singular you-form.</summary>
@@ -65,6 +77,18 @@ public sealed record SiteText
         PlayerSuffixManyFormat = "{0} spelers",
         PlayerSuffixMax = "8 of meer spelers",
         TimeSuffixFormat = "{0} minuten of minder",
+        ViewLegend = "Weergave",
+        ViewAll = "Alles samen",
+        ViewByLocation = "Per locatie",
+        PlayersLegend = "Spelers",
+        TimeLegend = "Max. minuten",
+        AnyChoice = "Alle",
+        LocationLabel = "Locatie",
+        AnyLocation = "Alle locaties",
+        UnknownLocation = "Onbekende locatie",
+        FiltersButton = "Filters",
+        FiltersActiveSuffix = "actief",
+        SheetTitle = "Filters",
     };
 
     /// <summary>The page title and heading.</summary>
@@ -135,6 +159,42 @@ public sealed record SiteText
 
     /// <summary>The spoken suffix of the time chip, with the number of minutes as <c>{0}</c>.</summary>
     public required string TimeSuffixFormat { get; init; }
+
+    /// <summary>The legend of the control that switches between one cabinet and a cabinet per location.</summary>
+    public required string ViewLegend { get; init; }
+
+    /// <summary>The view choice that shows every game in one cabinet.</summary>
+    public required string ViewAll { get; init; }
+
+    /// <summary>The view choice that shows one cabinet per storage location.</summary>
+    public required string ViewByLocation { get; init; }
+
+    /// <summary>The legend of the players choice.</summary>
+    public required string PlayersLegend { get; init; }
+
+    /// <summary>The legend of the play time choice.</summary>
+    public required string TimeLegend { get; init; }
+
+    /// <summary>The text of the choice that leaves a players or time filter off.</summary>
+    public required string AnyChoice { get; init; }
+
+    /// <summary>The visually hidden label of the location choice.</summary>
+    public required string LocationLabel { get; init; }
+
+    /// <summary>The location choice that leaves the location filter off.</summary>
+    public required string AnyLocation { get; init; }
+
+    /// <summary>The location choice and the heading for games that have no storage location.</summary>
+    public required string UnknownLocation { get; init; }
+
+    /// <summary>The text of the button that opens the filters on a narrow screen.</summary>
+    public required string FiltersButton { get; init; }
+
+    /// <summary>The word after the number of filters in use in the accessible name of the filters button.</summary>
+    public required string FiltersActiveSuffix { get; init; }
+
+    /// <summary>The visually hidden title of the filters sheet.</summary>
+    public required string SheetTitle { get; init; }
 
     /// <summary>The footer version line for a build.</summary>
     /// <param name="version">The running version.</param>

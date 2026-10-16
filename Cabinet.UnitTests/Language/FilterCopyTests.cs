@@ -14,6 +14,8 @@ public class FilterCopyTests
     {
         ["playersSuffix"] = (text, args) => text.PlayersSuffix(args[0].GetInt32()),
         ["timeSuffix"] = (text, args) => text.TimeSuffix(args[0].GetInt32()),
+        ["anyLocation"] = (text, _) => text.AnyLocation,
+        ["unknownLocation"] = (text, _) => text.UnknownLocation,
     };
 
     [Fact]
