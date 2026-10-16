@@ -313,6 +313,10 @@ public static class BggXml
             new XElement("maxplaytime", new XAttribute("value", Number(playingTime))),
             new XElement("minage", new XAttribute("value", Number(8 + item.ObjectId % 6))));
 
+        element.Element("name")!.AddAfterSelf(
+            SyntheticBggCollection.AlternateNamesFor(item).Select(
+                alternate => new XElement("name", new XAttribute("type", "alternate"), new XAttribute("sortindex", "1"), new XAttribute("value", alternate))));
+
         element.Add(
             Link("boardgamedesigner", 3000 + item.ObjectId % 5, $"Invented Designer {item.ObjectId % 5 + 1}", inbound: false),
             Link("boardgamedesigner", 3010 + item.ObjectId % 4, $"Invented Designer {item.ObjectId % 4 + 6}", inbound: false),

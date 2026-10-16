@@ -245,6 +245,30 @@ public static class SyntheticBggCollection
         return families;
     }
 
+    /// <summary>
+    /// The invented other titles BGG would list for an entry, chosen from its game id alone: none for most games, an accented
+    /// variant for one game in three and, for every sixth game, also a Dutch-like invented title. No title is a real game's.
+    /// </summary>
+    /// <param name="item">The collection entry.</param>
+    public static IReadOnlyList<string> AlternateNamesFor(FakeBggItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+
+        var names = new List<string>();
+
+        if (item.ObjectId % 3 == 0)
+        {
+            names.Add($"Exämple Gamé {item.ObjectId}");
+        }
+
+        if (item.ObjectId % 6 == 0)
+        {
+            names.Add($"Voorbeeldspel Nummer {item.ObjectId}");
+        }
+
+        return names;
+    }
+
     private static IEnumerable<FakeBggItem> EdgeCases()
     {
         yield return Entry(0, "Example Game 1", false, true, 1998, Dimensions(6.3, 8.27, 2.09), "Shelf A");
