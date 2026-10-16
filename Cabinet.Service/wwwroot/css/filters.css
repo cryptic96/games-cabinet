@@ -293,6 +293,10 @@ html {
   z-index: 2;
 }
 
+.filter-chip-text {
+  white-space: nowrap;
+}
+
 /**
  * Forced colours drop fills and shadows, so a chosen chip, Any included, gets a system outline drawn inside its edge.
  */
@@ -304,10 +308,21 @@ html {
 }
 
 /**
+ * From 64rem the bar is two designed rows of one line each: nothing wraps inside a row or inside a group, and the status group at the
+ * end of the second row keeps its space while it is hidden, so the bar is the same height whether or not a filter is set.
+ */
+@media (min-width: 64rem) {
+  .filter-row,
+  .filter-group {
+    flex-wrap: nowrap;
+  }
+}
+
+/**
  * On a screen too narrow for nine segments in a line, the chips of a group wrap and stand apart as separate chips, each still 44 px
  * high and wide, so the page never scrolls sideways.
  */
-@media (max-width: 64rem) {
+@media not all and (min-width: 64rem) {
   .filter-group {
     flex-wrap: wrap;
     gap: 8px;
