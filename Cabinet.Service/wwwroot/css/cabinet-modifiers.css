@@ -49,6 +49,14 @@
 }
 
 /**
+ * A pass that changes many veils at once shows them at once: the filter script marks the cabinet for that pass, so hundreds of
+ * veils never fade together on a cheap phone.
+ */
+.cabinet[data-bulk] {
+  --veil-fade: 0ms;
+}
+
+/**
  * Pointing at a box in shadow lifts its veil to a thin one, so its title can be read before it is opened.
  */
 @media (hover: hover) {

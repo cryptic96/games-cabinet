@@ -119,6 +119,21 @@
         </fieldset>
     </div>
     <div class="filter-row">
+        <fieldset class="filter-group" data-filter="time">
+            <legend>@Model.Language.Text.TimeLegend</legend>
+            <label class="filter-chip">
+                <input type="radio" name="filter-time" value="" checked />
+                <span class="filter-chip-text">@Model.Language.Text.AnyChoice</span>
+            </label>
+            @foreach (var minutes in new[] { 30, 45, 60, 90, 120 })
+            {
+                <label class="filter-chip">
+                    <input type="radio" name="filter-time" value="@minutes" />
+                    <span class="filter-chip-text" aria-hidden="true">@minutes.ToString(System.Globalization.CultureInfo.InvariantCulture)</span>
+                    <span class="visually-hidden">@Model.Language.Text.TimeSuffix(minutes)</span>
+                </label>
+            }
+        </fieldset>
         <div class="filter-status">
             <span class="filter-count" aria-hidden="true"></span>
             <button type="button" class="filter-clear" aria-label="@Model.Language.Text.ClearName">@Model.Language.Text.ClearVisible</button>

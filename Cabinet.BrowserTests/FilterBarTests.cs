@@ -124,6 +124,114 @@ public sealed class FilterBarTests : CabinetPageTest
         ConsoleErrors.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Time_and_players_combine_and_unknowns_stay_in_shadow()
+    {
+        await OpenAsync("/?sample=65", 1440, 900);
+        var cards = await LoadCardsAsync();
+        var time = Page.Locator("fieldset[data-filter=\"time\"]");
+        var all = await BoxIdsAsync(Boxes);
+
+        await Expect(time.Locator("legend")).ToHaveTextAsync("Max. minutes");
+        (await time.Locator("input[type=radio][name=\"filter-time\"]").CountAsync()).Should().Be(6);
+        (await time.Locator("input[type=radio]:checked").EvaluateAllAsync<string[]>("(radios) => radios.map((radio) => radio.value)")).Should().Equal(string.Empty);
+        (await Page.GetByRole(AriaRole.Radio, new PageGetByRoleOptions { Name = "60 minutes or less" }).CountAsync()).Should().Be(1);
+
+        var unknownTime = cards.Where(card => card.PlayTime is null or 0).Select(card => card.EntryId.ToString(CultureInfo.InvariantCulture)).ToList();
+        var longerThanAnHour = cards.Where(card => !card.IsExpansion && (card.PlayTime ?? 0) > 60).Select(card => card.EntryId.ToString(CultureInfo.InvariantCulture)).ToList();
+        unknownTime.Should().NotBeEmpty();
+        longerThanAnHour.Should().NotBeEmpty();
+
+        await time.Locator("input[value=\"60\"]").ClickAsync();
+
+        var byTime = ExpectedLit(cards, players: null, minutes: 60);
+        await Expect(Page.Locator(Dimmed)).ToHaveCountAsync(all.Count(id => !byTime.Contains(id)));
+        var dimmed = await BoxIdsAsync(Dimmed);
+        dimmed.Should().BeEquivalentTo(all.Where(id => !byTime.Contains(id)));
+        dimmed.Should().Contain(unknownTime.Where(all.Contains));
+        dimmed.Should().Contain(longerThanAnHour.Where(all.Contains));
+
+        await Page.Locator("fieldset[data-filter=\"players\"] input[value=\"4\"]").ClickAsync();
+
+        var both = ExpectedLit(cards, players: 4, minutes: 60);
+        both.Count.Should().BeLessThan(byTime.Count);
+        await Expect(Page.Locator(Dimmed)).ToHaveCountAsync(all.Count(id => !both.Contains(id)));
+        (await BoxIdsAsync(Dimmed)).Should().BeEquivalentTo(all.Where(id => !both.Contains(id)));
+
+        await time.Locator("input[value=\"60\"]").ClickAsync();
+
+        await Expect(time.Locator("input[value=\"\"]")).ToBeCheckedAsync();
+        var playersOnly = ExpectedLit(cards, players: 4, minutes: null);
+        await Expect(Page.Locator(Dimmed)).ToHaveCountAsync(all.Count(id => !playersOnly.Contains(id)));
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Search_players_and_time_narrow_together_and_Clear_returns_every_chip_to_Any()
+    {
+        await OpenAsync("/?sample=65", 1440, 900);
+        var cards = await LoadCardsAsync();
+        var all = await BoxIdsAsync(Boxes);
+
+        await Page.Locator("fieldset[data-filter=\"time\"] input[value=\"90\"]").ClickAsync();
+        await Page.Locator("fieldset[data-filter=\"players\"] input[value=\"3\"]").ClickAsync();
+        var lit = ExpectedLit(cards, players: 3, minutes: 90);
+        lit.Should().NotBeEmpty();
+        var fragment = cards.First(card => lit.Contains(card.EntryId.ToString(CultureInfo.InvariantCulture)) && !card.IsExpansion).Title;
+        await Page.Locator("#filter-q").FillAsync(fragment);
+
+        var shown = (await Page.Locator(Boxes).EvaluateAllAsync<string[]>("(boxes) => boxes.filter((box) => !box.hasAttribute('data-dim')).map((box) => box.dataset.entryId)")).ToList();
+        shown.Should().NotBeEmpty();
+        shown.Should().OnlyContain(id => lit.Contains(id));
+        shown.Count.Should().BeLessThan(all.Count(lit.Contains));
+
+        await Page.Locator(".filter-clear").ClickAsync();
+
+        await Expect(Page.Locator("#filter-q")).ToHaveValueAsync(string.Empty);
+        await Expect(Page.Locator("fieldset[data-filter=\"players\"] input[value=\"\"]")).ToBeCheckedAsync();
+        await Expect(Page.Locator("fieldset[data-filter=\"time\"] input[value=\"\"]")).ToBeCheckedAsync();
+        await Expect(Page.Locator(Dimmed)).ToHaveCountAsync(0);
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_large_change_is_shown_at_once()
+    {
+        await OpenAsync("/?sample=400", 1440, 900);
+        var cards = await LoadCardsAsync("400");
+        var all = await BoxIdsAsync(Boxes);
+        var expected = ExpectedLit(cards, players: null, minutes: 30);
+        all.Count(id => !expected.Contains(id)).Should().BeGreaterThan(120);
+        await Page.EvaluateAsync(RecordBulkPass);
+
+        await Page.Locator("fieldset[data-filter=\"time\"] input[value=\"30\"]").ClickAsync();
+
+        await Expect(Page.Locator(Dimmed)).ToHaveCountAsync(all.Count(id => !expected.Contains(id)));
+        await Expect(Page.Locator("#cabinet")).Not.ToHaveAttributeAsync("data-bulk", string.Empty);
+        var pass = await Page.EvaluateAsync<JsonElement>("() => window.__bulk");
+        pass.GetProperty("seen").GetBoolean().Should().BeTrue();
+        pass.GetProperty("gone").GetBoolean().Should().BeTrue();
+        pass.GetProperty("duration").GetString().Should().Be("0s");
+        (await Page.Locator(".placement-veil").First.EvaluateAsync<string>("(veil) => getComputedStyle(veil).transitionDuration")).Should().NotBe("0s");
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_small_change_keeps_its_fade()
+    {
+        await OpenAsync("/?sample=65", 1440, 900);
+        await Page.EvaluateAsync(RecordBulkPass);
+
+        await Page.Locator("fieldset[data-filter=\"players\"] input[value=\"5\"]").ClickAsync();
+
+        await Expect(Page.Locator(Dimmed).First).ToBeAttachedAsync();
+        await Page.EvaluateAsync("() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
+        (await Page.EvaluateAsync<bool>("() => window.__bulk.seen")).Should().BeFalse();
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    private const string RecordBulkPass = "() => { window.__bulk = { seen: false, gone: false, duration: null }; const mount = document.getElementById('cabinet'); new MutationObserver(() => { const on = mount.hasAttribute('data-bulk'); if (on && !window.__bulk.seen) { window.__bulk.seen = true; window.__bulk.duration = getComputedStyle(mount.querySelector('.placement-veil')).transitionDuration; } else if (!on && window.__bulk.seen) { window.__bulk.gone = true; } }).observe(mount, { attributes: true, attributeFilter: ['data-bulk'] }); }";
+
     private const string BoxRectangles = "() => [...document.querySelectorAll('#cabinet .placement')].map((box) => { const r = box.getBoundingClientRect(); return [box.dataset.entryId, box.dataset.kind, r.left, r.top, r.width, r.height].join(':'); })";
 
     private async Task<List<string>> BoxIdsAsync(string selector) =>
@@ -246,11 +354,11 @@ public sealed class FilterBarTests : CabinetPageTest
         await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
     }
 
-    private async Task<IReadOnlyList<CardData>> LoadCardsAsync()
+    private async Task<IReadOnlyList<CardData>> LoadCardsAsync(string sample = "65")
     {
         var json = await Page.EvaluateAsync<JsonElement>(
             "async address => (await (await fetch(address)).json()).cards",
-            "/cabinet/cards?profile=desktop&sample=65");
+            $"/cabinet/cards?profile=desktop&sample={sample}");
 
         return JsonSerializer.Deserialize<List<CardData>>(json.GetRawText(), WebOptions)!;
     }

@@ -75,6 +75,7 @@
 .filter-status {
   display: flex;
   flex: 0 0 auto;
+  margin-inline-start: auto;
   align-items: center;
   gap: 8px;
 }
@@ -83,9 +84,6 @@
   visibility: hidden;
 }
 
-.filter-row:last-child {
-  justify-content: flex-end;
-}
 
 .filter-count {
   font-size: 16px;
@@ -256,5 +254,28 @@
   .filter-chip:has(input:checked) {
     outline: 2px solid Highlight;
     outline-offset: -4px;
+  }
+}
+
+/**
+ * On a screen too narrow for nine segments in a line, the chips of a group wrap and stand apart as separate chips, each still 44 px
+ * high and wide, so the page never scrolls sideways.
+ */
+@media (max-width: 64rem) {
+  .filter-group {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .filter-group > legend {
+    float: none;
+    margin-inline-end: 0;
+  }
+
+  .filter-chip,
+  .filter-group > legend + .filter-chip,
+  .filter-group > .filter-chip:last-child {
+    margin-inline-start: 0;
+    border-radius: 4px;
   }
 }

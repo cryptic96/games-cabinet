@@ -4,10 +4,16 @@
  * nothing moves and nothing is removed. The rules live in the pure filter-rules module; this module only reads the controls, toggles
  * an attribute on the boxes and writes text.
  */
-import { EMPTY_FILTERS, PLAYER_CHOICES, buildModel, countLit, evaluate, fold, listEntries } from './filter-rules.js';
+import { EMPTY_FILTERS, PLAYER_CHOICES, TIME_CHOICES, buildModel, countLit, evaluate, fold, listEntries } from './filter-rules.js';
 
 /** How long the count must stay unchanged before it is announced to a screen reader, in milliseconds. */
 export const FILTER_ANNOUNCE_MS = 600;
+
+/**
+ * How many veils one pass may change before the fade is switched off for that pass. A pass that changes more boxes than this puts
+ * them in shadow or in the light at once, so a cheap phone never runs hundreds of fades together.
+ */
+export const BULK_VEIL_COUNT = 120;
 
 /**
  * The chip groups of the bar: which state member each group sets, and the values it may take. A chip value outside the set, or an
@@ -15,6 +21,7 @@ export const FILTER_ANNOUNCE_MS = 600;
  */
 const CHIP_GROUPS = Object.freeze([
   Object.freeze({ name: 'players', choices: PLAYER_CHOICES }),
+  Object.freeze({ name: 'time', choices: TIME_CHOICES }),
 ]);
 
 /**
@@ -65,6 +72,7 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
   let result = evaluate(state, model);
   let tally = countLit(entries, result.lit);
   let announceTimer = null;
+  let bulkFrame = 0;
 
   /**
    * Tells whether an entry is drawn in shadow. An entry the model does not hold is judged from its own title.
@@ -81,7 +89,7 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
       return !result.lit.has(entry);
     }
 
-    if (state.players !== null) {
+    if (state.players !== null || state.time !== null) {
       return true;
     }
 
@@ -100,13 +108,42 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
   }
 
   /**
-   * Decides again which games are lit, puts the boxes in shadow or in the light, writes the count and tells the page.
+   * Ends a pass that switched the fade off. The attribute stays through one drawn frame, so the browser has worked out the new
+   * shadows with no fade before the attribute goes, and a later pass cancels the pending end so two passes never cut each other short.
+   */
+  function endBulkPass() {
+    window.cancelAnimationFrame(bulkFrame);
+    bulkFrame = window.requestAnimationFrame(() => {
+      bulkFrame = window.requestAnimationFrame(() => {
+        mount.removeAttribute('data-bulk');
+      });
+    });
+  }
+
+  /**
+   * Decides again which games are lit, puts the boxes in shadow or in the light, writes the count and tells the page. A pass that
+   * changes more than BULK_VEIL_COUNT veils marks the mount first, so those veils change at once instead of fading.
    */
   function apply() {
     result = evaluate(state, model);
 
+    const changes = [];
+
     for (const box of mount.querySelectorAll('.placement')) {
-      box.toggleAttribute('data-dim', isDim(box.dataset.entryId, box.getAttribute('aria-label') ?? ''));
+      const dim = isDim(box.dataset.entryId, box.getAttribute('aria-label') ?? '');
+
+      if (dim !== box.hasAttribute('data-dim')) {
+        changes.push([box, dim]);
+      }
+    }
+
+    if (changes.length > BULK_VEIL_COUNT) {
+      mount.setAttribute('data-bulk', '');
+      endBulkPass();
+    }
+
+    for (const [box, dim] of changes) {
+      box.toggleAttribute('data-dim', dim);
     }
 
     tally = countLit(entries, result.lit);
