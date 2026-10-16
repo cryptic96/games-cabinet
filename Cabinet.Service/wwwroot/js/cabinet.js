@@ -162,10 +162,12 @@ function startCardsRequest() {
  * @param {number} epoch The load counter when the layout was drawn.
  * @param {string | null} etag The entity tag of the layout on screen, when the response carried one.
  * @param {Promise<Response | null> | null} [started] A request that is already under way, used instead of a new one.
+ * @param {boolean} [beforeDraw] Whether a draw follows, which applies the filters itself; the boxes on screen are then left alone
+ * until that draw swaps them.
  * @returns {Promise<'loaded' | 'superseded' | 'stale' | 'failed'>} Loaded when the data is kept, superseded when a newer load took
  * over, stale when the data belongs to a different layout, failed when the request or its answer was not usable.
  */
-async function requestCards(epoch, etag, started = null) {
+async function requestCards(epoch, etag, started = null, beforeDraw = false) {
   try {
     const response = started === null ? await fetch(cardsUrl(), { priority: 'low' }) : await started;
 
@@ -190,7 +192,7 @@ async function requestCards(epoch, etag, started = null) {
     cardRecords = new Map(body.cards.map((record) => [String(record.entryId), record]));
     filters.enableCardFilters();
     gamesList?.showCards(body.cards);
-    filters.rebuild(filterRecords(), body.locations ?? [], { layoutEtag: etag });
+    filters.rebuild(filterRecords(), body.locations ?? [], { layoutEtag: etag, quiet: beforeDraw });
     announce('cabinet:cards', { records: body.cards });
 
     return 'loaded';
@@ -211,10 +213,11 @@ async function requestCards(epoch, etag, started = null) {
  * @returns {Promise<'loaded' | 'superseded' | 'failed'>} How it ended.
  */
 async function fetchCards(epoch, etag, started = null) {
+  const beforeDraw = started !== null;
   let failures = 0;
 
   for (let attempt = 0; attempt < CARD_ATTEMPTS; attempt += 1) {
-    const outcome = await requestCards(epoch, etag, attempt === 0 ? started : null);
+    const outcome = await requestCards(epoch, etag, attempt === 0 ? started : null, beforeDraw);
 
     if (outcome === 'superseded') {
       return 'superseded';

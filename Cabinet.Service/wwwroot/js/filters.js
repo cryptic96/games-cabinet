@@ -115,9 +115,10 @@ function watchPinning(bar) {
  * kept; the controls start from them while the bar is still hidden.
  * @param {{ setItem: Function, removeItem: Function } | null} [parts.storage] Where the filters are kept for the tab; null keeps them
  * in memory only.
- * @returns {{ dimOf: (placement: object) => boolean, rebuild: (records: object[], locations?: object[], held?: { layoutEtag?: string | null }) => void, apply: () => void, showBar: (visible: boolean) => void, disableCardFilters: () => void, enableCardFilters: () => void, state: object }}
+ * @returns {{ dimOf: (placement: object) => boolean, rebuild: (records: object[], locations?: object[], held?: { layoutEtag?: string | null, quiet?: boolean }) => void, apply: () => void, showBar: (visible: boolean) => void, disableCardFilters: () => void, enableCardFilters: () => void, state: object }}
  * The controls: whether a box is drawn in shadow, a new model of the collection (with the owner's locations when the card data brings
- * them, and the entity tag of the layout the records belong to, so the other titles are read again when the collection changed), a
+ * them, and the entity tag of the layout the records belong to, so the other titles are read again when the collection changed; a
+ * quiet one only replaces the model and leaves the boxes on screen alone, for a draw that follows at once), a
  * fresh pass over the drawn boxes, showing or hiding the bar, switching off and on the controls that need the card data, and the
  * current state.
  */
@@ -586,8 +587,11 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
       locations = Array.isArray(owned) ? owned : locations;
       model = modelOf(records);
       entries = listEntries(model, { language });
-      fillPlaces();
-      apply();
+
+      if (held?.quiet !== true) {
+        fillPlaces();
+        apply();
+      }
 
       if (collectionChanged && field.value !== '') {
         fetchNames();

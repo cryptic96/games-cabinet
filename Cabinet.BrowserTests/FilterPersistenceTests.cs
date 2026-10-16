@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Cabinet.BrowserTests.Infrastructure;
+using Cabinet.FakeBgg;
 using FluentAssertions;
 using Microsoft.Playwright;
 
@@ -16,6 +17,7 @@ public sealed class FilterPersistenceTests : CabinetPageTest
     private const string Boxes = "#cabinet .placement";
     private const string Dimmed = "#cabinet .placement[data-dim]";
     private const string StorageKey = "cabinet-filters";
+    private const string Select = "#filter-loc";
 
     private const string InstallDrawRecorder = """
         (() => {
@@ -43,7 +45,7 @@ public sealed class FilterPersistenceTests : CabinetPageTest
                 if (record.attributeName === 'hidden' && record.target.classList.contains('filter-bar') && record.oldValue !== null && !record.target.hasAttribute('hidden')) {
                   shown = true;
                 }
-                if (record.attributeName === 'data-dim' && record.target.classList.contains('placement')) {
+                if (record.attributeName === 'data-dim' && record.target.classList.contains('placement') && record.target.isConnected) {
                   rec.toggles.push(record.target.dataset.entryId);
                 }
               }
@@ -229,6 +231,104 @@ public sealed class FilterPersistenceTests : CabinetPageTest
         AssertBarShownWithTheFirstDraw(recording);
         ConsoleErrors.Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task An_owner_move_redraws_with_the_filter_and_the_scroll_kept()
+    {
+        await Page.SetViewportSizeAsync(1440, 900);
+        var host = await OwnerHost.SyncAsync(factory => StartAsync(factory), SyntheticBggCollection.Create(120));
+        var places = await host.SeedAsync("Cabinet A", "Shelf B");
+        var games = host.Cards.DistinctBy(card => card.GameId).Take(3).ToList();
+        var moved = games[0];
+        await host.PlaceAsync(moved, places[1]);
+        await host.PlaceAsync(games[1], places[1]);
+        await host.PlaceAsync(games[2], places[0]);
+        await PrepareAsync();
+        await GotoCabinetAsync("/");
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
+
+        await Page.Locator(Select).SelectOptionAsync(places[1]);
+        await Expect(Page.Locator(Dimmed).First).ToBeAttachedAsync();
+        var movedId = (await EntryIdsAsync(moved.GameId))[0];
+        var movedBox = Page.Locator($"{Boxes}[data-entry-id=\"{movedId}\"]").First;
+        (await movedBox.GetAttributeAsync("data-dim")).Should().BeNull("the moved copy stands in the chosen place before the move");
+        var countBefore = await Page.Locator(".filter-count").InnerTextAsync();
+        await Page.EvaluateAsync("() => window.scrollTo(0, 400)");
+        await Page.WaitForFunctionAsync("() => window.scrollY > 300");
+        var scrolledBefore = await Page.EvaluateAsync<double>("() => window.scrollY");
+        await Page.EvaluateAsync("() => { window.__rec.inserted.length = 0; window.__rec.toggles.length = 0; window.__rec.batches.length = 0; }");
+
+        await host.PlaceAsync(moved, places[0]);
+        host.TellOpenPages();
+
+        await Page.WaitForFunctionAsync("() => window.__rec.inserted.length > 0", null, new PageWaitForFunctionOptions { Timeout = 20000 });
+        await Expect(movedBox).ToHaveAttributeAsync("data-dim", string.Empty);
+        var recording = await ReadRecorderAsync();
+        recording.Toggles.Should().BeEmpty("the redraw drew its boxes already in shadow");
+        var dimmedNow = await BoxIdsAsync(Dimmed);
+        recording.Inserted.Where(box => box.Dim).Select(box => box.Id).Should().BeEquivalentTo(dimmedNow);
+        recording.Inserted.First(box => box.Id == movedId).Dim.Should().BeTrue("the moved copy was dimmed in the first frame of the redraw");
+        await Expect(Page.Locator(Select)).ToHaveValueAsync(places[1]);
+        await Expect(Page.Locator(".filter-count")).Not.ToHaveTextAsync(countBefore);
+        var scrolledAfter = await Page.EvaluateAsync<double>("() => window.scrollY");
+        Math.Abs(scrolledAfter - scrolledBefore).Should().BeLessThan(900);
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_deleted_location_falls_back_to_Any()
+    {
+        await Page.SetViewportSizeAsync(1440, 900);
+        var host = await OwnerHost.SyncAsync(factory => StartAsync(factory), SyntheticBggCollection.Create(20));
+        var places = await host.SeedAsync("Cabinet A", "Shelf B");
+        var games = host.Cards.DistinctBy(card => card.GameId).Take(2).ToList();
+        await host.PlaceAsync(games[0], places[0]);
+        await host.PlaceAsync(games[1], places[1]);
+        await PrepareAsync();
+        await GotoCabinetAsync("/");
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
+        await Page.Locator(Select).SelectOptionAsync(places[1]);
+        await Expect(Page.Locator(Dimmed).First).ToBeAttachedAsync();
+
+        await host.DeleteLocationAsync(places[1]);
+        host.TellOpenPages();
+
+        await Expect(Page.Locator(Select)).ToHaveValueAsync(string.Empty, new LocatorAssertionsToHaveValueOptions { Timeout = 20000 });
+        await Expect(Page.Locator($"{Select} option")).ToHaveCountAsync(3);
+        await Expect(Page.Locator(Dimmed)).ToHaveCountAsync(0);
+        await Page.WaitForFunctionAsync($"() => JSON.parse(sessionStorage.getItem('{StorageKey}') ?? 'null')?.location == null");
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Without_locations_the_location_control_goes_away()
+    {
+        await Page.SetViewportSizeAsync(1440, 900);
+        var host = await OwnerHost.SyncAsync(factory => StartAsync(factory), SyntheticBggCollection.Create(20));
+        var places = await host.SeedAsync("Cabinet A", "Shelf B");
+        var games = host.Cards.DistinctBy(card => card.GameId).Take(2).ToList();
+        await host.PlaceAsync(games[0], places[0]);
+        await host.PlaceAsync(games[1], places[1]);
+        await PrepareAsync();
+        await GotoCabinetAsync("/");
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await Expect(Page.Locator(Select)).ToBeVisibleAsync();
+
+        await host.DeleteLocationAsync(places[0]);
+        await host.DeleteLocationAsync(places[1]);
+        host.TellOpenPages();
+
+        await Expect(Page.Locator(Select)).ToBeHiddenAsync(new LocatorAssertionsToBeHiddenOptions { Timeout = 20000 });
+        await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    private async Task<string[]> EntryIdsAsync(int gameId) =>
+        await Page.EvaluateAsync<string[]>(
+            "async (id) => (await (await fetch('/cabinet/cards?profile=desktop')).json()).cards.filter((card) => card.gameId === id).map((card) => String(card.entryId))",
+            gameId);
 
     private async Task AssertNoteUnderBarAsync()
     {
