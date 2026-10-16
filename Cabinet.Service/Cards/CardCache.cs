@@ -55,8 +55,9 @@ public sealed class CardCache(SampleCatalog catalog, LayoutCache layouts)
     private CachedCards Build(string sample, SectionDesign design)
     {
         var items = catalog.ItemsOf(sample);
-        var cards = CardRecords.Build(items, SampleCardDetails.SnapshotFor(sample, items), design);
+        var book = SampleCardDetails.LocationBookFor(sample, items);
+        var cards = CardRecords.Build(items, SampleCardDetails.SnapshotFor(sample, items), design, book);
 
-        return CachedCards.From(new CardsDocument(layouts.Get(sample, design).ETag, cards));
+        return CachedCards.From(new CardsDocument(layouts.Get(sample, design).ETag, cards, CardsDocument.ListLocations(book)));
     }
 }

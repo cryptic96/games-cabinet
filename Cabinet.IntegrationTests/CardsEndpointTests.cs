@@ -217,6 +217,26 @@ public sealed class CardsEndpointTests
     }
 
     [Fact]
+    public async Task The_sample_cards_carry_locations()
+    {
+        await using var factory = new CabinetWebApplicationFactory(PrototypeOn);
+        using var client = factory.CreatePublicClient();
+
+        using var response = await client.GetAsync("/cabinet/cards?sample=65&profile=desktop", TestContext.Current.CancellationToken);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var cards = document.RootElement.GetProperty("cards").EnumerateArray().ToList();
+        var locations = document.RootElement.GetProperty("locations").EnumerateArray().ToDictionary(
+            location => location.GetProperty("id").GetString()!,
+            location => location.GetProperty("name").GetString());
+        var placed = cards.Where(record => Has(record, "locationId")).ToList();
+
+        locations.Values.Should().Contain("Cabinet A").And.Contain("Lent out");
+        placed.Should().NotBeEmpty();
+        placed.Should().OnlyContain(record => locations[record.GetProperty("locationId").GetString()!] == record.GetProperty("location").GetString());
+        cards.Should().Contain(record => !Has(record, "locationId"));
+    }
+
+    [Fact]
     public async Task Without_owner_locations_the_cards_have_no_location_list_and_no_location_id()
     {
         using var storage = new TemporaryDirectory();
