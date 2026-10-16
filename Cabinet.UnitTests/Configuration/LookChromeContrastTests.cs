@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
 using Cabinet.Domain.Layout;
 using Cabinet.Domain.Owner;
 using Cabinet.UnitTests.Infrastructure;
@@ -12,7 +14,7 @@ namespace Cabinet.UnitTests.Configuration;
 /// out the way the browser works them out, so a change to a token that breaks legibility fails here.
 /// </summary>
 [Trait("Category", "Configuration")]
-public class LookChromeContrastTests
+public partial class LookChromeContrastTests
 {
     private const double TextContrast = 4.5;
     private const double GraphicContrast = 3.0;
@@ -32,6 +34,9 @@ public class LookChromeContrastTests
 
     /// <summary>The five woods the owner can pick.</summary>
     public static TheoryData<string> Woods { get; } = [.. CabinetLook.Woods];
+
+    /// <summary>Every wood in the day and in the evening.</summary>
+    public static TheoryData<string, string> WoodsByHour { get; } = BuildWoodsByHour();
 
     [Theory]
     [MemberData(nameof(Woods))]
@@ -152,6 +157,86 @@ public class LookChromeContrastTests
             SpineColour.ContrastRatio(wall, kick).Should().BeGreaterThanOrEqualTo(TextContrast);
             StyleSheetTokens.Luminance(kick).Should().BeGreaterThanOrEqualTo(KickNeverBlackBelow);
         }
+    }
+
+    /// <summary>
+    /// The filter bar and its sheet read on every wall by day and in the evening: the control text, the muted text, the borders, the
+    /// filled choice, the text on the hover wash, the focus ring and the quiet bar under the choice that means any. A stuck bar and the
+    /// sheet stand on the flat wall; a bar still in the page stands on the wall under the brightest part of the falloff.
+    /// </summary>
+    /// <param name="wood">The wood whose wall is drawn.</param>
+    /// <param name="hour">The light state of the page, which never changes a wall token.</param>
+    [Theory]
+    [MemberData(nameof(WoodsByHour))]
+    public void The_filter_bar_and_the_sheet_read_on_every_wall_by_day_and_in_the_evening(string wood, string hour)
+    {
+        var tokens = Sheets.Value.ForWood(wood);
+        var flat = StyleSheetTokens.Colour(tokens, "--room");
+        var walls = new Dictionary<string, RgbColour>
+        {
+            ["the stuck bar and the sheet on the flat wall"] = flat,
+            ["the bar in the page flow under the brightest falloff"] = BrightestWall(tokens),
+        };
+        var text = StyleSheetTokens.Colour(tokens, "--room-text");
+        var muted = StyleSheetTokens.Colour(tokens, "--room-muted");
+        var line = StyleSheetTokens.Colour(tokens, "--room-line");
+        var ring = StyleSheetTokens.Colour(tokens, "--room-ring");
+
+        foreach (var (surface, wall) in walls)
+        {
+            var label = $"{wood} by {hour}, {surface}";
+            var wash = WashOver(tokens, wall);
+
+            SpineColour.ContrastRatio(text, wall).Should().BeGreaterThanOrEqualTo(TextContrast, $"{label}: control text, legends, the count and a location name");
+            SpineColour.ContrastRatio(muted, wall).Should().BeGreaterThanOrEqualTo(TextContrast, $"{label}: the hint, the placeholder, a heading count and disabled text");
+            SpineColour.ContrastRatio(line, wall).Should().BeGreaterThanOrEqualTo(GraphicContrast, $"{label}: control borders and the segmented outline");
+            SpineColour.ContrastRatio(text, wash).Should().BeGreaterThanOrEqualTo(TextContrast, $"{label}: control text on the hover wash");
+            SpineColour.ContrastRatio(ring, wall).Should().BeGreaterThanOrEqualTo(GraphicContrast, $"{label}: the focus ring drawn outside a control");
+            SpineColour.ContrastRatio(text, wall).Should().BeGreaterThanOrEqualTo(GraphicContrast, $"{label}: the quiet bar under the choice that means any");
+        }
+
+        SpineColour.ContrastRatio(flat, text).Should().BeGreaterThanOrEqualTo(TextContrast, $"{wood} by {hour}: the label on a filled choice, a highlighted Clear and the primary sheet button");
+    }
+
+    [Theory]
+    [MemberData(nameof(Woods))]
+    public void The_evening_changes_no_wall_token(string wood)
+    {
+        var modifiers = StyleSheetTokens.FromFiles(RepositoryPaths.ServiceDirectory(), "cabinet-modifiers.css");
+
+        foreach (var selector in new[] { "[data-lights=\"on\"]", "[data-lights=\"evenings\"]", "[data-lit]", ":root" })
+        {
+            modifiers.Block(selector).Keys.Should().NotContain(name => name.StartsWith("--room", StringComparison.Ordinal), $"{wood}: the light state leaves the wall tokens of {selector} alone");
+        }
+    }
+
+    private static RgbColour WashOver(IReadOnlyDictionary<string, string> tokens, RgbColour wall)
+    {
+        var wash = WashPattern().Match(StyleSheetTokens.Resolve(tokens, "--room-wash"));
+
+        wash.Success.Should().BeTrue("the hover wash is the wall's text colour at a share over nothing");
+
+        var share = double.Parse(wash.Groups["share"].Value, CultureInfo.InvariantCulture) / 100.0;
+
+        return StyleSheetTokens.Over(StyleSheetTokens.Colour(tokens, "--room-text"), wall, share);
+    }
+
+    [GeneratedRegex(@"^color-mix\(in srgb, #[0-9a-fA-F]{6} (?<share>[0-9.]+)%, transparent\)$")]
+    private static partial Regex WashPattern();
+
+    private static TheoryData<string, string> BuildWoodsByHour()
+    {
+        var data = new TheoryData<string, string>();
+
+        foreach (var wood in CabinetLook.Woods)
+        {
+            foreach (var hour in new[] { "day", "evening" })
+            {
+                data.Add(wood, hour);
+            }
+        }
+
+        return data;
     }
 
     private static RgbColour BrightestWall(IReadOnlyDictionary<string, string> tokens)
