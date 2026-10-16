@@ -15,7 +15,7 @@ public sealed class GamesListTests : CabinetPageTest
 {
     private const string Entries = ".games-list button";
     private const string OpenCard = "dialog.card-dialog[open]";
-    private const string LiveRegionsOtherThanTheSyncNote = "[...document.querySelectorAll('[aria-live], [role=\"status\"], [role=\"alert\"], [role=\"log\"]')].filter((e) => e.id !== 'sync-note').length";
+    private const string LiveRegionsOtherThanTheSyncAndFilterNotes = "[...document.querySelectorAll('[aria-live], [role=\"status\"], [role=\"alert\"], [role=\"log\"]')].filter((e) => e.id !== 'sync-note' && e.id !== 'filter-live').length";
     private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
 
     [Fact]
@@ -86,18 +86,18 @@ public sealed class GamesListTests : CabinetPageTest
     }
 
     [Fact]
-    public async Task The_page_keeps_one_live_region_and_the_list_adds_none()
+    public async Task The_page_keeps_two_live_regions_and_the_list_adds_none()
     {
         await OpenAsync("/?sample=65", 1440, 900);
 
-        (await Page.EvaluateAsync<int>(LiveRegionsOtherThanTheSyncNote)).Should().Be(0);
+        (await Page.EvaluateAsync<int>(LiveRegionsOtherThanTheSyncAndFilterNotes)).Should().Be(0);
 
         await Page.Keyboard.PressAsync("Tab");
         await Page.Keyboard.PressAsync("Enter");
         await Page.Keyboard.PressAsync("Enter");
         await Expect(Page.Locator(OpenCard)).ToBeVisibleAsync();
 
-        (await Page.EvaluateAsync<int>(LiveRegionsOtherThanTheSyncNote)).Should().Be(0);
+        (await Page.EvaluateAsync<int>(LiveRegionsOtherThanTheSyncAndFilterNotes)).Should().Be(0);
     }
 
     [Fact]

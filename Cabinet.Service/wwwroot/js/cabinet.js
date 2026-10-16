@@ -11,6 +11,7 @@ import { initCardDialog } from './detail.js';
 import { indexPlacements, recordFromPlacement } from './card-flow.js';
 import { initRoving } from './keys.js';
 import { initGamesList } from './games-list.js';
+import { initFilters, NO_FILTERS } from './filters.js';
 import { initLook } from './look.js';
 import { applyLookStatus } from './look-switch.js';
 
@@ -38,6 +39,29 @@ let cardRecords = new Map();
 let drawnPlacements = new Map();
 let drawnPalette = [];
 let cardsFailed = false;
+
+const filterBar = document.querySelector('.filter-bar');
+
+/**
+ * Gives the records the filters judge: every card record while the card data is held, plus a least record for each drawn box the
+ * card data does not hold. A box carries the id of its family, which the least record keeps so the family can still be found.
+ * @returns {object[]}
+ */
+function filterRecords() {
+  const records = [...cardRecords.values()];
+
+  for (const [key, placement] of drawnPlacements) {
+    if (!cardRecords.has(key)) {
+      records.push({ ...recordFromPlacement(placement), familyId: placement.familyId });
+    }
+  }
+
+  return records;
+}
+
+const filters = filterBar === null || mount === null
+  ? NO_FILTERS
+  : initFilters({ bar: filterBar, mount, copy: COPY, language: pageLanguage(), getRecords: filterRecords });
 
 /** The waits before the second and third request for the card data after a failed one, in milliseconds. */
 const CARD_RETRY_DELAYS_MS = [1500, 4000];
@@ -139,6 +163,7 @@ async function requestCards(epoch, etag) {
 
     cardRecords = new Map(body.cards.map((record) => [String(record.entryId), record]));
     gamesList?.showCards(body.cards);
+    filters.rebuild(filterRecords());
     announce('cabinet:cards', { records: body.cards });
 
     return 'loaded';
@@ -184,6 +209,23 @@ async function fetchCards(epoch, etag) {
 }
 
 /**
+ * Tells the filters what the layout about to be drawn holds, so the boxes are built already in the light or in shadow.
+ * @param {object} layout The layout about to be drawn.
+ */
+function prepareFilters(layout) {
+  drawnPlacements = indexPlacements(layout);
+  filters.rebuild(filterRecords());
+}
+
+/**
+ * Shows the filter bar when the cabinet drew at least one box and hides it otherwise, in the same task as the draw, so the cabinet
+ * never shifts under the reader.
+ */
+function showFilterBarForDrawnCabinet() {
+  filterBar?.toggleAttribute('hidden', drawnPlacements.size === 0);
+}
+
+/**
  * Remembers what the layout just drawn holds and starts fetching the card data that goes with it.
  * @param {object} layout The layout drawn.
  * @param {string | null} etag The entity tag of the layout response.
@@ -223,6 +265,8 @@ function showError() {
   retry.textContent = COPY.retry;
   retry.addEventListener('click', load);
 
+  filterBar?.setAttribute('hidden', '');
+
   const message = document.createElement('div');
   message.className = 'cabinet-message';
   message.append(heading, body, retry);
@@ -259,7 +303,9 @@ async function load() {
       return;
     }
 
-    renderCabinet(mount, layout, COPY);
+    prepareFilters(layout);
+    renderCabinet(mount, layout, COPY, filters.dimOf);
+    showFilterBarForDrawnCabinet();
     roving.refresh();
     announce('cabinet:drawn');
     afterDraw(layout, response.headers.get('ETag'));
@@ -323,7 +369,9 @@ async function redraw() {
     const active = document.activeElement;
     const focused = mount.contains(active) ? { entryId: active.dataset.entryId, kind: active.dataset.kind } : undefined;
 
-    renderCabinet(mount, layout, COPY);
+    prepareFilters(layout);
+    renderCabinet(mount, layout, COPY, filters.dimOf);
+    showFilterBarForDrawnCabinet();
     roving.refresh();
     announce('cabinet:drawn');
     afterDraw(layout, etag);

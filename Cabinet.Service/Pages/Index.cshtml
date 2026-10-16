@@ -94,6 +94,19 @@
         </nav>
     }
 </header>
+<div class="filter-sentinel" aria-hidden="true"></div>
+<div class="filter-bar" role="search" aria-label="@Model.Language.Text.FilterBarLabel" hidden>
+    <label class="visually-hidden" for="filter-q">@Model.Language.Text.SearchLabel</label>
+    <span class="filter-search">
+        <input id="filter-q" type="search" name="q" placeholder="@Model.Language.Text.SearchLabel" enterkeyhint="search" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" dir="auto" aria-keyshortcuts="/" />
+        <kbd class="filter-hint" aria-hidden="true">/</kbd>
+    </span>
+    <div class="filter-status">
+        <span class="filter-count" aria-hidden="true"></span>
+        <button type="button" class="filter-clear" aria-label="@Model.Language.Text.ClearName">@Model.Language.Text.ClearVisible</button>
+    </div>
+</div>
+<p id="filter-live" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
 <main>
     <section class="games-list" aria-labelledby="games-list-title">
         <h2 id="games-list-title" class="games-list-heading" tabindex="-1">@Model.Language.Text.GamesListHeading</h2>

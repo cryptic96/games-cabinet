@@ -12,7 +12,8 @@ namespace Cabinet.BrowserTests;
 public sealed class KeyboardTests : CabinetPageTest
 {
     private const string Boxes = "#cabinet .placement";
-    private const string LastLinkBeforeCabinet = ".sample-switcher a >> nth=-1";
+    private const string LastControlBeforeCabinet = "#filter-q";
+    private const string LastLinkBeforeTheBar = ".sample-switcher a >> nth=-1";
     private const string FocusedBoxScript = "(() => { const e = document.activeElement; const r = e.getBoundingClientRect(); return { isBox: e.classList.contains('placement'), shelf: e.dataset.shelf ?? null, entryId: e.dataset.entryId ?? null, kind: e.dataset.kind ?? null, tabIndex: e.getAttribute('tabindex'), left: r.left, top: r.top, right: r.right, bottom: r.bottom }; })()";
     private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
 
@@ -55,7 +56,7 @@ public sealed class KeyboardTests : CabinetPageTest
     {
         await OpenAsync("/?sample=65", 1440, 900);
 
-        await Page.Locator(LastLinkBeforeCabinet).FocusAsync();
+        await Page.Locator(LastControlBeforeCabinet).FocusAsync();
         await Page.Keyboard.PressAsync("Tab");
 
         await Expect(Page.Locator(Boxes).First).ToBeFocusedAsync();
@@ -125,7 +126,7 @@ public sealed class KeyboardTests : CabinetPageTest
     {
         await OpenAsync("/?sample=65", 1440, 900);
 
-        await Page.Locator(LastLinkBeforeCabinet).FocusAsync();
+        await Page.Locator(LastControlBeforeCabinet).FocusAsync();
         await Page.Keyboard.PressAsync("Tab");
         await Page.Keyboard.PressAsync("ArrowRight");
         var box = await FocusedAsync();
@@ -276,7 +277,7 @@ public sealed class KeyboardTests : CabinetPageTest
 
         await Expect(Page.Locator(Boxes)).ToHaveCountAsync(0);
 
-        await Page.Locator(LastLinkBeforeCabinet).FocusAsync();
+        await Page.Locator(LastLinkBeforeTheBar).FocusAsync();
         await Page.Keyboard.PressAsync("Tab");
 
         await Expect(Page.Locator(".bgg-credit")).ToBeFocusedAsync();
