@@ -165,6 +165,152 @@ public sealed partial class FilterSlimBarTests : CabinetPageTest
         ConsoleErrors.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Scrolling_down_slides_the_bar_away_and_up_brings_it_back()
+    {
+        await OpenAsync(390, 844, recordScroll: true);
+
+        (await ReadAwayAsync()).Away.Should().BeFalse();
+        var listeners = await Page.EvaluateAsync<JsonElement>("() => window.__scrollListeners");
+        listeners.GetArrayLength().Should().Be(1, "one scroll listener serves the slide");
+        listeners[0].GetProperty("passive").GetBoolean().Should().BeTrue();
+
+        await ScrollToAsync(200);
+        await Expect(Page.Locator(Bar)).ToHaveAttributeAsync("data-away", string.Empty);
+        await Expect(Page.Locator(Bar)).ToHaveCSSAsync("visibility", "hidden");
+        await Expect(Page.Locator(Field)).ToBeHiddenAsync();
+        await Expect(Page.Locator(".filter-bar .filter-open")).ToBeHiddenAsync();
+        (await ReadAwayAsync()).Transform.Should().Be("matrix(1, 0, 0, 1, 0, -60)");
+        await Expect(Page.Locator(Bar)).ToHaveCSSAsync("transition-property", "transform, visibility");
+
+        await ScrollToAsync(180);
+        await Expect(Page.Locator(Bar)).Not.ToHaveAttributeAsync("data-away", string.Empty);
+        await Expect(Page.Locator(Bar)).ToHaveCSSAsync("visibility", "visible");
+        await Expect(Page.Locator(Field)).ToBeVisibleAsync();
+        await Expect(Page.Locator(Bar)).ToHaveCSSAsync("transform", "none");
+        await Expect(Page.Locator(Bar)).ToHaveCSSAsync("transition-property", "transform, visibility");
+
+        await ScrollToAsync(186);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
+        (await ReadAwayAsync()).Away.Should().BeFalse("a few pixels down are not enough");
+
+        await ScrollToAsync(200);
+        await Expect(Page.Locator(Bar)).ToHaveAttributeAsync("data-away", string.Empty);
+
+        await ScrollToAsync(0);
+        await Expect(Page.Locator(Bar)).Not.ToHaveAttributeAsync("data-away", string.Empty);
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task The_bar_stays_while_it_matters()
+    {
+        await OpenAsync(390, 844);
+
+        await ScrollToAsync(40);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
+        (await ReadAwayAsync()).Away.Should().BeFalse("within one bar height of the top");
+
+        await Page.Locator(Field).FillAsync("a");
+        await Expect(Page.Locator(Bar)).ToHaveAttributeAsync("data-active", string.Empty);
+        await Page.Locator(Field).BlurAsync();
+        await ScrollToAsync(300);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
+        (await ReadAwayAsync()).Away.Should().BeFalse("a filter is in use");
+        await Page.Locator(IconClear).DispatchEventAsync("click");
+        await Expect(Page.Locator(Bar)).Not.ToHaveAttributeAsync("data-active", string.Empty);
+        await Page.Locator(Field).BlurAsync();
+
+        await ScrollToAsync(0);
+        await Page.Locator(Field).FocusAsync();
+        await ScrollToAsync(300);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
+        (await ReadAwayAsync()).Away.Should().BeFalse("the field has focus");
+        await Page.Locator(Field).BlurAsync();
+
+        await ScrollToAsync(0);
+        await Page.Locator(".filter-bar .filter-open").DispatchEventAsync("click");
+        await Expect(Page.Locator("dialog.filter-dialog[open]")).ToBeVisibleAsync();
+        await ScrollToAsync(300);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
+        (await ReadAwayAsync()).Away.Should().BeFalse("the sheet is open");
+        await Page.Keyboard.PressAsync("Escape");
+        await Expect(Page.Locator("dialog.filter-dialog[open]")).ToHaveCountAsync(0);
+        await Page.EvaluateAsync("() => document.activeElement?.blur()");
+
+        await ScrollToAsync(0);
+        await Page.Locator("#cabinet .placement").First.DispatchEventAsync("click");
+        await Expect(Page.Locator("dialog.card-dialog[open]")).ToBeVisibleAsync();
+        await ScrollToAsync(300);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
+        (await ReadAwayAsync()).Away.Should().BeFalse("a card is open");
+        await Page.Keyboard.PressAsync("Escape");
+        await Expect(Page.Locator("dialog.card-dialog[open]")).ToHaveCountAsync(0);
+        await WaitUntilTheCardStepIsGoneAsync();
+        await Page.EvaluateAsync("() => document.activeElement?.blur()");
+
+        await ScrollToAsync(0);
+        await ScrollToAsync(300);
+        await Expect(Page.Locator(Bar)).ToHaveAttributeAsync("data-away", string.Empty);
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Slash_brings_an_away_bar_back_and_focuses_the_field()
+    {
+        await OpenAsync(390, 844);
+        await ScrollToAsync(300);
+        await Expect(Page.Locator(Bar)).ToHaveAttributeAsync("data-away", string.Empty);
+
+        await Page.Keyboard.PressAsync("/");
+
+        await Expect(Page.Locator(Bar)).Not.ToHaveAttributeAsync("data-away", string.Empty);
+        await Expect(Page.Locator(Field)).ToBeFocusedAsync();
+        await ScrollToAsync(500);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
+        (await ReadAwayAsync()).Away.Should().BeFalse("the field keeps focus");
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task The_full_bar_never_slides_and_the_listener_follows_the_width()
+    {
+        await OpenAsync(1280, 900, recordScroll: true);
+
+        (await Page.EvaluateAsync<int>("() => window.__scrollListeners.length")).Should().Be(0);
+        var reach = await Page.EvaluateAsync<double>("() => document.documentElement.scrollHeight - window.innerHeight");
+        reach.Should().BeGreaterThan(300, "the page can be scrolled well past the bar");
+        await ScrollToAsync(Math.Min(600, reach));
+        await Task.Delay(150, TestContext.Current.CancellationToken);
+        (await ReadAwayAsync()).Away.Should().BeFalse();
+        (await Page.Locator(Bar).EvaluateAsync<string>("(bar) => getComputedStyle(bar).position")).Should().Be("sticky");
+
+        await Page.SetViewportSizeAsync(390, 844);
+        await Page.WaitForFunctionAsync("() => window.__scrollListeners.length === 1");
+        await Page.WaitForFunctionAsync("() => document.documentElement.scrollHeight - window.innerHeight > 400");
+        await ScrollToAsync(0);
+        await ScrollToAsync(300);
+        await Expect(Page.Locator(Bar)).ToHaveAttributeAsync("data-away", string.Empty);
+
+        await Page.SetViewportSizeAsync(1280, 900);
+        await Expect(Page.Locator(Bar)).Not.ToHaveAttributeAsync("data-away", string.Empty);
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Under_reduced_motion_the_bar_goes_and_returns_at_once()
+    {
+        await Page.EmulateMediaAsync(new PageEmulateMediaOptions { ReducedMotion = ReducedMotion.Reduce });
+        await OpenAsync(390, 844);
+
+        await Expect(Page.Locator(Bar)).ToHaveCSSAsync("transition-duration", "0s");
+        await ScrollToAsync(300);
+        await Expect(Page.Locator(Bar)).ToHaveAttributeAsync("data-away", string.Empty);
+        await Expect(Page.Locator(Bar)).ToHaveCSSAsync("transition-duration", "0s");
+        await Expect(Page.Locator(Bar)).ToHaveCSSAsync("visibility", "hidden");
+        ConsoleErrors.Should().BeEmpty();
+    }
+
     [GeneratedRegex(@"^\d+ of \d+ games?$")]
     private static partial Regex FullCountPattern();
 
@@ -251,7 +397,20 @@ public sealed partial class FilterSlimBarTests : CabinetPageTest
         element.GetProperty("right").GetDouble(),
         element.GetProperty("height").GetDouble());
 
-    private async Task OpenAsync(int width, int height)
+    private async Task ScrollToAsync(double top)
+    {
+        await Page.EvaluateAsync("(y) => window.scrollTo({ top: y, behavior: 'instant' })", top);
+        await Page.WaitForFunctionAsync("(y) => Math.abs(window.scrollY - y) < 1.5", top);
+    }
+
+    private async Task<AwayReading> ReadAwayAsync()
+    {
+        var reading = await Page.EvaluateAsync<JsonElement>(ReadAway);
+
+        return new AwayReading(reading.GetProperty("away").GetBoolean(), reading.GetProperty("transform").GetString()!);
+    }
+
+    private async Task OpenAsync(int width, int height, bool recordScroll = false)
     {
         await Page.SetViewportSizeAsync(width, height);
 
@@ -267,10 +426,17 @@ public sealed partial class FilterSlimBarTests : CabinetPageTest
             _started = true;
         }
 
+        if (recordScroll)
+        {
+            await Page.AddInitScriptAsync($"({RecordScrollListeners})()");
+        }
+
         await GotoCabinetAsync("/?sample=65");
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await Expect(Page.Locator(Bar)).ToBeVisibleAsync();
     }
+
+    private sealed record AwayReading(bool Away, string Transform);
 
     private sealed record Box(double Top, double Bottom, double Right, double Height);
 
