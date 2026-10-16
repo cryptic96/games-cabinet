@@ -349,6 +349,25 @@ public static class OwnerStrings
     /// <param name="title">The game's title.</param>
     public static string PickerLabel(string title) => $"Location for {title}";
 
+    /// <summary>The tag that tells apart the copies of one game owned more than once.</summary>
+    /// <param name="index">The position of the copy, counting from 1.</param>
+    /// <param name="count">How many copies of the game are owned.</param>
+    public static string CopyTag(int index, int count) => $"Copy {index} of {count}";
+
+    /// <summary>The accessible name of the picker of one copy of a game owned more than once.</summary>
+    /// <param name="title">The game's title.</param>
+    /// <param name="copy">What tells the copy apart, such as its copy tag.</param>
+    public static string PickerLabelForCopy(string title, string copy)
+    {
+        var named = copy.StartsWith("Copy ", StringComparison.Ordinal) ? string.Concat("c", copy.AsSpan(1)) : copy;
+
+        return $"Location for {title}, {named}";
+    }
+
+    /// <summary>The hint under the picker of an expansion that has no place of its own and follows the first copy of its base game.</summary>
+    /// <param name="baseTitle">The base game's title.</param>
+    public static string FollowsFirstCopy(string baseTitle) => $"Follows the first copy of {baseTitle}.";
+
     /// <summary>The picker option that makes an expansion follow its base game.</summary>
     /// <param name="baseTitle">The base game's title.</param>
     public static string SameAs(string baseTitle) => $"Same as {baseTitle}";

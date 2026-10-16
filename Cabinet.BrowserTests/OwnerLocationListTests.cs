@@ -107,7 +107,7 @@ public sealed class OwnerLocationListTests : CabinetPageTest
 
         var item = Page.Locator(".loc-item").Nth(1);
         var delete = item.GetByRole(AriaRole.Button, new() { Name = "Delete Shelf B" });
-        await Expect(item.Locator(".loc-count")).ToHaveTextAsync("2 games");
+        await Expect(item.Locator(".loc-count")).ToHaveTextAsync("3 games");
         await delete.ClickAsync();
 
         var dialog = Page.Locator("dialog.owner-dialog[open]");

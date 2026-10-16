@@ -41,7 +41,7 @@ public sealed partial class OwnerGamesListPageTests
         rows.Should().BeGreaterThan(1);
         Pickers().Matches(page.Body).Count.Should().Be(rows);
         ForwardForms().Matches(page.Body).Count.Should().Be(rows);
-        page.Body.Should().Contain("aria-label=\"Location for Example Game 1\"");
+        page.Body.Should().Contain("aria-label=\"Location for Example Game 1, copy 1 of 2\"").And.Contain("aria-label=\"Location for Example Game 1, copy 2 of 2\"");
         var expansionPicker = PickerOf(page.Body, "Example Game 1: Lantern Extras");
         expansionPicker.Should().Contain("Same as Example Game 1").And.NotContain(">Not placed<").And.Contain(">Cabinet A<");
         PickerOf(page.Body, "Lantern &amp; Harbour").Should().Contain(">Not placed<").And.Contain(">Cabinet A<");
