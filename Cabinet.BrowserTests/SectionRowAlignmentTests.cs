@@ -46,6 +46,35 @@ public sealed class SectionRowAlignmentTests : CabinetPageTest
         ConsoleErrors.Should().BeEmpty();
     }
 
+    [Theory]
+    [InlineData("1")]
+    [InlineData("5")]
+    public async Task A_sparse_last_section_on_a_phone_has_no_empty_shelf_above_its_boxes(string sample)
+    {
+        await Page.SetViewportSizeAsync(390, 800);
+        await StartAsync(PrototypeOn);
+        await GotoCabinetAsync($"/?sample={sample}");
+
+        await Page.Locator("#cabinet .section").Last.ScrollIntoViewIfNeededAsync();
+        var json = await Page.EvaluateAsync<string>(LastSectionShelvesScript);
+        var shelves = JsonSerializer.Deserialize<List<ShelfReading>>(json, ReadingOptions)!;
+        var topBoxShelf = shelves.FindIndex(shelf => shelf.Boxes > 0);
+
+        shelves.Should().NotBeEmpty();
+        shelves.Count.Should().BeLessThan(7, "a sparse last section keeps only the shelf rows that hold a game");
+        shelves[^1].Boxes.Should().BeGreaterThan(0, "the boxes stand on the bottom shelf");
+        topBoxShelf.Should().BeLessThanOrEqualTo(1, "at most the one shelf that makes the two-shelf minimum is empty above the boxes");
+
+        if (topBoxShelf == 1)
+        {
+            shelves.Should().HaveCount(2);
+        }
+
+        shelves.Skip(topBoxShelf).Should().OnlyContain(shelf => shelf.Boxes > 0, "no shelf between the boxes is empty");
+        shelves.Should().OnlyContain(shelf => shelf.Overhang < Tolerance, "every box ends on a shelf of its section");
+        ConsoleErrors.Should().BeEmpty();
+    }
+
     private async Task<List<RowReading>> ReadRowsAsync(int columns)
     {
         var json = await Page.EvaluateAsync<string>(RowsScript, columns);
@@ -60,6 +89,22 @@ public sealed class SectionRowAlignmentTests : CabinetPageTest
             const height = parseFloat(getComputedStyle(sections[index]).getPropertyValue('--section-h'));
             sections[index].style.setProperty('--section-h', String(height * 0.8));
           }
+        }
+        """;
+
+    private const string LastSectionShelvesScript = """
+        async () => {
+          await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+          const sections = [...document.querySelectorAll('#cabinet .section')];
+          const cubbies = [...sections[sections.length - 1].querySelectorAll('.cubby')];
+          const tops = [...new Set(cubbies.map((cubby) => Math.round(cubby.getBoundingClientRect().top)))].sort((a, b) => a - b);
+          return JSON.stringify(tops.map((top) => {
+            const row = cubbies.filter((cubby) => Math.round(cubby.getBoundingClientRect().top) === top);
+            const boxes = row.flatMap((cubby) => [...cubby.querySelectorAll('.placement')].map((box) => ({ box, cubby })));
+            const overhang = Math.max(0, ...boxes.map((entry) =>
+              entry.box.getBoundingClientRect().bottom - entry.cubby.getBoundingClientRect().bottom));
+            return { boxes: boxes.length, overhang };
+          }));
         }
         """;
 
@@ -81,4 +126,6 @@ public sealed class SectionRowAlignmentTests : CabinetPageTest
         """;
 
     private sealed record RowReading(double[] Bottoms, double[] Heights, double[] Tops);
+
+    private sealed record ShelfReading(int Boxes, double Overhang);
 }

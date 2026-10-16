@@ -1,5 +1,5 @@
 {
-  "layoutVersion": 16,
+  "layoutVersion": 17,
   "profile": "phone",
   "optionsFingerprint": "334acc9b71de0655",
   "palette": [
@@ -56,7 +56,7 @@
     {
       "index": 0,
       "widthMm": 640,
-      "heightMm": 2160,
+      "heightMm": 1140,
       "frameMm": 20,
       "cubbies": [
         {
@@ -117,33 +117,9 @@
           ]
         },
         {
-          "index": 2,
-          "xMm": 0,
-          "yMm": 320,
-          "widthMm": 260,
-          "heightMm": 280,
-          "placements": []
-        },
-        {
-          "index": 3,
-          "xMm": 280,
-          "yMm": 320,
-          "widthMm": 180,
-          "heightMm": 280,
-          "placements": []
-        },
-        {
-          "index": 4,
-          "xMm": 480,
-          "yMm": 320,
-          "widthMm": 160,
-          "heightMm": 280,
-          "placements": []
-        },
-        {
           "index": 5,
           "xMm": 0,
-          "yMm": 620,
+          "yMm": 320,
           "widthMm": 290,
           "heightMm": 380,
           "placements": []
@@ -151,7 +127,7 @@
         {
           "index": 6,
           "xMm": 310,
-          "yMm": 620,
+          "yMm": 320,
           "widthMm": 330,
           "heightMm": 380,
           "placements": [
@@ -171,41 +147,9 @@
           ]
         },
         {
-          "index": 7,
-          "xMm": 0,
-          "yMm": 1020,
-          "widthMm": 290,
-          "heightMm": 340,
-          "placements": []
-        },
-        {
-          "index": 8,
-          "xMm": 310,
-          "yMm": 1020,
-          "widthMm": 330,
-          "heightMm": 340,
-          "placements": []
-        },
-        {
-          "index": 9,
-          "xMm": 0,
-          "yMm": 1380,
-          "widthMm": 440,
-          "heightMm": 340,
-          "placements": []
-        },
-        {
-          "index": 10,
-          "xMm": 460,
-          "yMm": 1380,
-          "widthMm": 180,
-          "heightMm": 340,
-          "placements": []
-        },
-        {
           "index": 11,
           "xMm": 0,
-          "yMm": 1740,
+          "yMm": 720,
           "widthMm": 170,
           "heightMm": 420,
           "placements": []
@@ -213,7 +157,7 @@
         {
           "index": 12,
           "xMm": 190,
-          "yMm": 1740,
+          "yMm": 720,
           "widthMm": 450,
           "heightMm": 420,
           "placements": [
