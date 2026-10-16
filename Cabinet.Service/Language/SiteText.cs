@@ -26,6 +26,10 @@ public sealed record SiteText
         LogoAlt = "Powered by BGG",
         SyncNow = "Sync now",
         LastSyncedFormat = "Last synced {0}",
+        FilterBarLabel = "Find a game",
+        SearchLabel = "Search games",
+        ClearVisible = "Clear",
+        ClearName = "Clear filters",
     };
 
     /// <summary>The Dutch labels, informal and in the singular you-form.</summary>
@@ -46,6 +50,10 @@ public sealed record SiteText
         LogoAlt = "Powered by BGG",
         SyncNow = "Nu synchroniseren",
         LastSyncedFormat = "Laatst gesynchroniseerd op {0}",
+        FilterBarLabel = "Zoek een spel",
+        SearchLabel = "Zoek een spel",
+        ClearVisible = "Wissen",
+        ClearName = "Filters wissen",
     };
 
     /// <summary>The page title and heading.</summary>
@@ -92,6 +100,18 @@ public sealed record SiteText
 
     /// <summary>The exact-time line with the written-out time as <c>{0}</c>.</summary>
     public required string LastSyncedFormat { get; init; }
+
+    /// <summary>The accessible name of the search region above the cabinet.</summary>
+    public required string FilterBarLabel { get; init; }
+
+    /// <summary>The label and the placeholder of the search field.</summary>
+    public required string SearchLabel { get; init; }
+
+    /// <summary>The visible text of the button that clears the filters.</summary>
+    public required string ClearVisible { get; init; }
+
+    /// <summary>The accessible name of the button that clears the filters.</summary>
+    public required string ClearName { get; init; }
 
     /// <summary>The footer version line for a build.</summary>
     /// <param name="version">The running version.</param>

@@ -315,6 +315,27 @@ const ENGLISH = Object.freeze({
   moreName(n, base) {
     return n === 1 ? `+${n} more expansion for ${base}` : `+${n} more expansions for ${base}`;
   },
+
+  noMatch: 'No games match',
+
+  /**
+   * The count beside the search while a filter is active: how many games stand in the light out of how many there are.
+   * @param {number} lit How many games are lit.
+   * @param {number} total How many games there are.
+   * @returns {string}
+   */
+  filterCount(lit, total) {
+    return `${lit} of ${total} ${total === 1 ? 'game' : 'games'}`;
+  },
+
+  /**
+   * What is announced when every filter has been cleared.
+   * @param {number} total How many games there are.
+   * @returns {string}
+   */
+  filtersCleared(total) {
+    return `Filters cleared, ${total} ${total === 1 ? 'game' : 'games'}`;
+  },
 });
 
 const DUTCH = Object.freeze({
@@ -555,6 +576,27 @@ const DUTCH = Object.freeze({
    */
   moreName(n, base) {
     return n === 1 ? `+${n} meer uitbreiding op ${base}` : `+${n} meer uitbreidingen op ${base}`;
+  },
+
+  noMatch: 'Geen spellen gevonden',
+
+  /**
+   * The count beside the search while a filter is active: how many games stand in the light out of how many there are.
+   * @param {number} lit How many games are lit.
+   * @param {number} total How many games there are.
+   * @returns {string}
+   */
+  filterCount(lit, total) {
+    return `${lit} van ${total} ${total === 1 ? 'spel' : 'spellen'}`;
+  },
+
+  /**
+   * What is announced when every filter has been cleared.
+   * @param {number} total How many games there are.
+   * @returns {string}
+   */
+  filtersCleared(total) {
+    return `Filters gewist, ${total} ${total === 1 ? 'spel' : 'spellen'}`;
   },
 });
 

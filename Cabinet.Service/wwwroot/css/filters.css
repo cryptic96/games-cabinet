@@ -1,0 +1,138 @@
+/**
+ * The filter bar on the wall above the cabinet: a search field, the count of games that stand in the light and a button that clears
+ * the search. It is page chrome in wall colours, like the rest of the page controls, and holds no cabinet rule: the shadow a search
+ * puts on a box is drawn by the modifiers layer. The bar is transparent so the wall shows through, and the group at its end is
+ * hidden by visibility while nothing is filtered, so its space stays and the bar never changes height when a search starts.
+ */
+.filter-sentinel {
+  block-size: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-block-end: 16px;
+  padding-block: 8px;
+  color: var(--room-text, var(--wall-text));
+  background: transparent;
+}
+
+.filter-bar[hidden] {
+  display: none;
+}
+
+.filter-search {
+  position: relative;
+  display: block;
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+#filter-q {
+  display: block;
+  inline-size: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 28px 0 12px;
+  border: 1px solid var(--room-line, var(--chrome-line));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--room-text, var(--wall-text));
+  font: inherit;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  appearance: none;
+}
+
+#filter-q::placeholder {
+  color: var(--room-muted, var(--chrome-muted));
+  opacity: 1;
+}
+
+#filter-q::-webkit-search-cancel-button,
+#filter-q::-webkit-search-decoration {
+  appearance: none;
+}
+
+#filter-q:focus-visible,
+.filter-clear:focus-visible {
+  outline: 2px solid var(--room-ring, var(--wood-light));
+  outline-offset: 2px;
+}
+
+.filter-status {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-bar:not([data-active]) .filter-status {
+  visibility: hidden;
+}
+
+.filter-count {
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/**
+ * The slash that tells a visitor with a keyboard where the shortcut is. It sits inside the empty field at its inline end, in the
+ * muted wall colour on the plain field, and only on a device with a mouse; it goes away as soon as the field has focus or text.
+ */
+.filter-hint {
+  position: absolute;
+  inset-inline-end: 4px;
+  top: 50%;
+  display: none;
+  transform: translateY(-50%);
+  border: 0;
+  background: none;
+  color: var(--room-muted, var(--chrome-muted));
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1;
+  pointer-events: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .filter-hint {
+    display: block;
+  }
+
+  #filter-q:focus ~ .filter-hint,
+  #filter-q:not(:placeholder-shown) ~ .filter-hint {
+    display: none;
+  }
+}
+
+.filter-clear {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--room-line, var(--chrome-line));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--room-text, var(--wall-text));
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+/**
+ * When nothing matches, Clear is the action to take, so it is drawn as the inverted wall fill, the way a chosen value is.
+ */
+.filter-clear[data-highlighted] {
+  background: var(--room-text, var(--wall-text));
+  color: var(--room, var(--wood-dark));
+  font-weight: 600;
+}

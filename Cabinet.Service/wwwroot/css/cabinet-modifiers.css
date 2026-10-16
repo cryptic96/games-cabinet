@@ -2,18 +2,68 @@
 
 /**
  * Modifiers only add overlays and set their strengths. They never move or resize anything and never touch a box face
- * except through the shade alpha. The strengths below are the defaults of an element that carries none of the choices.
+ * except through the shade alpha and, for a box in shadow, its veil. The strengths below are the defaults of an element that
+ * carries none of the choices.
  */
 :root {
   --depth-k: 1;
   --seam-k: 1;
   --lamp-fade: 2000ms;
   --lamp-front: 0;
+  --veil-alpha: 0.6;
+  --veil-peek-alpha: 0.2;
+  --veil-fade: 160ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
   :root {
     --lamp-fade: 0ms;
+    --veil-fade: 0ms;
+  }
+}
+
+/**
+ * Shadow. A box that does not match what the visitor is looking for stands where it stands under a dark veil with a thin lit
+ * rim, so it stays a solid box and never becomes see-through. The veil is the last child of the box, so it lies above the box's
+ * own face and, because the box is above the light layer, above the light of its cubby too: the lamp never lifts a box out of
+ * its shadow. It only fades in and out and never takes a pointer event, so a box in shadow is clicked, focused and read exactly
+ * like a lit one.
+ */
+.placement-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  background: rgb(var(--box-shade-rgb) / var(--veil-alpha));
+  box-shadow: inset 1px 1px 0 rgb(255 255 255 / 0.2);
+  transition: opacity var(--veil-fade) ease-out;
+}
+
+.placement[data-dim] > .placement-veil {
+  opacity: 1;
+}
+
+.placement[data-found] > .placement-veil {
+  opacity: 0;
+}
+
+/**
+ * Pointing at a box in shadow lifts its veil to a thin one, so its title can be read before it is opened.
+ */
+@media (hover: hover) {
+  .placement[data-dim]:hover > .placement-veil {
+    opacity: calc(var(--veil-peek-alpha) / var(--veil-alpha));
+  }
+}
+
+/**
+ * Forced colours drop every fill, so the veil would vanish; the system's own mode gets the one place where a box is made
+ * half transparent instead.
+ */
+@media (forced-colors: active) {
+  .placement[data-dim] {
+    opacity: 0.5;
   }
 }
 

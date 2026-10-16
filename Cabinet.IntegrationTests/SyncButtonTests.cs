@@ -28,7 +28,7 @@ public partial class SyncButtonTests
     }
 
     [Fact]
-    public async Task The_note_exists_empty_as_the_only_live_region_of_the_block()
+    public async Task The_sync_note_exists_empty_and_the_filter_message_is_the_only_other_live_region()
     {
         await using var factory = SyncHarness.CreateFactory(new ScriptedBggHandler(), SyncHarness.NewClock());
         using var client = factory.CreatePublicClient();
@@ -39,7 +39,8 @@ public partial class SyncButtonTests
         note.Success.Should().BeTrue();
         note.Groups["attributes"].Value.Should().Contain("role=\"status\"").And.Contain("aria-atomic=\"true\"");
         note.Groups["text"].Value.Should().BeEmpty();
-        Regex.Matches(html, "role=\"status\"").Count.Should().Be(1);
+        Regex.Matches(html, "role=\"status\"").Count.Should().Be(2);
+        Regex.IsMatch(html, "<p id=\"filter-live\"[^>]*role=\"status\"").Should().BeTrue();
     }
 
     [Fact]

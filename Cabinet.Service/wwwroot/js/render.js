@@ -270,7 +270,15 @@ function drawGeneratedCover(button, placement, lines) {
   const plate = document.createElement('span');
   plate.className = 'cover-plate';
   plate.append(...lines);
-  button.append(plate);
+
+  const veil = button.querySelector('.' + VEIL_CLASS);
+
+  if (veil === null) {
+    button.append(plate);
+  } else {
+    veil.remove();
+    button.append(plate, veil);
+  }
 }
 
 /**
@@ -316,20 +324,28 @@ function drawArtCover(button, placement, art, lines) {
   button.append(image);
 }
 
+/** The class of the empty node that carries the shadow of a box; every box ends with one. */
+const VEIL_CLASS = 'placement-veil';
+
 /**
  * Builds the button for one placement.
  * @param {object} placement One placement from the layout.
  * @param {object} copy The visitor-facing strings.
  * @param {object[]} palette The colour table of the layout.
+ * @param {(placement: object) => boolean} dimOf Tells whether the box is drawn in shadow.
  * @returns {HTMLButtonElement}
  */
-function buildPlacement(placement, copy, palette) {
+function buildPlacement(placement, copy, palette, dimOf) {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'placement';
   button.dataset.kind = placement.kind;
   button.dataset.gameId = String(placement.gameId);
   button.dataset.entryId = String(placement.entryId);
+
+  if (dimOf(placement)) {
+    button.dataset.dim = '';
+  }
 
   if (placement.familyId !== undefined) {
     button.dataset.familyId = String(placement.familyId);
@@ -373,6 +389,11 @@ function buildPlacement(placement, copy, palette) {
     button.append(...lines);
   }
 
+  const veil = document.createElement('span');
+  veil.className = VEIL_CLASS;
+  veil.setAttribute('aria-hidden', 'true');
+  button.append(veil);
+
   return button;
 }
 
@@ -386,9 +407,10 @@ const BOARD_TONE_COUNT = 6;
  * @param {object[]} palette The colour table of the layout.
  * @param {object} section The section the cubby belongs to.
  * @param {number[]} rowTops The distinct cubby tops of the section in ascending order.
+ * @param {(placement: object) => boolean} dimOf Tells whether a box is drawn in shadow.
  * @returns {HTMLDivElement}
  */
-function buildCubby(cubby, copy, palette, section, rowTops) {
+function buildCubby(cubby, copy, palette, section, rowTops, dimOf) {
   const element = document.createElement('div');
   element.className = 'cubby';
   element.dataset.board = String((section.index * 2 + rowTops.indexOf(cubby.yMm)) % BOARD_TONE_COUNT);
@@ -403,7 +425,7 @@ function buildCubby(cubby, copy, palette, section, rowTops) {
   setNumber(element, '--h', cubby.heightMm);
 
   const shelf = section.index + ':' + rowTops.indexOf(cubby.yMm);
-  const boxes = cubby.placements.map((placement) => buildPlacement(placement, copy, palette));
+  const boxes = cubby.placements.map((placement) => buildPlacement(placement, copy, palette, dimOf));
 
   for (const box of boxes) {
     box.dataset.shelf = shelf;
@@ -457,9 +479,10 @@ function buildLight(section) {
  * @param {object} section One section from the layout.
  * @param {object} copy The visitor-facing strings.
  * @param {object[]} palette The colour table of the layout.
+ * @param {(placement: object) => boolean} dimOf Tells whether a box is drawn in shadow.
  * @returns {HTMLDivElement}
  */
-function buildSection(section, copy, palette) {
+function buildSection(section, copy, palette, dimOf) {
   const element = document.createElement('div');
   element.className = 'section';
   setNumber(element, '--section-w', section.widthMm + 2 * section.frameMm);
@@ -470,7 +493,7 @@ function buildSection(section, copy, palette) {
 
   const body = document.createElement('div');
   body.className = 'section-body';
-  body.append(...section.cubbies.map((cubby) => buildCubby(cubby, copy, palette, section, rowTops)));
+  body.append(...section.cubbies.map((cubby) => buildCubby(cubby, copy, palette, section, rowTops, dimOf)));
   element.append(
     buildDecoration('section-floor'),
     body,
@@ -488,7 +511,9 @@ function buildSection(section, copy, palette) {
  * @param {HTMLElement} mount The element that holds the cabinet.
  * @param {object} layout The layout JSON.
  * @param {object} copy The visitor-facing strings.
+ * @param {(placement: object) => boolean} [dimOf] Tells whether a box is drawn in shadow; by default none is. The shadow is decided
+ * here, while the box is built, so a cabinet drawn during a search never shows a lit frame first.
  */
-export function renderCabinet(mount, layout, copy) {
-  mount.replaceChildren(...layout.sections.map((section) => buildSection(section, copy, layout.palette ?? [])));
+export function renderCabinet(mount, layout, copy, dimOf = () => false) {
+  mount.replaceChildren(...layout.sections.map((section) => buildSection(section, copy, layout.palette ?? [], dimOf)));
 }
