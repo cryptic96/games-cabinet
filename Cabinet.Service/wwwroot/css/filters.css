@@ -298,6 +298,111 @@
 }
 
 /**
+ * The view switch: two segments in one outline, All together and By location. Only the segment of the view on screen is filled, in
+ * the wall colours inverted; the other stays as quiet as the rest of the bar. Each segment is 44 px high and never wraps, and the
+ * radio inside it is an invisible hit target, so the native group keeps its role, its one tab stop and its arrow keys.
+ */
+.filter-view {
+  display: flex;
+  flex: 0 0 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--room-line, var(--chrome-line));
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.filter-view[hidden] {
+  display: none;
+}
+
+.filter-view-segment {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding-inline: 12px;
+  background: transparent;
+  color: var(--room-text, var(--wall-text));
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.filter-view-segment + .filter-view-segment {
+  border-inline-start: 1px solid var(--room-line, var(--chrome-line));
+}
+
+.filter-view-segment input {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  margin: 0;
+  opacity: 0;
+  outline: none;
+  cursor: inherit;
+}
+
+.filter-view-text {
+  white-space: nowrap;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .filter-view-segment:hover {
+    background: var(--room-wash, color-mix(in srgb, var(--room-text, var(--wall-text)) 8%, transparent));
+  }
+}
+
+.filter-view-segment:has(input:checked),
+.filter-view-segment:has(input:checked):hover {
+  background: var(--room-text, var(--wall-text));
+  color: var(--room, var(--wood-dark));
+  font-weight: 600;
+}
+
+.filter-view-segment:has(input:focus-visible) {
+  outline: 2px solid var(--room-ring, var(--wood-light));
+  outline-offset: -4px;
+}
+
+@media (forced-colors: active) {
+  .filter-view-segment:has(input:checked) {
+    outline: 2px solid Highlight;
+    outline-offset: -4px;
+  }
+}
+
+/**
+ * One location's cabinet has its name on the wall above it: the name in strong wall text and, after it, the number of games in the
+ * muted wall colour, centred over the cabinet. A long name wraps inside the page. A cabinet that holds no match while filtering has
+ * its name drawn in the muted colour, so the eye skips to the cabinets that hold matches.
+ */
+.location-heading {
+  margin: 0 0 16px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--room-muted, var(--chrome-muted));
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.location-name {
+  color: var(--room-text, var(--wall-text));
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+/**
  * The location select: a native list in wall colours, as tall as a chip. The list it opens takes light or dark system colours from the
  * wall, so its options stay readable on either.
  */

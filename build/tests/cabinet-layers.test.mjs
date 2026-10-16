@@ -575,3 +575,18 @@ test('a box in shadow stays a solid box: no filter, blur or opacity is put on th
   assert.doesNotMatch(sheets.modifiers.replace(/@media \(forced-colors: active\) \{[^}]*\{[^}]*\}\s*\}/g, ''), /\.placement\[data-dim\]\s*\{/);
   assert.doesNotMatch(sheets.modifiers, /aria-disabled/);
 });
+
+test('a location group is a full-width centred row of sections in the structure layer, with its heading on a row of its own', () => {
+  const group = allRules.structure.find((rule) => rule.selector === '.location-group');
+  const heading = allRules.structure.find((rule) => rule.selector === '.location-group > .location-heading');
+  const valueOf = (rule, property) => rule?.declarations.find(({ name }) => name === property)?.value;
+
+  assert.ok(group, 'the structure layer holds the location group');
+  assert.equal(valueOf(group, 'flex'), '0 0 100%');
+  assert.equal(valueOf(group, 'display'), 'flex');
+  assert.equal(valueOf(group, 'flex-wrap'), 'wrap');
+  assert.equal(valueOf(group, 'justify-content'), 'center');
+  assert.equal(valueOf(group, 'align-items'), 'flex-end');
+  assert.equal(valueOf(heading, 'flex'), '0 0 100%');
+  assert.equal(allRules.design.concat(allRules.wood, allRules.modifiers).some((rule) => /location-group/.test(rule.selector)), false);
+});

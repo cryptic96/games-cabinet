@@ -274,7 +274,7 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
 
     tally = countLit(entries, result.lit);
     showTally();
-    document.dispatchEvent(new CustomEvent('cabinet:filtered', { detail: { active: result.active, lit: result.lit, count: tally, state } }));
+    document.dispatchEvent(new CustomEvent('cabinet:filtered', { detail: { active: result.active, lit: result.lit, count: tally, state, hasLocations: model.locations.length > 0 } }));
   }
 
   /**
