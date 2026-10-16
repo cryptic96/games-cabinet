@@ -378,7 +378,7 @@ public sealed class FilterShowOnShelfTests : CabinetPageTest
 
     private async Task<Pick> PickBoxAsync(IReadOnlyList<ViewCard> cards, bool tallest, bool lastGroupOnly)
     {
-        await Page.Locator(".filter-view-segment").Nth(1).ClickAsync();
+        await ChooseViewAsync(1);
         await Expect(Page.Locator(Groups).First).ToBeAttachedAsync();
         var json = await Page.EvaluateAsync<JsonElement>(MeasureGroups);
         var groups = JsonSerializer.Deserialize<List<MeasuredGroup>>(json.GetRawText(), WebOptions)!
@@ -395,7 +395,7 @@ public sealed class FilterShowOnShelfTests : CabinetPageTest
             ? candidates.OrderByDescending(item => item.Box.Span).First()
             : candidates.OrderBy(item => item.Box.Span).First();
 
-        await Page.Locator(".filter-view-segment").Nth(0).ClickAsync();
+        await ChooseViewAsync(0);
         await Expect(Page.Locator(Groups)).ToHaveCountAsync(0);
         await Page.EvaluateAsync("() => window.scrollTo(0, 0)");
         await Page.EvaluateAsync("() => { window.__found.shown.length = 0; window.__found.cleared.length = 0; }");
