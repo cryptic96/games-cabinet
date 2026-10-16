@@ -18,7 +18,7 @@ for (const name of readdirSync(new URL('../../Cabinet.Service/wwwroot/js/', impo
   copyFileSync(new URL('../../Cabinet.Service/wwwroot/js/' + name, import.meta.url), join(FOLDER, name));
 }
 
-const { EMPTY_FILTERS, fold, buildModel, isActive, evaluate, listEntries, countLit } = await import(pathToFileURL(join(FOLDER, 'filter-rules.js')).href);
+const { EMPTY_FILTERS, fold, buildModel, isActive, evaluate, listEntries, countLit, familyRange, PLAYER_CHOICES, TIME_CHOICES } = await import(pathToFileURL(join(FOLDER, 'filter-rules.js')).href);
 
 /**
  * Builds an invented card record; fields not given are unknown.
@@ -160,4 +160,129 @@ test('matching never changes what the records say', () => {
   evaluate(search('Café'), buildModel(COLLECTION));
 
   assert.equal(JSON.stringify(COLLECTION), before);
+});
+
+/**
+ * Builds a collection of one base game with the given player span and playing time, plus optional owned expansions.
+ * @param {object} base The fields of the base game.
+ * @param {object[]} [extras] The fields of owned expansions, each becoming a linked expansion record.
+ * @returns {object[]} The records, base first.
+ */
+function family(base, extras = []) {
+  const baseRecord = record(100, 'Family Base', base);
+  const expansions = extras.map((fields, index) => record(101 + index, 'Family Layer ' + index, { isExpansion: true, ...fields }));
+
+  baseRecord.expansions = expansions.map(link);
+  expansions.forEach((expansion) => {
+    expansion.bases = [link(baseRecord)];
+  });
+
+  return [baseRecord, ...expansions];
+}
+
+const withPlayers = (n) => ({ ...EMPTY_FILTERS, players: n });
+const withTime = (t) => ({ ...EMPTY_FILTERS, time: t });
+const isLit = (records, state, entryId = 100) => evaluate(state, buildModel(records)).lit.has(String(entryId));
+
+test('the family range runs from the smallest known minimum to the largest known maximum', () => {
+  assert.deepEqual(familyRange([{ minPlayers: 3, maxPlayers: 4 }, { minPlayers: 5, maxPlayers: 6 }]), { min: 3, max: 6 });
+  assert.deepEqual(familyRange([{ minPlayers: 1, maxPlayers: 2 }, { minPlayers: 5, maxPlayers: 6 }]), { min: 1, max: 6 });
+});
+
+test('a missing or zero value on one member is ignored, and a family with no usable end has no range', () => {
+  assert.deepEqual(familyRange([{ minPlayers: 2, maxPlayers: 4 }, { minPlayers: 0, maxPlayers: null }]), { min: 2, max: 4 });
+  assert.equal(familyRange([{ minPlayers: 2 }, { minPlayers: 3, maxPlayers: 0 }]), null);
+  assert.equal(familyRange([{ maxPlayers: 4 }]), null);
+  assert.equal(familyRange([{ minPlayers: -1, maxPlayers: 4 }]), null);
+  assert.equal(familyRange([{}]), null);
+  assert.equal(familyRange([]), null);
+});
+
+test('five lights both boxes of a family that an owned expansion makes playable for five', () => {
+  const records = family({ minPlayers: 3, maxPlayers: 4, playTime: 60 }, [{ minPlayers: 5, maxPlayers: 6, playTime: 15 }]);
+
+  assert.deepEqual([...evaluate(withPlayers(5), buildModel(records)).lit].sort(), ['100', '101']);
+  assert.equal(isLit(records, withPlayers(2)), false);
+});
+
+test('the players test is inclusive at both ends', () => {
+  const records = family({ minPlayers: 2, maxPlayers: 4 });
+
+  assert.deepEqual([1, 2, 3, 4, 5].map((n) => isLit(records, withPlayers(n))), [false, true, true, true, false]);
+});
+
+test('eight or more lights when the family maximum is 8 or more', () => {
+  assert.equal(isLit(family({ minPlayers: 2, maxPlayers: 7 }), withPlayers(8)), false);
+  assert.equal(isLit(family({ minPlayers: 2, maxPlayers: 8 }), withPlayers(8)), true);
+  assert.equal(isLit(family({ minPlayers: 2, maxPlayers: 12 }), withPlayers(8)), true);
+});
+
+test('ranges that leave a gap are joined into one span', () => {
+  const records = family({ minPlayers: 1, maxPlayers: 2 }, [{ minPlayers: 5, maxPlayers: 6 }]);
+
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 7].map((n) => isLit(records, withPlayers(n))), [true, true, true, true, true, true, false]);
+});
+
+test('a family with an unknown player range stays in shadow while a count is chosen, and lights for any', () => {
+  const unknown = family({ minPlayers: 2, maxPlayers: 0 });
+
+  assert.equal(isLit(unknown, withPlayers(2)), false);
+  assert.equal(isLit(family({ minPlayers: null, maxPlayers: 4 }), withPlayers(2)), false);
+  assert.equal(isLit(unknown, EMPTY_FILTERS), true);
+});
+
+test('choosing a count only changes the lit set, not the records or their order', () => {
+  const records = family({ minPlayers: 2, maxPlayers: 4 });
+  const before = JSON.stringify(records);
+
+  evaluate(withPlayers(3), buildModel(records));
+
+  assert.equal(JSON.stringify(records), before);
+});
+
+test('the chip sets are the fixed ones', () => {
+  assert.deepEqual([...PLAYER_CHOICES], [1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.deepEqual([...TIME_CHOICES], [30, 45, 60, 90, 120]);
+});
+
+test('a time lights a game done within it, judged at the stated playing time', () => {
+  assert.equal(isLit(family({ playTime: 60 }), withTime(60)), true);
+  assert.equal(isLit(family({ playTime: 61 }), withTime(60)), false);
+  assert.equal(isLit(family({ playTime: 90, minPlayTime: 45, maxPlayTime: 90 }), withTime(60)), false);
+  assert.equal(isLit(family({ playTime: 90, minPlayTime: 45, maxPlayTime: 90 }), withTime(90)), true);
+  assert.equal(isLit(family({ playTime: 90, minPlayTime: 45, maxPlayTime: 90 }), withTime(120)), true);
+});
+
+test('an expansion with a shorter time does not change the family result', () => {
+  const records = family({ playTime: 90 }, [{ playTime: 20 }]);
+
+  assert.equal(isLit(records, withTime(60)), false);
+  assert.equal(isLit(records, withTime(60), 101), false);
+  assert.equal(isLit(records, withTime(90), 101), true);
+});
+
+test('an orphan expansion is judged by its own time', () => {
+  const orphan = record(5, 'Loose Layer', { isExpansion: true, bases: [{ entryId: null, gameId: 1, title: 'Not Owned' }], playTime: 30 });
+
+  assert.equal(isLit([orphan], withTime(30), 5), true);
+  assert.equal(isLit([{ ...orphan, playTime: 31 }], withTime(30), 5), false);
+});
+
+test('a playing time of 0 or missing stays in shadow while a time is chosen', () => {
+  assert.equal(isLit(family({ playTime: 0 }), withTime(120)), false);
+  assert.equal(isLit(family({ playTime: null }), withTime(120)), false);
+  assert.equal(isLit(family({}), withTime(120)), false);
+  assert.equal(isLit(family({}), EMPTY_FILTERS), true);
+});
+
+test('search, players and time combine with AND, and an entry is lit when one of its families is', () => {
+  const records = family({ minPlayers: 2, maxPlayers: 4, playTime: 60 });
+  const both = { ...EMPTY_FILTERS, q: 'family base', players: 4, time: 60 };
+
+  assert.equal(isLit(records, both), true);
+  assert.equal(isLit(records, { ...both, q: 'nothing like it' }), false);
+  assert.equal(isLit(records, { ...both, players: 5 }), false);
+  assert.equal(isLit(records, { ...both, time: 45 }), false);
+  assert.equal(isActive(withTime(45)), true);
+  assert.equal(isActive(withPlayers(2)), true);
 });

@@ -1,12 +1,33 @@
 /**
- * The filter bar above the cabinet: the search field and the count of games that stand in the light. Typing puts every box that is not
- * part of a matching family into shadow where it stands, in the same task as the keystroke; nothing moves and nothing is removed. The
- * rules live in the pure filter-rules module; this module only reads the field, toggles an attribute on the boxes and writes text.
+ * The filter bar above the cabinet: the search field, the chip groups and the count of games that stand in the light. Typing or
+ * choosing puts every box that is not part of a matching family into shadow where it stands, in the same task as the keystroke or tap;
+ * nothing moves and nothing is removed. The rules live in the pure filter-rules module; this module only reads the controls, toggles
+ * an attribute on the boxes and writes text.
  */
-import { EMPTY_FILTERS, buildModel, countLit, evaluate, fold, listEntries } from './filter-rules.js';
+import { EMPTY_FILTERS, PLAYER_CHOICES, buildModel, countLit, evaluate, fold, listEntries } from './filter-rules.js';
 
 /** How long the count must stay unchanged before it is announced to a screen reader, in milliseconds. */
 export const FILTER_ANNOUNCE_MS = 600;
+
+/**
+ * The chip groups of the bar: which state member each group sets, and the values it may take. A chip value outside the set, or an
+ * empty one, means Any.
+ */
+const CHIP_GROUPS = Object.freeze([
+  Object.freeze({ name: 'players', choices: PLAYER_CHOICES }),
+]);
+
+/**
+ * Reads the value a chip stands for, against the fixed set of its group.
+ * @param {string} raw The value attribute of the chip's radio.
+ * @param {readonly number[]} choices The values the group offers.
+ * @returns {number | null} The value, or null for Any and for anything that is not one of the choices.
+ */
+function chipValue(raw, choices) {
+  const value = Number(raw);
+
+  return raw !== '' && Number.isInteger(value) && choices.includes(value) ? value : null;
+}
 
 /**
  * The controller of a page that has no filter bar: it dims nothing and ignores every call, so the cabinet script can use one
@@ -36,6 +57,7 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
   const count = bar.querySelector('.filter-count');
   const clear = bar.querySelector('.filter-clear');
   const live = document.getElementById('filter-live');
+  const groups = CHIP_GROUPS.map((group) => ({ ...group, element: bar.querySelector(`.filter-group[data-filter="${group.name}"]`) })).filter((group) => group.element !== null);
 
   let state = { ...EMPTY_FILTERS };
   let model = buildModel(getRecords());
@@ -57,6 +79,10 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
 
     if (model.byEntry.has(entry)) {
       return !result.lit.has(entry);
+    }
+
+    if (state.players !== null) {
+      return true;
     }
 
     return !fold(title).includes(fold(state.q));
@@ -121,12 +147,44 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
   }
 
   /**
+   * Takes the choice of one chip group, shows its result at once and queues the announcement. A choice that is already held changes
+   * nothing.
+   * @param {{ name: string, choices: readonly number[], element: HTMLElement }} group The group the visitor used.
+   */
+  function choose(group) {
+    const checked = group.element.querySelector('input:checked');
+    const value = checked === null ? null : chipValue(checked.value, group.choices);
+
+    if (state[group.name] === value) {
+      return;
+    }
+
+    state = { ...state, [group.name]: value };
+    apply();
+    announceSoon();
+  }
+
+  /**
+   * Returns every chip group to Any without telling anyone; the caller applies the state.
+   */
+  function resetChips() {
+    for (const group of groups) {
+      const any = group.element.querySelector('input[value=""]');
+
+      if (any !== null) {
+        any.checked = true;
+      }
+    }
+  }
+
+  /**
    * Empties the search, puts every box back in the light and announces it at once. Focus ends in the search field.
    */
   function clearAll() {
     window.clearTimeout(announceTimer);
     announceTimer = null;
     field.value = '';
+    resetChips();
     state = { ...EMPTY_FILTERS };
     apply();
     live.textContent = announcement();
@@ -143,6 +201,25 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
   }
 
   field.addEventListener('input', search);
+
+  for (const group of groups) {
+    group.element.addEventListener('change', () => choose(group));
+
+    group.element.addEventListener('click', (event) => {
+      const radio = event.target;
+
+      if (!(radio instanceof HTMLInputElement) || radio.type !== 'radio') {
+        return;
+      }
+
+      const value = chipValue(radio.value, group.choices);
+
+      if (value !== null && state[group.name] === value) {
+        resetChips();
+        choose(group);
+      }
+    });
+  }
 
   field.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && field.value !== '') {

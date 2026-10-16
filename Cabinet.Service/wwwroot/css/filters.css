@@ -1,6 +1,6 @@
 /**
- * The filter bar on the wall above the cabinet: a search field, the count of games that stand in the light and a button that clears
- * the search. It is page chrome in wall colours, like the rest of the page controls, and holds no cabinet rule: the shadow a search
+ * The filter bar on the wall above the cabinet: a search field, the player and time choices, the count of games that stand in the
+ * light and a button that clears the choices. It is page chrome in wall colours, like the rest of the page controls, and holds no cabinet rule: the shadow a search
  * puts on a box is drawn by the modifiers layer. The bar is transparent so the wall shows through, and the group at its end is
  * hidden by visibility while nothing is filtered, so its space stays and the bar never changes height when a search starts.
  */
@@ -12,12 +12,19 @@
 
 .filter-bar {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  flex-direction: column;
+  gap: 8px;
   margin-block-end: 16px;
   padding-block: 8px;
   color: var(--room-text, var(--wall-text));
   background: transparent;
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
 }
 
 .filter-bar[hidden] {
@@ -59,7 +66,8 @@
 }
 
 #filter-q:focus-visible,
-.filter-clear:focus-visible {
+.filter-clear:focus-visible,
+.filter-chip:has(input:focus-visible) {
   outline: 2px solid var(--room-ring, var(--wood-light));
   outline-offset: 2px;
 }
@@ -73,6 +81,10 @@
 
 .filter-bar:not([data-active]) .filter-status {
   visibility: hidden;
+}
+
+.filter-row:last-child {
+  justify-content: flex-end;
 }
 
 .filter-count {
@@ -135,4 +147,114 @@
   background: var(--room-text, var(--wall-text));
   color: var(--room, var(--wood-dark));
   font-weight: 600;
+}
+
+/**
+ * A group of choices: its legend stands inline before the chips, which form one segmented control with shared borders. The legend
+ * is floated so that it is an ordinary item of the row and the group can lay out as a flex row; it still names the group.
+ */
+.filter-group {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.filter-group > legend {
+  float: inline-start;
+  margin-inline-end: 8px;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+/**
+ * One chip: the label is the visible control and the radio inside it is an invisible hit target that covers the whole chip, so the
+ * native group keeps its role, its one tab stop and its arrow keys. Neighbouring chips share their border.
+ */
+.filter-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  margin-inline-start: -1px;
+  padding-inline: 12px;
+  border: 1px solid var(--room-line, var(--chrome-line));
+  background: transparent;
+  color: var(--room-text, var(--wall-text));
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.filter-group > legend + .filter-chip {
+  margin-inline-start: 0;
+  border-start-start-radius: 4px;
+  border-end-start-radius: 4px;
+}
+
+.filter-group > .filter-chip:last-child {
+  border-start-end-radius: 4px;
+  border-end-end-radius: 4px;
+}
+
+.filter-chip input {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  margin: 0;
+  opacity: 0;
+  outline: none;
+  cursor: inherit;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .filter-chip:hover {
+    background: var(--room-wash, color-mix(in srgb, var(--room-text, var(--wall-text)) 8%, transparent));
+  }
+}
+
+/**
+ * A chosen count or time is the one filled chip: the wall colours inverted, never the accent, so what is bright in the bar is what is
+ * active. The weight carries the state as well as the fill.
+ */
+.filter-chip:has(input:checked:not([value=""])) {
+  z-index: 1;
+  border-color: var(--room-text, var(--wall-text));
+  background: var(--room-text, var(--wall-text));
+  color: var(--room, var(--wood-dark));
+  font-weight: 600;
+}
+
+/**
+ * Any is the quiet choice: heavier text and a thin bar along the bottom edge, with no fill, so a bar with nothing chosen holds no
+ * filled block.
+ */
+.filter-chip:has(input[value=""]:checked) {
+  z-index: 1;
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--room-text, var(--wall-text));
+}
+
+.filter-chip:has(input:focus-visible) {
+  z-index: 2;
+}
+
+/**
+ * Forced colours drop fills and shadows, so a chosen chip, Any included, gets a system outline drawn inside its edge.
+ */
+@media (forced-colors: active) {
+  .filter-chip:has(input:checked) {
+    outline: 2px solid Highlight;
+    outline-offset: -4px;
+  }
 }

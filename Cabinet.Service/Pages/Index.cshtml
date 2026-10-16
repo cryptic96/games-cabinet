@@ -96,14 +96,33 @@
 </header>
 <div class="filter-sentinel" aria-hidden="true"></div>
 <div class="filter-bar" role="search" aria-label="@Model.Language.Text.FilterBarLabel" hidden>
-    <label class="visually-hidden" for="filter-q">@Model.Language.Text.SearchLabel</label>
-    <span class="filter-search">
-        <input id="filter-q" type="search" name="q" placeholder="@Model.Language.Text.SearchLabel" enterkeyhint="search" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" dir="auto" aria-keyshortcuts="/" />
-        <kbd class="filter-hint" aria-hidden="true">/</kbd>
-    </span>
-    <div class="filter-status">
-        <span class="filter-count" aria-hidden="true"></span>
-        <button type="button" class="filter-clear" aria-label="@Model.Language.Text.ClearName">@Model.Language.Text.ClearVisible</button>
+    <div class="filter-row">
+        <label class="visually-hidden" for="filter-q">@Model.Language.Text.SearchLabel</label>
+        <span class="filter-search">
+            <input id="filter-q" type="search" name="q" placeholder="@Model.Language.Text.SearchLabel" enterkeyhint="search" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" dir="auto" aria-keyshortcuts="/" />
+            <kbd class="filter-hint" aria-hidden="true">/</kbd>
+        </span>
+        <fieldset class="filter-group" data-filter="players">
+            <legend>@Model.Language.Text.PlayersLegend</legend>
+            <label class="filter-chip">
+                <input type="radio" name="filter-players" value="" checked />
+                <span class="filter-chip-text">@Model.Language.Text.AnyChoice</span>
+            </label>
+            @for (var players = 1; players <= 8; players++)
+            {
+                <label class="filter-chip">
+                    <input type="radio" name="filter-players" value="@players" />
+                    <span class="filter-chip-text" aria-hidden="true">@(players == 8 ? "8+" : players.ToString(System.Globalization.CultureInfo.InvariantCulture))</span>
+                    <span class="visually-hidden">@Model.Language.Text.PlayersSuffix(players)</span>
+                </label>
+            }
+        </fieldset>
+    </div>
+    <div class="filter-row">
+        <div class="filter-status">
+            <span class="filter-count" aria-hidden="true"></span>
+            <button type="button" class="filter-clear" aria-label="@Model.Language.Text.ClearName">@Model.Language.Text.ClearVisible</button>
+        </div>
     </div>
 </div>
 <p id="filter-live" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
