@@ -344,7 +344,6 @@
   border-radius: 4px;
   outline: 1px solid var(--room-line, var(--chrome-line));
   outline-offset: -1px;
-  overflow: hidden;
 }
 
 .filter-view[hidden] {
@@ -369,6 +368,20 @@
 
 .filter-view-segment + .filter-view-segment {
   border-inline-start: 1px solid var(--room-line, var(--chrome-line));
+}
+
+/**
+ * The switch does not clip its segments, so a keyboard ring can stand outside them like the ring of every other control; the two end
+ * segments take the corner radius of the outline instead, so the fill of the chosen one never pokes out of it.
+ */
+.filter-view-segment:first-of-type {
+  border-start-start-radius: 3px;
+  border-end-start-radius: 3px;
+}
+
+.filter-view-segment:last-of-type {
+  border-start-end-radius: 3px;
+  border-end-end-radius: 3px;
 }
 
 .filter-view-segment input {
@@ -400,8 +413,9 @@
 }
 
 .filter-view-segment:has(input:focus-visible) {
+  z-index: 2;
   outline: 2px solid var(--room-ring, var(--wood-light));
-  outline-offset: -4px;
+  outline-offset: 2px;
 }
 
 @media (forced-colors: active) {

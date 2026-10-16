@@ -23,13 +23,14 @@
 /**
  * The mark on a box whose game has no place: a small two-tone dog-ear in the top-left corner, paper-coloured with an ink fold, so
  * it reads on a cream box and on a navy one alike. It is one element placed over the corner; it takes no space, no pointer input
- * and no text, and it leaves the box's geometry, order and focus ring as they are.
+ * and no text, and it leaves the box's geometry, order and focus ring as they are. It sits one level above the shadow of a dimmed box,
+ * so the owner still sees which games have no place while the cabinet is filtered.
  */
 .placement-tag {
   position: absolute;
   top: 0;
   left: 0;
-  z-index: 1;
+  z-index: 2;
   width: var(--tag-size);
   height: var(--tag-size);
   pointer-events: none;
