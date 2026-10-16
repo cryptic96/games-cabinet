@@ -245,13 +245,15 @@ public sealed class KeyboardTests : CabinetPageTest
         await Page.Locator(Boxes).Nth(await IndexOfBoxWithBoxBelowAsync()).FocusAsync();
         await Page.EvaluateAsync("() => document.activeElement.scrollIntoView({ block: 'start' })");
         var start = await FocusedAsync();
+        var startScroll = await Page.EvaluateAsync<double>("window.scrollY");
 
         await Page.Keyboard.PressAsync("ArrowDown");
         var next = await FocusedAsync();
+        var nextScroll = await Page.EvaluateAsync<double>("window.scrollY");
 
         next.IsBox.Should().BeTrue();
         next.Shelf.Should().NotBe(start.Shelf);
-        next.Top.Should().BeGreaterThanOrEqualTo(start.Bottom - 2);
+        (next.Top + nextScroll).Should().BeGreaterThanOrEqualTo(start.Bottom + startScroll - 2);
         ConsoleErrors.Should().BeEmpty();
     }
 

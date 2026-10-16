@@ -20,6 +20,51 @@
   background: transparent;
 }
 
+/**
+ * From 64rem the bar stays pinned at the top while the cabinet scrolls. It runs edge to edge across the page padding so its fill, once
+ * stuck, covers the full width. In the page flow it has no fill; the fill and the shadow live on one layer under the controls that
+ * fades in when the sentinel above the bar has scrolled out of view. Below 64rem the bar stays in the page flow.
+ */
+@media (min-width: 64rem) {
+  .filter-bar {
+    --bar-pad: var(--page-pad, 24px);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    isolation: isolate;
+    margin-inline: calc(-1 * var(--bar-pad));
+    padding-inline: var(--bar-pad);
+  }
+
+  .filter-bar::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--room, var(--wood-dark));
+    box-shadow:
+      0 6px 12px -6px rgb(var(--room-shade-rgb, 20 10 4) / 0.55),
+      0 1px 0 color-mix(in srgb, var(--room-line, var(--chrome-line)) 40%, transparent);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--swap-fade);
+  }
+
+  .filter-bar[data-stuck]::after {
+    opacity: 1;
+  }
+
+  html {
+    scroll-padding-top: var(--filter-bar-h, 0px);
+  }
+}
+
+@media (min-width: 64rem) and (prefers-reduced-motion: reduce) {
+  .filter-bar::after {
+    transition: none;
+  }
+}
+
 .filter-row {
   display: flex;
   flex-wrap: wrap;
@@ -247,6 +292,10 @@
   z-index: 2;
 }
 
+.filter-chip-text {
+  white-space: nowrap;
+}
+
 /**
  * Forced colours drop fills and shadows, so a chosen chip, Any included, gets a system outline drawn inside its edge.
  */
@@ -258,10 +307,21 @@
 }
 
 /**
+ * From 64rem the bar is two designed rows of one line each: nothing wraps inside a row or inside a group, and the status group at the
+ * end of the second row keeps its space while it is hidden, so the bar is the same height whether or not a filter is set.
+ */
+@media (min-width: 64rem) {
+  .filter-row,
+  .filter-group {
+    flex-wrap: nowrap;
+  }
+}
+
+/**
  * On a screen too narrow for nine segments in a line, the chips of a group wrap and stand apart as separate chips, each still 44 px
  * high and wide, so the page never scrolls sideways.
  */
-@media (max-width: 64rem) {
+@media not all and (min-width: 64rem) {
   .filter-group {
     flex-wrap: wrap;
     gap: 8px;

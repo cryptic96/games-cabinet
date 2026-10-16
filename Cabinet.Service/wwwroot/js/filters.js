@@ -48,6 +48,41 @@ export const NO_FILTERS = Object.freeze({
 });
 
 /**
+ * Keeps the page in step with the pinned bar without a scroll handler. One observer on the zero-height marker that sits right before
+ * the bar sets the stuck attribute while the marker is above the top of the viewport, which is when the bar is pinned, and a second
+ * observer writes the bar's height on the root while the bar is pinned, and zero while it is not, so the page can keep focused and
+ * scrolled-to boxes clear of it.
+ * @param {HTMLElement} bar The filter bar element.
+ */
+function watchPinning(bar) {
+  const sentinel = bar.previousElementSibling;
+
+  if (sentinel instanceof HTMLElement && sentinel.classList.contains('filter-sentinel') && 'IntersectionObserver' in window) {
+    new IntersectionObserver(
+      (observed) => {
+        const latest = observed[observed.length - 1];
+
+        bar.toggleAttribute('data-stuck', !latest.isIntersecting && latest.boundingClientRect.top < 0);
+      },
+      { root: null, threshold: 0 },
+    ).observe(sentinel);
+  }
+
+  if ('ResizeObserver' in window) {
+    const publish = () => {
+      const pinned = window.getComputedStyle(bar).position === 'sticky';
+
+      document.documentElement.style.setProperty('--filter-bar-h', `${pinned ? bar.offsetHeight : 0}px`);
+    };
+
+    const observer = new ResizeObserver(publish);
+
+    observer.observe(bar);
+    observer.observe(document.documentElement);
+  }
+}
+
+/**
  * Starts the filter bar.
  * @param {object} parts What the bar needs from the page.
  * @param {HTMLElement} parts.bar The filter bar element.
@@ -73,6 +108,8 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
   let tally = countLit(entries, result.lit);
   let announceTimer = null;
   let bulkFrame = 0;
+
+  watchPinning(bar);
 
   /**
    * Tells whether an entry is drawn in shadow. An entry the model does not hold is judged from its own title.
