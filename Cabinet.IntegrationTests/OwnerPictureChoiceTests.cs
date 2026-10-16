@@ -2,13 +2,17 @@ using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Cabinet.Domain.Collection;
+using Cabinet.Domain.Layout;
 using Cabinet.Domain.Owner;
 using Cabinet.FakeBgg;
 using Cabinet.FakeBgg.Testing;
 using Cabinet.IntegrationTests.Infrastructure;
+using Cabinet.Repository.Storage;
 using Cabinet.Service.Owner;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Cabinet.IntegrationTests;
 
@@ -52,6 +56,46 @@ public sealed partial class OwnerPictureChoiceTests
         host.Changes.Take(2).Select(change => change.Text).Should().Equal(
             $"Picture of {host.Title}: back to Automatic",
             $"Picture of {host.Title}: main picture");
+    }
+
+    [Fact]
+    public async Task A_choice_saved_for_one_copy_changes_only_that_copys_box()
+    {
+        const int gameId = 5101;
+        const string versionUrl = "https://cf.example.org/version.jpg";
+        const string mainUrl = "https://cf.example.org/main.jpg";
+        long[] copies = [7001, 7002, 7003];
+        using var storage = new TemporaryDirectory();
+        var moment = new DateTimeOffset(2030, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var images = new Dictionary<string, ImageRecord>
+        {
+            [versionUrl] = new(versionUrl, ImageStatus.Ok, moment, [new ArtFile(600, 800, "1111111111111111-600.webp")], new ArtFeatures(0.0, 1.0, 0.0, 0.0, 4)),
+            [mainUrl] = new(mainUrl, ImageStatus.Ok, moment, [new ArtFile(600, 800, "2222222222222222-600.webp")], new ArtFeatures(0.3, 0.70, 0.60, 0.50, 1)),
+        };
+        new SnapshotStore(storage.FullPath, NullLogger<SnapshotStore>.Instance).Save(new CollectionSnapshot(
+            CollectionSnapshot.CurrentSchemaVersion,
+            moment,
+            [.. copies.Select(copy => new SnapshotItem(copy, gameId, "Quiet Quarry", ItemKind.Base, 2015, null, null, versionUrl, mainUrl))],
+            images,
+            null));
+        await using var factory = new CabinetWebApplicationFactory(new Dictionary<string, string?> { ["Storage:Directory"] = storage.FullPath });
+        using var client = factory.CreatePublicClient();
+        var owner = factory.ServingServices.GetRequiredService<OwnerDataService>();
+        var before = await CoversAsync(client);
+        var layoutBefore = await LayoutTagAsync(client);
+
+        var saved = await owner.MutateAsync(
+            owner.Revision,
+            data => PictureEdits.Choose(data, gameId, copies[1], copies, PictureChoice.MainPicture, "Quiet Quarry", versionUrl, mainUrl),
+            TestContext.Current.CancellationToken);
+        var after = await CoversAsync(client);
+
+        saved.Outcome.Should().Be(OwnerOutcome.Saved);
+        before.Values.Should().OnlyContain(cover => cover.Contains("1111111111111111", StringComparison.Ordinal));
+        after[7001].Should().Be(before[7001]);
+        after[7003].Should().Be(before[7003]);
+        after[7002].Should().Contain("2222222222222222");
+        (await LayoutTagAsync(client)).Should().NotBe(layoutBefore);
     }
 
     [Fact]
@@ -158,6 +202,22 @@ public sealed partial class OwnerPictureChoiceTests
         expansions.Any(expansion => ownedBasesOf(expansion) == 1).Should().BeTrue("an expansion with one owned base");
         expansions.Any(expansion => ownedBasesOf(expansion) > 1).Should().BeTrue("an expansion with several owned bases");
         expansions.Any(expansion => ownedBasesOf(expansion) == 0).Should().BeTrue("an expansion with no owned base");
+    }
+
+    private static async Task<Dictionary<long, string>> CoversAsync(HttpClient client)
+    {
+        using var response = await client.GetAsync(CardsPath, TestContext.Current.CancellationToken);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+
+        return document.RootElement.GetProperty("cards").EnumerateArray()
+            .ToDictionary(card => card.GetProperty("entryId").GetInt64(), card => card.GetProperty("cover").GetProperty("url").GetString()!);
+    }
+
+    private static async Task<string> LayoutTagAsync(HttpClient client)
+    {
+        using var response = await client.GetAsync(LayoutPath, TestContext.Current.CancellationToken);
+
+        return response.Headers.ETag!.Tag;
     }
 
     private static bool IsUnusable(SyntheticArtKind? kind) => kind is null or SyntheticArtKind.Undecodable;
