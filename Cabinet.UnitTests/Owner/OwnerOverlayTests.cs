@@ -11,6 +11,8 @@ public sealed class OwnerOverlayTests
 {
     private const string CabinetA = "loc1";
     private const string ShelfB = "loc2";
+    private const string OwnedUrl = "https://cf.example.org/owned.jpg";
+    private const string MainUrl = "https://cf.example.org/main.jpg";
 
     private static readonly DateTimeOffset Moment = new(2030, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
@@ -283,6 +285,120 @@ public sealed class OwnerOverlayTests
             .Should().Be("Example Expansion 100 now follows its base game");
         LocationEdits.Assign(data, 100, "missing", "Example Game 100").Changed.Should().BeFalse();
     }
+
+    [Fact]
+    public void A_copy_gets_its_own_picture_choice_else_the_one_for_every_copy_and_a_copy_with_neither_gets_none()
+    {
+        long[] copies = [7001, 7002, 7003];
+        var snapshot = Snapshot([.. copies.Select(copy => Base(copy, 100)), Base(7101, 200)]);
+        var data = OwnerData.Empty with
+        {
+            Games =
+            [
+                new OwnerGame(100, null, null, Picture(PictureChoice.MainPicture)),
+                new OwnerGame(100, null, null, Picture(PictureChoice.OwnedEdition), 7002),
+            ],
+        };
+
+        var overlay = OwnerOverlay.From(snapshot, data);
+
+        overlay.EntryPictureOverride(7001)!.Choice.Should().Be(PictureChoice.MainPicture);
+        overlay.EntryPictureOverride(7002)!.Choice.Should().Be(PictureChoice.OwnedEdition);
+        overlay.EntryPictureOverride(7003)!.Choice.Should().Be(PictureChoice.MainPicture);
+        overlay.EntryPictureOverride(7101).Should().BeNull();
+        overlay.EntryPictureOverride(999).Should().BeNull();
+    }
+
+    [Fact]
+    public void A_copy_whose_own_choice_is_Automatic_stays_automatic_and_a_copy_with_only_a_place_follows_the_game_wide_picture()
+    {
+        var snapshot = Snapshot([Base(7001, 100), Base(7002, 100), Base(7003, 100)]);
+        var data = OwnerData.Empty with
+        {
+            Locations = [new OwnerLocation(CabinetA, "Cabinet A")],
+            Games =
+            [
+                new OwnerGame(100, null, null, Picture(PictureChoice.MainPicture)),
+                new OwnerGame(100, null, null, Picture(PictureChoice.Automatic), 7002),
+                new OwnerGame(100, CabinetA, null, null, 7003),
+            ],
+        };
+
+        var overlay = OwnerOverlay.From(snapshot, data);
+
+        overlay.EntryPictureOverride(7001)!.Choice.Should().Be(PictureChoice.MainPicture);
+        overlay.EntryPictureOverride(7002).Should().BeNull();
+        overlay.EntryPictureOverride(7003)!.Choice.Should().Be(PictureChoice.MainPicture);
+    }
+
+    [Fact]
+    public void Choosing_a_picture_for_one_copy_splits_the_game_wide_entry_so_the_other_copies_keep_theirs_and_their_place()
+    {
+        long[] copies = [7001, 7002, 7003];
+        var data = OwnerData.Empty with
+        {
+            Locations = [new OwnerLocation(CabinetA, "Cabinet A")],
+            Games = [new OwnerGame(100, CabinetA, null, Picture(PictureChoice.OwnedEdition))],
+        };
+
+        var change = PictureEdits.Choose(data, 100, 7002, copies, PictureChoice.MainPicture, "Quiet Quarry", OwnedUrl, MainUrl);
+
+        change.Changed.Should().BeTrue();
+        change.LogText.Should().Be("Picture of Quiet Quarry (copy 2 of 3): main picture");
+        change.Data.Games.Select(game => game.CollectionId).Should().Equal(7001L, 7002L, 7003L);
+        change.Data.Games.Select(game => game.LocationId).Should().OnlyContain(location => location == CabinetA);
+        change.Data.Games.Select(game => game.Picture!.Choice).Should().Equal(PictureChoice.OwnedEdition, PictureChoice.MainPicture, PictureChoice.OwnedEdition);
+    }
+
+    [Fact]
+    public void Choosing_for_one_copy_what_it_already_has_changes_nothing_and_a_picture_BGG_does_not_offer_is_refused()
+    {
+        long[] copies = [7001, 7002];
+        var data = OwnerData.Empty with { Games = [new OwnerGame(100, null, null, Picture(PictureChoice.MainPicture))] };
+
+        PictureEdits.Choose(data, 100, 7001, copies, PictureChoice.MainPicture, "Quiet Quarry", OwnedUrl, MainUrl).IsNone.Should().BeTrue();
+        PictureEdits.Choose(data, 100, 7001, copies, PictureChoice.OwnedEdition, "Quiet Quarry", null, MainUrl).StatusKey.Should().Be("no-picture");
+        PictureEdits.Choose(data, 100, 7001, copies, PictureChoice.Link, "Quiet Quarry", OwnedUrl, MainUrl).StatusKey.Should().Be("no-link");
+        PictureEdits.Choose(data, 100, 7001, copies, (PictureChoice)99, "Quiet Quarry", OwnedUrl, MainUrl).Changed.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Marking_one_copy_as_checked_marks_that_copy_alone()
+    {
+        long[] copies = [7001, 7002, 7003];
+        var data = OwnerData.Empty with
+        {
+            Games = [new OwnerGame(100, null, null, new PictureSetting(PictureChoice.OwnedEdition, false, null, null, null))],
+        };
+
+        var change = PictureEdits.LooksRight(data, 100, 7002, copies, "Quiet Quarry", OwnedUrl, MainUrl, Moment);
+
+        change.LogText.Should().Be("Marked Quiet Quarry (copy 2 of 3) as checked");
+        change.Data.Games.Select(game => game.Picture!.Checked).Should().Equal(false, true, false);
+        change.Data.Games.Single(game => game.CollectionId == 7002).Picture!.SeenMainUrl.Should().Be(MainUrl);
+        PictureEdits.LooksRight(change.Data, 100, 7002, copies, "Quiet Quarry", OwnedUrl, MainUrl, Moment).IsNone.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Choosing_a_picture_for_every_copy_sets_every_entry_of_the_game_and_leaves_the_places_alone()
+    {
+        var data = OwnerData.Empty with
+        {
+            Locations = [new OwnerLocation(CabinetA, "Cabinet A"), new OwnerLocation(ShelfB, "Shelf B")],
+            Games =
+            [
+                new OwnerGame(100, CabinetA, null, Picture(PictureChoice.OwnedEdition), 7001),
+                new OwnerGame(100, ShelfB, null, null, 7002),
+            ],
+        };
+
+        var change = PictureEdits.Choose(data, 100, PictureChoice.MainPicture, "Quiet Quarry", OwnedUrl, MainUrl);
+
+        change.Data.Games.Select(game => (game.CollectionId, game.LocationId)).Should().Equal((null, null), (7001L, CabinetA), (7002L, ShelfB));
+        change.Data.Games.Select(game => game.Picture!.Choice).Should().OnlyContain(choice => choice == PictureChoice.MainPicture);
+    }
+
+    private static PictureSetting Picture(PictureChoice choice) => new(choice, true, null, null, null);
 
     private static OwnerData Data(params (int GameId, string LocationId)[] assignments) =>
         OwnerData.Empty with

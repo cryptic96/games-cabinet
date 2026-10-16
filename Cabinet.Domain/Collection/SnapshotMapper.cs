@@ -104,7 +104,7 @@ public static class SnapshotMapper
                 .Select(entry => InEntryOrder(entry).First())
                 .OrderBy(item => item.CollectionId)
                 .ThenBy(item => item.GameId)
-                .Select(item => Trace(item, snapshot, images, pairing, rules, overlay.PictureOverrideOf(item.GameId))),
+                .Select(item => Trace(item, snapshot, images, pairing, rules, overlay.EntryPictureOverride(item.CollectionId))),
         ];
     }
 
@@ -198,7 +198,7 @@ public static class SnapshotMapper
             .ToDictionary(group => group.Key, group => InEntryOrder(group).First());
 
         return HashOf(items
-            .Select(item => $"{DrawnText(item)}|{CardText(item, entries, snapshot.Games)}{PictureText(overlay.PictureOverrideOf(item.BggId))}")
+            .Select(item => $"{DrawnText(item)}|{CardText(item, entries, snapshot.Games)}{PictureText(overlay.EntryPictureOverride(item.CollectionId))}")
             .Prepend(rules.Fingerprint));
     }
 

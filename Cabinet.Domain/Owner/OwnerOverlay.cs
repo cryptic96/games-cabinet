@@ -15,7 +15,8 @@ public sealed record PictureOverride(PictureChoice Choice, ImageRecord? LinkReco
 /// A copy is in the location the owner gave that copy, else the one the owner gave every copy of its game; an expansion without
 /// one of its own follows the first copy of the base game it stands beside (the one <see cref="ExpansionPairing"/> pairs it
 /// with, when that base game is owned); every other copy has no location. The synced collection itself carries no location the
-/// cabinet uses. It also holds the picture the owner chose for each game that is not left to the automatic pick.
+/// cabinet uses. It also holds the picture the owner chose for each copy that is not left to the automatic pick, resolved the same way:
+/// the copy's own choice, else the one for every copy of its game.
 /// </summary>
 public sealed class OwnerOverlay
 {
@@ -23,7 +24,7 @@ public sealed class OwnerOverlay
     private readonly IReadOnlyDictionary<int, long> _firstCopies;
     private readonly IReadOnlyDictionary<string, string> _names;
     private readonly IReadOnlyDictionary<long, int> _pairedBases;
-    private readonly IReadOnlyDictionary<int, PictureOverride> _pictures;
+    private readonly IReadOnlyDictionary<long, PictureOverride> _pictures;
 
     private OwnerOverlay(
         IReadOnlyList<OwnerLocation> locations,
@@ -31,7 +32,7 @@ public sealed class OwnerOverlay
         IReadOnlyDictionary<int, long> firstCopies,
         IReadOnlyDictionary<string, string> names,
         IReadOnlyDictionary<long, int> pairedBases,
-        IReadOnlyDictionary<int, PictureOverride> pictures)
+        IReadOnlyDictionary<long, PictureOverride> pictures)
     {
         Locations = locations;
         _places = places;
@@ -48,7 +49,7 @@ public sealed class OwnerOverlay
         new Dictionary<int, long>(),
         new Dictionary<string, string>(),
         new Dictionary<long, int>(),
-        new Dictionary<int, PictureOverride>());
+        new Dictionary<long, PictureOverride>());
 
     /// <summary>The owner's locations in the order the owner set, a location listed twice counted once; empty while the owner data cannot be read.</summary>
     public IReadOnlyList<OwnerLocation> Locations { get; }
@@ -114,24 +115,18 @@ public sealed class OwnerOverlay
             places[item.CollectionId] = PlaceOf(item, owns, baseCopies, pairedBases);
         }
 
-        var pictures = data.Games
-            .Where(game => game.Picture is { Choice: not PictureChoice.Automatic })
-            .GroupBy(game => game.GameId)
-            .ToDictionary(
-                group => group.Key,
-                group =>
-                {
-                    var setting = group.First().Picture!;
-
-                    return new PictureOverride(setting.Choice, setting.Link?.Record, setting.Link?.Url);
-                });
+        var pictures = PicturesOf(snapshot, data);
 
         return new OwnerOverlay(locations, places, firstCopies, names, pairedBases, pictures);
     }
 
-    /// <summary>The picture the owner chose for a game, or null when the game is left to the automatic pick.</summary>
-    /// <param name="gameId">The game.</param>
-    public PictureOverride? PictureOverrideOf(int gameId) => _pictures.TryGetValue(gameId, out var setting) ? setting : null;
+    /// <summary>
+    /// The picture the owner chose for a copy: the choice made for that copy, else the one made for every copy of its game, or
+    /// null when the copy is left to the automatic pick. A copy whose own choice is Automatic stays automatic even when its
+    /// game has a choice for every copy.
+    /// </summary>
+    /// <param name="collectionId">The collection entry.</param>
+    public PictureOverride? EntryPictureOverride(long collectionId) => _pictures.TryGetValue(collectionId, out var setting) ? setting : null;
 
     /// <summary>The identifier of the location the owner gave a copy itself, or gave every copy of its game, or null when it has none of its own.</summary>
     /// <param name="collectionId">The collection entry.</param>
@@ -169,6 +164,34 @@ public sealed class OwnerOverlay
             Items = [.. snapshot.Items.Select(item => item with { Location = EntryLocationName(item.CollectionId) })],
         };
     }
+
+    private static Dictionary<long, PictureOverride> PicturesOf(CollectionSnapshot snapshot, OwnerData data)
+    {
+        var everyCopy = data.Games
+            .Where(game => game.CollectionId is null && game.Picture is not null)
+            .GroupBy(game => game.GameId)
+            .ToDictionary(group => group.Key, group => OverrideOf(group.First().Picture!));
+        var ownChoice = data.Games
+            .Where(game => game.CollectionId is not null && game.Picture is not null)
+            .GroupBy(game => game.CollectionId!.Value)
+            .ToDictionary(group => group.Key, group => OverrideOf(group.First().Picture!));
+        var pictures = new Dictionary<long, PictureOverride>();
+
+        foreach (var item in snapshot.Items.GroupBy(item => item.CollectionId).Select(entry => SnapshotMapper.InEntryOrder(entry).First()))
+        {
+            var chosen = ownChoice.TryGetValue(item.CollectionId, out var own) ? own : everyCopy.GetValueOrDefault(item.GameId);
+
+            if (chosen is not null)
+            {
+                pictures[item.CollectionId] = chosen;
+            }
+        }
+
+        return pictures;
+    }
+
+    private static PictureOverride? OverrideOf(PictureSetting setting) =>
+        setting.Choice == PictureChoice.Automatic ? null : new PictureOverride(setting.Choice, setting.Link?.Record, setting.Link?.Url);
 
     private static Place PlaceOf(
         SnapshotItem item,
