@@ -10,10 +10,12 @@ import {
   TIME_CHOICES,
   UNKNOWN_LOCATION,
   buildModel,
+  countGroups,
   countLit,
   effectiveLocation,
   evaluate,
   fold,
+  groupsFromDocument,
   listEntries,
   locationChoices,
   withAlternates,
@@ -62,6 +64,8 @@ export const NO_FILTERS = Object.freeze({
   rebuild: () => {},
   apply: () => {},
   showBar: () => {},
+  setView: () => {},
+  showHeadings: () => {},
   disableCardFilters: () => {},
   enableCardFilters: () => {},
   state: EMPTY_FILTERS,
@@ -115,7 +119,7 @@ function watchPinning(bar) {
  * kept; the controls start from them while the bar is still hidden.
  * @param {{ setItem: Function, removeItem: Function } | null} [parts.storage] Where the filters are kept for the tab; null keeps them
  * in memory only.
- * @returns {{ dimOf: (placement: object) => boolean, rebuild: (records: object[], locations?: object[], held?: { layoutEtag?: string | null, quiet?: boolean }) => void, apply: () => void, showBar: (visible: boolean) => void, disableCardFilters: () => void, enableCardFilters: () => void, state: object }}
+ * @returns {{ dimOf: (placement: object) => boolean, setView: (view: 'all' | 'location', doc: object | null) => void, showHeadings: () => void, rebuild: (records: object[], locations?: object[], held?: { layoutEtag?: string | null, quiet?: boolean }) => void, apply: () => void, showBar: (visible: boolean) => void, disableCardFilters: () => void, enableCardFilters: () => void, state: object }}
  * The controls: whether a box is drawn in shadow, a new model of the collection (with the owner's locations when the card data brings
  * them, and the entity tag of the layout the records belong to, so the other titles are read again when the collection changed; a
  * quiet one only replaces the model and leaves the boxes on screen alone, for a draw that follows at once), a
@@ -146,13 +150,27 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
   let namesGeneration = 0;
   let heldLayout = null;
   let model = buildModel(getRecords(), locations);
-  let entries = listEntries(model, { language });
+  let view = 'all';
+  let viewDocument = null;
+  let entries = listOf();
   let result = evaluate(state, model);
   let tally = countLit(entries, result.lit);
   let announceTimer = null;
   let bulkFrame = 0;
 
   watchPinning(bar);
+
+  /**
+   * Lists the entries the count works on for the view on screen: one list for the whole collection, or one per location cabinet.
+   * @returns {ReturnType<typeof listEntries>}
+   */
+  function listOf() {
+    if (view === 'location' && viewDocument !== null) {
+      return listEntries(model, { language, view, groups: groupsFromDocument(viewDocument, model) });
+    }
+
+    return listEntries(model, { language });
+  }
 
   /**
    * Tells whether an entry is drawn in shadow. An entry the model does not hold is judged from its own title.
@@ -224,6 +242,33 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
     count.textContent = !result.active ? '' : none ? copy.noMatch : copy.filterCount(tally.lit, tally.total);
     bar.toggleAttribute('data-active', result.active);
     clear.toggleAttribute('data-highlighted', none);
+    showHeadings();
+  }
+
+  /**
+   * Writes the count into the heading of every location cabinet on screen: the number of its games, or while filtering the matching
+   * ones out of all of them. A cabinet that holds no match while filtering is marked, so its name can be drawn quietly. Nothing
+   * happens in the all-together view.
+   */
+  function showHeadings() {
+    if (view !== 'location' || Array.isArray(entries)) {
+      return;
+    }
+
+    const counts = new Map(countGroups(entries, result.lit).map((group) => [group.id ?? UNKNOWN_LOCATION, group]));
+
+    for (const group of mount.querySelectorAll('.location-group')) {
+      const own = counts.get(group.dataset.locationId);
+      const heading = group.querySelector('.location-heading');
+      const text = group.querySelector('.location-count');
+
+      if (own === undefined || heading === null || text === null) {
+        continue;
+      }
+
+      text.textContent = copy.locationHeadingCount(own.lit, own.total, result.active);
+      heading.toggleAttribute('data-no-match', result.active && own.lit === 0);
+    }
   }
 
   /**
@@ -274,7 +319,7 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
 
     tally = countLit(entries, result.lit);
     showTally();
-    document.dispatchEvent(new CustomEvent('cabinet:filtered', { detail: { active: result.active, lit: result.lit, count: tally, state } }));
+    document.dispatchEvent(new CustomEvent('cabinet:filtered', { detail: { active: result.active, lit: result.lit, count: tally, state, view, entries, hasLocations: model.locations.length > 0 } }));
   }
 
   /**
@@ -586,7 +631,7 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
       heldLayout = layoutEtag ?? heldLayout;
       locations = Array.isArray(owned) ? owned : locations;
       model = modelOf(records);
-      entries = listEntries(model, { language });
+      entries = listOf();
 
       if (held?.quiet !== true) {
         fillPlaces();
@@ -600,6 +645,13 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
 
     apply,
     showBar,
+    showHeadings,
+
+    setView(next, doc) {
+      view = next;
+      viewDocument = next === 'location' ? doc : null;
+    },
+
     disableCardFilters,
     enableCardFilters,
 

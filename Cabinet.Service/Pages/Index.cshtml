@@ -97,6 +97,17 @@
 <div class="filter-sentinel" aria-hidden="true"></div>
 <div class="filter-bar" role="search" aria-label="@Model.Language.Text.FilterBarLabel" hidden>
     <div class="filter-row">
+        <fieldset class="filter-view" hidden>
+            <legend class="visually-hidden">@Model.Language.Text.ViewLegend</legend>
+            <label class="filter-view-segment">
+                <input type="radio" name="filter-view" value="all" checked />
+                <span class="filter-view-text">@Model.Language.Text.ViewAll</span>
+            </label>
+            <label class="filter-view-segment">
+                <input type="radio" name="filter-view" value="location" />
+                <span class="filter-view-text">@Model.Language.Text.ViewByLocation</span>
+            </label>
+        </fieldset>
         <label class="visually-hidden" for="filter-q">@Model.Language.Text.SearchLabel</label>
         <span class="filter-search">
             <input id="filter-q" type="search" name="q" placeholder="@Model.Language.Text.SearchLabel" enterkeyhint="search" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" dir="auto" aria-keyshortcuts="/" />

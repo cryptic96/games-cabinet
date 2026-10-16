@@ -18,7 +18,7 @@ for (const name of readdirSync(new URL('../../Cabinet.Service/wwwroot/js/', impo
   copyFileSync(new URL('../../Cabinet.Service/wwwroot/js/' + name, import.meta.url), join(FOLDER, name));
 }
 
-const { EMPTY_FILTERS, fold, buildModel, withAlternates, isActive, evaluate, listEntries, countLit, familyRange, PLAYER_CHOICES, TIME_CHOICES, locationChoices, effectiveLocation, UNKNOWN_LOCATION } = await import(pathToFileURL(join(FOLDER, 'filter-rules.js')).href);
+const { EMPTY_FILTERS, fold, buildModel, withAlternates, isActive, evaluate, listEntries, countLit, countGroups, groupsFromDocument, familyRange, PLAYER_CHOICES, TIME_CHOICES, locationChoices, effectiveLocation, UNKNOWN_LOCATION } = await import(pathToFileURL(join(FOLDER, 'filter-rules.js')).href);
 
 /**
  * Builds an invented card record; fields not given are unknown.
@@ -387,4 +387,65 @@ test('adding other titles keeps titles matching and leaves the given model untou
   assert.equal(JSON.stringify([...model.haystacks]), before);
   assert.deepEqual([...evaluate(search('quiet'), extended).lit].sort(), ['3']);
   assert.deepEqual([...evaluate(search('harbour'), extended).lit].sort(), ['1', '2']);
+});
+
+/**
+ * Builds a by-location document from lists of entry ids, one cabinet each; a group with no id and no name is the unknown location.
+ * @param {{ id?: string, name?: string, entries: number[] }[]} places The cabinets in order.
+ * @returns {object}
+ */
+const documentOf = (places) => ({
+  layout: '"v1"',
+  locations: places.map((place) => ({
+    ...(place.id === undefined ? {} : { id: place.id, name: place.name }),
+    sections: [{ index: 0, cubbies: [{ placements: place.entries.map((entryId) => ({ entryId, kind: 'cover' })) }] }],
+  })),
+});
+
+test('in the location view an expansion nests only under a base game of its own location, and is its own entry otherwise', () => {
+  const shore = record(2, 'Far Shore', { isExpansion: true, locationId: 'bbbbbbbb' });
+  const harbour = record(1, 'Lantern & Harbour', { expansions: [link(shore)], locationId: 'aaaaaaaa' });
+  const tally = record(3, 'Tide Tally', { locationId: 'aaaaaaaa' });
+  const meadow = record(4, 'Plain Meadow');
+  shore.bases = [link(harbour)];
+  const model = buildModel([harbour, shore, tally, meadow], [{ id: 'aaaaaaaa', name: 'Cabinet A', games: 2 }, { id: 'bbbbbbbb', name: 'Shelf B', games: 1 }]);
+  const groups = groupsFromDocument(documentOf([{ id: 'aaaaaaaa', name: 'Cabinet A', entries: [1, 3] }, { id: 'bbbbbbbb', name: 'Shelf B', entries: [2] }, { entries: [4] }]), model);
+  const listing = listEntries(model, { language: 'en', view: 'location', groups });
+
+  assert.equal(listing.view, 'location');
+  assert.deepEqual(listing.groups.map((group) => [group.id, group.name, group.entries.map((entry) => entry.boxes)]), [
+    ['aaaaaaaa', 'Cabinet A', [['1'], ['3']]],
+    ['bbbbbbbb', 'Shelf B', [['2']]],
+    [null, null, [['4']]],
+  ]);
+  assert.deepEqual(countLit(listEntries(model, { language: 'en' }), new Set(['1', '2', '3', '4'])), { lit: 3, total: 3 });
+  assert.deepEqual(countLit(listing, new Set(['1', '2', '3', '4'])), { lit: 4, total: 4 });
+});
+
+test('the count over every location is the sum of the locations, lit or not', () => {
+  const records = [record(1, 'One', { locationId: 'aaaaaaaa', minPlayers: 2, maxPlayers: 4 }), record(2, 'Two', { locationId: 'aaaaaaaa', minPlayers: 5, maxPlayers: 6 }), record(3, 'Three', { minPlayers: 2, maxPlayers: 4 })];
+  const model = buildModel(records, [{ id: 'aaaaaaaa', name: 'Cabinet A', games: 2 }]);
+  const listing = listEntries(model, { language: 'en', view: 'location', groups: groupsFromDocument(documentOf([{ id: 'aaaaaaaa', name: 'Cabinet A', entries: [1, 2] }, { entries: [3] }]), model) });
+  const everything = evaluate(EMPTY_FILTERS, model);
+  const fours = evaluate({ ...EMPTY_FILTERS, players: 4 }, model);
+
+  assert.deepEqual(countGroups(listing, everything.lit), [{ id: 'aaaaaaaa', lit: 2, total: 2 }, { id: null, lit: 1, total: 1 }]);
+  assert.deepEqual(countGroups(listing, fours.lit), [{ id: 'aaaaaaaa', lit: 1, total: 2 }, { id: null, lit: 1, total: 1 }]);
+  assert.deepEqual(countLit(listing, fours.lit), { lit: 2, total: 3 });
+  assert.deepEqual(countGroups(listEntries(model, { language: 'en' }), fours.lit), []);
+});
+
+test('a record made of a drawn box alone is placed by the box that is drawn, until the card data is held', () => {
+  const least = [{ entryId: 1, gameId: 10, title: 'One', isExpansion: false, incomplete: true, expansions: [], bases: [] }, { entryId: 2, gameId: 20, title: 'Two', isExpansion: false, incomplete: true, expansions: [], bases: [] }];
+  const model = buildModel(least);
+  const groups = groupsFromDocument(documentOf([{ id: 'aaaaaaaa', name: 'Cabinet A', entries: [1] }, { entries: [2] }]), model);
+
+  assert.deepEqual(groups.map((group) => [...group.entryIds]), [['1'], ['2']]);
+});
+
+test('without a view or without groups the listing is the plain list, as before', () => {
+  const model = buildModel(COLLECTION);
+
+  assert.deepEqual(listEntries(model, { language: 'en', view: 'location', groups: null }), listEntries(model, { language: 'en' }));
+  assert.equal(Array.isArray(listEntries(model, { language: 'en', view: 'all' })), true);
 });
