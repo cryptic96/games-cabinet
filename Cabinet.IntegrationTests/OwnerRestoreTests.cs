@@ -75,6 +75,42 @@ public sealed class OwnerRestoreTests
     }
 
     [Fact]
+    public async Task A_restored_copy_the_collection_no_longer_holds_is_stamped_and_counted()
+    {
+        await using var host = await RestoreHost.StartAsync(seed: null, background: true);
+        await SyncRounds.PressAndWait(host.Client, host.Clock, advance: false);
+        var held = SyntheticBggCollection.Create(5).First(item => item.Owned && !item.IsExpansion && item.ObjectId == host.GameIds[1]).CollId;
+        const long gone = 9_999_001;
+        var file = OwnerDataExport.Write(
+            OwnerData.Empty with
+            {
+                Revision = 3,
+                Locations = [new OwnerLocation(CabinetAId, CabinetA)],
+                Games =
+                [
+                    new OwnerGame(host.GameIds[0], CabinetAId, null, null),
+                    new OwnerGame(host.GameIds[1], CabinetAId, null, null, held),
+                    new OwnerGame(host.GameIds[1], CabinetAId, null, null, gone),
+                ],
+            },
+            SyncHarness.StartTime);
+
+        var check = await host.Session.PostFileAsync(CheckPath, FileField, file);
+        var preview = await host.Session.GetAsync(check.Location!);
+        await host.Session.PostFormAsync(RestorePath, [new("token", OwnerSession.FieldValue(preview.Body, "token"))]);
+
+        var counted = System.Text.RegularExpressions.Regex.Match(
+            preview.Body,
+            "Not in your collection now.*?<td>(\\d+)</td>\\s*<td>(\\d+)</td>",
+            System.Text.RegularExpressions.RegexOptions.Singleline);
+        counted.Success.Should().BeTrue();
+        counted.Groups[1].Value.Should().Be("1");
+        host.Data.Games.Single(game => game.CollectionId == gone).AbsentSinceUtc.Should().NotBeNull();
+        host.Data.Games.Single(game => game.CollectionId == held).AbsentSinceUtc.Should().BeNull();
+        host.Data.Games.Single(game => game.GameId == host.GameIds[0]).AbsentSinceUtc.Should().BeNull();
+    }
+
+    [Fact]
     public async Task The_check_of_a_script_answers_with_a_token_and_a_script_without_the_token_header_is_refused()
     {
         await using var first = await RestoreHost.StartAsync(seed: Seeded());

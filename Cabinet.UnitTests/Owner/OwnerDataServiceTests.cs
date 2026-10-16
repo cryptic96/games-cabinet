@@ -330,7 +330,7 @@ public sealed class OwnerDataServiceTests : IDisposable
         KeepRecentCopy();
         var service = CreateService(store, out _);
 
-        await service.ReconcileAsync(new HashSet<int>(), CancellationToken.None);
+        await service.ReconcileAsync(new HashSet<int>(), new Dictionary<long, int>(), CancellationToken.None);
 
         store.EarlierVersions().Should().HaveCount(2);
         store.ReadEarlierVersion(0).Should().Equal(oldFile);
@@ -418,7 +418,7 @@ public sealed class OwnerDataServiceTests : IDisposable
         BlockVersionsFolder();
         var service = CreateService(CreateStore(), out _);
 
-        await service.ReconcileAsync(new HashSet<int>(), CancellationToken.None);
+        await service.ReconcileAsync(new HashSet<int>(), new Dictionary<long, int>(), CancellationToken.None);
 
         File.ReadAllBytes(FilePath).Should().Equal(oldFile);
         ((OwnerDataState.Ready)service.State).Data.Games.Single().AbsentSinceUtc.Should().BeNull();
@@ -535,7 +535,7 @@ public sealed class OwnerDataServiceTests : IDisposable
         var service = CreateService(CreateStore(), out _);
         var document = OwnerData.Empty with { Revision = 1, Locations = [new OwnerLocation("0a1b2c3d", CabinetA)] };
 
-        var result = await service.RestoreAsync(document, RestoreSource.File, null, CancellationToken.None);
+        var result = await service.RestoreAsync(document, RestoreSource.File, null, null, CancellationToken.None);
 
         result.Outcome.Should().Be(OwnerOutcome.Refused);
         result.StatusKey.Should().Be("save-failed");
@@ -577,6 +577,28 @@ public sealed class OwnerDataServiceTests : IDisposable
     }
 
     /// <summary>Takes every permission off the stored file; false when the file can still be read, as it can for a user that file modes do not bind.</summary>
+    [Fact]
+    public async Task Reconciling_with_the_games_and_copies_a_collection_lists_stores_the_hand_over_through_the_single_writer()
+    {
+        var harness = OwnerTestKit.Harness();
+        await harness.AddAsync(ShelfB);
+        var shelf = harness.Data.Locations.Single().Id;
+        var seeded = await harness.Service.MutateAsync(
+            harness.Service.Revision,
+            data => LocationEdits.Assign(data, 100, 7002, [7002], shelf, "Game 100"),
+            CancellationToken.None);
+        var revision = harness.Service.Revision;
+        var changes = harness.Data.Changes.Count;
+
+        await harness.Service.ReconcileAsync(new HashSet<int> { 100 }, new Dictionary<long, int> { [7009] = 100 }, CancellationToken.None);
+
+        seeded.Outcome.Should().Be(OwnerOutcome.Saved);
+        harness.Data.Games.Should().ContainSingle().Which.Should().Be(new OwnerGame(100, shelf, null, null, 7009));
+        harness.Store.Saved.Last().Games.Should().Equal(harness.Data.Games);
+        harness.Service.Revision.Should().Be(revision);
+        harness.Data.Changes.Should().HaveCount(changes);
+    }
+
     private bool MakeStoredFileUnreadable()
     {
         if (OperatingSystem.IsWindows())
