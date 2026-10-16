@@ -8,6 +8,9 @@ namespace Cabinet.Service.Language;
 /// </summary>
 public sealed record SiteText
 {
+    /// <summary>The players chip that stands for this many players or more.</summary>
+    private const int MaxPlayersChip = 8;
+
     /// <summary>The English labels.</summary>
     public static SiteText English { get; } = new()
     {
@@ -30,6 +33,22 @@ public sealed record SiteText
         SearchLabel = "Search games",
         ClearVisible = "Clear",
         ClearName = "Clear filters",
+        PlayerSuffixOneFormat = "{0} player",
+        PlayerSuffixManyFormat = "{0} players",
+        PlayerSuffixMax = "8 or more players",
+        TimeSuffixFormat = "{0} minutes or less",
+        ViewLegend = "View",
+        ViewAll = "All together",
+        ViewByLocation = "By location",
+        PlayersLegend = "Players",
+        TimeLegend = "Max. minutes",
+        AnyChoice = "Any",
+        LocationLabel = "Location",
+        AnyLocation = "Any location",
+        UnknownLocation = "Unknown location",
+        FiltersButton = "Filters",
+        FiltersActiveSuffix = "active",
+        SheetTitle = "Filters",
     };
 
     /// <summary>The Dutch labels, informal and in the singular you-form.</summary>
@@ -54,6 +73,22 @@ public sealed record SiteText
         SearchLabel = "Zoek een spel",
         ClearVisible = "Wissen",
         ClearName = "Filters wissen",
+        PlayerSuffixOneFormat = "{0} speler",
+        PlayerSuffixManyFormat = "{0} spelers",
+        PlayerSuffixMax = "8 of meer spelers",
+        TimeSuffixFormat = "{0} minuten of minder",
+        ViewLegend = "Weergave",
+        ViewAll = "Alles samen",
+        ViewByLocation = "Per locatie",
+        PlayersLegend = "Spelers",
+        TimeLegend = "Max. minuten",
+        AnyChoice = "Alle",
+        LocationLabel = "Locatie",
+        AnyLocation = "Alle locaties",
+        UnknownLocation = "Onbekende locatie",
+        FiltersButton = "Filters",
+        FiltersActiveSuffix = "actief",
+        SheetTitle = "Filters",
     };
 
     /// <summary>The page title and heading.</summary>
@@ -113,6 +148,54 @@ public sealed record SiteText
     /// <summary>The accessible name of the button that clears the filters.</summary>
     public required string ClearName { get; init; }
 
+    /// <summary>The spoken suffix of the players chip for exactly one player, with the number as <c>{0}</c>.</summary>
+    public required string PlayerSuffixOneFormat { get; init; }
+
+    /// <summary>The spoken suffix of the players chip for two to seven players, with the number as <c>{0}</c>.</summary>
+    public required string PlayerSuffixManyFormat { get; init; }
+
+    /// <summary>The spoken suffix of the players chip that means the largest group size or more.</summary>
+    public required string PlayerSuffixMax { get; init; }
+
+    /// <summary>The spoken suffix of the time chip, with the number of minutes as <c>{0}</c>.</summary>
+    public required string TimeSuffixFormat { get; init; }
+
+    /// <summary>The legend of the control that switches between one cabinet and a cabinet per location.</summary>
+    public required string ViewLegend { get; init; }
+
+    /// <summary>The view choice that shows every game in one cabinet.</summary>
+    public required string ViewAll { get; init; }
+
+    /// <summary>The view choice that shows one cabinet per storage location.</summary>
+    public required string ViewByLocation { get; init; }
+
+    /// <summary>The legend of the players choice.</summary>
+    public required string PlayersLegend { get; init; }
+
+    /// <summary>The legend of the play time choice.</summary>
+    public required string TimeLegend { get; init; }
+
+    /// <summary>The text of the choice that leaves a players or time filter off.</summary>
+    public required string AnyChoice { get; init; }
+
+    /// <summary>The visually hidden label of the location choice.</summary>
+    public required string LocationLabel { get; init; }
+
+    /// <summary>The location choice that leaves the location filter off.</summary>
+    public required string AnyLocation { get; init; }
+
+    /// <summary>The location choice and the heading for games that have no storage location.</summary>
+    public required string UnknownLocation { get; init; }
+
+    /// <summary>The text of the button that opens the filters on a narrow screen.</summary>
+    public required string FiltersButton { get; init; }
+
+    /// <summary>The word after the number of filters in use in the accessible name of the filters button.</summary>
+    public required string FiltersActiveSuffix { get; init; }
+
+    /// <summary>The visually hidden title of the filters sheet.</summary>
+    public required string SheetTitle { get; init; }
+
     /// <summary>The footer version line for a build.</summary>
     /// <param name="version">The running version.</param>
     /// <param name="commit">The short commit the build came from.</param>
@@ -123,4 +206,18 @@ public sealed record SiteText
     /// <param name="exact">The time of the last good sync, written out.</param>
     public string LastSynced(string exact) =>
         string.Format(CultureInfo.InvariantCulture, LastSyncedFormat, exact);
+
+    /// <summary>The spoken suffix of a players chip: singular for one, the open-ended form for the largest size, plural otherwise.</summary>
+    /// <param name="players">The number of players the chip stands for.</param>
+    public string PlayersSuffix(int players) => players switch
+    {
+        1 => string.Format(CultureInfo.InvariantCulture, PlayerSuffixOneFormat, players),
+        MaxPlayersChip => PlayerSuffixMax,
+        _ => string.Format(CultureInfo.InvariantCulture, PlayerSuffixManyFormat, players),
+    };
+
+    /// <summary>The spoken suffix of a time chip.</summary>
+    /// <param name="minutes">The longest play time the chip allows, in minutes.</param>
+    public string TimeSuffix(int minutes) =>
+        string.Format(CultureInfo.InvariantCulture, TimeSuffixFormat, minutes);
 }

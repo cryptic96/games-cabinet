@@ -9,6 +9,11 @@ const SECONDS_PER_HOUR = 3600;
 const SECONDS_PER_DAY = 86400;
 const MILLISECONDS_PER_MINUTE = 60000;
 
+/**
+ * The players chip that stands for this many players or more.
+ */
+const MAX_PLAYERS_CHIP = 8;
+
 const englishRelative = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 const dutchRelative = new Intl.RelativeTimeFormat('nl', { numeric: 'always' });
 
@@ -66,6 +71,48 @@ function dutchWaitPhrase(remainingMs) {
   const minutes = Math.ceil(remainingMs / MILLISECONDS_PER_MINUTE);
 
   return minutes === 1 ? '1 minuut' : `${minutes} minuten`;
+}
+
+/**
+ * A number of games in English: singular for exactly one.
+ * @param {number} count How many games.
+ * @returns {string}
+ */
+function englishGames(count) {
+  return `${count} ${count === 1 ? 'game' : 'games'}`;
+}
+
+/**
+ * A number of games in Dutch: singular for exactly one.
+ * @param {number} count How many games.
+ * @returns {string}
+ */
+function dutchGames(count) {
+  return `${count} ${count === 1 ? 'spel' : 'spellen'}`;
+}
+
+/**
+ * The part of an English location heading after the name, starting with a dot between spaces: the number of games, or while
+ * filtering the matching ones out of all of them. The noun follows the total.
+ * @param {number} lit How many games are lit.
+ * @param {number} total How many games the location holds.
+ * @param {boolean} filtering Whether a filter is in use.
+ * @returns {string}
+ */
+function englishHeadingCount(lit, total, filtering) {
+  return filtering ? ` · ${lit} of ${englishGames(total)}` : ` · ${englishGames(total)}`;
+}
+
+/**
+ * The part of a Dutch location heading after the name, starting with a dot between spaces: the number of games, or while
+ * filtering the matching ones out of all of them. The noun follows the total.
+ * @param {number} lit How many games are lit.
+ * @param {number} total How many games the location holds.
+ * @param {boolean} filtering Whether a filter is in use.
+ * @returns {string}
+ */
+function dutchHeadingCount(lit, total, filtering) {
+  return filtering ? ` · ${lit} van ${dutchGames(total)}` : ` · ${dutchGames(total)}`;
 }
 
 const EXACT_OPTIONS = {
@@ -336,6 +383,141 @@ const ENGLISH = Object.freeze({
   filtersCleared(total) {
     return `Filters cleared, ${total} ${total === 1 ? 'game' : 'games'}`;
   },
+
+  /**
+   * The spoken suffix of a players chip: singular for one, the open-ended form for the largest size, plural otherwise.
+   * @param {number} players The number of players the chip stands for.
+   * @returns {string}
+   */
+  playersSuffix(players) {
+    if (players === MAX_PLAYERS_CHIP) {
+      return `${players} or more players`;
+    }
+
+    return `${players} ${players === 1 ? 'player' : 'players'}`;
+  },
+
+  /**
+   * The spoken suffix of a time chip.
+   * @param {number} minutes The longest play time the chip allows, in minutes.
+   * @returns {string}
+   */
+  timeSuffix(minutes) {
+    return `${minutes} minutes or less`;
+  },
+
+  /**
+   * The short count of the slim bar: how many games stand in the light out of how many there are, with no noun.
+   * @param {number} lit How many games are lit.
+   * @param {number} total How many games there are.
+   * @returns {string}
+   */
+  filterCountShort(lit, total) {
+    return `${lit} of ${total}`;
+  },
+
+  viewAllAnnounce: 'Showing all games together',
+  viewLocationAnnounce: 'Showing a cabinet per location',
+  locationViewFailed: "Couldn't load the location view. Showing everything together.",
+
+  /**
+   * The text of the filters sheet's main button: how many games the filters leave in the light.
+   * @param {number} count How many games are lit.
+   * @returns {string}
+   */
+  showGames(count) {
+    return `Show ${englishGames(count)}`;
+  },
+
+  /**
+   * The visible text of the Filters button: the number of filters in use after a dot, nothing while none is.
+   * @param {number} active How many filters are in use.
+   * @returns {string}
+   */
+  filtersButton(active) {
+    return active === 0 ? 'Filters' : `Filters · ${active}`;
+  },
+
+  /**
+   * The accessible name of the Filters button, which spells out what the number means.
+   * @param {number} active How many filters are in use.
+   * @returns {string}
+   */
+  filtersButtonName(active) {
+    return active === 0 ? 'Filters' : `Filters · ${active} active`;
+  },
+
+  anyLocation: 'Any location',
+  unknownLocation: 'Unknown location',
+
+  /**
+   * The part of a location heading after the name: the number of games, or while filtering the matching ones out of all of them.
+   * @param {number} lit How many games of the location are lit.
+   * @param {number} total How many games the location holds.
+   * @param {boolean} filtering Whether a filter is in use.
+   * @returns {string}
+   */
+  locationHeadingCount(lit, total, filtering) {
+    return englishHeadingCount(lit, total, filtering);
+  },
+
+  /**
+   * The heading of one location group in the games list: the location and how many of its games the list shows.
+   * @param {string} name The location name.
+   * @param {number} shown How many games of the location match the filters.
+   * @param {number} total How many games the location holds.
+   * @param {boolean} filtering Whether a filter is in use.
+   * @returns {string}
+   */
+  listGroupHeading(name, shown, total, filtering) {
+    return `${name}, ${englishGames(filtering ? shown : total)}`;
+  },
+
+  /**
+   * The location part of a games list entry for a game that has a place.
+   * @param {string} name The location name.
+   * @returns {string}
+   */
+  listStoredIn(name) {
+    return `, stored in ${name}`;
+  },
+
+  /**
+   * The location part of a games list entry for a game that has no place.
+   * @returns {string}
+   */
+  listUnknownEntry() {
+    return ', unknown location';
+  },
+
+  /**
+   * The heading of the group for games with no location in the games list; while filtering the count is the matching one.
+   * @param {number} count How many games the group lists.
+   * @returns {string}
+   */
+  listUnknownGroupHeading(count) {
+    return `Unknown location, ${englishGames(count)}`;
+  },
+
+  /**
+   * The whole heading of the cabinet for games with no location: the name followed by the same count the other headings carry.
+   * @param {number} lit How many games of the group are lit.
+   * @param {number} total How many games the group holds.
+   * @param {boolean} filtering Whether a filter is in use.
+   * @returns {string}
+   */
+  unknownLocationHeading(lit, total, filtering) {
+    return `Unknown location${englishHeadingCount(lit, total, filtering)}`;
+  },
+
+  /**
+   * The accessible name of the card button that scrolls to the game's shelf.
+   * @param {string} name The location name.
+   * @returns {string}
+   */
+  showOnShelfName(name) {
+    return `Show on shelf: ${name}`;
+  },
 });
 
 const DUTCH = Object.freeze({
@@ -597,6 +779,141 @@ const DUTCH = Object.freeze({
    */
   filtersCleared(total) {
     return `Filters gewist, ${total} ${total === 1 ? 'spel' : 'spellen'}`;
+  },
+
+  /**
+   * The spoken suffix of a players chip: singular for one, the open-ended form for the largest size, plural otherwise.
+   * @param {number} players The number of players the chip stands for.
+   * @returns {string}
+   */
+  playersSuffix(players) {
+    if (players === MAX_PLAYERS_CHIP) {
+      return `${players} of meer spelers`;
+    }
+
+    return `${players} ${players === 1 ? 'speler' : 'spelers'}`;
+  },
+
+  /**
+   * The spoken suffix of a time chip.
+   * @param {number} minutes The longest play time the chip allows, in minutes.
+   * @returns {string}
+   */
+  timeSuffix(minutes) {
+    return `${minutes} minuten of minder`;
+  },
+
+  /**
+   * The short count of the slim bar: how many games stand in the light out of how many there are, with no noun.
+   * @param {number} lit How many games are lit.
+   * @param {number} total How many games there are.
+   * @returns {string}
+   */
+  filterCountShort(lit, total) {
+    return `${lit} van ${total}`;
+  },
+
+  viewAllAnnounce: 'Je ziet alles samen',
+  viewLocationAnnounce: 'Je ziet een kast per locatie',
+  locationViewFailed: 'Het lukte niet om de kasten per locatie te laden. Je ziet alles samen.',
+
+  /**
+   * The text of the filters sheet's main button: how many games the filters leave in the light.
+   * @param {number} count How many games are lit.
+   * @returns {string}
+   */
+  showGames(count) {
+    return `Toon ${dutchGames(count)}`;
+  },
+
+  /**
+   * The visible text of the Filters button: the number of filters in use after a dot, nothing while none is.
+   * @param {number} active How many filters are in use.
+   * @returns {string}
+   */
+  filtersButton(active) {
+    return active === 0 ? 'Filters' : `Filters · ${active}`;
+  },
+
+  /**
+   * The accessible name of the Filters button, which spells out what the number means.
+   * @param {number} active How many filters are in use.
+   * @returns {string}
+   */
+  filtersButtonName(active) {
+    return active === 0 ? 'Filters' : `Filters · ${active} actief`;
+  },
+
+  anyLocation: 'Alle locaties',
+  unknownLocation: 'Onbekende locatie',
+
+  /**
+   * The part of a location heading after the name: the number of games, or while filtering the matching ones out of all of them.
+   * @param {number} lit How many games of the location are lit.
+   * @param {number} total How many games the location holds.
+   * @param {boolean} filtering Whether a filter is in use.
+   * @returns {string}
+   */
+  locationHeadingCount(lit, total, filtering) {
+    return dutchHeadingCount(lit, total, filtering);
+  },
+
+  /**
+   * The heading of one location group in the games list: the location and how many of its games the list shows.
+   * @param {string} name The location name.
+   * @param {number} shown How many games of the location match the filters.
+   * @param {number} total How many games the location holds.
+   * @param {boolean} filtering Whether a filter is in use.
+   * @returns {string}
+   */
+  listGroupHeading(name, shown, total, filtering) {
+    return `${name}, ${dutchGames(filtering ? shown : total)}`;
+  },
+
+  /**
+   * The location part of a games list entry for a game that has a place.
+   * @param {string} name The location name.
+   * @returns {string}
+   */
+  listStoredIn(name) {
+    return `, staat in ${name}`;
+  },
+
+  /**
+   * The location part of a games list entry for a game that has no place.
+   * @returns {string}
+   */
+  listUnknownEntry() {
+    return ', onbekende locatie';
+  },
+
+  /**
+   * The heading of the group for games with no location in the games list; while filtering the count is the matching one.
+   * @param {number} count How many games the group lists.
+   * @returns {string}
+   */
+  listUnknownGroupHeading(count) {
+    return `Onbekende locatie, ${dutchGames(count)}`;
+  },
+
+  /**
+   * The whole heading of the cabinet for games with no location: the name followed by the same count the other headings carry.
+   * @param {number} lit How many games of the group are lit.
+   * @param {number} total How many games the group holds.
+   * @param {boolean} filtering Whether a filter is in use.
+   * @returns {string}
+   */
+  unknownLocationHeading(lit, total, filtering) {
+    return `Onbekende locatie${dutchHeadingCount(lit, total, filtering)}`;
+  },
+
+  /**
+   * The accessible name of the card button that scrolls to the game's shelf.
+   * @param {string} name The location name.
+   * @returns {string}
+   */
+  showOnShelfName(name) {
+    return `Toon in de kast: ${name}`;
   },
 });
 

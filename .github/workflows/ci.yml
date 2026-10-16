@@ -61,9 +61,9 @@ jobs:
         env:
           CABINET_E2E: 1
 
-  # The browser tests run as four parallel jobs so the slowest one sets the
+  # The browser tests run as five parallel jobs so the slowest one sets the
   # time, not the sum. Each job builds the test project, installs only the
-  # browser it needs and runs one slice; the three Chromium slices together are
+  # browser it needs and runs one slice; the four Chromium slices together are
   # every test that is not the WebKit one, with no test in two of them.
   # Playwright's dependency installer may not know this runner image yet; if
   # an install step fails on an unsupported platform, set
@@ -149,7 +149,47 @@ jobs:
           path: ${{ runner.temp }}/screenshots
           if-no-files-found: ignore
 
-  # Every test class that is neither a look nor an owner class, and not WebKit.
+  browser-filters:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore packages
+        run: dotnet restore Cabinet.slnx --locked-mode
+
+      - name: Build browser tests
+        run: dotnet build Cabinet.BrowserTests --no-restore
+
+      - name: Install Chromium
+        run: Cabinet.BrowserTests/bin/Debug/net10.0/.playwright/node/linux-x64/node Cabinet.BrowserTests/bin/Debug/net10.0/.playwright/package/cli.js install --with-deps chromium-headless-shell
+
+      - name: Run browser tests
+        run: dotnet test --project Cabinet.BrowserTests --no-build --filter-class "Cabinet.BrowserTests.Filter*"
+        env:
+          CI: true
+          CABINET_SCREENSHOT_DIR: ${{ runner.temp }}/screenshots
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-screenshots-filters
+          path: ${{ runner.temp }}/screenshots
+          if-no-files-found: ignore
+
+  # Every test class that is not a look, owner or filter class, and not WebKit.
   browser-rest:
     runs-on: ubuntu-26.04
     timeout-minutes: 20
@@ -177,7 +217,7 @@ jobs:
         run: Cabinet.BrowserTests/bin/Debug/net10.0/.playwright/node/linux-x64/node Cabinet.BrowserTests/bin/Debug/net10.0/.playwright/package/cli.js install --with-deps chromium-headless-shell
 
       - name: Run browser tests
-        run: dotnet test --project Cabinet.BrowserTests --no-build --filter-not-class "Cabinet.BrowserTests.Look*" --filter-not-class "Cabinet.BrowserTests.Owner*" --filter-not-trait "Engine=WebKit"
+        run: dotnet test --project Cabinet.BrowserTests --no-build --filter-not-class "Cabinet.BrowserTests.Look*" --filter-not-class "Cabinet.BrowserTests.Owner*" --filter-not-class "Cabinet.BrowserTests.Filter*" --filter-not-trait "Engine=WebKit"
         env:
           CI: true
           CABINET_SCREENSHOT_DIR: ${{ runner.temp }}/screenshots
