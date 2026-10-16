@@ -40,7 +40,6 @@ public class PicturesModel : OwnerPage
     private readonly OwnerCheckFetcher _fetcher;
     private readonly StagedItems<StagedLink> _staged;
     private readonly ArtCache _cache;
-    private HashSet<long> _firstEntries = [];
 
     /// <summary>Creates the page.</summary>
     /// <param name="owner">The single writer of the owner data.</param>
@@ -118,17 +117,8 @@ public class PicturesModel : OwnerPage
     /// <summary>The token of the staged picture <see cref="Preview"/> was made from; it is only set when <see cref="Preview"/> is not null.</summary>
     public string? PreviewToken { get; private set; }
 
-    /// <summary>
-    /// Whether the row carries the form that sets a picture from a link. A link is stored for the whole game, so only the first
-    /// copy of each game offers it.
-    /// </summary>
-    /// <param name="row">The row.</param>
-    public bool OffersLink(PictureRow row)
-    {
-        ArgumentNullException.ThrowIfNull(row);
-
-        return _firstEntries.Contains(row.CollectionId);
-    }
+    /// <summary>The copy the preview of <see cref="Preview"/> is for; it is only set when <see cref="Preview"/> is not null.</summary>
+    public long? PreviewCollectionId { get; private set; }
 
     /// <summary>The value of the <c>view</c> query that selects the view of every game.</summary>
     public static string AllViewQuery => AllViewValue;
@@ -203,25 +193,28 @@ public class PicturesModel : OwnerPage
     }
 
     /// <summary>
-    /// Removes the picture link of a game and the record of its stored copy. When the link was the choice, the choice falls back
-    /// to Automatic. The change can be undone, which puts the link back and fetches its picture again.
+    /// Removes the picture link of one copy and the record of its stored copy; no other copy changes. When the link was the
+    /// choice, the choice falls back to Automatic. The change can be undone, which puts the link back and fetches its picture again.
     /// </summary>
     /// <param name="revision">The revision the form was built from.</param>
-    /// <param name="gameId">The game.</param>
+    /// <param name="gameId">The game the copy belongs to.</param>
+    /// <param name="collectionId">The collection entry of the copy; it has to be an entry of that game in the collection, or the post is refused.</param>
     /// <param name="view">The view the form was on, so a form posted without script returns to it.</param>
     /// <param name="game">The game of the single-game view the form was on, so a form posted without script returns to it.</param>
     /// <param name="cancellationToken">Cancels the wait for the writer.</param>
-    public async Task<IActionResult> OnPostRemoveLinkAsync(long revision, int gameId, string? view, int? game, CancellationToken cancellationToken)
+    public async Task<IActionResult> OnPostRemoveLinkAsync(long revision, int gameId, long collectionId, string? view, int? game, CancellationToken cancellationToken)
     {
         var snapshot = _collection.Current.Snapshot;
-        var item = snapshot?.Items.FirstOrDefault(candidate => candidate.GameId == gameId);
+        var copy = snapshot is null ? null : CopyOf(snapshot, gameId, collectionId);
 
         var result = await _owner.MutateAsync(
             revision,
-            data => item is null ? OwnerChange.Refused(data, "unknown-game") : PictureEdits.RemoveLink(data, gameId, PictureRows.TitleOf(item)),
+            data => copy is not { } known
+                ? OwnerChange.Refused(data, "unknown-game")
+                : PictureEdits.RemoveLink(data, gameId, collectionId, known.Entries, PictureRows.TitleOf(known.Item)),
             cancellationToken);
 
-        return OwnerResponses.For(this, result, PagePath, GameAnchor(gameId), extra: StateAfter(result, FirstEntryOf(gameId), withLinkTile: true), view: ViewQueryOf(view, game), game: KnownGame(game));
+        return OwnerResponses.For(this, result, PagePath, RowAnchor(collectionId), extra: StateAfter(result, collectionId, withLinkTile: true), view: ViewQueryOf(view, game), game: KnownGame(game));
     }
 
     /// <summary>Takes back the latest change, when nothing was written after it.</summary>
@@ -251,13 +244,14 @@ public class PicturesModel : OwnerPage
     /// staged picture.
     /// </summary>
     /// <param name="gameId">The game the link is for.</param>
+    /// <param name="collectionId">The collection entry of the copy the link is for; it has to be an entry of that game in the collection, or the check is refused before anything is fetched.</param>
     /// <param name="link">The address as the owner typed it.</param>
     /// <param name="cancellationToken">Cancels the check.</param>
-    public async Task<IActionResult> OnPostCheckLinkAsync(int gameId, string? link, CancellationToken cancellationToken)
+    public async Task<IActionResult> OnPostCheckLinkAsync(int gameId, long collectionId, string? link, CancellationToken cancellationToken)
     {
         var snapshot = _collection.Current.Snapshot;
 
-        if (snapshot is null || !snapshot.Items.Any(item => item.GameId == gameId))
+        if (snapshot is null || CopyOf(snapshot, gameId, collectionId) is null)
         {
             return Refused("unknown-game", gameId, null, gameId);
         }
@@ -268,57 +262,69 @@ public class PicturesModel : OwnerPage
         {
             var failed = check as LinkCheck.Failed;
 
-            return LinkRefused(gameId, failed?.Problem ?? LinkProblem.FetchFailed, failed?.Bytes);
+            return LinkRefused(gameId, collectionId, failed?.Problem ?? LinkProblem.FetchFailed, failed?.Bytes);
         }
 
-        var preview = LinkPreview.Build(snapshot, gameId, _rules, ready.Link.Record);
+        var preview = LinkPreview.Build(snapshot, gameId, collectionId, _rules, ready.Link.Record);
         var variant = preview is null ? null : ready.Link.Variants.FirstOrDefault(candidate => candidate.Name == preview.ArtFileName);
 
         if (preview is null || variant is null)
         {
-            return Refused("link-failed", gameId, null, gameId);
+            return Refused("link-failed", gameId, null, gameId, collectionId);
         }
 
-        var token = _staged.Stage(new StagedLink(gameId, ready.Link, variant));
+        var token = _staged.Stage(new StagedLink(gameId, collectionId, ready.Link, variant));
 
         return OwnerResponses.AsksForJson(Request)
             ? new JsonResult(PreviewJson(token, preview))
-            : RedirectToPage(PagePath, pageHandler: null, routeValues: new { game = gameId, preview = token }, fragment: GameAnchor(gameId));
+            : RedirectToPage(PagePath, pageHandler: null, routeValues: new { game = gameId, preview = token }, fragment: RowAnchor(collectionId));
     }
 
     /// <summary>
     /// Uses the previewed picture: its files are written to the art directory first, then the link and its record are stored as
-    /// the game's own picture, replacing any link the game had. The staged picture is forgotten once the change is saved.
+    /// the copy's own picture, replacing any link the copy had. The picture can be used for the copy it was checked for and no
+    /// other. The staged picture is forgotten once the change is saved.
     /// </summary>
     /// <param name="revision">The revision the form was built from.</param>
-    /// <param name="gameId">The game.</param>
+    /// <param name="gameId">The game the copy belongs to.</param>
+    /// <param name="collectionId">The collection entry of the copy; it has to be an entry of that game in the collection, or the post is refused.</param>
     /// <param name="token">The token of the staged picture.</param>
     /// <param name="view">The view the form was on, so a form posted without script returns to it.</param>
     /// <param name="game">The game of the single-game view the form was on, so a form posted without script returns to it.</param>
     /// <param name="cancellationToken">Cancels the wait for the writer.</param>
-    public async Task<IActionResult> OnPostUseLinkAsync(long revision, int gameId, string? token, string? view, int? game, CancellationToken cancellationToken)
+    public async Task<IActionResult> OnPostUseLinkAsync(long revision, int gameId, long collectionId, string? token, string? view, int? game, CancellationToken cancellationToken)
     {
         var snapshot = _collection.Current.Snapshot;
-        var item = snapshot?.Items.FirstOrDefault(candidate => candidate.GameId == gameId);
+        var copy = snapshot is null ? null : CopyOf(snapshot, gameId, collectionId);
 
-        if (snapshot is null || item is null)
+        if (snapshot is null || copy is not { } known)
         {
             return Refused("unknown-game", gameId, view, game);
         }
 
-        if (!_staged.TryGet(token, out var staged) || staged.GameId != gameId)
+        if (!_staged.TryGet(token, out var staged) || staged.GameId != gameId || staged.CollectionId != collectionId)
         {
-            return Refused("link-expired", gameId, view, game);
+            return Refused("link-expired", gameId, view, game, collectionId);
         }
 
         if (!TryStore(staged.Link))
         {
-            return Refused("save-failed", gameId, view, game);
+            return Refused("save-failed", gameId, view, game, collectionId);
         }
 
+        var item = known.Item;
         var result = await _owner.MutateAsync(
             revision,
-            data => PictureEdits.UseLink(data, gameId, staged.Link.Url, staged.Link.Record, PictureRows.TitleOf(item), item.VersionImageUrl, SnapshotMapper.MainPictureUrl(item, snapshot)),
+            data => PictureEdits.UseLink(
+                data,
+                gameId,
+                collectionId,
+                known.Entries,
+                staged.Link.Url,
+                staged.Link.Record,
+                PictureRows.TitleOf(item),
+                item.VersionImageUrl,
+                SnapshotMapper.MainPictureUrl(item, snapshot)),
             cancellationToken);
 
         if (result.Outcome == OwnerOutcome.Saved)
@@ -326,19 +332,28 @@ public class PicturesModel : OwnerPage
             _staged.Remove(token);
         }
 
-        return OwnerResponses.For(this, result, PagePath, GameAnchor(gameId), extra: StateAfter(result, FirstEntryOf(gameId), withLinkTile: true), view: ViewQueryOf(view, game), game: KnownGame(game));
+        return OwnerResponses.For(this, result, PagePath, RowAnchor(collectionId), extra: StateAfter(result, collectionId, withLinkTile: true), view: ViewQueryOf(view, game), game: KnownGame(game));
     }
 
     /// <summary>Throws a previewed picture away. Nothing was stored, so nothing else changes.</summary>
     /// <param name="gameId">The game the preview was for, so a form posted without script returns to its view.</param>
-    /// <param name="token">The token of the staged picture; one that is not the shape of a token or is unknown does nothing.</param>
-    public IActionResult OnPostDiscardPreview(int gameId, string? token)
+    /// <param name="collectionId">The collection entry of the copy the preview was for; it has to be an entry of that game in the collection, or the post is refused and nothing is thrown away.</param>
+    /// <param name="token">The token of the staged picture; one that is not the shape of a token, is unknown or was staged for another copy does nothing.</param>
+    public IActionResult OnPostDiscardPreview(int gameId, long collectionId, string? token)
     {
-        _staged.Remove(token);
+        if (_collection.Current.Snapshot is not { } snapshot || CopyOf(snapshot, gameId, collectionId) is null)
+        {
+            return Refused("unknown-game", gameId, null, gameId);
+        }
+
+        if (_staged.TryGet(token, out var staged) && staged.GameId == gameId && staged.CollectionId == collectionId)
+        {
+            _staged.Remove(token);
+        }
 
         return OwnerResponses.AsksForJson(Request)
             ? new JsonResult(new Dictionary<string, object?> { ["outcome"] = "discarded" })
-            : RedirectToPage(PagePath, pageHandler: null, routeValues: new { game = KnownGame(gameId) }, fragment: GameAnchor(gameId));
+            : RedirectToPage(PagePath, pageHandler: null, routeValues: new { game = KnownGame(gameId) }, fragment: RowAnchor(collectionId));
     }
 
     private static PicturesView ViewOf(string? view) =>
@@ -404,7 +419,7 @@ public class PicturesModel : OwnerPage
         return item is null ? null : (item, [.. copies.Select(copy => copy.CollectionId).Distinct()]);
     }
 
-    /// <summary>The first collection entry of a game, which a game-wide link post reports on and returns to, or null when the game is not in the collection.</summary>
+    /// <summary>The first collection entry of a game, which a post that names only the game reports on and returns to, or null when the game is not in the collection.</summary>
     private long? FirstEntryOf(int gameId) =>
         _collection.Current.Snapshot?.Items.Where(item => item.GameId == gameId).Select(item => (long?)item.CollectionId).Min();
 
@@ -426,12 +441,12 @@ public class PicturesModel : OwnerPage
         return gameId is { } id ? FirstEntryOf(id) : null;
     }
 
-    private IActionResult Refused(string statusKey, int gameId, string? view = null, int? game = null) =>
+    private IActionResult Refused(string statusKey, int gameId, string? view = null, int? game = null, long? collectionId = null) =>
         OwnerResponses.For(
             this,
             new OwnerResult(OwnerOutcome.Refused, null, statusKey),
             PagePath,
-            GameAnchor(gameId),
+            collectionId is { } entry ? RowAnchor(entry) : GameAnchor(gameId),
             view: ViewQueryOf(view, game),
             game: KnownGame(game));
 
@@ -465,7 +480,7 @@ public class PicturesModel : OwnerPage
         };
     }
 
-    private IActionResult LinkRefused(int gameId, LinkProblem problem, long? announcedBytes)
+    private IActionResult LinkRefused(int gameId, long collectionId, LinkProblem problem, long? announcedBytes)
     {
         var key = OwnerStrings.LinkKey(problem);
         var refusal = new OwnerResult(OwnerOutcome.Refused, null, key);
@@ -476,7 +491,7 @@ public class PicturesModel : OwnerPage
                 PagePath,
                 pageHandler: null,
                 routeValues: new { done = OwnerResponses.DoneCode(refusal), game = gameId, size = problem == LinkProblem.TooLarge ? announcedBytes : null },
-                fragment: GameAnchor(gameId));
+                fragment: RowAnchor(collectionId));
         }
 
         var extra = new Dictionary<string, object?>
@@ -485,7 +500,7 @@ public class PicturesModel : OwnerPage
             ["message"] = OwnerStrings.LinkError(problem, _fetcher.AllowedHost, announcedBytes, _fetcher.MaxBytes),
         };
 
-        return OwnerResponses.For(this, refusal, PagePath, GameAnchor(gameId), extra: extra, game: gameId);
+        return OwnerResponses.For(this, refusal, PagePath, RowAnchor(collectionId), extra: extra, game: gameId);
     }
 
     private bool TryStore(ProcessedLink link)
@@ -528,8 +543,9 @@ public class PicturesModel : OwnerPage
             return;
         }
 
-        Preview = LinkPreview.Build(snapshot, staged.GameId, _rules, staged.Link.Record);
+        Preview = LinkPreview.Build(snapshot, staged.GameId, staged.CollectionId, _rules, staged.Link.Record);
         PreviewToken = Preview is null ? null : token;
+        PreviewCollectionId = Preview is null ? null : staged.CollectionId;
     }
 
     private static Dictionary<string, object?> PreviewJson(string token, LinkPreview preview) =>
@@ -640,7 +656,6 @@ public class PicturesModel : OwnerPage
         var rows = PictureRows.Build(snapshot, _rules, ready.Data, _time.GetUtcNow());
 
         Counts = PictureRows.CountsOf(rows);
-        _firstEntries = [.. rows.GroupBy(row => row.GameId).Select(group => group.Min(row => row.CollectionId))];
         HasLocations = ready.Data.Locations.Count > 0;
 
         if (View == PicturesView.Single)

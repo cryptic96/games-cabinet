@@ -256,20 +256,20 @@ else
                             <p class="owner-hint" id="no-locations-note">@OwnerStrings.AddLocationOnLocationsPage <a class="pic-link" href="~/owner/locations">@OwnerStrings.LocationsLink</a></p>
                         }
                     }
-                    @if (Model.OffersLink(game))
-                    {
-                    var preview = Model.Preview is not null && Model.PreviewToken is not null && game.GameId == Model.SingleGameId
-                        ? new LinkPreviewModel(game.GameId, Model.PreviewToken, Model.Preview, Model.Revision)
+                    @{
+                    var preview = Model.Preview is not null && Model.PreviewToken is not null && game.CollectionId == Model.PreviewCollectionId
+                        ? new LinkPreviewModel(game.GameId, game.CollectionId, Model.PreviewToken, Model.Preview, Model.Revision)
                         : null;
                     var linkFieldId = $"pic-link-{game.CollectionId}";
                     var linkHintId = $"pic-link-hint-{game.CollectionId}";
                     var linkErrorId = $"pic-link-error-{game.CollectionId}";
                     var storedLink = game.Tile(PictureChoice.Link);
-
+                    }
                     <details class="pic-linkbox" open="@(preview is not null)">
                         <summary>@OwnerStrings.LinkSummary</summary>
                         <form method="post" class="pic-link-form" asp-page-handler="CheckLink" novalidate>
                             <input type="hidden" name="gameId" value="@game.GameId" />
+                            <input type="hidden" name="collectionId" value="@game.CollectionId" />
                             <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
                             @if (showsAll)
                             {
@@ -295,7 +295,6 @@ else
                             <partial name="_LinkPreview" model="preview" />
                         }
                     </details>
-                    }
                 </li>
             }
         </ul>

@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Net;
 using System.Text.Json;
 using Cabinet.Domain.Collection;
 using Cabinet.Domain.Owner;
@@ -5,6 +7,7 @@ using Cabinet.FakeBgg;
 using Cabinet.FakeBgg.Testing;
 using Cabinet.IntegrationTests.Infrastructure;
 using Cabinet.Repository.Images;
+using Cabinet.Service.Collection;
 using Cabinet.Service.Owner;
 using Cabinet.Service.Sync;
 using FluentAssertions;
@@ -128,7 +131,88 @@ public sealed class OwnerLinkTests
         host.LinkRecord.Should().BeNull();
     }
 
+    [Fact]
+    public async Task A_link_used_for_one_copy_draws_only_that_copy()
+    {
+        await using var host = await CopiesHost.StartAsync();
+        var before = await host.CoversAsync();
+        var (first, second) = (host.Copies[0], host.Copies[1]);
+
+        var checkedLink = await host.CheckAsync(second);
+        var used = await host.UseAsync(second, checkedLink.JsonText("token"));
+        var linked = await host.CoversAsync();
+
+        used.JsonText("outcome").Should().Be("saved");
+        host.EntryOf(second)!.Picture!.Link!.Url.Should().Be(LinkUrl);
+        host.EntryOf(second)!.Picture!.Choice.Should().Be(PictureChoice.Link);
+        host.EntryOf(first)?.Picture?.Link.Should().BeNull();
+        linked[first].Should().Be(before[first]);
+        linked[second].Should().NotBe(before[second]);
+        host.EntryOf(second)!.Picture!.Link!.Record!.Files!.Select(file => file.Name).Should().Contain(Path.GetFileName(linked[second]!));
+
+        var removed = await host.RemoveAsync(second);
+        var unlinked = await host.CoversAsync();
+
+        removed.JsonText("outcome").Should().Be("saved");
+        host.EntryOf(second)?.Picture?.Link.Should().BeNull();
+        unlinked[second].Should().Be(before[second]);
+        unlinked[first].Should().Be(before[first]);
+
+        var undone = await host.UndoAsync(second);
+        var restored = await host.CoversAsync();
+
+        undone.JsonText("outcome").Should().Be("saved");
+        host.EntryOf(second)!.Picture!.Link!.Url.Should().Be(LinkUrl);
+        restored[first].Should().Be(before[first]);
+        restored[second].Should().NotBe(before[second]);
+    }
+
+    [Fact]
+    public async Task Every_link_handler_refuses_a_foreign_copy()
+    {
+        await using var host = await CopiesHost.StartAsync();
+        var token = (await host.CheckAsync(host.Copies[1])).JsonText("token");
+        var requests = host.Images.Requests.Count;
+        var revision = host.Service.Revision;
+
+        var check = await host.CheckAsync(host.Foreign);
+        var use = await host.UseAsync(host.Foreign, token);
+        var remove = await host.RemoveAsync(host.Foreign);
+        var discard = await host.DiscardAsync(host.Foreign, token);
+        var missing = await host.Session.PostJsonAsync("/owner/pictures?handler=CheckLink", [Field("gameId", host.GameId), Field("link", LinkUrl)]);
+        using var owner = host.Factory.CreateOwnerClient();
+        using var served = await owner.GetAsync($"/owner/preview/{token}", TestContext.Current.CancellationToken);
+
+        foreach (var reply in new[] { check, use, remove, discard, missing })
+        {
+            reply.Status.Should().Be(HttpStatusCode.UnprocessableEntity);
+            reply.JsonText("status").Should().Be("unknown-game");
+        }
+
+        host.Service.Revision.Should().Be(revision);
+        host.Images.Requests.Count.Should().Be(requests, "a refused check fetches nothing");
+        served.StatusCode.Should().Be(HttpStatusCode.OK, "a refused post does not throw away a preview that belongs to another copy");
+    }
+
+    [Fact]
+    public async Task A_preview_checked_for_one_copy_cannot_be_used_for_another_copy_of_the_same_game()
+    {
+        await using var host = await CopiesHost.StartAsync();
+        var token = (await host.CheckAsync(host.Copies[1])).JsonText("token");
+        var revision = host.Service.Revision;
+
+        var use = await host.UseAsync(host.Copies[0], token);
+
+        use.Status.Should().Be(HttpStatusCode.UnprocessableEntity);
+        use.JsonText("status").Should().Be("link-expired");
+        host.Service.Revision.Should().Be(revision);
+    }
+
     private sealed record Cover(string Url, string ETag);
+
+    private static KeyValuePair<string, string> Field(string name, long value) => new(name, value.ToString(CultureInfo.InvariantCulture));
+
+    private static KeyValuePair<string, string> Field(string name, string value) => new(name, value);
 
     private sealed class LinkHost : IAsyncDisposable
     {
@@ -272,6 +356,102 @@ public sealed class OwnerLinkTests
             var game = new OwnerGame(gameId, null, null, new PictureSetting(PictureChoice.Link, true, null, null, link));
 
             OwnerDataSeed.Write(storage.FullPath, OwnerData.Empty with { Revision = 1, Games = [game] });
+        }
+    }
+
+    private sealed class CopiesHost : IAsyncDisposable
+    {
+        private const string PagePath = "/owner/pictures?handler=";
+
+        private readonly TemporaryDirectory _storage;
+        private readonly HttpClient _client;
+
+        private CopiesHost(TemporaryDirectory storage, CabinetWebApplicationFactory factory, ScriptedImageHandler images, HttpClient client, int gameId, IReadOnlyList<long> copies, long foreign)
+        {
+            _storage = storage;
+            Factory = factory;
+            Images = images;
+            _client = client;
+            GameId = gameId;
+            Copies = copies;
+            Foreign = foreign;
+            Session = new OwnerSession(factory);
+        }
+
+        public CabinetWebApplicationFactory Factory { get; }
+
+        public ScriptedImageHandler Images { get; }
+
+        public OwnerSession Session { get; }
+
+        public int GameId { get; }
+
+        public IReadOnlyList<long> Copies { get; }
+
+        public long Foreign { get; }
+
+        public OwnerDataService Service => Factory.ServingServices.GetRequiredService<OwnerDataService>();
+
+        public static async Task<CopiesHost> StartAsync()
+        {
+            var storage = new TemporaryDirectory();
+            var items = SyntheticBggCollection.Create(5);
+            var images = new ScriptedImageHandler().Serve(LinkUrl, LinkedCover);
+            var clock = SyncHarness.NewClock();
+            var factory = SyncHarness.CreateFactory(
+                ScriptedBggHandler.ForCollection(items),
+                clock,
+                new Dictionary<string, string?>
+                {
+                    ["Images:AllowedHosts"] = "example.org",
+                    ["Images:MaxDownloadsPerRun"] = "1000",
+                    ["Storage:Directory"] = storage.FullPath,
+                },
+                images);
+            var client = factory.CreatePublicClient();
+            await SyncRounds.PressAndWait(client, clock, advance: false);
+
+            var snapshotItems = factory.ServingServices.GetRequiredService<CollectionStore>().Current.Snapshot!.Items;
+            var twice = snapshotItems.GroupBy(item => item.GameId).First(group => group.Select(item => item.CollectionId).Distinct().Count() > 1);
+            var foreign = snapshotItems.First(item => item.GameId != twice.Key).CollectionId;
+
+            return new CopiesHost(storage, factory, images, client, twice.Key, [.. twice.Select(item => item.CollectionId).Distinct().Order()], foreign);
+        }
+
+        public OwnerGame? EntryOf(long collectionId) =>
+            Service.State is OwnerDataState.Ready ready ? ready.Data.Games.FirstOrDefault(game => game.CollectionId == collectionId) : null;
+
+        public async Task<Dictionary<long, string?>> CoversAsync()
+        {
+            using var response = await _client.GetAsync(CardsPath, TestContext.Current.CancellationToken);
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+
+            return document.RootElement.GetProperty("cards").EnumerateArray().ToDictionary(
+                card => card.GetProperty("entryId").GetInt64(),
+                card => card.TryGetProperty("cover", out var cover) && cover.ValueKind == JsonValueKind.Object ? cover.GetProperty("url").GetString() : null);
+        }
+
+        public Task<OwnerReply> CheckAsync(long collectionId) =>
+            Session.PostJsonAsync($"{PagePath}CheckLink", [Field("gameId", GameId), Field("collectionId", collectionId), Field("link", LinkUrl)]);
+
+        public Task<OwnerReply> UseAsync(long collectionId, string token) =>
+            Session.PostJsonAsync($"{PagePath}UseLink", [Field("gameId", GameId), Field("collectionId", collectionId), Field("token", token), Field("revision", Service.Revision)]);
+
+        public Task<OwnerReply> RemoveAsync(long collectionId) =>
+            Session.PostJsonAsync($"{PagePath}RemoveLink", [Field("gameId", GameId), Field("collectionId", collectionId), Field("revision", Service.Revision)]);
+
+        public Task<OwnerReply> DiscardAsync(long collectionId, string token) =>
+            Session.PostJsonAsync($"{PagePath}DiscardPreview", [Field("gameId", GameId), Field("collectionId", collectionId), Field("token", token)]);
+
+        public Task<OwnerReply> UndoAsync(long collectionId) =>
+            Session.PostJsonAsync($"{PagePath}Undo", [Field("gameId", GameId), Field("collectionId", collectionId), Field("revision", Service.Revision)]);
+
+        public async ValueTask DisposeAsync()
+        {
+            Session.Dispose();
+            _client.Dispose();
+            await Factory.DisposeAsync();
+            _storage.Dispose();
         }
     }
 }

@@ -147,6 +147,58 @@ public static class PictureEdits
     }
 
     /// <summary>
+    /// Stores a picture the owner linked for one copy of a game and chooses it for that copy alone: a choice that holds for every
+    /// copy of the game is first turned into one choice per copy that exists, so the other copies keep their picture, their link
+    /// and their location. The copy's link is replaced, its choice becomes the link and it counts as checked.
+    /// </summary>
+    /// <param name="data">The data to change.</param>
+    /// <param name="gameId">The game the copy belongs to.</param>
+    /// <param name="collectionId">The copy.</param>
+    /// <param name="copies">The collection entries of the game that exist now, the copy included.</param>
+    /// <param name="url">The canonical address of the linked picture.</param>
+    /// <param name="record">The processed record of the picture.</param>
+    /// <param name="title">The game's title, for the change log.</param>
+    /// <param name="currentOwnedUrl">The address of the owned edition's picture now, or null when BGG offers none.</param>
+    /// <param name="currentMainUrl">The address of the game's main picture now, or null when BGG offers none.</param>
+    public static OwnerChange UseLink(
+        OwnerData data,
+        int gameId,
+        long collectionId,
+        IReadOnlyList<long> copies,
+        string url,
+        ImageRecord record,
+        string title,
+        string? currentOwnedUrl,
+        string? currentMainUrl)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(copies);
+        ArgumentNullException.ThrowIfNull(record);
+        ArgumentNullException.ThrowIfNull(title);
+
+        if (string.IsNullOrWhiteSpace(url) || record.Status != ImageStatus.Ok || record.Files is not { Count: > 0 })
+        {
+            return OwnerChange.Refused(data, NoLinkStatusKey);
+        }
+
+        var linked = new PictureSetting(
+            PictureChoice.Link,
+            true,
+            currentOwnedUrl,
+            currentMainUrl,
+            new PictureLink(url, record, 0, null));
+
+        return EditOneCopy(
+            data,
+            gameId,
+            collectionId,
+            copies,
+            _ => Step.Changed(linked),
+            $"Picture of {NameOf(title, collectionId, copies)}: {Words(PictureChoice.Link)}",
+            ChosenStatusKey);
+    }
+
+    /// <summary>
     /// Removes the picture link of every copy of a game, and with it the record of the stored copy; the files are tidied away
     /// later by the clean-up, which keeps what the owner data refers to. Where the link was the choice, the choice becomes
     /// Automatic and the copy no longer counts as checked, so it asks for a look again by the normal rule; any other choice
@@ -162,6 +214,32 @@ public static class PictureEdits
         ArgumentNullException.ThrowIfNull(title);
 
         return EditEveryCopy(data, gameId, RemoveLinkStep, $"Removed the picture link of {title}", RemovedStatusKey);
+    }
+
+    /// <summary>
+    /// Removes the picture link of one copy of a game and with it the record of the stored copy, and no other copy's link: a
+    /// choice that holds for every copy of the game is first turned into one choice per copy that exists. The rules are those of
+    /// the form that takes a game, judged against what applies to the copy now; a copy without a link has nothing to remove.
+    /// </summary>
+    /// <param name="data">The data to change.</param>
+    /// <param name="gameId">The game the copy belongs to.</param>
+    /// <param name="collectionId">The copy.</param>
+    /// <param name="copies">The collection entries of the game that exist now, the copy included.</param>
+    /// <param name="title">The game's title, for the change log.</param>
+    public static OwnerChange RemoveLink(OwnerData data, int gameId, long collectionId, IReadOnlyList<long> copies, string title)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(copies);
+        ArgumentNullException.ThrowIfNull(title);
+
+        return EditOneCopy(
+            data,
+            gameId,
+            collectionId,
+            copies,
+            RemoveLinkStep,
+            $"Removed the picture link of {NameOf(title, collectionId, copies)}",
+            RemovedStatusKey);
     }
 
     /// <summary>
