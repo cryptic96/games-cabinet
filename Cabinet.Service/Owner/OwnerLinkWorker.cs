@@ -8,7 +8,11 @@ namespace Cabinet.Service.Owner;
 
 /// <summary>
 /// Keeps the pictures the owner linked alive in the background. When the host starts, once an hour, when something asks for
-/// it and after every owner change, it looks at every stored link and fetches again each one that is due. A link with no
+/// it and after every owner change, it looks at every stored link and fetches again each one that is due. Each copy of a game
+/// keeps its own link on its own entry, so every link is judged, checked and recorded on its own entry: what the worker
+/// remembers (when it last checked, when it could not store a picture) is kept per entry, an entry that holds for every copy of
+/// a game is checked once and its health recorded on that entry, and a check on one copy never changes the link or the place of
+/// another copy. A link with no
 /// usable processed copy is due at once: one that was never fetched, one that came back with a restore or an undo, one whose
 /// files are missing from the art directory and one measured by an older analysis than the current one. A link with a usable
 /// copy is checked again <see cref="RecheckEvery"/> after the host started or after its last check, so a restart never
@@ -48,8 +52,8 @@ public sealed class OwnerLinkWorker(
     private readonly Channel<bool> _wake = Channel.CreateBounded<bool>(
         new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropWrite, SingleReader = true });
 
-    private readonly Dictionary<int, DateTimeOffset> _lastChecked = [];
-    private readonly Dictionary<int, (string Url, DateTimeOffset At)> _storeFailed = [];
+    private readonly Dictionary<EntryKey, DateTimeOffset> _lastChecked = [];
+    private readonly Dictionary<EntryKey, (string Url, DateTimeOffset At)> _storeFailed = [];
     private DateTimeOffset _startedAt;
     private int _asked;
 
@@ -134,9 +138,9 @@ public sealed class OwnerLinkWorker(
             var failed = 0;
             var asked = Interlocked.Exchange(ref _asked, 0) == 1;
 
-            foreach (var (gameId, link) in LinksDue(asked))
+            foreach (var (key, link) in LinksDue(asked))
             {
-                if (await FetchOneAsync(gameId, link, stoppingToken))
+                if (await FetchOneAsync(key, link, stoppingToken))
                 {
                     stored++;
                 }
@@ -157,7 +161,7 @@ public sealed class OwnerLinkWorker(
         }
     }
 
-    private List<(int GameId, PictureLink Link)> LinksDue(bool asked)
+    private List<(EntryKey Key, PictureLink Link)> LinksDue(bool asked)
     {
         if (owner.State is not OwnerDataState.Ready ready)
         {
@@ -167,19 +171,20 @@ public sealed class OwnerLinkWorker(
         var now = time.GetUtcNow();
 
         return [.. ready.Data.Games
-            .Where(game => game.Picture?.Link is { } link && IsDue(game.GameId, link, asked, now))
+            .Where(game => game.Picture?.Link is { } link && IsDue(EntryKey.Of(game), link, asked, now))
             .OrderBy(game => game.GameId)
-            .Select(game => (game.GameId, game.Picture!.Link!))];
+            .ThenBy(game => game.CollectionId ?? long.MinValue)
+            .Select(game => (EntryKey.Of(game), game.Picture!.Link!))];
     }
 
-    private bool IsDue(int gameId, PictureLink link, bool asked, DateTimeOffset now)
+    private bool IsDue(EntryKey key, PictureLink link, bool asked, DateTimeOffset now)
     {
         var usable = HasUsableCopy(link);
-        DateTimeOffset? lastChecked = _lastChecked.TryGetValue(gameId, out var checkedAt) ? checkedAt : null;
+        DateTimeOffset? lastChecked = _lastChecked.TryGetValue(key, out var checkedAt) ? checkedAt : null;
 
         if (link.FailedChecks == 0)
         {
-            return usable ? now - (lastChecked ?? _startedAt) >= RecheckEvery : asked || !WaitingAfterStoreFailure(gameId, link, now);
+            return usable ? now - (lastChecked ?? _startedAt) >= RecheckEvery : asked || !WaitingAfterStoreFailure(key, link, now);
         }
 
         if (asked && !usable)
@@ -193,27 +198,27 @@ public sealed class OwnerLinkWorker(
         return since is not { } moment || now - moment >= wait;
     }
 
-    private bool WaitingAfterStoreFailure(int gameId, PictureLink link, DateTimeOffset now) =>
-        _storeFailed.TryGetValue(gameId, out var failure) && failure.Url == link.Url && now - failure.At < LinkHealth.DeadAfterSpan;
+    private bool WaitingAfterStoreFailure(EntryKey key, PictureLink link, DateTimeOffset now) =>
+        _storeFailed.TryGetValue(key, out var failure) && failure.Url == link.Url && now - failure.At < LinkHealth.DeadAfterSpan;
 
     private bool HasUsableCopy(PictureLink link) =>
         link.Record is { Status: ImageStatus.Ok, Files: { Count: > 0 } files, Features: not null } record
         && record.AnalysisVersion == ArtProcessor.AnalysisVersion
         && files.All(file => cache.Has(file.Name));
 
-    private async Task<bool> FetchOneAsync(int gameId, PictureLink link, CancellationToken stoppingToken)
+    private async Task<bool> FetchOneAsync(EntryKey key, PictureLink link, CancellationToken stoppingToken)
     {
         var attemptedAt = time.GetUtcNow();
 
         if (await fetcher.CheckAsync(link.Url, stoppingToken) is not LinkCheck.Ready ready)
         {
-            _lastChecked[gameId] = attemptedAt;
-            await owner.MutateSystemAsync(data => WithLink(data, gameId, link.Url, current => LinkHealth.AfterFailure(current, attemptedAt)), stoppingToken);
+            _lastChecked[key] = attemptedAt;
+            await owner.MutateSystemAsync(data => WithLink(data, key, link.Url, current => LinkHealth.AfterFailure(current, attemptedAt)), stoppingToken);
 
             return false;
         }
 
-        _lastChecked[gameId] = attemptedAt;
+        _lastChecked[key] = attemptedAt;
 
         try
         {
@@ -225,23 +230,23 @@ public sealed class OwnerLinkWorker(
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             logger.LogWarning("A linked picture could not be stored: {ExceptionType}", exception.GetType().Name);
-            _storeFailed[gameId] = (link.Url, attemptedAt);
+            _storeFailed[key] = (link.Url, attemptedAt);
 
             return false;
         }
 
-        _lastChecked[gameId] = attemptedAt;
+        _lastChecked[key] = attemptedAt;
         await owner.MutateSystemAsync(
-            data => WithLink(data, gameId, link.Url, current => LinkHealth.AfterSuccess(current, ready.Link.Record)),
+            data => WithLink(data, key, link.Url, current => LinkHealth.AfterSuccess(current, ready.Link.Record)),
             stoppingToken,
             announce: true);
 
         return true;
     }
 
-    private static OwnerData? WithLink(OwnerData data, int gameId, string url, Func<PictureLink, PictureLink> change)
+    private static OwnerData? WithLink(OwnerData data, EntryKey key, string url, Func<PictureLink, PictureLink> change)
     {
-        var stillThere = data.Games.Any(game => game.GameId == gameId && game.Picture?.Link?.Url == url);
+        var stillThere = data.Games.Any(game => Holds(game, key, url));
 
         if (!stillThere)
         {
@@ -252,10 +257,21 @@ public sealed class OwnerLinkWorker(
         {
             Games =
             [
-                .. data.Games.Select(game => game.GameId == gameId && game.Picture?.Link?.Url == url
-                    ? game with { Picture = game.Picture with { Link = change(game.Picture.Link) } }
+                .. data.Games.Select(game => Holds(game, key, url)
+                    ? game with { Picture = game.Picture! with { Link = change(game.Picture!.Link!) } }
                     : game),
             ],
         };
+    }
+
+    private static bool Holds(OwnerGame game, EntryKey key, string url) =>
+        EntryKey.Of(game) == key && game.Picture?.Link?.Url == url;
+
+    /// <summary>One entry of the owner data: a game and the copy its entry is for, or no copy for an entry that holds for every copy.</summary>
+    /// <param name="GameId">The game.</param>
+    /// <param name="CollectionId">The collection entry, or null for the entry that holds for every copy of the game.</param>
+    private readonly record struct EntryKey(int GameId, long? CollectionId)
+    {
+        public static EntryKey Of(OwnerGame game) => new(game.GameId, game.CollectionId);
     }
 }
