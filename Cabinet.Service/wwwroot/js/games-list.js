@@ -136,13 +136,15 @@ export function orderEntries(records, language) {
 /**
  * Writes the accessible name of a list entry: the title, the year in brackets, then only what helps to pick a game for game night,
  * separated by commas: that it is an expansion and for which game, the players, the play time in full minutes and the weight word.
+ * A location phrase, when given, closes the name.
  * A fact that is missing is left out with its comma; a missing year drops the brackets; a blank title reads as the untitled text.
  * @param {object} record The card record, or anything with the same fields.
  * @param {object} copy The visitor-facing strings of the page language.
  * @param {string | undefined | null} baseTitle The base game an expansion is named for, when one is known.
+ * @param {string | undefined} [locationPhrase] The words that say where the game is stored, already starting with their comma.
  * @returns {string}
  */
-export function entryName(record, copy, baseTitle) {
+export function entryName(record, copy, baseTitle, locationPhrase) {
   const title = isBlank(record.title) ? copy.untitled : record.title;
   const parts = [isKnown(record.year) ? title + ' (' + record.year + ')' : title];
 
@@ -170,7 +172,7 @@ export function entryName(record, copy, baseTitle) {
     parts.push(copy.weightWordsLower[band]);
   }
 
-  return parts.join(', ');
+  return parts.join(', ') + (typeof locationPhrase === 'string' ? locationPhrase : '');
 }
 
 /**
@@ -221,6 +223,38 @@ export function titleOnlyEntries(placements, copy) {
 }
 
 /**
+ * Writes the heading of one location group in the list: the location with how many of its games the list shows. While filtering the
+ * count is the matching one; the group of games with no location has its own wording.
+ * @param {{ id: string | null, name: string | null, shown: number, total: number }} group The group and its two counts.
+ * @param {object} copy The visitor-facing strings of the page language.
+ * @param {boolean} filtering Whether a filter is in use.
+ * @returns {string}
+ */
+export function groupHeading(group, copy, filtering) {
+  if (group.id === null) {
+    return copy.listUnknownGroupHeading(filtering ? group.shown : group.total);
+  }
+
+  return copy.listGroupHeading(group.name ?? '', group.shown, group.total, filtering);
+}
+
+/**
+ * Gives the words that close a list entry's name: where the game is stored, or that the place is unknown. Nothing is said while the
+ * owner has no locations at all.
+ * @param {object} record The card record.
+ * @param {object} copy The visitor-facing strings of the page language.
+ * @param {boolean} hasLocations Whether the owner has locations.
+ * @returns {string | undefined}
+ */
+function locationPhrase(record, copy, hasLocations) {
+  if (!hasLocations) {
+    return undefined;
+  }
+
+  return typeof record.location === 'string' && record.location.trim() !== '' ? copy.listStoredIn(record.location) : copy.listUnknownEntry();
+}
+
+/**
  * Gives the name a list node shows: the name it already carries, or the one made from its record.
  * @param {object} node One entry of the ordered list.
  * @param {object} copy The visitor-facing strings of the page language.
@@ -240,8 +274,20 @@ function shapeOf(nodes) {
 }
 
 /**
+ * Tells whether an entry of the filter event stands in the light: always while nothing is filtered, otherwise when one of its boxes is lit.
+ * @param {{ boxes: string[] }} entry The entry from the event.
+ * @param {{ active: boolean, lit: Set<string> }} detail The event detail.
+ * @returns {boolean}
+ */
+function isLit(entry, detail) {
+  return !detail.active || entry.boxes.some((box) => detail.lit.has(box));
+}
+
+/**
  * Builds the list in the page and wires its keys. The entries are buttons that are not tab stops: the skip link or a screen
- * reader's own cursor enters the list, the arrow keys, Home and End move inside it and Tab leaves it for the cabinet.
+ * reader's own cursor enters the list, the arrow keys, Home and End move inside it and Tab leaves it for the cabinet. After every
+ * filter pass the list shows exactly the entries the count counts: all of them in one A to Z list, or in the by-location view one
+ * group under its own heading for every location with a match.
  * @param {object} parts What the list needs from the page.
  * @param {HTMLElement} parts.section The list section: its heading and its list.
  * @param {object} parts.copy The visitor-facing strings of the page language.
@@ -252,8 +298,20 @@ function shapeOf(nodes) {
 export function initGamesList({ section, copy, language, openCard }) {
   const heading = section.querySelector('.games-list-heading');
   const list = section.querySelector('.games-list-items');
+  const owner = section.ownerDocument ?? document;
+  const groupsHost = document.createElement('div');
+  const plainHeading = heading.textContent;
   let shape = '';
   let flat = [];
+  let kind = 'none';
+  let recordList = [];
+  let recordsById = new Map();
+  let placementsById = new Map();
+  let detail = null;
+
+  groupsHost.className = 'games-list-groups';
+  groupsHost.hidden = true;
+  section.append(groupsHost);
 
   /**
    * Makes one entry button.
@@ -275,23 +333,32 @@ export function initGamesList({ section, copy, language, openCard }) {
    * @returns {HTMLElement[]}
    */
   function buttons() {
-    return Array.from(list.querySelectorAll('button'));
+    return Array.from(section.querySelectorAll('button'));
   }
 
   /**
-   * Draws the list. Buttons are reused by entry id, so a card that was opened from the list still finds its entry afterwards, and
+   * Draws a plan. Buttons are reused by entry id, so a card that was opened from the list still finds its entry afterwards, and
    * keyboard focus that was inside the list stays on the same entry.
-   * @param {object[]} nodes The entries of the list.
+   * @param {{ heading: string, grouped: boolean, groups: { key: string, title: string | null, nodes: object[] }[] }} plan What to draw.
    */
-  function render(nodes) {
-    const nextShape = shapeOf(nodes);
-    const next = nodes.flatMap((node) => [node, ...node.children]);
+  function render(plan) {
+    heading.textContent = plan.heading;
+
+    const next = plan.groups.flatMap((group) => group.nodes.flatMap((node) => [node, ...node.children]));
+    const nextShape = (plan.grouped ? 'g:' : 'l:') + plan.groups.map((group) => group.key + '[' + shapeOf(group.nodes) + ']').join('|');
+
+    list.hidden = plan.grouped;
+    groupsHost.hidden = !plan.grouped;
 
     if (nextShape === shape && next.length === flat.length) {
       const current = buttons();
+      const titles = Array.from(groupsHost.querySelectorAll('h3'));
 
       next.forEach((node, index) => {
         current[index].textContent = nameOf(node, copy);
+      });
+      plan.groups.filter((group) => group.title !== null).forEach((group, index) => {
+        titles[index].textContent = group.title;
       });
 
       return;
@@ -317,7 +384,12 @@ export function initGamesList({ section, copy, language, openCard }) {
       return button;
     };
 
-    const items = nodes.map((node) => {
+    /**
+     * Makes the items of one list of entries, expansions nested under their base game.
+     * @param {object[]} nodes The entries.
+     * @returns {HTMLElement[]}
+     */
+    const itemsOf = (nodes) => nodes.map((node) => {
       const item = document.createElement('li');
       const button = take(node.entryId);
 
@@ -343,7 +415,25 @@ export function initGamesList({ section, copy, language, openCard }) {
       return item;
     });
 
-    list.replaceChildren(...items);
+    if (plan.grouped) {
+      list.replaceChildren();
+      groupsHost.replaceChildren(...plan.groups.flatMap((group) => {
+        const title = document.createElement('h3');
+        const groupList = document.createElement('ul');
+
+        title.className = 'games-list-heading';
+        title.setAttribute('dir', 'auto');
+        title.textContent = group.title;
+        groupList.setAttribute('role', 'list');
+        groupList.append(...itemsOf(group.nodes));
+
+        return [title, groupList];
+      }));
+    } else {
+      groupsHost.replaceChildren();
+      list.replaceChildren(...itemsOf(plan.groups[0]?.nodes ?? []));
+    }
+
     shape = nextShape;
     flat = next;
 
@@ -363,6 +453,91 @@ export function initGamesList({ section, copy, language, openCard }) {
       same?.focus({ preventScroll: true });
     }
   }
+
+  /**
+   * Makes the node of one entry of the filter event, named from the card data or from the drawn box, or nothing when the entry is
+   * not known to the list.
+   * @param {{ entryId: string, boxes: string[] }} entry The entry from the event.
+   * @returns {object | null}
+   */
+  function nodeOfEntry(entry) {
+    if (kind === 'titles') {
+      const placement = placementsById.get(String(entry.entryId));
+
+      return placement === undefined ? null : { entryId: entry.entryId, name: placementName(placement, copy), children: [] };
+    }
+
+    const own = recordsById.get(String(entry.entryId));
+
+    if (own === undefined) {
+      return null;
+    }
+
+    const places = detail.hasLocations === true;
+    const children = entry.boxes.slice(1)
+      .map((box) => recordsById.get(String(box)))
+      .filter((child) => child !== undefined)
+      .map((child) => ({ entryId: child.entryId, name: entryName(child, copy, own.title, locationPhrase(child, copy, places)), children: [] }));
+
+    return {
+      entryId: own.entryId,
+      name: entryName(own, copy, own.isExpansion === true ? firstNamedBase(own) : undefined, locationPhrase(own, copy, places)),
+      children,
+    };
+  }
+
+  /**
+   * Plans the list from the latest filter event: only the lit entries, under the count the bar shows, in one list or in one group
+   * for every location with a match.
+   * @returns {{ heading: string, grouped: boolean, groups: { key: string, title: string | null, nodes: object[] }[] }}
+   */
+  function planFromEvent() {
+    const filtering = detail.active === true;
+    const text = !filtering ? plainHeading : detail.count.lit === 0 ? copy.noMatch : copy.filterCount(detail.count.lit, detail.count.total);
+    const nodesOf = (entries) => entries.filter((entry) => isLit(entry, detail)).map(nodeOfEntry).filter((node) => node !== null);
+    const byLocation = detail.view === 'location' && detail.entries !== null && !Array.isArray(detail.entries) && Array.isArray(detail.entries.groups);
+
+    if (!byLocation) {
+      return { heading: text, grouped: false, groups: [{ key: '', title: null, nodes: nodesOf(Array.isArray(detail.entries) ? detail.entries : []) }] };
+    }
+
+    const groups = detail.entries.groups
+      .map((group) => ({ group, nodes: nodesOf(group.entries) }))
+      .filter(({ group, nodes }) => group.entries.length > 0 && (!filtering || nodes.length > 0))
+      .map(({ group, nodes }) => ({
+        key: String(group.id),
+        title: groupHeading({ id: group.id, name: group.name, shown: nodes.length, total: group.entries.length }, copy, filtering),
+        nodes,
+      }));
+
+    return { heading: text, grouped: groups.length > 0, groups };
+  }
+
+  /**
+   * Plans the list before any filter event has arrived: every entry once, as the card data or the drawn boxes give them.
+   * @returns {{ heading: string, grouped: boolean, groups: { key: string, title: string | null, nodes: object[] }[] }}
+   */
+  function planPlain() {
+    const nodes = kind === 'titles' ? titleOnlyEntries(placementsById, copy) : orderEntries(recordList, language);
+
+    return { heading: plainHeading, grouped: false, groups: [{ key: '', title: null, nodes }] };
+  }
+
+  /**
+   * Draws the list from what is held: the latest filter event when there is one, otherwise the plain list.
+   */
+  function refresh() {
+    if (kind === 'none') {
+      return;
+    }
+
+    render(detail === null ? planPlain() : planFromEvent());
+  }
+
+  owner.addEventListener('cabinet:filtered', (event) => {
+    detail = event.detail ?? null;
+    refresh();
+  });
 
   section.addEventListener('keydown', (event) => {
     if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || !LIST_KEYS.includes(event.key)) {
@@ -393,7 +568,18 @@ export function initGamesList({ section, copy, language, openCard }) {
      * @param {Iterable<object> | Map<string, object>} placements The placements of the layout.
      */
     showTitles(placements) {
-      render(titleOnlyEntries(placements, copy));
+      const source = placements instanceof Map ? [...placements.values()] : [...placements];
+
+      kind = 'titles';
+      placementsById = new Map();
+
+      for (const placement of source) {
+        if (placement.kind !== 'moreMarker' && !placementsById.has(String(placement.entryId))) {
+          placementsById.set(String(placement.entryId), placement);
+        }
+      }
+
+      refresh();
     },
 
     /**
@@ -401,7 +587,10 @@ export function initGamesList({ section, copy, language, openCard }) {
      * @param {object[]} records The card records of the collection.
      */
     showCards(records) {
-      render(orderEntries(records, language));
+      kind = 'cards';
+      recordList = records;
+      recordsById = new Map(records.map((record) => [String(record.entryId), record]));
+      refresh();
     },
 
     /**
