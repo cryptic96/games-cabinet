@@ -284,7 +284,7 @@ public class LocationsModel : OwnerPage
 
         var known = snapshot?.Items.Any(item => item.GameId == gameId) == true;
 
-        return OwnerResponses.For(this, result, PicturesPagePath, GameAnchor(gameId), game: known ? gameId : null);
+        return OwnerResponses.For(this, result, PicturesPagePath, PicturesModel.RowId(collectionId), game: known ? gameId : null);
     }
 
     /// <summary>
@@ -512,17 +512,6 @@ public class LocationsModel : OwnerPage
         Games = Nested(RowsOf(snapshot, ready.Data, _collection.Current.Items));
     }
 
-    /// <summary>
-    /// Builds the location row of the first copy of one game, with the choices its picker needs, or null when the collection does
-    /// not hold it. The pictures page uses it to show the same picker the copies list uses.
-    /// </summary>
-    /// <param name="snapshot">The synced collection.</param>
-    /// <param name="data">The owner data.</param>
-    /// <param name="shown">The items the cabinet draws, which give each game's small picture.</param>
-    /// <param name="gameId">The game.</param>
-    internal static LocationGameRow? RowFor(CollectionSnapshot snapshot, OwnerData data, IEnumerable<CabinetItem> shown, int gameId) =>
-        RowsOf(snapshot, data, shown).FirstOrDefault(row => row.GameId == gameId);
-
     /// <summary>Builds the location row of one copy of a game, or null when the collection does not hold that entry.</summary>
     /// <param name="snapshot">The synced collection.</param>
     /// <param name="data">The owner data.</param>
@@ -561,17 +550,11 @@ public class LocationsModel : OwnerPage
         foreach (var group in snapshot.Items.GroupBy(item => item.GameId))
         {
             var copies = group.OrderBy(item => item.CollectionId).ToList();
-            var editions = copies
-                .Where(copy => copy.VersionName is not null)
-                .GroupBy(copy => copy.VersionName!, StringComparer.OrdinalIgnoreCase)
-                .Where(sameName => sameName.Count() == 1)
-                .Select(sameName => sameName.Key)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var labels = CopyLabels.Of(copies);
 
             for (var index = 0; index < copies.Count; index++)
             {
-                var edition = copies[index].VersionName is { } name && editions.Contains(name) ? name : null;
-                var label = copies.Count > 1 ? edition ?? OwnerStrings.CopyTag(index + 1, copies.Count) : null;
+                var label = labels[index];
 
                 rows.Add(RowOf(copies[index], overlay, titles, covers, firstEntries, splitGames, label, index == 0));
             }

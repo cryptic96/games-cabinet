@@ -248,7 +248,11 @@ function initRow(row, enqueue, showCounts) {
    */
   const undoer = (previous, refocus = true) => (saved) =>
     enqueue(async () => {
-      const result = await postOwner(HANDLERS.undo, { gameId: form.elements.gameId.value }, { revision: saved });
+      const result = await postOwner(
+        HANDLERS.undo,
+        { gameId: form.elements.gameId.value, collectionId: form.elements.collectionId.value },
+        { revision: saved },
+      );
 
       if (result.outcome === 'saved') {
         setChecked(fieldset, previous);
@@ -285,7 +289,7 @@ function initRow(row, enqueue, showCounts) {
 
       const result = await postOwner(
         form.getAttribute('action') ?? HANDLERS.choose,
-        { gameId: form.elements.gameId.value, choice: value },
+        { gameId: form.elements.gameId.value, collectionId: form.elements.collectionId.value, choice: value },
         { keepalive },
       );
 
@@ -320,7 +324,10 @@ function initRow(row, enqueue, showCounts) {
       }
 
       const previous = fieldset.dataset.saved ?? '';
-      const result = await postOwner(HANDLERS.looksRight, { gameId: form.elements.gameId.value });
+      const result = await postOwner(HANDLERS.looksRight, {
+        gameId: form.elements.gameId.value,
+        collectionId: form.elements.collectionId.value,
+      });
 
       if (result.outcome === 'saved') {
         applyRowState(row, result);

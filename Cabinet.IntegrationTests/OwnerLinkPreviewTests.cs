@@ -7,6 +7,7 @@ using Cabinet.Domain.Owner;
 using Cabinet.FakeBgg;
 using Cabinet.FakeBgg.Testing;
 using Cabinet.IntegrationTests.Infrastructure;
+using Cabinet.Service.Collection;
 using Cabinet.Service.Owner;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
@@ -278,7 +279,7 @@ public sealed partial class OwnerLinkPreviewTests
         using var served = await owner.GetAsync($"/owner/preview/{token}", TestContext.Current.CancellationToken);
 
         reply.Status.Should().Be(HttpStatusCode.Found);
-        reply.Location.Should().Be($"/owner/pictures?game={host.GameId}&preview={token}#game-{host.GameId}");
+        reply.Location.Should().Be($"/owner/pictures?game={host.GameId}&preview={token}#entry-{host.FirstEntry}");
         served.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
@@ -291,7 +292,7 @@ public sealed partial class OwnerLinkPreviewTests
         var page = await host.Session.GetAsync(reply.Location!);
 
         reply.Status.Should().Be(HttpStatusCode.Found);
-        reply.Location.Should().Be($"/owner/pictures?done=refused-link-address&game={host.GameId}#game-{host.GameId}");
+        reply.Location.Should().Be($"/owner/pictures?done=refused-link-address&game={host.GameId}#entry-{host.FirstEntry}");
         page.Body.Should().Contain("That isn&#x27;t a web address. Paste the full picture link, starting with https://.");
     }
 
@@ -394,6 +395,8 @@ public sealed partial class OwnerLinkPreviewTests
         public int GameId => _gameId;
 
         public int OtherGameId => _otherGameId;
+
+        public long FirstEntry => Factory.ServingServices.GetRequiredService<CollectionStore>().Current.Snapshot!.Items.Where(item => item.GameId == _gameId).Min(item => item.CollectionId);
 
         public OwnerDataService Service => Factory.ServingServices.GetRequiredService<OwnerDataService>();
 
