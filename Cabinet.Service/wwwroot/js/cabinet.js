@@ -163,7 +163,7 @@ async function requestCards(epoch, etag) {
 
     cardRecords = new Map(body.cards.map((record) => [String(record.entryId), record]));
     gamesList?.showCards(body.cards);
-    filters.rebuild(filterRecords());
+    filters.rebuild(filterRecords(), body.locations ?? []);
     announce('cabinet:cards', { records: body.cards });
 
     return 'loaded';

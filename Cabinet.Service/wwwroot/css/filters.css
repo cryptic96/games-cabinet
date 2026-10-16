@@ -111,6 +111,7 @@
 }
 
 #filter-q:focus-visible,
+#filter-loc:focus-visible,
 .filter-clear:focus-visible,
 .filter-chip:has(input:focus-visible) {
   outline: 2px solid var(--room-ring, var(--wood-light));
@@ -294,6 +295,38 @@
 
 .filter-chip-text {
   white-space: nowrap;
+}
+
+/**
+ * The location select: a native list in wall colours, as tall as a chip. The list it opens takes light or dark system colours from the
+ * wall, so its options stay readable on either.
+ */
+#filter-loc {
+  min-height: 44px;
+  min-width: 12rem;
+  max-width: 14rem;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid var(--room-line, var(--chrome-line));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--room-text, var(--wall-text));
+  color-scheme: dark;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  touch-action: manipulation;
+}
+
+#filter-loc[hidden] {
+  display: none;
+}
+
+:root[data-wood="walnut"] #filter-loc,
+:root[data-wood="birch"] #filter-loc {
+  color-scheme: light;
 }
 
 /**

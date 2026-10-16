@@ -134,6 +134,10 @@
                 </label>
             }
         </fieldset>
+        <label class="visually-hidden" for="filter-loc" hidden>@Model.Language.Text.LocationLabel</label>
+        <select id="filter-loc" name="location" hidden>
+            <option value="">@Model.Language.Text.AnyLocation</option>
+        </select>
         <div class="filter-status">
             <span class="filter-count" aria-hidden="true"></span>
             <button type="button" class="filter-clear" aria-label="@Model.Language.Text.ClearName">@Model.Language.Text.ClearVisible</button>
