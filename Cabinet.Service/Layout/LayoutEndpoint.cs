@@ -3,6 +3,7 @@ using Cabinet.Service.Cards;
 using Cabinet.Service.Collection;
 using Cabinet.Service.Hosting;
 using Cabinet.Service.Prototype;
+using Cabinet.Service.Search;
 
 namespace Cabinet.Service.Layout;
 
@@ -39,10 +40,11 @@ public static class LayoutEndpoint
             .AddSingleton(SampleCatalog.FromConfiguration(configuration, environment))
             .AddSingleton<LayoutCache>()
             .AddSingleton<CardCache>()
+            .AddSingleton<SearchNamesCache>()
             .AddSingleton<CollectionStore>();
     }
 
-    /// <summary>Maps the layout route, the by-location layout route and the card route; each answers 404 for an unknown or missing profile name.</summary>
+    /// <summary>Maps the layout route, the by-location layout route, the card route and the other-titles route; the ones that take a profile answer 404 for an unknown or missing profile name.</summary>
     public static IEndpointRouteBuilder MapCabinetLayout(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
@@ -50,6 +52,7 @@ public static class LayoutEndpoint
         endpoints.MapGet(Route, Handle);
         endpoints.MapGet(LocationLayoutEndpoint.Route, LocationLayoutEndpoint.Handle);
         endpoints.MapGet(CardsEndpoint.Route, CardsEndpoint.Handle);
+        endpoints.MapGet(SearchNamesEndpoint.Route, SearchNamesEndpoint.Handle);
 
         return endpoints;
     }

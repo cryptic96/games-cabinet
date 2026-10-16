@@ -163,7 +163,7 @@ async function requestCards(epoch, etag) {
 
     cardRecords = new Map(body.cards.map((record) => [String(record.entryId), record]));
     gamesList?.showCards(body.cards);
-    filters.rebuild(filterRecords(), body.locations ?? []);
+    filters.rebuild(filterRecords(), body.locations ?? [], { layoutEtag: etag });
     announce('cabinet:cards', { records: body.cards });
 
     return 'loaded';
@@ -211,10 +211,11 @@ async function fetchCards(epoch, etag) {
 /**
  * Tells the filters what the layout about to be drawn holds, so the boxes are built already in the light or in shadow.
  * @param {object} layout The layout about to be drawn.
+ * @param {string | null} etag The entity tag of the layout response, which tells the filters when the collection changed.
  */
-function prepareFilters(layout) {
+function prepareFilters(layout, etag) {
   drawnPlacements = indexPlacements(layout);
-  filters.rebuild(filterRecords());
+  filters.rebuild(filterRecords(), undefined, { layoutEtag: etag });
 }
 
 /**
@@ -303,12 +304,14 @@ async function load() {
       return;
     }
 
-    prepareFilters(layout);
+    const etag = response.headers.get('ETag');
+
+    prepareFilters(layout, etag);
     renderCabinet(mount, layout, COPY, filters.dimOf);
     showFilterBarForDrawnCabinet();
     roving.refresh();
     announce('cabinet:drawn');
-    afterDraw(layout, response.headers.get('ETag'));
+    afterDraw(layout, etag);
   } catch {
     if (thisLoad === latestLoad) {
       showError();
@@ -369,7 +372,7 @@ async function redraw() {
     const active = document.activeElement;
     const focused = mount.contains(active) ? { entryId: active.dataset.entryId, kind: active.dataset.kind } : undefined;
 
-    prepareFilters(layout);
+    prepareFilters(layout, etag);
     renderCabinet(mount, layout, COPY, filters.dimOf);
     showFilterBarForDrawnCabinet();
     roving.refresh();

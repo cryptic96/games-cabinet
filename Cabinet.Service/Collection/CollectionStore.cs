@@ -7,6 +7,7 @@ using Cabinet.Domain.Layout;
 using Cabinet.Domain.Owner;
 using Cabinet.Service.Cards;
 using Cabinet.Service.Layout;
+using Cabinet.Service.Search;
 
 namespace Cabinet.Service.Collection;
 
@@ -22,6 +23,7 @@ public sealed class CollectionState
     private readonly ConcurrentDictionary<string, Lazy<CachedLayout>> _layouts = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, Lazy<CachedCards>> _cards = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, Lazy<CachedLayout>> _locationLayouts = new(StringComparer.Ordinal);
+    private readonly Lazy<CachedNames> _names;
 
     /// <summary>Creates a view of a collection that has been synced.</summary>
     /// <param name="items">The items to draw.</param>
@@ -49,6 +51,7 @@ public sealed class CollectionState
         Snapshot = snapshot;
         CardSnapshot = cardSnapshot ?? snapshot;
         Locations = locations;
+        _names = new Lazy<CachedNames>(() => CachedNames.From(SearchNames.Build(CardSnapshot)));
     }
 
     /// <summary>Creates the view of a stored collection: its items are mapped in a fixed order and its version is derived from them.</summary>
@@ -180,6 +183,12 @@ public sealed class CollectionState
 
         return _locationLayouts.GetOrAdd(design.Name, _ => new Lazy<CachedLayout>(() => BuildLocationLayouts(design, options))).Value;
     }
+
+    /// <summary>
+    /// The serialised other titles of the owned games, built on first use and kept with the view, so they are built at most once
+    /// per collection version however many visitors ask. A view that was not made from a stored collection holds none.
+    /// </summary>
+    public CachedNames NamesIndex => _names.Value;
 
     private CachedLayout BuildLocationLayouts(SectionDesign design, LayoutOptions options)
     {
