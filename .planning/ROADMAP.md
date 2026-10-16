@@ -545,16 +545,16 @@ Plans:
   4. Every game's storage location is visible to every visitor, whether it was read from BGG or entered by the owner.
   5. A visitor can toggle between one big cabinet and one cabinet per storage location, with games that have no location placed in an "Unknown location" cabinet.
 
-**Plans:** 34 plans
+**Plans:** 5/34 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 07-01-PLAN.md — Tracer: typing a name puts every other game in shadow, in place (count, Clear, keys)
-- [ ] 07-02-PLAN.md — A sparse last section stands short and complete (layout version 17)
-- [ ] 07-03-PLAN.md — Each copy of a game gets its own place: the owner-data format gate and the per-copy data (owner-gated)
-- [ ] 07-04-PLAN.md — The sync keeps BGG's other titles and the owned edition's name
-- [ ] 07-05-PLAN.md — The BGG access check counts edition names and other titles, without recording them
+- [x] 07-01-PLAN.md — Tracer: typing a name puts every other game in shadow, in place (count, Clear, keys)
+- [x] 07-02-PLAN.md — A sparse last section stands short and complete (layout version 17)
+- [x] 07-03-PLAN.md — Each copy of a game gets its own place: the owner-data format gate and the per-copy data (owner-gated)
+- [x] 07-04-PLAN.md — The sync keeps BGG's other titles and the owned edition's name
+- [x] 07-05-PLAN.md — The BGG access check counts edition names and other titles, without recording them
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -666,5 +666,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. Game Detail, Accessibility & Language | 16/16 | Complete    | 2026-10-12 |
 | 6. Owner Tools & Persistence | 30/30 | Complete    | 2026-10-13 |
 | 6.1. Selectable Cabinet Finishes & Lighting (INSERTED) | 21/21 | Complete    | 2026-10-15 |
-| 7. Game-Night Filters & Location Cabinets | 0/0 | Not started | - |
+| 7. Game-Night Filters & Location Cabinets | 5/34 | In Progress|  |
 | 8. Public Hardening & Go-Public | 0/0 | Not started | - |
