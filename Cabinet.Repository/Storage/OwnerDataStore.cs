@@ -31,6 +31,7 @@ public sealed class OwnerDataStore : IOwnerDataStore
     private const string VersionTimeFormat = "yyyyMMdd'T'HHmmss'Z'";
     private const string OlderFormatTimeFormat = "yyyyMMdd'T'HHmmssfff'Z'";
     private const int HeaderBytes = 4096;
+    private const int LookFormat = 2;
 
     private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
 
@@ -339,9 +340,11 @@ public sealed class OwnerDataStore : IOwnerDataStore
     }
 
     /// <summary>
-    /// Brings the bytes of a stored or downloaded owner-data file in an older format to the current one, in memory only. A file
-    /// of the first format held one finish name, which is dropped for the default look, because no earlier finish was ever
-    /// anything but the default. A file that is already current is returned as it is.
+    /// Brings the bytes of a stored or downloaded owner-data file in an older format to the current one, in memory only, one
+    /// format at a time. A file of the first format held one finish name, which is dropped for the default look, because no
+    /// earlier finish was ever anything but the default. A file of the second format needs no change of content: a decision
+    /// without a collection entry already means every copy of its game, so only the format number moves on. A file that is
+    /// already current is returned as it is.
     /// </summary>
     /// <param name="content">The content of the file, whose header was already read.</param>
     /// <param name="schemaVersion">The format version the header names.</param>
@@ -362,16 +365,11 @@ public sealed class OwnerDataStore : IOwnerDataStore
                 return null;
             }
 
-            var look = CabinetLook.Default;
-            root.Remove("finish");
-            root["look"] = new JsonObject
+            if (schemaVersion < LookFormat)
             {
-                ["design"] = look.Design,
-                ["wood"] = look.Wood,
-                ["backs"] = look.Backs,
-                ["lights"] = look.Lights,
-                ["depth"] = look.Depth,
-            };
+                ApplyDefaultLook(root);
+            }
+
             root["schemaVersion"] = OwnerData.CurrentSchemaVersion;
 
             return JsonSerializer.SerializeToUtf8Bytes(root);
@@ -380,6 +378,20 @@ public sealed class OwnerDataStore : IOwnerDataStore
         {
             return null;
         }
+    }
+
+    private static void ApplyDefaultLook(JsonObject root)
+    {
+        var look = CabinetLook.Default;
+        root.Remove("finish");
+        root["look"] = new JsonObject
+        {
+            ["design"] = look.Design,
+            ["wood"] = look.Wood,
+            ["backs"] = look.Backs,
+            ["lights"] = look.Lights,
+            ["depth"] = look.Depth,
+        };
     }
 
     private static (string? Kind, int SchemaVersion)? ReadHeader(byte[] content)

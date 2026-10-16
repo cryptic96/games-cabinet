@@ -36,7 +36,7 @@ public sealed class OwnerDataUpgradeTests : IDisposable
 
         var data = state.Should().BeOfType<OwnerDataState.Ready>().Which.Data;
         data.Look.Should().Be(CabinetLook.Default);
-        data.SchemaVersion.Should().Be(2);
+        data.SchemaVersion.Should().Be(3);
         data.Revision.Should().Be(3);
         File.ReadAllBytes(FilePath).Should().Equal(bytes);
         Directory.EnumerateFileSystemEntries(_directory.FullPath).Order().Should().Equal(listingBefore);
@@ -96,7 +96,7 @@ public sealed class OwnerDataUpgradeTests : IDisposable
     [Fact]
     public void A_stored_file_of_the_current_format_without_a_look_is_unreadable()
     {
-        var bytes = Encoding.UTF8.GetBytes($"{{\"kind\":\"{Marker}\",\"schemaVersion\":2,\"revision\":3,\"locations\":[],\"games\":[],\"changesSinceDownload\":0,\"changes\":[]}}");
+        var bytes = Encoding.UTF8.GetBytes($"{{\"kind\":\"{Marker}\",\"schemaVersion\":3,\"revision\":3,\"locations\":[],\"games\":[],\"changesSinceDownload\":0,\"changes\":[]}}");
         File.WriteAllBytes(FilePath, bytes);
 
         CreateStore().Load().Should().BeOfType<OwnerDataState.Unreadable>();
@@ -114,7 +114,7 @@ public sealed class OwnerDataUpgradeTests : IDisposable
     [Fact]
     public void A_stored_file_of_a_newer_format_is_unreadable_as_newer_and_left_as_it_is()
     {
-        var bytes = Encoding.UTF8.GetBytes($"{{\"kind\":\"{Marker}\",\"schemaVersion\":3,\"revision\":7}}");
+        var bytes = Encoding.UTF8.GetBytes($"{{\"kind\":\"{Marker}\",\"schemaVersion\":4,\"revision\":7}}");
         File.WriteAllBytes(FilePath, bytes);
 
         var state = CreateStore().Load();
@@ -142,16 +142,16 @@ public sealed class OwnerDataUpgradeTests : IDisposable
         check.IsOk.Should().BeTrue();
         check.FormatVersion.Should().Be(1);
         check.Data!.Look.Should().Be(CabinetLook.Default);
-        check.Data.SchemaVersion.Should().Be(2);
+        check.Data.SchemaVersion.Should().Be(3);
     }
 
     [Fact]
     public void The_restore_check_of_a_file_of_a_newer_format_is_refused_as_newer()
     {
-        var check = OwnerDataExport.Check(Encoding.UTF8.GetBytes($"{{\"kind\":\"{Marker}\",\"schemaVersion\":3,\"revision\":7}}"), Policy);
+        var check = OwnerDataExport.Check(Encoding.UTF8.GetBytes($"{{\"kind\":\"{Marker}\",\"schemaVersion\":4,\"revision\":7}}"), Policy);
 
         check.Refusal.Should().Be(RestoreProblem.Newer);
-        check.FormatVersion.Should().Be(3);
+        check.FormatVersion.Should().Be(4);
     }
 
     [Fact]
@@ -183,7 +183,7 @@ public sealed class OwnerDataUpgradeTests : IDisposable
         var check = OwnerDataExport.Check(export, Policy);
 
         check.IsOk.Should().BeTrue();
-        check.FormatVersion.Should().Be(2);
+        check.FormatVersion.Should().Be(3);
         check.Data!.Look.Should().Be(look);
     }
 
@@ -192,7 +192,7 @@ public sealed class OwnerDataUpgradeTests : IDisposable
 
     private static byte[] CurrentFormat(string design, string wood, string backs, string lights, string depth) =>
         Encoding.UTF8.GetBytes(
-            $"{{\"kind\":\"{Marker}\",\"schemaVersion\":2,\"revision\":3,\"look\":{{\"design\":\"{design}\",\"wood\":\"{wood}\",\"backs\":\"{backs}\",\"lights\":\"{lights}\",\"depth\":\"{depth}\"}},"
+            $"{{\"kind\":\"{Marker}\",\"schemaVersion\":3,\"revision\":3,\"look\":{{\"design\":\"{design}\",\"wood\":\"{wood}\",\"backs\":\"{backs}\",\"lights\":\"{lights}\",\"depth\":\"{depth}\"}},"
             + "\"locations\":[],\"games\":[],\"changesSinceDownload\":0,\"changes\":[]}");
 
     private OwnerDataStore CreateStore() => new(_directory.FullPath, NullLogger<OwnerDataStore>.Instance);

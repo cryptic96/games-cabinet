@@ -57,7 +57,8 @@ public sealed record PictureSetting(
 /// <param name="LocationId">The location the game is kept in, or null when it has no location of its own.</param>
 /// <param name="AbsentSinceUtc">When the game stopped being owned, or null while it is owned; its decisions are kept for a while.</param>
 /// <param name="Picture">The picture decision, or null when the owner made none.</param>
-public sealed record OwnerGame(int GameId, string? LocationId, DateTimeOffset? AbsentSinceUtc, PictureSetting? Picture);
+/// <param name="CollectionId">The collection entry this choice is for, or null for every copy of the game, the form older files have.</param>
+public sealed record OwnerGame(int GameId, string? LocationId, DateTimeOffset? AbsentSinceUtc, PictureSetting? Picture, long? CollectionId = null);
 
 /// <summary>The three counts that say what a copy of the owner data holds, which the owner compares before a copy replaces another.</summary>
 /// <param name="Locations">How many locations there are.</param>
@@ -73,7 +74,7 @@ public readonly record struct OwnerDataFigures(int Locations, int PlacedGames, i
 
         return new OwnerDataFigures(
             data.Locations.Count,
-            data.Games.Count(game => game.LocationId is not null),
+            data.Games.Where(game => game.LocationId is not null).Select(game => game.GameId).Distinct().Count(),
             data.Games.Count(game => game.Picture is { } picture && picture.Choice != PictureChoice.Automatic));
     }
 }
@@ -93,7 +94,7 @@ public sealed record ChangeEntry(DateTimeOffset AtUtc, string Text);
 /// <param name="SavedAtUtc">When the data was last saved, or null before the first save.</param>
 /// <param name="Look">The look of the cabinet for every visitor.</param>
 /// <param name="Locations">The locations in the order the owner set.</param>
-/// <param name="Games">The per-game decisions, sorted by game identifier.</param>
+/// <param name="Games">The per-game and per-copy decisions, sorted by game identifier and then by collection entry, the choice that holds for every copy first.</param>
 /// <param name="LastDownloadAtUtc">When the owner last downloaded a backup, or null when never.</param>
 /// <param name="ChangesSinceDownload">How many changes were saved since that download.</param>
 /// <param name="Changes">The change log, newest first.</param>
@@ -113,7 +114,7 @@ public sealed record OwnerData(
     public const string KindMarker = "games-cabinet-owner-data";
 
     /// <summary>The stored shape this build writes and understands.</summary>
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
 
     /// <summary>The most locations the owner can have.</summary>
     public const int MaxLocations = 50;

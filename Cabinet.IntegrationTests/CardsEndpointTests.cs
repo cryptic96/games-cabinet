@@ -7,6 +7,7 @@ using Cabinet.Domain.Owner;
 using Cabinet.IntegrationTests.Infrastructure;
 using Cabinet.Repository.Storage;
 using Cabinet.Service.Collection;
+using Cabinet.Service.Owner;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -145,6 +146,42 @@ public sealed class CardsEndpointTests
         game.GetProperty("expansions").EnumerateArray().Select(link => link.GetProperty("gameId").GetInt32()).Should().Equal(ExpansionGameId);
         expansion.GetProperty("bases").EnumerateArray().Select(link => link.GetProperty("gameId").GetInt32()).Should().Equal(BaseGameId);
         document.RootElement.GetProperty("layout").GetString().Should().Be(layout.Headers.ETag!.Tag);
+    }
+
+    [Fact]
+    public async Task Each_copy_of_a_game_shows_its_own_place_on_the_public_card()
+    {
+        const int gameId = 5101;
+        const string cabinetId = "a1b2c3d4";
+        const string shelfId = "e5f6a7b8";
+        long[] copies = [7001, 7002, 7003];
+        using var storage = new TemporaryDirectory();
+        new SnapshotStore(storage.FullPath, NullLogger<SnapshotStore>.Instance).Save(new CollectionSnapshot(
+            CollectionSnapshot.CurrentSchemaVersion,
+            Moment,
+            [.. copies.Select(copy => new SnapshotItem(copy, gameId, "Quiet Quarry", ItemKind.Base, 2015, null, null))],
+            null,
+            null));
+        new OwnerDataStore(storage.FullPath, NullLogger<OwnerDataStore>.Instance).Save(OwnerData.Empty with
+        {
+            Locations = [new OwnerLocation(cabinetId, "Cabinet A"), new OwnerLocation(shelfId, "Shelf B")],
+            Games = [new OwnerGame(gameId, cabinetId, null, null)],
+        });
+        await using var factory = new CabinetWebApplicationFactory(new Dictionary<string, string?> { ["Storage:Directory"] = storage.FullPath });
+        using var client = factory.CreatePublicClient();
+        var owner = factory.ServingServices.GetRequiredService<OwnerDataService>();
+
+        var saved = await owner.MutateAsync(
+            owner.Revision,
+            data => LocationEdits.Assign(data, gameId, copies[1], copies, shelfId, "Quiet Quarry"),
+            TestContext.Current.CancellationToken);
+        using var response = await client.GetAsync("/cabinet/cards?profile=desktop", TestContext.Current.CancellationToken);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var locations = document.RootElement.GetProperty("cards").EnumerateArray()
+            .ToDictionary(record => record.GetProperty("entryId").GetInt64(), record => record.GetProperty("location").GetString());
+
+        saved.Outcome.Should().Be(OwnerOutcome.Saved);
+        locations.Should().Equal(new Dictionary<long, string?> { [7001] = "Cabinet A", [7002] = "Shelf B", [7003] = "Cabinet A" });
     }
 
     [Fact]

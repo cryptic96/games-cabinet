@@ -87,7 +87,7 @@ public sealed class LookRoundTripTests
         var restored = await secondSession.PostFormAsync(RestorePath, [new("token", OwnerSession.FieldValue(preview.Body, "token"))]);
         var page = await publicClient.GetStringAsync("/", TestContext.Current.CancellationToken);
 
-        download.Body.Should().Contain($"\"{field}\": \"{value}\"").And.Contain("\"schemaVersion\": 2");
+        download.Body.Should().Contain($"\"{field}\": \"{value}\"").And.Contain("\"schemaVersion\": 3");
         restored.Status.Should().Be(HttpStatusCode.OK);
         page.Should().Contain($"data-{field}=\"{value}\"");
         ((OwnerDataState.Ready)second.ServingServices.GetRequiredService<OwnerDataService>().State).Data.Look
