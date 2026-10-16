@@ -352,7 +352,7 @@ public static class OwnerStrings
     /// <summary>The tag that tells apart the copies of one game owned more than once.</summary>
     /// <param name="index">The position of the copy, counting from 1.</param>
     /// <param name="count">How many copies of the game are owned.</param>
-    public static string CopyTag(int index, int count) => $"Copy {index} of {count}";
+    public static string CopyTag(int index, int count) => CopyLabels.Tag(index, count);
 
     /// <summary>The accessible name of the picker of one copy of a game owned more than once.</summary>
     /// <param name="title">The game's title.</param>

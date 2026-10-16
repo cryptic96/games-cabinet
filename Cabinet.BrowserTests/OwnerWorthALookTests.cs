@@ -169,12 +169,12 @@ public sealed partial class OwnerWorthALookTests : CabinetPageTest
         await GotoOwnerAsync(PicturesPath);
 
         var titles = await Rows.Locator(".game-title").AllTextContentsAsync();
-        titles.Take(4).Should().Equal("Example Game 17", "Example Game 18", "Lantern & Harbour", "Example Game 1");
+        titles.Take(5).Should().Equal("Example Game 17", "Example Game 18", "Lantern & Harbour", "Example Game 1", "Example Game 1");
         var rest = await Page.EvaluateAsync<bool>(
             """
             () => {
               const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
-              const rows = Array.from(document.querySelectorAll('.pic-row')).slice(4);
+              const rows = Array.from(document.querySelectorAll('.pic-row')).slice(5);
               const titles = rows.map((row) => row.querySelector('.game-title').textContent);
               const quiet = rows.every((row) => row.querySelector('[data-mark="skips-owned"]') !== null);
               return quiet && titles.every((title, index) => index === 0 || collator.compare(titles[index - 1], title) <= 0);
@@ -382,7 +382,7 @@ public sealed partial class OwnerWorthALookTests : CabinetPageTest
         await page.Locator("[data-looks-right]").First.ClickAsync();
 
         await Expect(page.Locator("#owner-notice")).ToHaveTextAsync("Saved.");
-        page.Url.Should().MatchRegex(@"/owner/pictures\?done=saved#game-\d+$");
+        page.Url.Should().MatchRegex(@"/owner/pictures\?done=saved#entry-\d+$");
         await Expect(page.Locator(".pic-row")).ToHaveCountAsync(shown - 1);
         await Expect(page.Locator("#pic-counter")).ToHaveTextAsync($"{shown - 1} of {shown} to check");
 
@@ -463,7 +463,7 @@ public sealed partial class OwnerWorthALookTests : CabinetPageTest
     private ILocator AllLink => Page.Locator("nav[aria-label='Games shown'] a").Last;
 
     private ILocator RowOf(string title) =>
-        Page.Locator(".pic-row", new PageLocatorOptions { Has = Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = title, Exact = true }) });
+        Page.Locator(".pic-row", new PageLocatorOptions { Has = Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = title, Exact = true }) }).First;
 
     private async Task StartHostAsync(Action<string>? seed = null, int size = CollectionSize)
     {

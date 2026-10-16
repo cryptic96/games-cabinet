@@ -61,7 +61,7 @@ public sealed record PictureTile(
     string? LinkAddress,
     string? LinkFullAddress);
 
-/// <summary>One game on the pictures page, with its choice and the four tiles.</summary>
+/// <summary>One copy of a game on the pictures page, with its choice and the four tiles.</summary>
 /// <param name="GameId">The game.</param>
 /// <param name="Title">The title to show.</param>
 /// <param name="Year">The publication year, or null when it is not known.</param>
@@ -75,6 +75,8 @@ public sealed record PictureTile(
 /// <param name="Look">What the worklist knows about the game: its reasons to be looked at, its marks and whether it is resolved.</param>
 /// <param name="Why">Why Automatic drew what it did.</param>
 /// <param name="OwnedReadsAs">What the owned edition's picture looks like to the detector, or null when it has no usable picture.</param>
+/// <param name="CollectionId">The collection entry of the copy the row stands for.</param>
+/// <param name="CopyLabel">The tag that tells this copy apart from the other copies of its game, or null for a game owned once.</param>
 public sealed record PictureRow(
     int GameId,
     string Title,
@@ -88,7 +90,9 @@ public sealed record PictureRow(
     IReadOnlyList<PictureTile> Tiles,
     WorthALookResult Look,
     AutomaticWhy Why,
-    ArtVerdictKind? OwnedReadsAs)
+    ArtVerdictKind? OwnedReadsAs,
+    long CollectionId = 0,
+    string? CopyLabel = null)
 {
     /// <summary>The tile of one choice.</summary>
     /// <param name="kind">The choice.</param>
@@ -102,9 +106,10 @@ public static class PictureRows
     private const string AddressGap = "/.../";
 
     /// <summary>
-    /// Builds one row per game, ordered by title with case ignored and then by game. Each row is made from what the automatic pick
-    /// would draw for the game, never from what the owner chose, so the owner always sees the candidates as they are. A game
-    /// listed in several collection entries is one row, made from the entry with the lowest identifier.
+    /// Builds one row per copy, ordered by title with case ignored, then by game, then by collection entry, so the copies of one
+    /// game stay together in collection order. Each row is made from what the automatic pick would draw for the copy, never from
+    /// what the owner chose, so the owner always sees the candidates as they are. The choice, the marks and the worklist state of
+    /// a row are the copy's own: its own decision, else the one that holds for every copy of its game.
     /// </summary>
     /// <param name="snapshot">The stored collection as the sync wrote it.</param>
     /// <param name="rules">The rules that decide what Automatic picks.</param>
@@ -116,14 +121,29 @@ public static class PictureRows
         ArgumentNullException.ThrowIfNull(rules);
         ArgumentNullException.ThrowIfNull(data);
 
+        var traces = SnapshotMapper.Explain(snapshot, rules)
+            .GroupBy(trace => trace.Item.CollectionId)
+            .Select(group => group.First())
+            .ToList();
+        var rows = new List<PictureRow>(traces.Count);
+
+        foreach (var game in traces.GroupBy(trace => trace.Item.GameId))
+        {
+            var copies = game.OrderBy(trace => trace.Item.CollectionId).ToList();
+            var labels = CopyLabels.Of([.. copies.Select(trace => trace.Item)]);
+
+            for (var index = 0; index < copies.Count; index++)
+            {
+                rows.Add(RowOf(copies[index], snapshot, rules, data, now) with { CopyLabel = labels[index] });
+            }
+        }
+
         return
         [
-            .. SnapshotMapper.Explain(snapshot, rules)
-                .GroupBy(trace => trace.Item.GameId)
-                .Select(group => group.First())
-                .Select(trace => RowOf(trace, snapshot, rules, data, now))
+            .. rows
                 .OrderBy(row => row.Title, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(row => row.GameId),
+                .ThenBy(row => row.GameId)
+                .ThenBy(row => row.CollectionId),
         ];
     }
 
@@ -143,12 +163,13 @@ public static class PictureRows
                 .Where(row => row.Look.ToCheck)
                 .OrderBy(row => row.Look.AttentionRank)
                 .ThenBy(row => row.Title, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(row => row.GameId),
+                .ThenBy(row => row.GameId)
+                .ThenBy(row => row.CollectionId),
         ];
     }
 
-    /// <summary>Counts what the worklist holds.</summary>
-    /// <param name="rows">The rows of every game.</param>
+    /// <summary>Counts what the worklist holds, one for every copy.</summary>
+    /// <param name="rows">The rows of every copy.</param>
     public static PictureCounts CountsOf(IReadOnlyList<PictureRow> rows)
     {
         ArgumentNullException.ThrowIfNull(rows);
@@ -168,7 +189,7 @@ public static class PictureRows
     private static PictureRow RowOf(MappedItemTrace trace, CollectionSnapshot snapshot, ArtRules rules, OwnerData data, DateTimeOffset now)
     {
         var item = trace.Item;
-        var setting = data.Games.FirstOrDefault(game => game.GameId == item.GameId)?.Picture;
+        var setting = SettingOf(data, item);
         var source = trace.Pick switch
         {
             ArtPick.VersionImage => AutomaticSource.OwnedEdition,
@@ -199,8 +220,14 @@ public static class PictureRows
             [automatic, owned, main, LinkTileOf(setting?.Link, rules)],
             WorthALook.Evaluate(trace, mainUrl, setting, snapshot.Images ?? new Dictionary<string, ImageRecord>(StringComparer.Ordinal), now),
             WhyOf(source, trace.VersionImage),
-            owned.Verdict);
+            owned.Verdict,
+            item.CollectionId);
     }
+
+    private static PictureSetting? SettingOf(OwnerData data, SnapshotItem item) =>
+        OwnerGames.Find(data, item.GameId, item.CollectionId) is { Picture: { } own }
+            ? own
+            : OwnerGames.Find(data, item.GameId, null)?.Picture;
 
     private static AutomaticWhy WhyOf(AutomaticSource source, ImageRecord? ownedUsable) => source switch
     {

@@ -28,3 +28,7 @@ Decide first what the owner should be able to set per version: picture, location
 - **Migrate old data:** existing per-game overlay entries need an upgrade path, applying a per-game choice to every version of that game. That likely means another owner-data schema step, with the same safety rules: a forced copy of the old-format file and restore of older files.
 - **Check Locations and filters:** apply the same to the Locations page, and check the cabinet's location filter and the games list for the same collapse.
 - **Test:** add a synthetic fixture with one game owned in several versions (invented titles only), then cover rows, picture choice, location choice, and a round-trip through download and restore.
+
+## Completed (2026-10-16, phase 7)
+
+Resolved by: the Locations page and the Pictures page now list every collection entry of a game as its own row, labelled with its edition name or `Copy k of n`. A place or a picture chosen on one row is saved for that copy alone, and the single-game view of the Pictures page shows every copy with its own picture choices and location picker.

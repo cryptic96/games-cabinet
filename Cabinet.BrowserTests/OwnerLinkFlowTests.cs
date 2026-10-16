@@ -352,7 +352,7 @@ public sealed class OwnerLinkFlowTests : CabinetPageTest
         await row.Locator("summary").ClickAsync();
         await Expect(row.Locator("[data-current-link]")).ToHaveTextAsync("Current link: example.org/.../linked-picture.png");
         await Expect(row.GetByRole(AriaRole.Button, new() { Name = "Remove link" })).ToBeVisibleAsync();
-        var kept = Owner.State is OwnerDataState.Ready ready ? ready.Data.Games.Single().Picture : null;
+        var kept = Owner.State is OwnerDataState.Ready ready ? ready.Data.Games.Single(game => game.Picture?.Choice == PictureChoice.Automatic).Picture : null;
         kept!.Choice.Should().Be(PictureChoice.Automatic);
         kept.Link!.Url.Should().Be(LinkUrl);
         kept.Link.Record!.Files.Should().NotBeEmpty();
@@ -363,7 +363,7 @@ public sealed class OwnerLinkFlowTests : CabinetPageTest
         await Expect(status).ToContainTextAsync("Saved");
         await Expect(linkTile.Locator("input")).ToBeCheckedAsync();
         await Expect(row.Locator("[data-mark=yours]")).ToHaveTextAsync("Yours");
-        ((Owner.State as OwnerDataState.Ready)!.Data.Games.Single().Picture!.Choice).Should().Be(PictureChoice.Link);
+        (Owner.State as OwnerDataState.Ready)!.Data.Games.Should().OnlyContain(game => game.Picture!.Choice == PictureChoice.Link);
         ConsoleErrors.Where(error => !error.Contains("Failed to load resource", StringComparison.Ordinal)).Should().BeEmpty();
     }
 
@@ -438,16 +438,16 @@ public sealed class OwnerLinkFlowTests : CabinetPageTest
 
         await page.GetByRole(AriaRole.Button, new() { Name = "Remove link" }).ClickAsync();
 
-        await Expect(page).ToHaveURLAsync(new Regex($@"/owner/pictures\?done=link-removed&game={gameId}#game-{gameId}$"));
+        await Expect(page).ToHaveURLAsync(new Regex($@"/owner/pictures\?done=link-removed&game={gameId}#entry-\d+$"));
         await Expect(page.Locator("#owner-notice")).ToHaveTextAsync("Link removed.");
         await Expect(page.Locator(".owner-notice").GetByRole(AriaRole.Button, new() { Name = "Undo" })).ToBeVisibleAsync();
-        await Expect(page.Locator("input[value=Automatic]")).ToBeCheckedAsync();
-        await Expect(page.Locator("label.pic-tile[data-kind=Link] .pic-sub")).ToHaveTextAsync("None yet");
+        await Expect(page.Locator("input[value=Automatic]").First).ToBeCheckedAsync();
+        await Expect(page.Locator("label.pic-tile[data-kind=Link] .pic-sub").First).ToHaveTextAsync("None yet");
         (Owner.State as OwnerDataState.Ready)!.Data.Games.Should().BeEmpty();
 
         await page.Locator(".owner-notice").GetByRole(AriaRole.Button, new() { Name = "Undo" }).ClickAsync();
 
-        await Expect(page.Locator("input[value=Link]")).ToBeCheckedAsync();
+        await Expect(page.Locator("input[value=Link]").First).ToBeCheckedAsync();
         await plain.CloseAsync();
     }
 
@@ -596,7 +596,7 @@ public sealed class OwnerLinkFlowTests : CabinetPageTest
         await page.GetByLabel("Picture link").FillAsync(LinkUrl);
         await page.GetByRole(AriaRole.Button, new() { Name = "Check link" }).ClickAsync();
 
-        await Expect(page).ToHaveURLAsync(new Regex($@"/owner/pictures\?game={gameId}&preview=[0-9a-f]{{32}}#game-{gameId}$"));
+        await Expect(page).ToHaveURLAsync(new Regex($@"/owner/pictures\?game={gameId}&preview=[0-9a-f]{{32}}#entry-\d+$"));
         var preview = page.Locator(".pic-preview");
         await Expect(preview.GetByRole(AriaRole.Heading, new() { Name = "Preview" })).ToBeVisibleAsync();
         await Expect(preview.Locator("svg")).ToHaveCountAsync(2);
@@ -607,11 +607,11 @@ public sealed class OwnerLinkFlowTests : CabinetPageTest
         (await page.Locator("details.pic-linkbox").EvaluateAsync<bool>("element => element.open")).Should().BeTrue();
         await preview.GetByRole(AriaRole.Button, new() { Name = "Use this" }).ClickAsync();
 
-        await Expect(page).ToHaveURLAsync(new Regex($@"/owner/pictures\?done=saved&game={gameId}#game-{gameId}$"));
+        await Expect(page).ToHaveURLAsync(new Regex($@"/owner/pictures\?done=saved&game={gameId}#entry-\d+$"));
         await Expect(page.Locator("#owner-notice")).ToHaveTextAsync("Saved.");
-        await Expect(page.Locator("input[value=Link]")).ToBeCheckedAsync();
+        await Expect(page.Locator("input[value=Link]").First).ToBeCheckedAsync();
         await Expect(page.Locator(".pic-preview")).ToHaveCountAsync(0);
-        await Expect(page.Locator("label.pic-tile[data-kind=Link] img")).ToHaveAttributeAsync("src", new Regex("^/art/"));
+        await Expect(page.Locator("label.pic-tile[data-kind=Link] img").First).ToHaveAttributeAsync("src", new Regex("^/art/"));
         await plain.CloseAsync();
     }
 
@@ -641,7 +641,7 @@ public sealed class OwnerLinkFlowTests : CabinetPageTest
     private OwnerDataService Owner => _factory!.ServingServices.GetRequiredService<OwnerDataService>();
 
     private ILocator RowOf(string title) =>
-        Page.Locator(".pic-row", new PageLocatorOptions { Has = Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = title, Exact = true }) });
+        Page.Locator(".pic-row", new PageLocatorOptions { Has = Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = title, Exact = true }) }).First;
 
     private async Task GotoPicturesAsync()
     {

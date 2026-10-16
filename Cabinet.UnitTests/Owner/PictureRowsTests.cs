@@ -206,7 +206,7 @@ public sealed class PictureRowsTests
     }
 
     [Fact]
-    public void Games_are_listed_once_by_title_ignoring_case_with_a_name_for_a_blank_title_and_the_expansion_flag()
+    public void Copies_are_listed_by_title_ignoring_case_with_a_name_for_a_blank_title_and_the_expansion_flag()
     {
         var snapshot = new CollectionSnapshot(
             CollectionSnapshot.CurrentSchemaVersion,
@@ -221,8 +221,89 @@ public sealed class PictureRowsTests
 
         var rows = Build(snapshot, OwnerData.Empty);
 
-        rows.Select(row => row.Title).Should().Equal("Apple Orchard", "Game 5", "zebra Crossing");
+        rows.Select(row => row.Title).Should().Equal("Apple Orchard", "Apple Orchard", "Game 5", "zebra Crossing");
         rows.Single(row => row.GameId == 5).IsExpansion.Should().BeTrue();
+    }
+
+    [Fact]
+    public void A_game_with_two_edition_named_copies_and_a_plain_one_has_three_rows_in_collection_order_with_their_labels()
+    {
+        var snapshot = new CollectionSnapshot(
+            CollectionSnapshot.CurrentSchemaVersion,
+            Moment,
+            [
+                new SnapshotItem(30, GameId, "Invented Game", ItemKind.Base, 2019, null, null, VersionName: "Plain box"),
+                new SnapshotItem(10, GameId, "Invented Game", ItemKind.Base, 2019, null, null),
+                new SnapshotItem(20, GameId, "Invented Game", ItemKind.Base, 2019, null, null, VersionName: "Deluxe edition"),
+                new SnapshotItem(40, 8, "Other Game", ItemKind.Base, 2020, null, null),
+            ],
+            new Dictionary<string, ImageRecord>());
+
+        var rows = Build(snapshot, OwnerData.Empty);
+
+        rows.Where(row => row.GameId == GameId).Select(row => row.CollectionId).Should().Equal(10, 20, 30);
+        rows.Where(row => row.GameId == GameId).Select(row => row.CopyLabel).Should().Equal("Copy 1 of 3", "Deluxe edition", "Plain box");
+        rows.Single(row => row.GameId == 8).CopyLabel.Should().BeNull();
+    }
+
+    [Fact]
+    public void Copies_that_share_an_edition_name_keep_their_position_labels()
+    {
+        var snapshot = new CollectionSnapshot(
+            CollectionSnapshot.CurrentSchemaVersion,
+            Moment,
+            [
+                new SnapshotItem(1, GameId, "Invented Game", ItemKind.Base, 2019, null, null, VersionName: "Deluxe edition"),
+                new SnapshotItem(2, GameId, "Invented Game", ItemKind.Base, 2019, null, null, VersionName: "deluxe edition"),
+                new SnapshotItem(3, GameId, "Invented Game", ItemKind.Base, 2019, null, null),
+            ],
+            new Dictionary<string, ImageRecord>());
+
+        Build(snapshot, OwnerData.Empty).Select(row => row.CopyLabel).Should().Equal("Copy 1 of 3", "Copy 2 of 3", "Copy 3 of 3");
+    }
+
+    [Fact]
+    public void Each_copy_row_carries_the_choice_of_that_copy_and_the_counts_count_rows()
+    {
+        var snapshot = new CollectionSnapshot(
+            CollectionSnapshot.CurrentSchemaVersion,
+            Moment,
+            [
+                new SnapshotItem(1, GameId, "Invented Game", ItemKind.Base, 2019, null, null, VersionUrl, MainUrl),
+                new SnapshotItem(2, GameId, "Invented Game", ItemKind.Base, 2019, null, null, VersionUrl, MainUrl),
+                new SnapshotItem(3, GameId, "Invented Game", ItemKind.Base, 2019, null, null, VersionUrl, MainUrl),
+            ],
+            new Dictionary<string, ImageRecord>());
+        var data = OwnerData.Empty with
+        {
+            Games = [new OwnerGame(GameId, null, null, new PictureSetting(PictureChoice.MainPicture, true, VersionUrl, MainUrl, null), 2)],
+        };
+
+        var rows = Build(snapshot, data);
+
+        rows.Select(row => row.Choice).Should().Equal(PictureChoice.Automatic, PictureChoice.MainPicture, PictureChoice.Automatic);
+        PictureRows.CountsOf(rows).Total.Should().Be(3);
+    }
+
+    [Fact]
+    public void A_choice_for_every_copy_of_a_game_shows_on_each_copy_row_until_a_copy_has_its_own()
+    {
+        var snapshot = new CollectionSnapshot(
+            CollectionSnapshot.CurrentSchemaVersion,
+            Moment,
+            [
+                new SnapshotItem(1, GameId, "Invented Game", ItemKind.Base, 2019, null, null, VersionUrl, MainUrl),
+                new SnapshotItem(2, GameId, "Invented Game", ItemKind.Base, 2019, null, null, VersionUrl, MainUrl),
+            ],
+            new Dictionary<string, ImageRecord>());
+        var main = new PictureSetting(PictureChoice.MainPicture, true, VersionUrl, MainUrl, null);
+        var data = OwnerData.Empty with
+        {
+            Games = [new OwnerGame(GameId, null, null, main), new OwnerGame(GameId, null, null, new PictureSetting(PictureChoice.Automatic, true, VersionUrl, MainUrl, null), 2)],
+        };
+
+        Build(snapshot, OwnerData.Empty with { Games = [data.Games[0]] }).Select(row => row.Choice).Should().Equal(PictureChoice.MainPicture, PictureChoice.MainPicture);
+        Build(snapshot, data).Select(row => row.Choice).Should().Equal(PictureChoice.MainPicture, PictureChoice.Automatic);
     }
 
     [Fact]
