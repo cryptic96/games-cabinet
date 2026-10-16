@@ -128,7 +128,7 @@ public sealed class FilterListTests : CabinetPageTest
         apart.Should().NotBeNull("the sample holds an expansion stored away from every base game it expands");
         groups.Should().HaveCountGreaterThan(1);
 
-        await Page.Locator(".filter-view-segment").Nth(1).ClickAsync();
+        await ChooseViewAsync(1);
 
         await Expect(Page.Locator(GroupTitles)).ToHaveTextAsync(groups.Select(group => group.Heading).ToArray());
         await Expect(Page.Locator(Heading)).ToHaveTextAsync("All games");
@@ -174,8 +174,8 @@ public sealed class FilterListTests : CabinetPageTest
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         var names = Enumerable.Range(0, 14).Select(index => $"Cabinet {(char)('A' + index)}").ToArray();
 
-        await Expect(Page.Locator(".filter-view")).ToBeVisibleAsync();
-        await Page.Locator(".filter-view-segment").Nth(1).ClickAsync();
+        await ExpectViewSwitchAvailableAsync();
+        await ChooseViewAsync(1);
 
         await Expect(Page.Locator(GroupTitles)).ToHaveTextAsync(names.Select(name => $"{name}, 2 games").ToArray());
         (await Page.Locator(GroupTitles).EvaluateAllAsync<string[]>("(titles) => titles.map((title) => title.nextElementSibling?.tagName ?? '')")).Should().OnlyContain(tag => tag == "UL");
@@ -188,17 +188,17 @@ public sealed class FilterListTests : CabinetPageTest
     {
         await OpenSampleAsync(1440, 900);
         var total = await Page.Locator(TopEntries).CountAsync();
-        await Page.Locator(".filter-view-segment").Nth(1).ClickAsync();
+        await ChooseViewAsync(1);
         await Expect(Page.Locator(GroupTitles).First).ToBeAttachedAsync();
         await Expect(Page.Locator(".games-list-items")).ToBeHiddenAsync();
 
-        await Page.Locator(".filter-view-segment").Nth(0).ClickAsync();
+        await ChooseViewAsync(0);
 
         await Expect(Page.Locator(GroupTitles)).ToHaveCountAsync(0);
         await Expect(Page.Locator(".games-list-items")).Not.ToBeHiddenAsync();
         await Expect(Page.Locator(TopEntries)).ToHaveCountAsync(total);
 
-        await Page.Locator(".filter-view-segment").Nth(1).ClickAsync();
+        await ChooseViewAsync(1);
         await Expect(Page.Locator(GroupTitles).First).ToBeAttachedAsync();
         await Page.Locator(".skip-link").FocusAsync();
         await Page.Keyboard.PressAsync("Enter");
@@ -223,8 +223,8 @@ public sealed class FilterListTests : CabinetPageTest
         await host.PlaceAsync(games[1], places[1]);
         await GotoCabinetAsync("/");
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-        await Expect(Page.Locator(".filter-view")).ToBeVisibleAsync();
-        await Page.Locator(".filter-view-segment").Nth(1).ClickAsync();
+        await ExpectViewSwitchAvailableAsync();
+        await ChooseViewAsync(1);
         await Expect(Page.Locator(GroupTitles).First).ToContainTextAsync(longName);
 
         await Page.Locator(".skip-link").FocusAsync();
@@ -251,7 +251,7 @@ public sealed class FilterListTests : CabinetPageTest
         await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
         var total = await Page.Locator(TopEntries).CountAsync();
 
-        await Page.Locator(".filter-view-segment").Nth(1).ClickAsync();
+        await ChooseViewAsync(1);
 
         await Expect(Page.Locator("input[name=\"filter-view\"][value=\"all\"]")).ToBeCheckedAsync();
         await Expect(Page.Locator("#cabinet section.location-group")).ToHaveCountAsync(0);
