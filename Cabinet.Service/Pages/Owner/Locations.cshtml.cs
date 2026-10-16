@@ -286,18 +286,18 @@ public class LocationsModel : OwnerPage
     }
 
     /// <summary>
-    /// Moves the ticked games in one change: into one location, to no location of their own, or back to following their base game.
-    /// Every game must be in the collection and the target must be one of the owner's locations or one of the two fixed words;
-    /// otherwise nothing moves.
+    /// Moves the ticked copies in one change: into one location, to no location of their own, or back to following their base game.
+    /// Every copy must be an entry of the collection and the target must be one of the owner's locations or one of the two fixed
+    /// words; otherwise nothing moves. Copies that were not ticked stay where they are, even when they belong to a ticked game.
     /// </summary>
     /// <param name="revision">The revision the page was built from.</param>
-    /// <param name="gameIds">The ticked games.</param>
+    /// <param name="collectionIds">The collection entries of the ticked copies.</param>
     /// <param name="target">Where they go: <c>location:{id}</c>, <c>not-placed</c> or <c>same-as-base</c>.</param>
     /// <param name="cancellationToken">Cancels the wait for the writer.</param>
-    public async Task<IActionResult> OnPostBulkMoveAsync(long revision, int[]? gameIds, string? target, CancellationToken cancellationToken)
+    public async Task<IActionResult> OnPostBulkMoveAsync(long revision, long[]? collectionIds, string? target, CancellationToken cancellationToken)
     {
         var snapshot = _collection.Current.Snapshot;
-        var ids = gameIds ?? [];
+        var ids = collectionIds ?? [];
 
         var result = await _owner.MutateAsync(
             revision,
@@ -337,7 +337,7 @@ public class LocationsModel : OwnerPage
         return LocationEdits.Assign(data, gameId, collectionId, [.. copies.Select(copy => copy.CollectionId)], locationId, TitleOf(item), followsBase);
     }
 
-    private static OwnerChange BulkMoveInSnapshot(OwnerData data, CollectionSnapshot? snapshot, int[] gameIds, string? target)
+    private static OwnerChange BulkMoveInSnapshot(OwnerData data, CollectionSnapshot? snapshot, long[] collectionIds, string? target)
     {
         var moveTarget = ParseTarget(target);
 
@@ -351,21 +351,43 @@ public class LocationsModel : OwnerPage
             return OwnerChange.Refused(data, "unknown-game");
         }
 
-        var titles = new Dictionary<int, string>();
+        var entries = snapshot.Items.GroupBy(item => item.CollectionId).ToDictionary(group => group.Key, group => group.First());
+        var copies = new List<(int GameId, long CollectionId)>(collectionIds.Length);
 
-        foreach (var item in snapshot.Items)
+        foreach (var id in collectionIds)
+        {
+            if (!entries.TryGetValue(id, out var entry))
+            {
+                return OwnerChange.Refused(data, "unknown-game");
+            }
+
+            copies.Add((entry.GameId, id));
+        }
+
+        var titles = new Dictionary<int, string>();
+        var entriesOf = new Dictionary<int, List<long>>();
+
+        foreach (var item in snapshot.Items.OrderBy(item => item.CollectionId))
         {
             titles.TryAdd(item.GameId, TitleOf(item));
+
+            if (!entriesOf.TryGetValue(item.GameId, out var held))
+            {
+                entriesOf[item.GameId] = held = [];
+            }
+
+            held.Add(item.CollectionId);
         }
 
         var overlay = OwnerOverlay.From(snapshot, data);
 
         return LocationEdits.MoveMany(
             data,
-            gameIds,
+            copies,
             moveTarget,
             gameId => titles.GetValueOrDefault(gameId),
-            gameId => overlay.OwnedBaseGameId(gameId) is not null);
+            gameId => overlay.OwnedBaseGameId(gameId) is not null,
+            gameId => entriesOf.TryGetValue(gameId, out var held) ? held : []);
     }
 
     private static MoveTarget? ParseTarget(string? target) => target switch

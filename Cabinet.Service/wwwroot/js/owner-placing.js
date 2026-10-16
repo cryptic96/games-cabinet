@@ -1,6 +1,6 @@
 /**
  * The script side of the games list on the locations page: ticking rows, the selection dock that slides up while any row is
- * ticked, and the dialog of buttons that asks where the ticked games go. A move is one request for every ticked game and one
+ * ticked, and the dialog of buttons that asks where the ticked games go. A move is one request for every ticked copy and one
  * change on the server, so one Undo takes all of it back. The dock then shows what happened, with Undo and Dismiss, until the
  * owner ticks a row again. Every name and title is written with `textContent`, never as markup.
  */
@@ -325,7 +325,7 @@ export function initPlacing(doc, hooks) {
     const previous = moving.map((row) => ({ row, own: pickerOf(row).value }));
 
     hooks.enqueue(async () => {
-      const result = await postOwner(HANDLERS.bulkMove, { gameIds: moving.map((row) => row.dataset.gameId), target });
+      const result = await postOwner(HANDLERS.bulkMove, { collectionIds: moving.map((row) => row.dataset.entryId), target });
 
       if (result.outcome === 'noChange') {
         showDone(OWNER_TEXT.nothingToChange, null);

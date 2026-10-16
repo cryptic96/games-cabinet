@@ -83,7 +83,7 @@ else
                 {
                     <li class="game-row" id="@game.Anchor" data-game-id="@game.GameId" data-entry-id="@game.CollectionId" data-base-id="@game.BaseGameId" data-base-entry-id="@game.BaseEntryId" data-nested="@(game.FollowsBase ? "true" : "false")">
                         <label class="game-pick">
-                            <input type="checkbox" class="game-check" value="@game.GameId" aria-label="@OwnerStrings.SelectLabel(game.Title)" />
+                            <input type="checkbox" class="game-check" value="@game.CollectionId" aria-label="@OwnerStrings.SelectLabel(game.Title)" />
                         </label>
                         @if (game.CoverUrl is not null)
                         {
