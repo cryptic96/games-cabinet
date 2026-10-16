@@ -330,6 +330,46 @@
 }
 
 /**
+ * The controls that need the card data while it could not be loaded: a dashed outline, muted text, regular weight and no hover wash,
+ * so they read as unavailable. Search is not among them and keeps its look.
+ */
+.filter-group .filter-chip:has(input:disabled) {
+  border-style: dashed;
+  color: var(--room-muted, var(--chrome-muted));
+  font-weight: 400;
+  box-shadow: none;
+  cursor: default;
+}
+
+#filter-loc:disabled {
+  border-style: dashed;
+  color: var(--room-muted, var(--chrome-muted));
+  font-weight: 400;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .filter-group .filter-chip:has(input:disabled):hover {
+    background: transparent;
+  }
+}
+
+/**
+ * The note that says why the card-based controls are off. It stands on the plain wall directly under the bar and outside it, so a full
+ * sentence can never make the pinned bar taller.
+ */
+.filter-note {
+  margin: 0 0 16px;
+  color: var(--room-muted, var(--chrome-muted));
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.filter-note[hidden] {
+  display: none;
+}
+
+/**
  * Forced colours drop fills and shadows, so a chosen chip, Any included, gets a system outline drawn inside its edge.
  */
 @media (forced-colors: active) {

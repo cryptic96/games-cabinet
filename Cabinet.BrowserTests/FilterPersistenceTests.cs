@@ -19,8 +19,13 @@ public sealed class FilterPersistenceTests : CabinetPageTest
 
     private const string InstallDrawRecorder = """
         (() => {
-          const rec = { batches: [], toggles: [], inserted: [] };
+          const rec = { batches: [], toggles: [], inserted: [], cardRequests: 0 };
           window.__rec = rec;
+          const originalFetch = window.fetch;
+          window.fetch = (...args) => {
+            if (String(args[0]).includes('/cabinet/cards')) { rec.cardRequests += 1; }
+            return originalFetch.apply(window, args);
+          };
           new MutationObserver((records) => {
             let inserted = 0;
             let shown = false;
@@ -48,6 +53,7 @@ public sealed class FilterPersistenceTests : CabinetPageTest
               rec.batches.push({
                 inserted,
                 shown,
+                cardRequests: rec.cardRequests,
                 resources: first ? performance.getEntriesByType('resource').filter((entry) => entry.name.includes('/cabinet/')).map((entry) => ({ name: entry.name, start: entry.startTime, end: entry.responseEnd })) : null,
               });
             }
@@ -114,6 +120,159 @@ public sealed class FilterPersistenceTests : CabinetPageTest
         ConsoleErrors.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Failed_card_data_disables_only_the_card_filters()
+    {
+        await StartAsync(PrototypeOn);
+        var fragment = await TitleFragmentAsync();
+        var requestCount = await FailCardDataRequestsAsync();
+        await Page.SetViewportSizeAsync(1440, 900);
+        await PrepareAsync(StoredFilters(fragment, players: 4));
+
+        await GotoCabinetAsync("/?sample=65");
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
+
+        var recording = await ReadRecorderAsync();
+        AssertBarShownWithTheFirstDraw(recording);
+        var firstDraw = recording.Batches.First(batch => batch.Inserted > 0);
+        firstDraw.CardRequests.Should().Be(3, "the first try and one retry per delay had failed before the cabinet drew");
+        requestCount().Should().Be(3);
+        recording.Toggles.Should().BeEmpty("every box that is dimmed was inserted dimmed");
+
+        var dimmed = await BoxIdsAsync(Dimmed);
+        dimmed.Should().NotBeEmpty();
+        recording.Inserted.Where(box => box.Dim).Select(box => box.Id).Should().BeEquivalentTo(dimmed);
+        (await Page.Locator(".filter-group input").EvaluateAllAsync<bool[]>("(inputs) => inputs.map((input) => input.disabled)")).Should().OnlyContain(disabled => disabled);
+        (await Page.Locator("#filter-loc").IsDisabledAsync()).Should().BeTrue();
+        await Expect(Page.Locator(".filter-note")).ToBeVisibleAsync();
+        await Expect(Page.Locator(".filter-note")).ToHaveTextAsync("Couldn't load the details. Reload the page to try again.");
+        await Expect(Page.Locator("fieldset[data-filter=\"players\"] input[value=\"\"]")).ToBeCheckedAsync();
+        (await Page.Locator("fieldset[data-filter=\"players\"] .filter-chip").First.EvaluateAsync<string>("(chip) => getComputedStyle(chip).borderStyle")).Should().Be("dashed");
+        await Expect(Page.Locator("#filter-q")).ToHaveValueAsync(fragment);
+        var count = await Page.Locator(".filter-count").InnerTextAsync();
+        count.Should().MatchRegex(@"^\d+ of \d+ games?$");
+
+        await Page.Locator("#filter-q").FillAsync(string.Empty);
+        await Expect(Page.Locator(Dimmed)).ToHaveCountAsync(0);
+        await Page.Locator("#filter-q").FillAsync(fragment);
+        await Expect(Page.Locator(Dimmed)).ToHaveCountAsync(dimmed.Length);
+        (await BoxIdsAsync(Dimmed)).Should().BeEquivalentTo(dimmed, "the search alone decides, so typing the same text again dims the same boxes");
+        await Expect(Page.Locator(".filter-count")).ToHaveTextAsync(count);
+
+        await Page.Locator(".lang-toggle a[lang=nl]").ClickAsync();
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("lang", "nl");
+        await Expect(Page.Locator(".filter-note")).ToHaveTextAsync("De details konden niet worden geladen. Laad de pagina opnieuw om het nog eens te proberen.", new LocatorAssertionsToHaveTextOptions { Timeout = 20000 });
+    }
+
+    [Theory]
+    [InlineData(1024)]
+    [InlineData(1440)]
+    public async Task Failed_card_data_keeps_the_pinned_bar_at_112_px(int width)
+    {
+        await StartAsync(PrototypeOn);
+        await FailCardDataRequestsAsync();
+        await Page.SetViewportSizeAsync(width, 900);
+
+        await GotoCabinetAsync("/?sample=65");
+        await Expect(Page.Locator(".filter-note")).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 20000 });
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        (await Page.EvaluateAsync<double>("() => window.scrollY")).Should().Be(0);
+        await AssertNoteUnderBarAsync();
+
+        await Page.EvaluateAsync("() => window.scrollTo(0, document.querySelector('.filter-sentinel').getBoundingClientRect().top + window.scrollY + 2)");
+        await Expect(Page.Locator(".filter-bar")).ToHaveAttributeAsync("data-stuck", string.Empty);
+        await AssertNoteUnderBarAsync();
+
+        await Page.EvaluateAsync("() => window.scrollTo(0, 700)");
+        (await Page.Locator(".filter-bar").BoundingBoxAsync())!.Height.Should().Be(112);
+    }
+
+    [Fact]
+    public async Task A_failed_layout_keeps_the_bar_hidden()
+    {
+        await StartAsync(PrototypeOn);
+        await Page.RouteAsync("**/cabinet/layout**", route => route.AbortAsync());
+        await Page.SetViewportSizeAsync(1440, 900);
+
+        await GotoCabinetAsync("/?sample=65");
+
+        await Expect(Page.Locator(".cabinet-retry")).ToBeVisibleAsync();
+        await Expect(Page.Locator(".filter-bar")).ToBeHiddenAsync();
+        await Expect(Page.Locator(".filter-note")).ToBeHiddenAsync();
+    }
+
+    [Fact]
+    public async Task The_language_switch_keeps_the_question()
+    {
+        await OpenAsync("/?sample=65", 1440, 900);
+        var fragment = await TitleFragmentAsync();
+        await Page.Locator("#filter-q").FillAsync(fragment);
+        await Page.Locator("fieldset[data-filter=\"time\"] input[value=\"60\"]").ClickAsync();
+        await Expect(Page.Locator(Dimmed).First).ToBeAttachedAsync();
+        var dimmed = await BoxIdsAsync(Dimmed);
+        await Page.WaitForFunctionAsync($"() => JSON.parse(sessionStorage.getItem('{StorageKey}') ?? 'null')?.time === 60");
+
+        await Page.Locator(".lang-toggle a[lang=nl]").ClickAsync();
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("lang", "nl");
+        await Page.WaitForSelectorAsync(Boxes, new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached });
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
+
+        await Expect(Page.Locator("#filter-q")).ToHaveValueAsync(fragment);
+        await Expect(Page.Locator("fieldset[data-filter=\"time\"] input[value=\"60\"]")).ToBeCheckedAsync();
+        (await BoxIdsAsync(Dimmed)).Should().BeEquivalentTo(dimmed);
+        var recording = await ReadRecorderAsync();
+        recording.Toggles.Should().BeEmpty("the Dutch page drew its boxes already in shadow");
+        recording.Inserted.Where(box => box.Dim).Select(box => box.Id).Should().BeEquivalentTo(dimmed);
+        AssertBarShownWithTheFirstDraw(recording);
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    private async Task AssertNoteUnderBarAsync()
+    {
+        var bar = Page.Locator(".filter-bar");
+        var note = Page.Locator(".filter-note");
+        (await note.EvaluateAsync<bool>("(note) => note.previousElementSibling === document.querySelector('.filter-bar')")).Should().BeTrue("the note is the bar's next sibling");
+        (await note.EvaluateAsync<bool>("(note) => document.querySelector('.filter-bar').contains(note)")).Should().BeFalse();
+        var barBox = (await bar.BoundingBoxAsync())!;
+        var noteBox = (await note.BoundingBoxAsync())!;
+        noteBox.Y.Should().BeGreaterThanOrEqualTo(barBox.Y + barBox.Height);
+        noteBox.Y.Should().BeLessThanOrEqualTo(barBox.Y + barBox.Height + 17);
+        barBox.Height.Should().Be(112);
+    }
+
+    private async Task<string> TitleFragmentAsync()
+    {
+        var response = await Context.APIRequest.GetAsync($"http://127.0.0.1:{PublicPort}/cabinet/cards?profile=desktop&sample=65");
+        var document = await response.JsonAsync();
+        var title = document!.Value.GetProperty("cards").EnumerateArray()
+            .Select(card => card.GetProperty("title").GetString()!)
+            .First(candidate => candidate.Length >= 5);
+
+        return title[..5].ToLowerInvariant();
+    }
+
+    private static string StoredFilters(string query, int? players = null, int? time = null) =>
+        JsonSerializer.Serialize(new { q = query, players, time, location = (string?)null });
+
+    private async Task PrepareAsync(string? stored = null)
+    {
+        await Page.RouteAsync("**/cabinet/search-names**", route => route.FulfillAsync(new RouteFulfillOptions
+        {
+            Status = 200,
+            ContentType = "application/json",
+            Body = "{\"names\":{}}",
+        }));
+        await Page.AddInitScriptAsync(InstallDrawRecorder);
+
+        if (stored is not null)
+        {
+            await Page.AddInitScriptAsync($"if (sessionStorage.getItem('{StorageKey}') === null) {{ sessionStorage.setItem('{StorageKey}', {JsonSerializer.Serialize(stored)}); }}");
+        }
+    }
+
     private static void AssertBarShownWithTheFirstDraw(Recording recording)
     {
         var firstDraw = recording.Batches.FindIndex(batch => batch.Inserted > 0);
@@ -126,13 +285,7 @@ public sealed class FilterPersistenceTests : CabinetPageTest
     {
         await Page.SetViewportSizeAsync(width, height);
         await StartAsync(PrototypeOn);
-        await Page.RouteAsync("**/cabinet/search-names**", route => route.FulfillAsync(new RouteFulfillOptions
-        {
-            Status = 200,
-            ContentType = "application/json",
-            Body = "{\"names\":{}}",
-        }));
-        await Page.AddInitScriptAsync(InstallDrawRecorder);
+        await PrepareAsync();
         var address = await GotoCabinetAsync(path);
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
@@ -152,7 +305,7 @@ public sealed class FilterPersistenceTests : CabinetPageTest
 
     private sealed record Recording(List<Batch> Batches, List<string> Toggles, List<InsertedBox> Inserted);
 
-    private sealed record Batch(int Inserted, bool Shown, List<ResourceTiming>? Resources);
+    private sealed record Batch(int Inserted, bool Shown, int CardRequests, List<ResourceTiming>? Resources);
 
     private sealed record InsertedBox(string Id, bool Dim);
 
