@@ -82,8 +82,35 @@
   white-space: nowrap;
 }
 
+/**
+ * The slash that tells a visitor with a keyboard where the shortcut is. It sits inside the empty field at its inline end, in the
+ * muted wall colour on the plain field, and only on a device with a mouse; it goes away as soon as the field has focus or text.
+ */
 .filter-hint {
+  position: absolute;
+  inset-inline-end: 4px;
+  top: 50%;
   display: none;
+  transform: translateY(-50%);
+  border: 0;
+  background: none;
+  color: var(--room-muted, var(--chrome-muted));
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1;
+  pointer-events: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .filter-hint {
+    display: block;
+  }
+
+  #filter-q:focus ~ .filter-hint,
+  #filter-q:not(:placeholder-shown) ~ .filter-hint {
+    display: none;
+  }
 }
 
 .filter-clear {
@@ -99,4 +126,13 @@
   line-height: 1.5;
   cursor: pointer;
   touch-action: manipulation;
+}
+
+/**
+ * When nothing matches, Clear is the action to take, so it is drawn as the inverted wall fill, the way a chosen value is.
+ */
+.filter-clear[data-highlighted] {
+  background: var(--room-text, var(--wall-text));
+  color: var(--room, var(--wood-dark));
+  font-weight: 600;
 }

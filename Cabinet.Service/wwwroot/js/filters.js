@@ -35,11 +35,14 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
   const field = bar.querySelector('#filter-q');
   const count = bar.querySelector('.filter-count');
   const clear = bar.querySelector('.filter-clear');
+  const live = document.getElementById('filter-live');
 
   let state = { ...EMPTY_FILTERS };
   let model = buildModel(getRecords());
   let entries = listEntries(model, { language });
   let result = evaluate(state, model);
+  let tally = countLit(entries, result.lit);
+  let announceTimer = null;
 
   /**
    * Tells whether an entry is drawn in shadow. An entry the model does not hold is judged from its own title.
@@ -61,9 +64,8 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
 
   /**
    * Writes the count and the state of the bar for the current result.
-   * @param {{ lit: number, total: number }} tally How many entries are lit out of how many there are.
    */
-  function showTally(tally) {
+  function showTally() {
     const none = result.active && tally.lit === 0;
 
     count.textContent = !result.active ? '' : none ? copy.noMatch : copy.filterCount(tally.lit, tally.total);
@@ -81,15 +83,88 @@ export function initFilters({ bar, mount, copy, language, getRecords }) {
       box.toggleAttribute('data-dim', isDim(box.dataset.entryId, box.getAttribute('aria-label') ?? ''));
     }
 
-    const tally = countLit(entries, result.lit);
-
-    showTally(tally);
+    tally = countLit(entries, result.lit);
+    showTally();
     document.dispatchEvent(new CustomEvent('cabinet:filtered', { detail: { active: result.active, lit: result.lit, count: tally, state } }));
   }
 
-  field.addEventListener('input', () => {
+  /**
+   * Gives the text a screen reader hears for the current result: the full count, the none-found sentence, or the cleared sentence.
+   * @returns {string}
+   */
+  function announcement() {
+    if (!result.active) {
+      return copy.filtersCleared(tally.total);
+    }
+
+    return tally.lit === 0 ? copy.noMatch : copy.filterCount(tally.lit, tally.total);
+  }
+
+  /**
+   * Writes the announcement once the count has stayed the same for a moment, so a burst of keystrokes is heard as one message.
+   */
+  function announceSoon() {
+    window.clearTimeout(announceTimer);
+    announceTimer = window.setTimeout(() => {
+      announceTimer = null;
+      live.textContent = announcement();
+    }, FILTER_ANNOUNCE_MS);
+  }
+
+  /**
+   * Takes the search the visitor typed, shows its result at once and queues the announcement.
+   */
+  function search() {
     state = { ...state, q: field.value };
     apply();
+    announceSoon();
+  }
+
+  /**
+   * Empties the search, puts every box back in the light and announces it at once. Focus ends in the search field.
+   */
+  function clearAll() {
+    window.clearTimeout(announceTimer);
+    announceTimer = null;
+    field.value = '';
+    state = { ...EMPTY_FILTERS };
+    apply();
+    live.textContent = announcement();
+    field.focus();
+  }
+
+  /**
+   * Tells whether a key press target is somewhere the visitor types, so a slash typed there stays a slash.
+   * @param {EventTarget | null} target The element the key was pressed on.
+   * @returns {boolean}
+   */
+  function isTypingPlace(target) {
+    return target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+  }
+
+  field.addEventListener('input', search);
+
+  field.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && field.value !== '') {
+      event.preventDefault();
+      clearAll();
+    } else if (event.key === 'Enter' && window.matchMedia('(pointer: coarse)').matches) {
+      field.blur();
+    }
+  });
+
+  clear.addEventListener('click', clearAll);
+
+  document.addEventListener('keydown', (event) => {
+    const plain = !event.ctrlKey && !event.altKey && !event.metaKey;
+
+    if (event.key !== '/' || !plain || event.defaultPrevented || bar.hidden || isTypingPlace(event.target) || document.querySelector('dialog[open]') !== null) {
+      return;
+    }
+
+    event.preventDefault();
+    field.focus();
+    field.select();
   });
 
   return {
