@@ -168,7 +168,7 @@ A second look, by the senior-frontend Critic, at all 163 frames (the 164th, the 
 
 ### Defects
 
-- **D1, the "found" box is marked in the wall's text colour, so on Walnut the mark disappears. Awaiting your yes; not changed.** When you press Show on shelf, the box is outlined for a couple of seconds. The same outline is used for an open box when animations are reduced. Both are drawn in the wall's text colour, but the box stands on the cabinet back, not on the wall. Walnut has a light wall (dark text colour) and a dark cabinet back, so the outline is dark on dark and the jump lands on a box with no visible mark. Evidence: `M7-show-on-shelf-outline-found-walnut-lit-1440-en.png` (the problem, with the card frame `M7-show-on-shelf-outline-card-walnut-lit-1440-en.png` before it) against `M7-show-on-shelf-found-brown-day-1440-en.png` (Brown, where it reads). I did not change it because this colour is fixed in the earlier design contracts: the accent list says "exhaustive, FIXED" and names the wall text colour for the reduced-motion highlight, and the location contract's Show on shelf reuses `2px solid var(--room-text)`. An older contract for the open box says it wears "the same ring" as the keyboard focus ring plus a halo, which does not match what shipped. So it needs your yes. The exact change:
+- **D1, the "found" box is marked in the wall's text colour, so on Walnut the mark disappears. Changed after your yes, commit `b1b0c29` (see "Owner's answer").** When you press Show on shelf, the box is outlined for a couple of seconds. The same outline is used for an open box when animations are reduced. Both are drawn in the wall's text colour, but the box stands on the cabinet back, not on the wall. Walnut has a light wall (dark text colour) and a dark cabinet back, so the outline is dark on dark and the jump lands on a box with no visible mark. Evidence: `M7-show-on-shelf-outline-found-walnut-lit-1440-en.png` (the problem, with the card frame `M7-show-on-shelf-outline-card-walnut-lit-1440-en.png` before it) against `M7-show-on-shelf-found-brown-day-1440-en.png` (Brown, where it reads). I did not change it because this colour is fixed in the earlier design contracts: the accent list says "exhaustive, FIXED" and names the wall text colour for the reduced-motion highlight, and the location contract's Show on shelf reuses `2px solid var(--room-text)`. An older contract for the open box says it wears "the same ring" as the keyboard focus ring plus a halo, which does not match what shipped. So it needs your yes. The exact change:
 
   `.placement[data-open], .placement[data-found] { outline: 3px solid var(--wood-light); outline-offset: 2px; }`
 
@@ -212,3 +212,37 @@ Answer by label only; "all recommended" is a valid answer. Each line is the labe
 16. **N17**, the no-script Undo reports only the first copy: leave it and note it for a later change.
 
 R-4 is decided and fixed (two rows, 112 px), so nothing to answer. The Dutch texts in T1 are still a draft for you to approve; say so if any line should change.
+
+## Owner's answer
+
+The owner's answer, verbatim: "all recommended"
+
+What that means, label by label (the recommended answers in "Your questions" above), and what was done:
+
+| Label | Answer | What it meant | State |
+|---|---|---|---|
+| D1 | yes | CHANGE. The found and the open box wear the furniture ring: `outline: 3px solid var(--wood-light); outline-offset: 2px;` in `Cabinet.Service/wwwroot/css/cabinet.css`, keeping the ink halo (`0 0 0 6px var(--ring-halo)`). The rule's doc comment now says the colour reads against the furniture like the focus ring, 3px so it stays distinct from the 2px focus ring. The owner's yes overrides the earlier FIXED tag (the wall's text colour for this mark). The box-ring contrast test also measures this mark on all five woods, by day and in the evening. | done, commit `b1b0c29`; re-shot M7 found frames |
+| R-1 | 0.6 | keep as built | nothing changed |
+| R-2 | 0.20 | keep as built | nothing changed |
+| R-3 | solid with the shadow | keep as built | nothing changed |
+| R-5 | 400 to 600, fill only | keep as built | nothing changed |
+| R-6 | 160 ms and 120 boxes | keep as built | nothing changed |
+| R-7 | 24 px bold | keep as built | nothing changed |
+| R-8 | 2 seconds | keep as built | nothing changed |
+| K1 | A for now, B as a later improvement | keep the single column; side-by-side location cabinets sized to their games are a later change | nothing changed; todo `2026-10-17-side-by-side-location-cabinets-sized-to-their-games.md` (commit `3c4d577`) |
+| K2 | B | CHANGE. The view switch fades through the wall with the same total time: the old view fades out in the first half of the look fade (`::view-transition-old(cabinet-area)`, half the duration) and the new one fades in during the second half (`::view-transition-new(cabinet-area)`, delayed by half and half the duration), in `card.css`; the group's fill mode keeps the old view gone; reduced motion still swaps at once. The pins in `build/tests/card-css.test.mjs` are updated. | done, commit `3cddf51`; re-shot M8 middle frames |
+| K3 | A, 0.6 everywhere | keep as built | nothing changed |
+| K4 (and N5) | change | CHANGE. The 8+ chip's spoken name is "8+ players" (English) and "8+ spelers" (Dutch), in `copy.js`, `SiteText.cs` and the shared fixture `build/tests/fixtures/filter-copy-cases.json`; the other chips' phrases are unchanged; the browser test that reads the chip's name expects the new phrase. | done, commit `1ee9d7f`; no frame shows the chip's name, so none re-shot |
+| K5 | A | keep as built | nothing changed |
+| K6 (and N11) | leave it | keep as built | nothing changed |
+| N10 | keep as built | Show on shelf stays in By location | nothing changed |
+| N17 | leave it and note it | the no-script Undo keeps reporting the first copy only; noted for a later change | nothing changed; todo `2026-10-17-no-script-undo-should-carry-the-copy-id.md` (commit `3c4d577`) |
+| T1 | not asked to change | the Dutch texts are approved as drafted (apart from the K4 phrase above) | approved |
+
+In the table of T1 above, the "Player chip, spoken, eight" row reads "8 or more players" / "8 of meer spelers" as it was at review time; it is now "8+ players" / "8+ spelers".
+
+Re-shot after the changes, under the same names and the same wide-font configuration (every one looked at before it was recorded as viewed in `ui-refs/build-round/frames.tsv`):
+
+- **M7, all 14 frames** (`M7-show-on-shelf-…`, `M7-show-on-shelf-outline-…`, `M7-low-in-tall-cabinet-…`). The found boxes now show the light 3px ring with the ink halo on every wall; on Walnut (`M7-show-on-shelf-outline-found-walnut-lit-1440-en.png`) the box that was unmarked is now clearly marked. The card frames came out byte for byte the same.
+- **M8, all 8 frames.** The middle frames now show the old view fading out alone into the wall, not two layouts on top of each other: the browser's animation clock is slowed 12 times and the frame is taken in the fade-out half (about 800 ms of real time after the click, which is roughly the first half of the fade). The settled frames came out the same. On the phone frame (`M8-cross-fade-mid-brown-day-390-en.png`) the fading cabinet picture is drawn over the open Filters sheet, because the browser paints a view transition above everything on the page; this was so before too, and only lasts the quarter second.
+- No frame shows the 8+ chip's spoken name, so none was re-shot for K4.
