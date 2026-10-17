@@ -676,6 +676,48 @@
 }
 
 /**
+ * The magnifier that stands in for the hint of the search field. It is drawn in the muted wall colour at the start of the field and
+ * is only shown by the rule below.
+ */
+.filter-glass {
+  position: absolute;
+  inset-inline-start: 12px;
+  top: 50%;
+  display: none;
+  inline-size: 16px;
+  block-size: 16px;
+  transform: translateY(-50%);
+  color: var(--room-muted, var(--chrome-muted));
+  pointer-events: none;
+}
+
+/**
+ * On a phone, while a filter is in use, the status group takes room from the search field and the hint would be cut in the middle
+ * of a word. In that one state, and only while the field is too narrow to show the whole hint, the hint steps aside and a magnifier
+ * at the start of the field says what the field is; the label stays, so assistive technology still hears "Search games". The field
+ * keeps the room for the glyph whether or not it holds text, so typing never moves the text.
+ */
+.filter-search {
+  container-type: inline-size;
+}
+
+@media (width < 64rem) {
+  @container (width < 9.75rem) {
+    .filter-bar[data-active] #filter-q {
+      padding-inline: 36px 12px;
+    }
+
+    .filter-bar[data-active] #filter-q::placeholder {
+      color: transparent;
+    }
+
+    .filter-bar[data-active] .filter-glass {
+      display: block;
+    }
+  }
+}
+
+/**
  * The Filters sheet. Its dialog is a transparent frame the size of the screen, like the card's, with a clear backdrop so the
  * dimmed cabinet stays visible above the sheet; the sheet is wall-coloured, anchored to the bottom, as tall as its content up to
  * seven tenths of the screen, and scrolls inside beyond that with its grip strip kept at the top.

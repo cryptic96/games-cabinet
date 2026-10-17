@@ -45,6 +45,26 @@ public sealed partial class FilterSlimBarTests : CabinetPageTest
         }
         """;
 
+    private const string ReadHint = """
+        () => {
+          const field = document.querySelector('#filter-q');
+          const style = getComputedStyle(field);
+          const probe = document.createElement('span');
+          probe.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font:' + style.font;
+          probe.textContent = field.placeholder;
+          document.body.append(probe);
+          const hint = probe.getBoundingClientRect().width;
+          probe.remove();
+          const colour = getComputedStyle(field, '::placeholder').color;
+          return {
+            hint,
+            room: field.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+            hintDrawn: colour !== 'rgba(0, 0, 0, 0)',
+            glyph: getComputedStyle(document.querySelector('.filter-glass')).display,
+          };
+        }
+        """;
+
     private const string ReadAway = """
         () => {
           const bar = document.querySelector('.filter-bar');
@@ -142,6 +162,41 @@ public sealed partial class FilterSlimBarTests : CabinetPageTest
             await Page.Locator(IconClear).ClickAsync();
             await Expect(Page.Locator(Bar)).Not.ToHaveAttributeAsync("data-active", string.Empty);
             (await ReadBarAsync()).Bar.Height.Should().BeApproximately(SlimHeight, 0.5, $"{language} with no filter");
+        }
+
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task The_search_hint_is_never_cut_in_the_middle_of_a_word_while_a_filter_is_in_use()
+    {
+        await OpenAsync(390, 844);
+
+        foreach (var language in new[] { "en", "nl" })
+        {
+            await ChooseLanguageAsync(language);
+            await Page.Locator(".filter-bar .filter-open").ClickAsync();
+            await Page.Locator("dialog.filter-dialog[open] fieldset[data-filter=\"players\"] input[value=\"4\"]").ClickAsync();
+            await Page.Locator("dialog.filter-dialog[open] .filter-done").ClickAsync();
+            await Expect(Page.Locator(Bar)).ToHaveAttributeAsync("data-active", string.Empty);
+
+            foreach (var width in new[] { 320, 360, 390, 414, 430 })
+            {
+                await Page.SetViewportSizeAsync(width, 844);
+                await Page.WaitForTimeoutAsync(200);
+
+                var reading = await Page.EvaluateAsync<JsonElement>(ReadHint);
+                var fits = reading.GetProperty("hint").GetDouble() <= reading.GetProperty("room").GetDouble();
+                var glyph = reading.GetProperty("glyph").GetString() != "none";
+                var hintDrawn = reading.GetProperty("hintDrawn").GetBoolean();
+
+                (fits ? hintDrawn && !glyph : !hintDrawn && glyph).Should().BeTrue(
+                    $"{language} at {width} px: the hint is drawn whole, or replaced by the magnifier, never clipped ({reading})");
+            }
+
+            await Page.SetViewportSizeAsync(390, 844);
+            await Page.Locator(IconClear).ClickAsync();
+            await Expect(Page.Locator(Bar)).Not.ToHaveAttributeAsync("data-active", string.Empty);
         }
 
         ConsoleErrors.Should().BeEmpty();

@@ -111,6 +111,7 @@
         <label class="visually-hidden" for="filter-q">@Model.Language.Text.SearchLabel</label>
         <span class="filter-search">
             <input id="filter-q" type="search" name="q" placeholder="@Model.Language.Text.SearchLabel" enterkeyhint="search" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" dir="auto" aria-keyshortcuts="/" />
+            <svg class="filter-glass" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="@iconsUrl#i-search"></use></svg>
             <kbd class="filter-hint" aria-hidden="true">/</kbd>
         </span>
         <button type="button" class="filter-open" aria-haspopup="dialog"><span class="filter-open-text">@Model.Language.Text.FiltersButton</span><span class="visually-hidden filter-open-suffix"></span></button>
