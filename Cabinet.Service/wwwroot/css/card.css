@@ -707,8 +707,10 @@ html[data-look-switch]::view-transition-group(root) {
 }
 
 /**
- * Switching between all together and by location cross-fades the cabinet area alone. The script only sets the attribute; the cabinet
- * takes the name here, the rest of the page (the pinned bar, the header) stays put because the root group does not animate.
+ * Switching between all together and by location fades the cabinet area through the wall: the old view fades out in the first half of
+ * the look fade and the new one fades in during the second half, so two different layouts are never drawn on top of each other. The
+ * script only sets the attribute; the cabinet takes the name here, the rest of the page (the pinned bar, the header) stays put
+ * because the root group does not animate. The group's fill mode keeps the old view gone and the new one hidden until its turn.
  */
 html[data-switching-view] #cabinet {
   view-transition-name: cabinet-area;
@@ -720,6 +722,15 @@ html[data-switching-view]::view-transition-group(root) {
 
 html[data-switching-view]::view-transition-group(cabinet-area) {
   animation-duration: var(--look-fade);
+}
+
+html[data-switching-view]::view-transition-old(cabinet-area) {
+  animation-duration: calc(var(--look-fade) / 2);
+}
+
+html[data-switching-view]::view-transition-new(cabinet-area) {
+  animation-delay: calc(var(--look-fade) / 2);
+  animation-duration: calc(var(--look-fade) / 2);
 }
 
 ::view-transition-group(pull) {

@@ -135,6 +135,12 @@ test('switching the view names the cabinet area, keeps the root still and fades 
   assert.ok(declares('html[data-switching-view]::view-transition-group(cabinet-area)', 'animation-duration: var(--look-fade)'));
 });
 
+test('switching the view fades through the wall: the old view out in the first half, the new one in during the second', () => {
+  assert.ok(declares('html[data-switching-view]::view-transition-old(cabinet-area)', 'animation-duration: calc(var(--look-fade) / 2)'));
+  assert.ok(declares('html[data-switching-view]::view-transition-new(cabinet-area)', 'animation-delay: calc(var(--look-fade) / 2)'));
+  assert.ok(declares('html[data-switching-view]::view-transition-new(cabinet-area)', 'animation-duration: calc(var(--look-fade) / 2)'));
+});
+
 test('the cabinet area takes its view-transition name only while a switch is under way', () => {
   const names = rules().filter((rule) => /view-transition-name:\s*cabinet-area/.test(rule.body));
 
