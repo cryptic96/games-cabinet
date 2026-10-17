@@ -114,7 +114,7 @@ public sealed class FilterShowOnShelfTests : CabinetPageTest
         landing.Fits.Should().BeTrue("a box in the first rows of a cabinet fits with its heading");
         landing.HeadingTop!.Value.Should().BeApproximately(landing.PinnedBarBottom + 16, 1.5, "the heading is aligned under the bar");
         landing.OutlineStyle.Should().Be("solid");
-        landing.OutlineWidth.Should().Be("2px");
+        landing.OutlineWidth.Should().Be("3px", "the furniture ring is 3px so it stays distinct from the 2px focus ring");
         landing.OutlineOffset.Should().Be("2px");
         landing.ZIndex.Should().Be("4");
         await Page.WaitForFunctionAsync("() => window.__found.shown.length > 0 && window.__found.shown[0].veil !== null");
@@ -250,7 +250,7 @@ public sealed class FilterShowOnShelfTests : CabinetPageTest
         await Expect(Page.Locator(Found)).ToHaveAttributeAsync("data-entry-id", pick.Id);
         var landing = (await ReadShownAsync()).Single();
         landing.OutlineStyle.Should().Be("solid", "the outline is static with or without reduced motion");
-        landing.OutlineWidth.Should().Be("2px");
+        landing.OutlineWidth.Should().Be("3px", "the furniture ring is 3px so it stays distinct from the 2px focus ring");
 
         for (var step = 0; step < 6; step++)
         {
