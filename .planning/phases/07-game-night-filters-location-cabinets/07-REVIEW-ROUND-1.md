@@ -1,8 +1,8 @@
 # Review round 1: the game-night filters and the location cabinets, built
 
-Status: DRAFT. Written by the build round before the senior-frontend Critic pass. The Critic findings (K items), the fixes and the final list of questions are added after that pass.
+Status: FINAL. The build round wrote the draft, a senior-frontend Critic pass followed, the small defects it found were fixed, and the Critic's findings and your questions are at the end ("Critic findings" and "Your questions").
 
-Reviewed commit: `f235f7a` on the milestone branch (the tree was clean when the suites ran and the frames were shot).
+Reviewed commit: `f235f7a` on the milestone branch (the tree was clean when the suites ran and the frames were shot). The fixes came after it; the last one is `fb82b40`, and the review document itself is committed on top of that. The 18 frames re-shot after the fixes (the phone bar and the owner pages) show a later build hash in their footer than the rest, which carry `f235f7a`.
 
 Everything in the pictures is invented: the 65 and 400 sample collections, plus a local synthetic set (fake BGG collection of 65 games synced into a local host, with the invented places Cabinet A, Shelf B and Lent out, a game owned twice, an expansion stored apart, one game in Lent out and 14 games left unplaced). `ui-refs/build-round/frames.tsv` lists every picture with the address it was shot at (always 127.0.0.1) and its source.
 
@@ -13,7 +13,7 @@ Everything in the pictures is invented: the 65 and 400 sample collections, plus 
 - P1 is the phone speed check. T1 is the side-by-side table of every new English and Dutch text.
 - C items are things the contrast and structure checks forced during the build.
 - N items are notes from the build: behaviour you will see that was decided on the way, and the few choices that are yours.
-- K items (Critic taste calls) will follow.
+- D items are defects the Critic found; K items are the Critic's taste calls. Both are in "Critic findings" near the end. "Your questions" at the very end lists everything that is yours to answer, by label.
 
 ## Automated results
 
@@ -50,13 +50,12 @@ All shot with the wide-font configuration CI uses. "Day" is lights off, "lit" is
 - **M11, focus states.** Crops on brown (dark wall) and birch (light wall) by day: in the full bar the search field, a chip inside a segmented group (lifted), a view segment, the location select and the text Clear; in the slim bar the Filters button and the icon Clear; in the open sheet its Clear and primary button; and a focused dimmed box. 20 crops, `M11-focus-…`.
 - **M12, forced colours and reduced motion.** `M12-filtered-forced-…` at 1440 and 390 (selected chip, a dimmed box and a lit box in view). `M12-reduced-after-players-change-…` and `M12-reduced-after-sheet-opens-…`: each taken right after the action, already showing the end state (the shadow at full strength, the sheet fully up).
 
-Counts: M1 42, M2 12, M3 17, M4 4, M5 14, M6 18, M7 14, M8 8, M9 6, M10 4, M11 20, M12 4: 163 frames.
+Counts: M1 42, M2 13, M3 17, M4 4, M5 14, M6 18, M7 14, M8 8, M9 6, M10 4, M11 20, M12 4: 164 frames. The 13th M2 frame is the close crop of the family, `M2-players4-time60-family-brown-day-1440-en-crop.png`.
 
 ### What I noticed while shooting (my own look, before the Critic's)
 
-- On the phone, with a filter active, the search field gets narrow and its hint is cut mid-word ("Search gar", "Zoek eer") in the sheet frames and the owner phone frame. It still works; it is the first thing to judge in M5 and M9.
 - In the 0.5 / 0.6 / 0.7 frames the labels on dimmed boxes read clearly at 0.5, are still legible at 0.6 and are close to lost on the darkest spines at 0.7. The recommended 0.6 looked right to me, but that is the Critic's call and then yours (R-1).
-- The family frame in M2 is a whole page, so the lit family is small in it; say so if you want a close crop instead.
+- The family frame in M2 is a whole page, so the lit family is small in it; the close crop (`M2-...-crop`) shows it up close.
 - "Show on shelf" works through the By location view, so after using it the page stays in that view (see N10).
 
 ## R items: tuning values you may change
@@ -146,7 +145,7 @@ Marked "decided as described" when it is how the build works and nothing is aske
 - **N2, keyboard order in the cabinet.** The arrow keys walk top to bottom first, then left to right, so a taller spine on the right can come before a shorter one on its left. Decided as described.
 - **N3, a game you buy again.** When a game you owned comes back, a new copy takes over the absent copy's place and picture only if it has no choice of its own and the 30 days have not run out; a game with a choice that holds for all copies never hands anything over. Decided as described.
 - **N4, how a family is judged by players and time.** The players range of a family is the smallest to the largest known value over the base game and the expansions you own; time is the base game's own playing time (an expansion never shortens it); a game with an unknown value stays in shadow when you filter on that value. Decided as described (M2 shows it).
-- **N5, the "8+" chip.** The chip shows "8+" but is spoken as "8 or more players", so the visible text is not literally inside the spoken name. Your call; recommended: keep it, because the spoken form is clearer for screen readers and voice control can still say the number.
+- **N5, the "8+" chip.** The chip shows "8+" but is spoken as "8 or more players", so the visible text is not literally inside the spoken name. Your call. My draft recommended keeping it, but the Critic disagrees, see K4: the Critic recommends "8+ players" as the spoken name so the visible text is inside it.
 - **N6, the shadow fade skips for big changes.** A pass that changes more than 120 boxes at once (for example clearing the filter on the 400 sample) shows at once instead of fading. Decided as described, same value as R-6.
 - **N7, naming the copies on the owner pages.** A copy is tagged with its edition name only when that name is unique among the game's copies; copies with the same edition keep "Copy 1 of 2", "Copy 2 of 2". An expansion whose base game copies stand in different places gets the hint "Follows the first copy of …" on the Locations page. Decided as described (M10).
 - **N8, location cabinets.** In the owner's order, "Unknown location" last, places with no games left out; in a small place an expansion stored apart is drawn face out. Decided as described (M6).
@@ -162,3 +161,54 @@ Marked "decided as described" when it is how the build works and nothing is aske
 - **N18, the end-of-phase gates.** The step-by-step "does the tracer work" checks of the earlier plans were held back for this round: this review is that check.
 
 Test notes: a few intermittent host problems showed up during the phase and none repeated on a re-run (a browser setup error once, "Internal CLR error" in builds, a solo test run that reported zero tests, one unidentified browser failure under load). The Show on shelf landing check once failed 2 of 3 runs by 188 px before a settle-and-measure loop was added; watch it in CI. The new filter browser job in CI (the `Filter` classes) is first exercised by the release pull request.
+
+## Critic findings
+
+A second look, by the senior-frontend Critic, at all 163 frames (the 164th, the close crop, was added after) and at this document, before you saw anything. The Critic found four defects (D1 to D4) and six taste calls (K1 to K6). The full text is in `07-BUILD-CRITIC.md`. The things it found that work well are the bar reading as wall chrome, the shadow behaving as the light cues ask, the location headings reading as signs on the wall, the focus rings, and the phone sheet.
+
+### Defects
+
+- **D1, the "found" box is marked in the wall's text colour, so on Walnut the mark disappears. Awaiting your yes; not changed.** When you press Show on shelf, the box is outlined for a couple of seconds. The same outline is used for an open box when animations are reduced. Both are drawn in the wall's text colour, but the box stands on the cabinet back, not on the wall. Walnut has a light wall (dark text colour) and a dark cabinet back, so the outline is dark on dark and the jump lands on a box with no visible mark. Evidence: `M7-show-on-shelf-outline-found-walnut-lit-1440-en.png` (the problem, with the card frame `M7-show-on-shelf-outline-card-walnut-lit-1440-en.png` before it) against `M7-show-on-shelf-found-brown-day-1440-en.png` (Brown, where it reads). I did not change it because this colour is fixed in the earlier design contracts: the accent list says "exhaustive, FIXED" and names the wall text colour for the reduced-motion highlight, and the location contract's Show on shelf reuses `2px solid var(--room-text)`. An older contract for the open box says it wears "the same ring" as the keyboard focus ring plus a halo, which does not match what shipped. So it needs your yes. The exact change:
+
+  `.placement[data-open], .placement[data-found] { outline: 3px solid var(--wood-light); outline-offset: 2px; }`
+
+  with the ink halo the keyboard focus ring already has (`0 0 0 6px var(--ring-halo)`). The 3 px keeps it distinct from the 2 px focus ring. I would also extend the existing box-ring contrast test to cover both marks on all five woods, by day and in the evening, so it cannot slip back. Recommended: yes.
+- **D2, the phone search hint was cut mid-word while a filter is on. Fixed, commits `ed5239a` and `8d5435b`.** At 390 px with a filter on, the search field is about 115 px wide and the hint read "Search gar" and "Zoek eer". Now, only in that narrow, filtering state, the hint steps aside and a small magnifier (a self-hosted icon) marks the field instead; the field's label is unchanged, so it is still announced as search. The hint is hidden by opacity so forced-colours mode cannot bring it back. A new browser test checks 320 to 430 px in both languages that the hint is either drawn whole or replaced, never clipped, and also in forced colours. Re-shot: `M5-slim-filtering-brown-day-390-en.png` and `-nl`, the sheet frames and the owner phone frames.
+- **D3, the "Same as Example Game 1" chip on an expansion row wrapped inside its border at 390 px. Fixed, commit `3152cbc`.** The chip now stays on one line and ends in an ellipsis in a narrow column (the full text is in the row's picker). Owner pages; re-shot in `M10-locations-twice-owned-paper-day-390-en.png`.
+- **D4, on the Pictures page "Copy 2 of 2" sat higher than the title on a row that also has the "Looks right" button. Fixed, commit `3152cbc`.** Title, year and copy label now share one baseline whatever the button does. Re-shot in `M10-pictures-twice-owned-paper-day-1440-en.png` (and 390).
+
+D3 and D4 are in the owner stylesheet and D2 touched the page markup and the icon sheet, all outside the plan's original file list; this was approved when the round was run.
+
+### Taste calls
+
+- **K1, location cabinets on a wide screen.** Today each place is one cabinet, stacked in a single centred column, each at the design's full width. At 1440 px the 65 sample becomes a 5,071 px page with seven small cabinets, more than half of every row bare wall, and a place with one game shows nine empty cubbies (`M6-by-location-brown-day-1440-en.png`). Option A (built): keep it; it is calm and every place reads as its own piece. Option B: from about 1,280 px let places that fit stand side by side, and size a small place's cabinet to its games. B halves the scrolling and reads more like a room, but it is a layout change (server layouts per place and the page flow), so it belongs in a later change. The Critic recommends A for this release and B as the next layout improvement.
+- **K2, the cross-fade between the views.** The middle of the fade shows two different layouts on top of each other, the big cabinet and the small Cabinet A (`M8-cross-fade-mid-brown-day-1440-en.png`). It lasts about a quarter of a second but can read as a glitch. Option A (built): cross-fade. Option B: fade through the wall: the old view fades out in the first half and the new one in during the second half, same total time, no overlap. The Critic recommends B.
+- **K3, the shadow on Birch.** On the light Birch back a dimmed box goes almost black (1.81 against the back, `M3-veil-06-s65-birch-day-1440-en.png`), more a dark stain than a shadow; on the dark woods 0.6 looks natural. Option A (built): 0.6 on every wood. Option B: 0.5 on Birch only, keeping the label floor. The Critic recommends A unless you find Birch heavy in daily use; it is a one-value change later. This goes with R-1.
+- **K4, the "8+" chip's spoken name (the same question as N5).** The chip shows "8+" but is spoken "8 or more players". People who control the page by voice say what they see ("click 8 plus"), and the accessibility rule on labels asks that the visible text be part of the spoken name. The Critic recommends making the spoken phrase "8+ players" (read "8 plus players"), against my draft's advice to keep it; the other chips already pass ("5" inside "5 players"). The Dutch would become "8+ spelers". I agree with the Critic and N5 now points here.
+- **K5, the count differs between the two views.** The same filter shows "11 of 52 games" all together and "18 of 61 games" by location, because an expansion stored apart from its base game counts on its own in a location cabinet. It follows the contract (the count equals what is drawn), but a visitor switching views sees the total jump. Option A (built): count what each view draws. Option B: say so in the heading's hint, or count families in both views. The Critic recommends A and a line in the help text if people ask.
+- **K6, the doubled page offset when a box is brought into view (the same question as N11).** The Critic agrees with my draft: leave it unless it looks too low in daily use; dropping one of the two settings is a one-line change.
+
+Other Critic notes: the family frame needed a close crop (done, M2); the slow first keystroke (P1) is the first filter pass plus the one-time names load, and a cheap later cure is to build the filter model when the browser is idle after the first draw; leave it unless the device round shows a stall.
+
+## Your questions
+
+Answer by label only; "all recommended" is a valid answer. Each line is the label, what it asks, and my recommended answer.
+
+1. **D1**, outline the found and open box in the furniture ring colour so it shows on Walnut: yes.
+2. **R-1**, shadow strength: 0.6 (keep).
+3. **R-2**, peek when you point at a dimmed box: 0.20 (keep).
+4. **R-3**, the stuck bar's fill on the light walls: solid with the shadow (keep).
+5. **R-5**, text weight on a chosen chip: 400 to 600, fill only (keep).
+6. **R-6**, fade speed and the many-at-once guard: 160 ms and 120 boxes (keep; you can only feel this by typing in the search field).
+7. **R-7**, location heading size: 24 px bold (keep).
+8. **R-8**, how long the found box stays outlined: 2 seconds (keep).
+9. **K1**, location cabinets on a wide screen: A for now, B as a later improvement.
+10. **K2**, view cross-fade: B, fade through the wall.
+11. **K3**, shadow on Birch: A, 0.6 everywhere (revisit after daily use).
+12. **K4** (and **N5**), the "8+" chip's spoken name: change to "8+ players" and "8+ spelers".
+13. **K5**, differing counts between the views: A, count what each view draws.
+14. **K6** (and **N11**), the doubled page offset: leave it.
+15. **N10**, Show on shelf switches to By location and stays there: keep as built.
+16. **N17**, the no-script Undo reports only the first copy: leave it and note it for a later change.
+
+R-4 is decided and fixed (two rows, 112 px), so nothing to answer. The Dutch texts in T1 are still a draft for you to approve; say so if any line should change.
