@@ -545,7 +545,7 @@ Plans:
   4. Every game's storage location is visible to every visitor, whether it was read from BGG or entered by the owner.
   5. A visitor can toggle between one big cabinet and one cabinet per storage location, with games that have no location placed in an "Unknown location" cabinet.
 
-**Plans:** 32/34 plans executed
+**Plans:** 33/34 plans executed
 
 Plans:
 **Wave 1**
@@ -627,7 +627,7 @@ Plans:
 
 **Wave 16** *(blocked on Wave 15 completion)*
 
-- [ ] 07-33-PLAN.md — Release v0.9.0, part two: the owner publishes the verified draft, and the container runs it (owner-gated)
+- [x] 07-33-PLAN.md — Release v0.9.0, part two: the owner publishes the verified draft, and the container runs it (owner-gated)
 
 **Wave 17** *(blocked on Wave 16 completion)*
 
@@ -666,5 +666,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. Game Detail, Accessibility & Language | 16/16 | Complete    | 2026-10-12 |
 | 6. Owner Tools & Persistence | 30/30 | Complete    | 2026-10-13 |
 | 6.1. Selectable Cabinet Finishes & Lighting (INSERTED) | 21/21 | Complete    | 2026-10-15 |
-| 7. Game-Night Filters & Location Cabinets | 32/34 | In Progress|  |
+| 7. Game-Night Filters & Location Cabinets | 33/34 | In Progress|  |
 | 8. Public Hardening & Go-Public | 0/0 | Not started | - |
