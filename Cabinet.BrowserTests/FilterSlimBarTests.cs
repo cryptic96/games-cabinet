@@ -396,7 +396,7 @@ public sealed partial class FilterSlimBarTests : CabinetPageTest
         var glyph = reading.GetProperty("glyph").GetString() != "none";
         var hintDrawn = reading.GetProperty("hintDrawn").GetBoolean();
 
-        (fits ? hintDrawn && !glyph : !hintDrawn && glyph).Should().BeTrue(
+        (hintDrawn ? fits && !glyph : glyph).Should().BeTrue(
             $"{context}: the hint is drawn whole, or replaced by the magnifier, never clipped ({reading})");
     }
 
