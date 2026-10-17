@@ -815,6 +815,17 @@ header > .header-aside {
   border-color: var(--paper-label);
 }
 
+/**
+ * The chip that names the game an expansion follows can be as long as that game's title, so it stays on one line inside its border
+ * and ends in an ellipsis when the column is narrower than the name; the picker below it holds the same name in full.
+ */
+.game-follow {
+  max-inline-size: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .game-picker {
   display: flex;
   grid-area: form;
@@ -1188,6 +1199,14 @@ header > .header-aside {
   font-weight: 600;
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+
+/**
+ * The copy label of a game owned more than once shares the baseline of the title and the year, whether or not the row also carries
+ * the button that confirms the picture. The tag's own top alignment would pin it to the top of a row made taller by that button.
+ */
+.pic-head .pic-tag {
+  align-self: baseline;
 }
 
 .pic-year {
