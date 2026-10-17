@@ -125,6 +125,41 @@ public partial class LookChromeContrastTests
         }
     }
 
+    /// <summary>
+    /// The mark of a box that is open or has just been found with Show on shelf is the furniture ring, so it has to read against the
+    /// frame, the shelf and both backs of every wood, by day and in the evening. The ring colour is the one the shipped rule draws.
+    /// </summary>
+    /// <param name="wood">The wood whose furniture the box stands on.</param>
+    /// <param name="hour">The light state of the page, which never changes a furniture token.</param>
+    [Theory]
+    [MemberData(nameof(WoodsByHour))]
+    public void The_mark_of_an_open_or_found_box_is_the_furniture_ring_and_shows_on_every_wood_surface_by_day_and_in_the_evening(string wood, string hour)
+    {
+        var rule = MarkRule().Match(File.ReadAllText(Path.Combine(RepositoryPaths.ServiceDirectory(), "wwwroot", "css", "cabinet.css")));
+
+        rule.Success.Should().BeTrue("the open and found box share one outline rule that draws the furniture ring in 3px");
+
+        var tokens = Sheets.Value.ForWood(wood);
+        var mark = StyleSheetTokens.Colour(tokens, "--wood-light");
+        var halo = HaloOrNull(tokens);
+        var surfaces = new Dictionary<string, RgbColour>
+        {
+            ["frame and shelf"] = StyleSheetTokens.Colour(tokens, "--wood"),
+            ["plain back"] = StyleSheetTokens.Colour(tokens, "--back"),
+            ["painted back"] = StyleSheetTokens.Colour(tokens, "--back-painted"),
+        };
+
+        foreach (var (name, surface) in surfaces)
+        {
+            var throughAccent = SpineColour.ContrastRatio(mark, surface) >= GraphicContrast;
+            var throughHalo = halo is { } ink
+                && SpineColour.ContrastRatio(ink, surface) >= GraphicContrast
+                && SpineColour.ContrastRatio(mark, ink) >= GraphicContrast;
+
+            (throughAccent || throughHalo).Should().BeTrue($"the mark of an open or found box on {wood}'s {name} by {hour} reaches {GraphicContrast}:1 through the accent or the ink halo");
+        }
+    }
+
     [Theory]
     [MemberData(nameof(Woods))]
     public void Every_back_sits_in_a_safe_luminance_zone(string wood)
@@ -220,6 +255,9 @@ public partial class LookChromeContrastTests
 
         return StyleSheetTokens.Over(StyleSheetTokens.Colour(tokens, "--room-text"), wall, share);
     }
+
+    [GeneratedRegex(@"\.placement\[data-open\],\s*\.placement\[data-found\]\s*\{[^}]*outline:\s*3px solid var\(--wood-light\);")]
+    private static partial Regex MarkRule();
 
     [GeneratedRegex(@"^color-mix\(in srgb, #[0-9a-fA-F]{6} (?<share>[0-9.]+)%, transparent\)$")]
     private static partial Regex WashPattern();
