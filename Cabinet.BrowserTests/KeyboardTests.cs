@@ -12,7 +12,8 @@ namespace Cabinet.BrowserTests;
 public sealed class KeyboardTests : CabinetPageTest
 {
     private const string Boxes = "#cabinet .placement";
-    private const string LastLinkBeforeCabinet = ".sample-switcher a >> nth=-1";
+    private const string LastControlBeforeCabinet = "#filter-loc";
+    private const string LastLinkBeforeTheBar = ".sample-switcher a >> nth=-1";
     private const string FocusedBoxScript = "(() => { const e = document.activeElement; const r = e.getBoundingClientRect(); return { isBox: e.classList.contains('placement'), shelf: e.dataset.shelf ?? null, entryId: e.dataset.entryId ?? null, kind: e.dataset.kind ?? null, tabIndex: e.getAttribute('tabindex'), left: r.left, top: r.top, right: r.right, bottom: r.bottom }; })()";
     private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
 
@@ -55,7 +56,7 @@ public sealed class KeyboardTests : CabinetPageTest
     {
         await OpenAsync("/?sample=65", 1440, 900);
 
-        await Page.Locator(LastLinkBeforeCabinet).FocusAsync();
+        await Page.Locator(LastControlBeforeCabinet).FocusAsync();
         await Page.Keyboard.PressAsync("Tab");
 
         await Expect(Page.Locator(Boxes).First).ToBeFocusedAsync();
@@ -125,7 +126,7 @@ public sealed class KeyboardTests : CabinetPageTest
     {
         await OpenAsync("/?sample=65", 1440, 900);
 
-        await Page.Locator(LastLinkBeforeCabinet).FocusAsync();
+        await Page.Locator(LastControlBeforeCabinet).FocusAsync();
         await Page.Keyboard.PressAsync("Tab");
         await Page.Keyboard.PressAsync("ArrowRight");
         var box = await FocusedAsync();
@@ -242,14 +243,17 @@ public sealed class KeyboardTests : CabinetPageTest
         await OpenAsync("/?sample=65", 390, 800);
 
         await Page.Locator(Boxes).Nth(await IndexOfBoxWithBoxBelowAsync()).FocusAsync();
+        await Page.EvaluateAsync("() => document.activeElement.scrollIntoView({ block: 'start' })");
         var start = await FocusedAsync();
+        var startScroll = await Page.EvaluateAsync<double>("window.scrollY");
 
         await Page.Keyboard.PressAsync("ArrowDown");
         var next = await FocusedAsync();
+        var nextScroll = await Page.EvaluateAsync<double>("window.scrollY");
 
         next.IsBox.Should().BeTrue();
         next.Shelf.Should().NotBe(start.Shelf);
-        next.Top.Should().BeGreaterThanOrEqualTo(start.Bottom - 2);
+        (next.Top + nextScroll).Should().BeGreaterThanOrEqualTo(start.Bottom + startScroll - 2);
         ConsoleErrors.Should().BeEmpty();
     }
 
@@ -276,7 +280,7 @@ public sealed class KeyboardTests : CabinetPageTest
 
         await Expect(Page.Locator(Boxes)).ToHaveCountAsync(0);
 
-        await Page.Locator(LastLinkBeforeCabinet).FocusAsync();
+        await Page.Locator(LastLinkBeforeTheBar).FocusAsync();
         await Page.Keyboard.PressAsync("Tab");
 
         await Expect(Page.Locator(".bgg-credit")).ToBeFocusedAsync();

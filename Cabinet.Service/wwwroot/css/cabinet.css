@@ -27,6 +27,29 @@
   flex: 1 1 100%;
 }
 
+/**
+ * A location's cabinet is its own group on its own row: a heading above the same centred columns of sections as the one big
+ * cabinet. A group never shares a row with another group, so a small location stands centred on its own row. The sections take their
+ * width from the same basis, which is worked out against the group, as wide as the cabinet.
+ */
+.location-group {
+  flex: 0 0 100%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-end;
+  gap: var(--column-gap);
+  scroll-margin-top: calc(var(--filter-bar-h, 0px) + 16px);
+}
+
+.location-group > .location-heading {
+  flex: 0 0 100%;
+}
+
+.location-group + .location-group {
+  margin-block-start: 24px;
+}
+
 @media (min-width: 80rem) {
   .cabinet {
     --section-basis: min(40rem, calc((100% - var(--column-gap)) / 2));
@@ -176,6 +199,7 @@
   color: var(--fg, var(--box-fallback-fg));
   overflow: hidden;
   scroll-margin: 16px;
+  scroll-margin-top: calc(var(--filter-bar-h, 0px) + 16px);
   box-shadow:
     inset 1px 1px 0 rgb(255 255 255 / 0.2),
     0 1px 2px rgb(0 0 0 / 0.5),
@@ -595,16 +619,20 @@
 
 /**
  * The box of the card that is open, for a visitor who prefers less motion: it stays in its slot and is marked with a plain light
- * outline instead of flying out. The colour is the room's text colour, not the accent.
+ * outline instead of flying out. The box that Show on shelf has just scrolled to wears the same outline for a moment, with or
+ * without reduced motion, because it never moves. The colour reads against the furniture like the focus ring does, since the box
+ * stands on the cabinet back and not on the wall; it is 3px so it stays distinct from the 2px focus ring.
  */
-.placement[data-open] {
+.placement[data-open],
+.placement[data-found] {
   z-index: 4;
-  outline: 2px solid var(--room-text, var(--wall-text));
+  outline: 3px solid var(--wood-light);
   outline-offset: 2px;
 }
 
 .placement:focus-visible,
-.placement[data-open] {
+.placement[data-open],
+.placement[data-found] {
   box-shadow:
     inset 1px 1px 0 rgb(255 255 255 / 0.2),
     0 1px 2px rgb(0 0 0 / 0.5),
@@ -612,7 +640,8 @@
 }
 
 .placement[data-art="true"]:focus-visible,
-.placement[data-art="true"][data-open] {
+.placement[data-art="true"][data-open],
+.placement[data-art="true"][data-found] {
   box-shadow:
     0 1px 2px rgb(0 0 0 / 0.5),
     0 0 0 6px var(--ring-halo);

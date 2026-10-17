@@ -487,11 +487,11 @@ export function createFinder(input, rows, options = {}) {
     const query = input.value.trim();
     const folded = foldForSearch(query);
     const passes = new Map(all.map((row) => [row, foldForSearch(titleOf(row)).includes(folded) && accepts(row)]));
-    const parents = new Map(all.map((row) => [row.dataset.gameId, row]));
+    const parents = new Map(all.map((row) => [row.dataset.entryId, row]));
     const context = new Set();
 
     for (const row of all) {
-      const parent = row.dataset.nested === 'true' && row.dataset.baseId ? parents.get(row.dataset.baseId) : undefined;
+      const parent = row.dataset.nested === 'true' && row.dataset.baseEntryId ? parents.get(row.dataset.baseEntryId) : undefined;
 
       if (passes.get(row) && parent && !passes.get(parent)) {
         context.add(parent);
@@ -539,23 +539,23 @@ export function sortByCollator(container) {
   const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
   const current = Array.from(container.children);
   const position = new Map(current.map((row, index) => [row, index]));
-  const present = new Set(current.map((row) => row.dataset.gameId));
+  const present = new Set(current.map((row) => row.dataset.entryId));
   const byTitle = (first, second) =>
     collator.compare(titleOfRow(first), titleOfRow(second)) || position.get(first) - position.get(second);
-  const isChild = (row) => row.dataset.nested === 'true' && Boolean(row.dataset.baseId) && present.has(row.dataset.baseId);
+  const isChild = (row) => row.dataset.nested === 'true' && Boolean(row.dataset.baseEntryId) && present.has(row.dataset.baseEntryId);
   const children = new Map();
 
   for (const row of current.filter(isChild)) {
-    const siblings = children.get(row.dataset.baseId) ?? [];
+    const siblings = children.get(row.dataset.baseEntryId) ?? [];
 
     siblings.push(row);
-    children.set(row.dataset.baseId, siblings);
+    children.set(row.dataset.baseEntryId, siblings);
   }
 
   const ordered = [];
 
   for (const row of current.filter((candidate) => !isChild(candidate)).sort(byTitle)) {
-    ordered.push(row, ...(children.get(row.dataset.gameId) ?? []).sort(byTitle));
+    ordered.push(row, ...(children.get(row.dataset.entryId) ?? []).sort(byTitle));
   }
 
   if (ordered.some((row, index) => row !== current[index])) {

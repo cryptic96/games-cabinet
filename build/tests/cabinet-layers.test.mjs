@@ -309,14 +309,15 @@ test('no selector combines two of the five look choices, and none depends on the
   }
 });
 
-test('the stacking map holds: light at 1, boxes and furniture at 2, the shade at 3, focus at 4, the floor behind', () => {
+test('the stacking map holds: light at 1, boxes and furniture at 2, the veil inside a box at 1, the shade at 3, focus at 4, the floor behind', () => {
   const expected = new Map([
     ['.section > .section-light', '1'],
     ['.placement', '2'],
+    ['.placement-veil', '1'],
     ['.section > :is(.section-top, .section-trim, .section-base)', '2'],
     ['.cubby::after', '3'],
     ['.placement:focus-visible', '4'],
-    ['.placement[data-open]', '4'],
+    ['.placement[data-open],\n.placement[data-found]', '4'],
     ['.section > .section-floor', '-1'],
   ]);
   const found = new Map();
@@ -500,9 +501,9 @@ test('every design rule that writes the background of a cubby or its shelf board
   assert.ok(checked >= 3, `only ${checked} cubby and shelf board backgrounds were found`);
 });
 
-test('the modifiers layer sets no size, position, margin, padding or display outside the light layer', () => {
+test('the modifiers layer sets no size, position, margin, padding or display outside the light layer and the veil of a box', () => {
   const forbidden = ['width', 'height', 'inset', 'top', 'left', 'right', 'bottom', 'aspect-ratio', 'margin', 'padding', 'display'];
-  const light = /section-light|light-pool/;
+  const light = /section-light|light-pool|placement-veil/;
 
   for (const rule of allRules.modifiers) {
     if (light.test(rule.selector)) {
@@ -523,4 +524,69 @@ test('the depth and back rules are single-choice selectors on any ancestor, so c
   for (const selector of choices) {
     assert.equal(LOOK_ATTRIBUTES.filter((name) => new RegExp(`\\[data-${name}\\b`).test(selector)).length, 1, selector);
   }
+});
+
+test('the veil of a box in shadow is the box shade at 0.6 over an invisible node that fades in 160 ms and never takes a pointer event', () => {
+  assert.equal(modifierValue(':root', '--veil-alpha'), '0.6');
+  assert.equal(modifierValue(':root', '--veil-peek-alpha'), '0.2');
+  assert.equal(modifierValue(':root', '--veil-fade'), '160ms');
+  const fades = allRules.modifiers
+    .filter((rule) => rule.selector === ':root')
+    .flatMap((rule) => rule.declarations)
+    .filter(({ name }) => name === '--veil-fade')
+    .map(({ value }) => value);
+
+  assert.deepEqual(fades, ['160ms', '0ms']);
+  assert.equal(modifierValue('.placement-veil', 'background'), 'rgb(var(--box-shade-rgb) / var(--veil-alpha))');
+  assert.equal(modifierValue('.placement-veil', 'opacity'), '0');
+  assert.equal(modifierValue('.placement-veil', 'pointer-events'), 'none');
+  assert.equal(modifierValue('.placement-veil', 'position'), 'absolute');
+  assert.equal(modifierValue('.placement-veil', 'transition'), 'opacity var(--veil-fade) ease-out');
+  assert.equal(modifierValue('.placement[data-dim] > .placement-veil', 'opacity'), '1');
+  assert.equal(modifierValue('.placement[data-found] > .placement-veil', 'opacity'), '0');
+});
+
+test('a pass that changes many veils at once switches the fade off on the cabinet and nothing else', () => {
+  assert.equal(modifierValue('.cabinet[data-bulk]', '--veil-fade'), '0ms');
+  const bulk = allRules.modifiers.find((rule) => rule.selector === '.cabinet[data-bulk]');
+
+  assert.deepEqual(bulk.declarations.map(({ name }) => name), ['--veil-fade']);
+});
+
+test('a box in shadow stays a solid box: no filter, blur or opacity is put on the box itself outside forced colours', () => {
+  for (const [file, layer] of LAYER_FILES) {
+    for (const rule of allRules[layer]) {
+      const onBox = selectorsOf(rule.selector).some((selector) => /\[data-dim\]/.test(selector) && !/placement-veil/.test(selector));
+
+      if (!onBox) {
+        continue;
+      }
+
+      for (const { name } of rule.declarations) {
+        assert.ok(name === 'opacity' || !['filter', 'backdrop-filter'].includes(name), `${file}: ${rule.selector} sets ${name}`);
+      }
+    }
+  }
+
+  const inForcedColours = /@media \(forced-colors: active\) \{\s*\.placement\[data-dim\] \{\s*opacity: 0\.5;/.test(sheets.modifiers);
+
+  assert.equal(inForcedColours, true);
+  assert.equal(allRules.modifiers.filter((rule) => rule.selector === '.placement[data-dim]').length, 1);
+  assert.doesNotMatch(sheets.modifiers.replace(/@media \(forced-colors: active\) \{[^}]*\{[^}]*\}\s*\}/g, ''), /\.placement\[data-dim\]\s*\{/);
+  assert.doesNotMatch(sheets.modifiers, /aria-disabled/);
+});
+
+test('a location group is a full-width centred row of sections in the structure layer, with its heading on a row of its own', () => {
+  const group = allRules.structure.find((rule) => rule.selector === '.location-group');
+  const heading = allRules.structure.find((rule) => rule.selector === '.location-group > .location-heading');
+  const valueOf = (rule, property) => rule?.declarations.find(({ name }) => name === property)?.value;
+
+  assert.ok(group, 'the structure layer holds the location group');
+  assert.equal(valueOf(group, 'flex'), '0 0 100%');
+  assert.equal(valueOf(group, 'display'), 'flex');
+  assert.equal(valueOf(group, 'flex-wrap'), 'wrap');
+  assert.equal(valueOf(group, 'justify-content'), 'center');
+  assert.equal(valueOf(group, 'align-items'), 'flex-end');
+  assert.equal(valueOf(heading, 'flex'), '0 0 100%');
+  assert.equal(allRules.design.concat(allRules.wood, allRules.modifiers).some((rule) => /location-group/.test(rule.selector)), false);
 });

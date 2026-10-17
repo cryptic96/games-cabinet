@@ -15,6 +15,7 @@ public sealed class LinkPreviewTests
 {
     private const string LinkUrl = "https://cf.example.org/pictures/link-shot.jpg";
     private const int GameId = 7;
+    private const long CollectionId = 1;
     private static readonly DateTimeOffset Moment = new(2030, 1, 1, 0, 0, 0, TimeSpan.Zero);
     private static readonly ArtFeatures FlatFeatures = new(0.0, 1.0, 0.0, 0.0, 4);
     private static readonly ArtFeatures ThreeDFeatures = new(0.3, 0.70, 0.60, 0.50, 1);
@@ -24,7 +25,7 @@ public sealed class LinkPreviewTests
     {
         var snapshot = Snapshot(Item(dimensions: null));
 
-        var preview = LinkPreview.Build(snapshot, GameId, ArtRules.Default, Record(240, 320, FlatFeatures))!;
+        var preview = LinkPreview.Build(snapshot, GameId, CollectionId, ArtRules.Default, Record(240, 320, FlatFeatures))!;
 
         preview.ShapeSource.Should().Be(PreviewShapeSource.Picture);
         preview.Verdict.Should().Be(ArtVerdictKind.Flat);
@@ -36,7 +37,7 @@ public sealed class LinkPreviewTests
     {
         var snapshot = Snapshot(Item(new VersionDimensions(9.0, 12.0, 3.0)));
 
-        var preview = LinkPreview.Build(snapshot, GameId, ArtRules.Default, Record(240, 320, FlatFeatures))!;
+        var preview = LinkPreview.Build(snapshot, GameId, CollectionId, ArtRules.Default, Record(240, 320, FlatFeatures))!;
 
         preview.ShapeSource.Should().Be(PreviewShapeSource.Bgg);
         preview.BoxWidthMm.Should().Be(229);
@@ -51,7 +52,7 @@ public sealed class LinkPreviewTests
     {
         var snapshot = Snapshot(Item(withRealSize ? new VersionDimensions(9.0, 12.0, 3.0) : null));
 
-        var preview = LinkPreview.Build(snapshot, GameId, ArtRules.Default, Record(240, 160, ThreeDFeatures))!;
+        var preview = LinkPreview.Build(snapshot, GameId, CollectionId, ArtRules.Default, Record(240, 160, ThreeDFeatures))!;
 
         preview.Verdict.Should().Be(ArtVerdictKind.ThreeD);
         preview.ShapeSource.Should().Be(withRealSize ? PreviewShapeSource.Bgg : PreviewShapeSource.Estimate);
@@ -67,7 +68,7 @@ public sealed class LinkPreviewTests
             Games = [new OwnerGame(GameId, null, null, new PictureSetting(PictureChoice.Link, true, null, null, new PictureLink(LinkUrl, record, 0, null)))],
         });
 
-        var preview = LinkPreview.Build(snapshot, GameId, ArtRules.Default, record)!;
+        var preview = LinkPreview.Build(snapshot, GameId, CollectionId, ArtRules.Default, record)!;
         var drawn = SnapshotMapper.ToCabinetItems(snapshot, ArtRules.Default, used).Single();
 
         new BoxDimensions(preview.BoxWidthMm, preview.BoxHeightMm, preview.BoxDepthMm).Should().Be(drawn.Box);
@@ -80,7 +81,7 @@ public sealed class LinkPreviewTests
     {
         var snapshot = Snapshot(Item(new VersionDimensions(9.0, 12.0, 0.5), title: "A Very Long Invented Title For A Game About Gardens And Bridges"));
 
-        var preview = LinkPreview.Build(snapshot, GameId, ArtRules.Default, Record(240, 320, FlatFeatures))!;
+        var preview = LinkPreview.Build(snapshot, GameId, CollectionId, ArtRules.Default, Record(240, 320, FlatFeatures))!;
 
         preview.SpineHeightMm.Should().Be(preview.BoxHeightMm);
         preview.SpineWidthMm.Should().Be(SectionDesigns.Desktop.MinBoxThicknessMm);
@@ -97,7 +98,7 @@ public sealed class LinkPreviewTests
             Files = [new ArtFile(480, 640, "1111111111111111-480.webp"), new ArtFile(240, 320, "1111111111111111-240.webp")],
         };
 
-        var preview = LinkPreview.Build(snapshot, GameId, ArtRules.Default, record)!;
+        var preview = LinkPreview.Build(snapshot, GameId, CollectionId, ArtRules.Default, record)!;
 
         preview.ArtWidth.Should().Be(240);
         preview.ArtHeight.Should().Be(320);
@@ -109,7 +110,7 @@ public sealed class LinkPreviewTests
     {
         var snapshot = Snapshot(Item(new VersionDimensions(9.0, 12.0, 3.0)));
 
-        var preview = LinkPreview.Build(snapshot, GameId, ArtRules.Default, Record(240, 200, ThreeDFeatures))!;
+        var preview = LinkPreview.Build(snapshot, GameId, CollectionId, ArtRules.Default, Record(240, 200, ThreeDFeatures))!;
 
         preview.Fit.Should().Be(ArtFit.Width);
     }
@@ -120,8 +121,25 @@ public sealed class LinkPreviewTests
         var snapshot = Snapshot(Item(null));
         var unusable = Record(240, 320, FlatFeatures) with { Status = ImageStatus.Failed };
 
-        LinkPreview.Build(snapshot, GameId + 1, ArtRules.Default, Record(240, 320, FlatFeatures)).Should().BeNull();
-        LinkPreview.Build(snapshot, GameId, ArtRules.Default, unusable).Should().BeNull();
+        LinkPreview.Build(snapshot, GameId + 1, CollectionId, ArtRules.Default, Record(240, 320, FlatFeatures)).Should().BeNull();
+        LinkPreview.Build(snapshot, GameId, CollectionId, ArtRules.Default, unusable).Should().BeNull();
+    }
+
+    [Fact]
+    public void The_preview_of_a_second_copy_is_that_copys_box_and_is_not_made_for_a_copy_the_game_does_not_have()
+    {
+        var twoCopies = Snapshot(
+            new SnapshotItem(1, GameId, "Invented Game", ItemKind.Base, 2019, new VersionDimensions(9.0, 12.0, 3.0), null),
+            new SnapshotItem(2, GameId, "Invented Game", ItemKind.Base, 2019, new VersionDimensions(6.0, 6.0, 2.0), null));
+        var record = Record(240, 320, FlatFeatures);
+
+        var first = LinkPreview.Build(twoCopies, GameId, 1, ArtRules.Default, record)!;
+        var second = LinkPreview.Build(twoCopies, GameId, 2, ArtRules.Default, record)!;
+
+        first.BoxWidthMm.Should().Be(229);
+        second.BoxWidthMm.Should().BeLessThan(first.BoxWidthMm);
+        second.BoxHeightMm.Should().BeLessThan(first.BoxHeightMm);
+        LinkPreview.Build(twoCopies, GameId, 3, ArtRules.Default, record).Should().BeNull();
     }
 
     private static SnapshotItem Item(VersionDimensions? dimensions, string title = "Invented Game") =>
@@ -139,6 +157,6 @@ public sealed class LinkPreviewTests
             new ArtEdges("#336699", "#336699", "#336699", "#336699"),
             3);
 
-    private static CollectionSnapshot Snapshot(SnapshotItem item) =>
-        new(CollectionSnapshot.CurrentSchemaVersion, Moment, [item], new Dictionary<string, ImageRecord>(StringComparer.Ordinal));
+    private static CollectionSnapshot Snapshot(params SnapshotItem[] items) =>
+        new(CollectionSnapshot.CurrentSchemaVersion, Moment, items, new Dictionary<string, ImageRecord>(StringComparer.Ordinal));
 }

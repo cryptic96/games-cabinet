@@ -88,22 +88,27 @@ else
         <ul class="pic-list" role="list" id="pic-list" data-view="@(single ? "single" : showsAll ? "all" : "worth")">
             @foreach (var game in Model.Games)
             {
-                var rowId = $"game-{game.GameId}";
-                var group = PicturesModel.GroupName(game.GameId);
+                var rowId = PicturesModel.RowId(game.CollectionId);
+                var group = PicturesModel.GroupName(game.CollectionId);
                 var look = game.Look;
 
-                <li class="pic-row" id="@rowId" data-game-id="@game.GameId">
+                <li class="pic-row" id="@rowId" data-game-id="@game.GameId" data-entry-id="@game.CollectionId">
                     <div class="pic-head">
                         <h3 class="game-title" dir="auto" tabindex="@(single ? "-1" : null)">@game.Title</h3>
                         @if (game.Year is { } year)
                         {
                             <span class="pic-year">@year</span>
                         }
+                        @if (game.CopyLabel is not null)
+                        {
+                            <span class="pic-tag pic-tag-plain" dir="auto" data-copy-tag>@game.CopyLabel</span>
+                        }
                         @if (look.Candidate && !look.Resolved)
                         {
                             <form method="post" class="pic-looks-form" asp-page-handler="LooksRight">
                                 <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
                                 <input type="hidden" name="gameId" value="@game.GameId" />
+                                <input type="hidden" name="collectionId" value="@game.CollectionId" />
                                 @if (showsAll)
                                 {
                                     <input type="hidden" name="view" value="@PicturesModel.AllViewQuery" />
@@ -172,6 +177,7 @@ else
                     <form method="post" class="pic-form" asp-page-handler="Choose">
                         <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
                         <input type="hidden" name="gameId" value="@game.GameId" />
+                        <input type="hidden" name="collectionId" value="@game.CollectionId" />
                         @if (showsAll)
                         {
                             <input type="hidden" name="view" value="@PicturesModel.AllViewQuery" />
@@ -242,27 +248,28 @@ else
                         <button type="submit" class="owner-btn" data-save>@OwnerStrings.SavePictureButton</button>
                     </form>
                     <p class="row-status" role="status"></p>
-                    @if (single && Model.Picker is { } picker)
+                    @if (single && Model.Pickers.TryGetValue(game.CollectionId, out var picker))
                     {
                         <partial name="_LocationPicker" model="picker" />
-                        @if (!Model.HasLocations)
+                        @if (!Model.HasLocations && game.CollectionId == Model.Games[0].CollectionId)
                         {
                             <p class="owner-hint" id="no-locations-note">@OwnerStrings.AddLocationOnLocationsPage <a class="pic-link" href="~/owner/locations">@OwnerStrings.LocationsLink</a></p>
                         }
                     }
                     @{
-                    var preview = Model.Preview is not null && Model.PreviewToken is not null && game.GameId == Model.SingleGameId
-                        ? new LinkPreviewModel(game.GameId, Model.PreviewToken, Model.Preview, Model.Revision)
+                    var preview = Model.Preview is not null && Model.PreviewToken is not null && game.CollectionId == Model.PreviewCollectionId
+                        ? new LinkPreviewModel(game.GameId, game.CollectionId, Model.PreviewToken, Model.Preview, Model.Revision)
                         : null;
-                    var linkFieldId = $"pic-link-{game.GameId}";
-                    var linkHintId = $"pic-link-hint-{game.GameId}";
-                    var linkErrorId = $"pic-link-error-{game.GameId}";
+                    var linkFieldId = $"pic-link-{game.CollectionId}";
+                    var linkHintId = $"pic-link-hint-{game.CollectionId}";
+                    var linkErrorId = $"pic-link-error-{game.CollectionId}";
                     var storedLink = game.Tile(PictureChoice.Link);
                     }
                     <details class="pic-linkbox" open="@(preview is not null)">
                         <summary>@OwnerStrings.LinkSummary</summary>
                         <form method="post" class="pic-link-form" asp-page-handler="CheckLink" novalidate>
                             <input type="hidden" name="gameId" value="@game.GameId" />
+                            <input type="hidden" name="collectionId" value="@game.CollectionId" />
                             <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
                             @if (showsAll)
                             {

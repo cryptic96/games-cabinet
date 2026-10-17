@@ -1,6 +1,7 @@
 using Cabinet.Domain.Cards;
 using Cabinet.Domain.Collection;
 using Cabinet.Domain.Layout;
+using Cabinet.Domain.Owner;
 using FluentAssertions;
 
 namespace Cabinet.UnitTests.Cards;
@@ -173,6 +174,45 @@ public sealed class CardRecordsTests
         withSnapshot.Location.Should().Be("Crate 7");
         without.Year.Should().BeNull();
         without.Location.Should().BeNull();
+    }
+
+    [Fact]
+    public void A_book_gives_each_placed_entry_its_location_id_and_leaves_the_others_without()
+    {
+        var snapshot = Snapshot([Base(1, 100), Base(2, 200)]);
+        var book = new LocationBook(
+            [new OwnerLocation("a1b2c3d4", "Cabinet A")],
+            new Dictionary<long, string> { [100] = "a1b2c3d4" });
+
+        var cards = CardRecords.Build([Item(1, 100), Item(2, 200)], snapshot, SectionDesigns.Desktop, book);
+
+        cards[0].LocationId.Should().Be("a1b2c3d4");
+        cards[1].LocationId.Should().BeNull();
+    }
+
+    [Fact]
+    public void Without_a_book_no_card_has_a_location_id_and_the_document_lists_no_locations()
+    {
+        var snapshot = Snapshot([Base(1, 100)]);
+
+        var cards = CardRecords.Build([Item(1, 100)], snapshot, SectionDesigns.Desktop);
+
+        cards[0].LocationId.Should().BeNull();
+        CardsDocument.ListLocations(null).Should().BeNull();
+        CardsDocument.ListLocations(LocationBook.Empty).Should().BeNull();
+        CardRecords.Serialize(new CardsDocument("\"layout\"", cards)).Should().NotContain("locationId").And.NotContain("locations");
+    }
+
+    [Fact]
+    public void The_document_lists_the_locations_in_order_with_the_copies_each_holds()
+    {
+        var book = new LocationBook(
+            [new OwnerLocation("a1b2c3d4", "Cabinet A"), new OwnerLocation("e5f6a7b8", "Shelf B")],
+            new Dictionary<long, string> { [1] = "e5f6a7b8", [2] = "e5f6a7b8" });
+
+        var locations = CardsDocument.ListLocations(book);
+
+        locations.Should().Equal(new LocationRef("a1b2c3d4", "Cabinet A", 0), new LocationRef("e5f6a7b8", "Shelf B", 2));
     }
 
     [Theory]

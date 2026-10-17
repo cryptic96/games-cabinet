@@ -11,7 +11,23 @@ const { COPY_BY_LANGUAGE, copyFor, pageLanguage, COPY } = await import('data:tex
 const en = COPY_BY_LANGUAGE.en;
 const nl = COPY_BY_LANGUAGE.nl;
 
-const SAMPLE_ARGUMENTS = [['2:05'], [30000], [180000], ['Base'], ['Title', 'Base'], [3, 'Base'], [new Date('2030-01-15T12:00:00Z')]];
+const SAMPLE_ARGUMENTS = [
+  ['2:05'],
+  [30000],
+  [180000],
+  ['Base'],
+  ['Title', 'Base'],
+  [3, 'Base'],
+  [new Date('2030-01-15T12:00:00Z')],
+  [],
+  [8],
+  [12, 48],
+  [1, 48],
+  [1, 48, true],
+  [12, 48, false],
+  ['Shelf B', 14, 14, false],
+  ['Shelf B', 3, 14, true],
+];
 
 /**
  * Every text a table can produce: its plain strings and what each function gives for a few sample arguments.
@@ -49,6 +65,19 @@ test('each key holds the same kind of value in both languages, and functions tak
 
     if (typeof en[key] === 'function') {
       assert.equal(nl[key].length, en[key].length, `argument count of ${key}`);
+    }
+  }
+});
+
+test('every function of both tables has a sample argument list of its arity, so the wording checks reach it', () => {
+  for (const [name, table] of [['en', en], ['nl', nl]]) {
+    for (const [key, value] of Object.entries(table)) {
+      if (typeof value === 'function') {
+        assert.ok(
+          SAMPLE_ARGUMENTS.some((args) => args.length === value.length),
+          `${name}.${key} takes ${value.length} arguments and no sample has that many`,
+        );
+      }
     }
   }
 });

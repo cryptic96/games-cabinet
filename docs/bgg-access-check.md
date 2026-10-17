@@ -206,17 +206,21 @@ Counts and classes only:
 
 - for J and K: how many items carry a version, a version image, an item-level
   image and a version thumbnail, and how many items have the same text for
-  both images
+  both images; also how many of the items seen carry a name on their selected
+  version, for example `edition name present for 37 of 48 copies` (the primary
+  name counts, otherwise the first name)
 - for every image address seen: the host class (`cdn`, `geekdo-other`,
   `other`), the path form (`signed-original`, `sized-variant`, `legacy-pic`,
   `other`), how many are written without a scheme and how many ask for a PNG
   rendition
 - for L: the items by type; per type how many carry an image, a thumbnail, a
   minimum age, an average rating, a Bayesian average above zero and a weight
-  above zero; link counts per link type, with expansion links split into
-  inbound and outbound; the smallest and largest number of inbound expansion
-  links on an expansion and the largest number of outbound expansion links on
-  a base game; how many requested ids did not come back
+  above zero; how many games carry at least one alternate name and the largest
+  number of alternate names on one game; link counts per link type, with
+  expansion links split into inbound and outbound; the smallest and largest
+  number of inbound expansion links on an expansion and the largest number of
+  outbound expansion links on a base game; how many requested ids did not come
+  back
 - for every download: the status, whole seconds, content type, whether a
   content length was sent, the byte count, the format read from the first
   bytes (`jpeg`, `png`, `webp`, `gif` or `other`), the pixel width and height
@@ -224,9 +228,9 @@ Counts and classes only:
   `over-pixel-cap`
 - for N: the status and whether it equals the status of the first download
 
-It never prints an address, a title, a game or collection id, the token or the
-username. The guard described above withholds the whole report if one of them
-would appear.
+It never prints an address, a title, an edition name, an alternate name, a game
+or collection id, the token or the username. The guard described above
+withholds the whole report if one of them would appear.
 
 `python3 -I build/bgg-access-check.py --self-test` runs both suites' proofs on
 invented collection, details and image-header data, including a check that the

@@ -1,0 +1,1023 @@
+/**
+ * The filter bar on the wall above the cabinet: a search field, the player and time choices, the count of games that stand in the
+ * light and a button that clears the choices. It is page chrome in wall colours, like the rest of the page controls, and holds no cabinet rule: the shadow a search
+ * puts on a box is drawn by the modifiers layer. The bar is transparent so the wall shows through, and the group at its end is
+ * hidden by visibility while nothing is filtered, so its space stays and the bar never changes height when a search starts.
+ */
+.filter-sentinel {
+  block-size: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-block-end: 16px;
+  padding-block: 8px;
+  color: var(--room-text, var(--wall-text));
+  background: transparent;
+}
+
+/**
+ * The bar stays pinned at the top while the cabinet scrolls. It runs edge to edge across the page padding so its fill, once stuck,
+ * covers the full width. In the page flow it has no fill; the fill and the shadow live on one layer under the controls that fades in
+ * when the sentinel above the bar has scrolled out of view. The padding of the page is 24px from 64rem and 8px below it.
+ */
+.filter-bar {
+  --bar-pad: var(--page-pad, 8px);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  isolation: isolate;
+  margin-inline: calc(-1 * var(--bar-pad));
+  padding-inline: var(--bar-pad);
+}
+
+.filter-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--room, var(--wood-dark));
+  box-shadow:
+    0 6px 12px -6px rgb(var(--room-shade-rgb, 20 10 4) / 0.55),
+    0 1px 0 color-mix(in srgb, var(--room-line, var(--chrome-line)) 40%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--swap-fade);
+}
+
+.filter-bar[data-stuck]::after {
+  opacity: 1;
+}
+
+@media (min-width: 64rem) {
+  .filter-bar {
+    --bar-pad: var(--page-pad, 24px);
+  }
+
+  html {
+    scroll-padding-top: var(--filter-bar-h, 0px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filter-bar::after {
+    transition: none;
+  }
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.filter-bar[hidden] {
+  display: none;
+}
+
+.filter-search {
+  position: relative;
+  display: block;
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+#filter-q {
+  display: block;
+  inline-size: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 28px 0 12px;
+  border: 1px solid var(--room-line, var(--chrome-line));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--room-text, var(--wall-text));
+  font: inherit;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  appearance: none;
+}
+
+#filter-q::placeholder {
+  color: var(--room-muted, var(--chrome-muted));
+  opacity: 1;
+}
+
+#filter-q::-webkit-search-cancel-button,
+#filter-q::-webkit-search-decoration {
+  appearance: none;
+}
+
+#filter-q:focus-visible,
+#filter-loc:focus-visible,
+.filter-clear:focus-visible,
+.filter-clear-icon:focus-visible,
+.filter-chip:has(input:focus-visible) {
+  outline: 2px solid var(--room-ring, var(--wood-light));
+  outline-offset: 2px;
+}
+
+.filter-status {
+  display: flex;
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-bar:not([data-active]) .filter-status {
+  visibility: hidden;
+}
+
+
+.filter-count {
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/**
+ * The slash that tells a visitor with a keyboard where the shortcut is. It sits inside the empty field at its inline end, in the
+ * muted wall colour on the plain field, and only on a device with a mouse; it goes away as soon as the field has focus or text.
+ */
+.filter-hint {
+  position: absolute;
+  inset-inline-end: 4px;
+  top: 50%;
+  display: none;
+  transform: translateY(-50%);
+  border: 0;
+  background: none;
+  color: var(--room-muted, var(--chrome-muted));
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1;
+  pointer-events: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .filter-hint {
+    display: block;
+  }
+
+  #filter-q:focus ~ .filter-hint,
+  #filter-q:not(:placeholder-shown) ~ .filter-hint {
+    display: none;
+  }
+}
+
+.filter-clear {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--room-line, var(--chrome-line));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--room-text, var(--wall-text));
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+/**
+ * When nothing matches, Clear is the action to take, so it is drawn as the inverted wall fill, the way a chosen value is.
+ */
+.filter-clear[data-highlighted],
+.filter-clear-icon[data-highlighted] {
+  background: var(--room-text, var(--wall-text));
+  color: var(--room, var(--wood-dark));
+  font-weight: 600;
+}
+
+/**
+ * The slim bar's Clear: a 44px square with the close icon in the current colour, so the count and Clear fit the one row of a phone.
+ * It is shown below 64rem only, where the text Clear is not.
+ */
+.filter-clear-icon {
+  display: none;
+  flex: none;
+  place-items: center;
+  inline-size: 44px;
+  block-size: 44px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--room-line, var(--chrome-line));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--room-text, var(--wall-text));
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.filter-clear-icon svg {
+  inline-size: 20px;
+  block-size: 20px;
+  pointer-events: none;
+}
+
+/**
+ * A group of choices: its legend stands inline before the chips, which form one segmented control with shared borders. The legend
+ * is floated so that it is an ordinary item of the row and the group can lay out as a flex row; it still names the group.
+ */
+.filter-group {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.filter-group > legend {
+  float: inline-start;
+  margin-inline-end: 8px;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+/**
+ * One chip: the label is the visible control and the radio inside it is an invisible hit target that covers the whole chip, so the
+ * native group keeps its role, its one tab stop and its arrow keys. Neighbouring chips share their border.
+ */
+.filter-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  margin-inline-start: -1px;
+  padding-inline: 12px;
+  border: 1px solid var(--room-line, var(--chrome-line));
+  background: transparent;
+  color: var(--room-text, var(--wall-text));
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.filter-group > legend + .filter-chip {
+  margin-inline-start: 0;
+  border-start-start-radius: 4px;
+  border-end-start-radius: 4px;
+}
+
+.filter-group > .filter-chip:last-child {
+  border-start-end-radius: 4px;
+  border-end-end-radius: 4px;
+}
+
+.filter-chip input {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  margin: 0;
+  opacity: 0;
+  outline: none;
+  cursor: inherit;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .filter-chip:hover {
+    background: var(--room-wash, color-mix(in srgb, var(--room-text, var(--wall-text)) 8%, transparent));
+  }
+}
+
+/**
+ * A chosen count or time is the one filled chip: the wall colours inverted, never the accent, so what is bright in the bar is what is
+ * active. The weight carries the state as well as the fill.
+ */
+.filter-chip:has(input:checked:not([value=""])) {
+  z-index: 1;
+  border-color: var(--room-text, var(--wall-text));
+  background: var(--room-text, var(--wall-text));
+  color: var(--room, var(--wood-dark));
+  font-weight: 600;
+}
+
+/**
+ * Any is the quiet choice: heavier text and a thin bar along the bottom edge, with no fill, so a bar with nothing chosen holds no
+ * filled block.
+ */
+.filter-chip:has(input[value=""]:checked) {
+  z-index: 1;
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--room-text, var(--wall-text));
+}
+
+.filter-chip:has(input:focus-visible) {
+  z-index: 2;
+}
+
+.filter-chip-text {
+  white-space: nowrap;
+}
+
+/**
+ * The view switch: two segments in one outline, All together and By location. Only the segment of the view on screen is filled, in
+ * the wall colours inverted; the other stays as quiet as the rest of the bar. Each segment is 44 px high and never wraps, and the
+ * radio inside it is an invisible hit target, so the native group keeps its role, its one tab stop and its arrow keys.
+ */
+.filter-view {
+  display: flex;
+  flex: 0 0 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  outline: 1px solid var(--room-line, var(--chrome-line));
+  outline-offset: -1px;
+}
+
+.filter-view[hidden] {
+  display: none;
+}
+
+.filter-view-segment {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding-inline: 12px;
+  background: transparent;
+  color: var(--room-text, var(--wall-text));
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.filter-view-segment + .filter-view-segment {
+  border-inline-start: 1px solid var(--room-line, var(--chrome-line));
+}
+
+/**
+ * The switch does not clip its segments, so a keyboard ring can stand outside them like the ring of every other control; the two end
+ * segments take the corner radius of the outline instead, so the fill of the chosen one never pokes out of it.
+ */
+.filter-view-segment:first-of-type {
+  border-start-start-radius: 3px;
+  border-end-start-radius: 3px;
+}
+
+.filter-view-segment:last-of-type {
+  border-start-end-radius: 3px;
+  border-end-end-radius: 3px;
+}
+
+.filter-view-segment input {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  margin: 0;
+  opacity: 0;
+  outline: none;
+  cursor: inherit;
+}
+
+.filter-view-text {
+  white-space: nowrap;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .filter-view-segment:hover {
+    background: var(--room-wash, color-mix(in srgb, var(--room-text, var(--wall-text)) 8%, transparent));
+  }
+}
+
+.filter-view-segment:has(input:checked),
+.filter-view-segment:has(input:checked):hover {
+  background: var(--room-text, var(--wall-text));
+  color: var(--room, var(--wood-dark));
+  font-weight: 600;
+}
+
+.filter-view-segment:has(input:focus-visible) {
+  z-index: 2;
+  outline: 2px solid var(--room-ring, var(--wood-light));
+  outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+  .filter-view-segment:has(input:checked) {
+    outline: 2px solid Highlight;
+    outline-offset: -4px;
+  }
+}
+
+/**
+ * One location's cabinet has its name on the wall above it: the name in strong wall text and, after it, the number of games in the
+ * muted wall colour, centred over the cabinet. A long name wraps inside the page. A cabinet that holds no match while filtering has
+ * its name drawn in the muted colour, so the eye skips to the cabinets that hold matches.
+ */
+.location-heading {
+  margin: 0 0 16px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--room-muted, var(--chrome-muted));
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.location-heading[data-no-match] .location-name {
+  color: var(--room-muted, var(--chrome-muted));
+}
+
+.location-name {
+  color: var(--room-text, var(--wall-text));
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+/**
+ * The location group: its label and its select travel together between the bar and the sheet. In the bar the label is visually
+ * hidden and the select is the only visible part.
+ */
+.filter-location {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+}
+
+.filter-location[hidden] {
+  display: none;
+}
+
+/**
+ * The location select: a native list in wall colours, as tall as a chip. The list it opens takes light or dark system colours from the
+ * wall, so its options stay readable on either.
+ */
+#filter-loc {
+  min-height: 44px;
+  min-width: 12rem;
+  max-width: 14rem;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid var(--room-line, var(--chrome-line));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--room-text, var(--wall-text));
+  color-scheme: dark;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  touch-action: manipulation;
+}
+
+#filter-loc[hidden] {
+  display: none;
+}
+
+:root[data-wood="walnut"] #filter-loc,
+:root[data-wood="birch"] #filter-loc {
+  color-scheme: light;
+}
+
+/**
+ * The controls that need the card data while it could not be loaded: a dashed outline, muted text, regular weight and no hover wash,
+ * so they read as unavailable. Search is not among them and keeps its look.
+ */
+.filter-group .filter-chip:has(input:disabled) {
+  border-style: dashed;
+  color: var(--room-muted, var(--chrome-muted));
+  font-weight: 400;
+  box-shadow: none;
+  cursor: default;
+}
+
+#filter-loc:disabled {
+  border-style: dashed;
+  color: var(--room-muted, var(--chrome-muted));
+  font-weight: 400;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .filter-group .filter-chip:has(input:disabled):hover {
+    background: transparent;
+  }
+}
+
+/**
+ * The note that says why the card-based controls are off. It stands on the plain wall directly under the bar and outside it, so a full
+ * sentence can never make the pinned bar taller.
+ */
+.filter-note {
+  margin: 0 0 16px;
+  color: var(--room-muted, var(--chrome-muted));
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.filter-note[hidden] {
+  display: none;
+}
+
+/**
+ * Forced colours drop fills and shadows, so a chosen chip, Any included, gets a system outline drawn inside its edge.
+ */
+@media (forced-colors: active) {
+  .filter-chip:has(input:checked) {
+    outline: 2px solid Highlight;
+    outline-offset: -4px;
+  }
+}
+
+/**
+ * From 64rem the bar is two designed rows of one line each: nothing wraps inside a row or inside a group, and the status group at the
+ * end of the second row keeps its space while it is hidden, so the bar is the same height whether or not a filter is set.
+ */
+@media (min-width: 64rem) {
+  .filter-row,
+  .filter-group {
+    flex-wrap: nowrap;
+  }
+}
+
+/**
+ * On a screen too narrow for nine segments in a line, the chips of a group wrap and stand apart as separate chips, each still 44 px
+ * high and wide, so the page never scrolls sideways.
+ */
+@media not all and (min-width: 64rem) {
+  .filter-group {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .filter-group > legend {
+    float: none;
+    margin-inline-end: 0;
+  }
+
+  .filter-chip,
+  .filter-group > legend + .filter-chip,
+  .filter-group > .filter-chip:last-child {
+    margin-inline-start: 0;
+    border-radius: 4px;
+  }
+}
+
+/**
+ * The Filters button of the slim bar, shown below 64rem only. It is as tall as every other control, never narrower than 88px, and
+ * its text carries the number of filters in use.
+ */
+.filter-open {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-width: 88px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid var(--room-line, var(--chrome-line));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--room-text, var(--wall-text));
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.filter-open:focus-visible,
+.filter-sheet-clear:focus-visible,
+.filter-done:focus-visible {
+  outline: 2px solid var(--room-ring, var(--wood-light));
+  outline-offset: 2px;
+}
+
+/**
+ * Below 64rem the bar is one slim row: the search field takes the spare width, then the Filters button, then the count and Clear
+ * while a filter is in use. The two rows dissolve so their remaining items join the one row, and the controls that are not in the
+ * bar live in the sheet.
+ */
+@media not all and (min-width: 64rem) {
+  .filter-bar {
+    --bar-pad: var(--page-pad, 8px);
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    transition:
+      transform var(--fallback-open) var(--pull-ease-out),
+      visibility 0s;
+  }
+
+  .filter-bar[data-away] {
+    transform: translateY(-100%);
+    visibility: hidden;
+    transition:
+      transform var(--fallback-close) var(--pull-ease-out),
+      visibility 0s linear var(--fallback-close);
+  }
+
+  .filter-row {
+    display: contents;
+  }
+
+  .filter-search {
+    flex: 1 1 7rem;
+    min-width: 112px;
+  }
+
+  .filter-open {
+    display: inline-flex;
+  }
+
+  .filter-bar:not([data-active]) .filter-status {
+    display: none;
+  }
+
+  .filter-clear {
+    display: none;
+  }
+
+  .filter-clear-icon {
+    display: grid;
+  }
+}
+
+@media (width < 64rem) and (prefers-reduced-motion: reduce) {
+  .filter-bar,
+  .filter-bar[data-away] {
+    transition: none;
+  }
+}
+
+/**
+ * The magnifier that stands in for the hint of the search field. It is drawn in the muted wall colour at the start of the field and
+ * is only shown by the rule below.
+ */
+.filter-glass {
+  position: absolute;
+  inset-inline-start: 12px;
+  top: 50%;
+  display: none;
+  inline-size: 16px;
+  block-size: 16px;
+  transform: translateY(-50%);
+  color: var(--room-muted, var(--chrome-muted));
+  pointer-events: none;
+}
+
+/**
+ * On a phone, while a filter is in use, the status group takes room from the search field and the hint would be cut in the middle
+ * of a word. In that one state, and only while the field is too narrow to show the whole hint, the hint steps aside and a magnifier
+ * at the start of the field says what the field is; the label stays, so assistive technology still hears "Search games". The field
+ * keeps the room for the glyph whether or not it holds text, so typing never moves the text. The hint is hidden with its opacity,
+ * not its colour, because forced colours override the colour of a hint but never its opacity.
+ */
+.filter-search {
+  container-type: inline-size;
+}
+
+@media (width < 64rem) {
+  @container (width < 9.75rem) {
+    .filter-bar[data-active] #filter-q {
+      padding-inline: 36px 12px;
+    }
+
+    .filter-bar[data-active] #filter-q::placeholder {
+      opacity: 0;
+    }
+
+    .filter-bar[data-active] .filter-glass {
+      display: block;
+    }
+  }
+}
+
+/**
+ * The Filters sheet. Its dialog is a transparent frame the size of the screen, like the card's, with a clear backdrop so the
+ * dimmed cabinet stays visible above the sheet; the sheet is wall-coloured, anchored to the bottom, as tall as its content up to
+ * seven tenths of the screen, and scrolls inside beyond that with its grip strip kept at the top.
+ */
+.filter-dialog {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--room-text, var(--wall-text));
+  inset: 0;
+  overflow: hidden;
+}
+
+.filter-dialog[open] {
+  display: grid;
+  place-items: end center;
+}
+
+.filter-dialog::backdrop {
+  background: transparent;
+}
+
+.filter-sheet {
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  inline-size: min(100%, 40rem);
+  max-block-size: 70vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 16px calc(16px + env(safe-area-inset-bottom));
+  border-radius: 12px 12px 0 0;
+  background: var(--room, var(--wood-dark));
+  color: var(--room-text, var(--wall-text));
+  box-shadow:
+    0 -12px 32px -12px rgb(var(--room-shade-rgb, 20 10 4) / 0.7),
+    inset 0 1px 0 var(--room-line, var(--chrome-line));
+  translate: 0 var(--sheet-dy, 0px);
+  transition: translate var(--fallback-open) var(--pull-ease-out);
+}
+
+@supports (max-height: 1dvh) {
+  .filter-sheet {
+    max-block-size: 70dvh;
+  }
+}
+
+/**
+ * The sheet rises from below on its own translate. A browser without starting styles simply shows it at once.
+ */
+@starting-style {
+  .filter-dialog[open] .filter-sheet {
+    translate: 0 100%;
+  }
+}
+
+/**
+ * Closing slides the sheet out the way the card's sheet goes; the script closes the dialog after the closing time. While it
+ * slides, nothing in it can be pressed.
+ */
+.filter-dialog[data-closing] .filter-sheet {
+  translate: 0 100%;
+  transition-duration: var(--fallback-close);
+  pointer-events: none;
+}
+
+.filter-sheet[data-moving] {
+  transition: none;
+  will-change: transform;
+}
+
+.filter-sheet[data-springing] {
+  transition: translate var(--sheet-spring) var(--pull-ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filter-sheet,
+  .filter-sheet[data-springing] {
+    transition: none;
+  }
+}
+
+.filter-grip {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  flex: none;
+  display: block;
+  block-size: var(--ruling);
+  margin-inline: -16px;
+  border-radius: 12px 12px 0 0;
+  background: var(--room, var(--wood-dark));
+  touch-action: none;
+}
+
+.filter-grip::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--room-line, var(--chrome-line));
+  translate: -50% 0;
+}
+
+/**
+ * The group host is a size container, so the chip grids read the width the groups really have, which is the sheet's width less its
+ * padding. Its groups carry no padding, border or margin of their own.
+ */
+.filter-sheet-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  container-type: inline-size;
+}
+
+.filter-sheet .filter-group,
+.filter-sheet .filter-view {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.filter-sheet .filter-note {
+  margin: 0;
+}
+
+/**
+ * In the sheet every group is named: the legends of the view switch and the players and time groups, and the label of the location
+ * select, are shown in the legend style, undoing what hides them in the bar.
+ */
+.filter-sheet .filter-view > legend,
+.filter-sheet .filter-group > legend,
+.filter-sheet label[for="filter-loc"] {
+  position: static;
+  display: block;
+  float: none;
+  width: auto;
+  height: auto;
+  margin: 0 0 8px;
+  padding: 0;
+  overflow: visible;
+  clip-path: none;
+  white-space: normal;
+  color: var(--room-text, var(--wall-text));
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.filter-sheet label[for="filter-loc"][hidden] {
+  display: none;
+}
+
+/**
+ * The chips of the sheet stand apart on equal-width grids that every thumb can hit: five columns for players and three for time,
+ * and one row of nine or one row of six once the group is wide enough.
+ */
+.filter-sheet .filter-group {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  align-items: stretch;
+}
+
+.filter-sheet .filter-group[data-filter="time"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.filter-sheet .filter-chip {
+  min-inline-size: 44px;
+  min-block-size: 44px;
+  margin: 0;
+  padding-inline: 4px;
+  border-radius: 4px;
+}
+
+@container (inline-size >= 19rem) {
+  .filter-sheet .filter-group[data-filter="time"] {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@container (inline-size >= 29rem) {
+  .filter-sheet .filter-group[data-filter="players"] {
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+  }
+}
+
+/**
+ * The view switch in the sheet: its two segments share the width, each with its own outline so the legend above is not enclosed.
+ */
+.filter-sheet .filter-view {
+  display: flex;
+  flex-wrap: wrap;
+  outline: none;
+  overflow: visible;
+}
+
+.filter-sheet .filter-view[hidden] {
+  display: none;
+}
+
+.filter-sheet .filter-view > legend {
+  flex: 0 0 100%;
+}
+
+.filter-sheet .filter-view-segment {
+  flex: 1 1 0;
+  border: 1px solid var(--room-line, var(--chrome-line));
+  border-radius: 4px 0 0 4px;
+}
+
+.filter-sheet .filter-view-segment + .filter-view-segment {
+  margin-inline-start: -1px;
+  border-radius: 0 4px 4px 0;
+}
+
+.filter-sheet .filter-view-segment:has(input:checked) {
+  position: relative;
+  z-index: 1;
+}
+
+.filter-sheet #filter-loc {
+  inline-size: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+.filter-sheet-actions {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.filter-sheet-clear {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--room-line, var(--chrome-line));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--room-text, var(--wall-text));
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.filter-sheet-clear[hidden] {
+  display: none;
+}
+
+.filter-sheet-clear[data-highlighted] {
+  background: var(--room-text, var(--wall-text));
+  color: var(--room, var(--wood-dark));
+  font-weight: 600;
+}
+
+/**
+ * The primary button closes the sheet and says how many games stay in the light. With nothing matching it is outlined, because
+ * the highlighted action is then Clear.
+ */
+.filter-done {
+  flex: 1 1 auto;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--room-text, var(--wall-text));
+  border-radius: 4px;
+  background: var(--room-text, var(--wall-text));
+  color: var(--room, var(--wood-dark));
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.filter-done[data-outlined] {
+  border-color: var(--room-line, var(--chrome-line));
+  background: transparent;
+  color: var(--room-text, var(--wall-text));
+}
+
+@media (forced-colors: active) {
+  .filter-sheet {
+    border: 1px solid CanvasText;
+  }
+}

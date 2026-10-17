@@ -16,7 +16,9 @@ public sealed class ReducedMotionTests : CabinetPageTest
 {
     private const string OpenCard = "dialog.card-dialog[open]";
     private const string MoreMarker = ".placement[data-kind=\"moreMarker\"]";
-    private const string WallTextColour = "rgb(239, 227, 194)";
+
+    /// <summary>The furniture ring of the default wood, which the open box wears.</summary>
+    private const string FurnitureRingColour = "rgb(217, 185, 138)";
     private const int HeadingTopTolerance = 32;
     private const string TransitionSpy = """
         (() => {
@@ -153,7 +155,8 @@ public sealed class ReducedMotionTests : CabinetPageTest
         await Expect(same).ToHaveCountAsync(1);
         await Expect(Page.Locator("[data-out]")).ToHaveCountAsync(0);
         await Expect(same).ToHaveCSSAsync("visibility", "visible");
-        await Expect(same).ToHaveCSSAsync("outline-color", WallTextColour);
+        await Expect(same).ToHaveCSSAsync("outline-color", FurnitureRingColour);
+        await Expect(same).ToHaveCSSAsync("outline-width", "3px");
         await Expect(Page.Locator("#card-title")).ToBeFocusedAsync();
 
         if (screenshot is not null)

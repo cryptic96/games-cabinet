@@ -1,10 +1,13 @@
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
 using Cabinet.Domain.Cards;
 using Cabinet.Domain.Collection;
 using Cabinet.Domain.Layout;
 using Cabinet.Domain.Owner;
 using Cabinet.Service.Cards;
 using Cabinet.Service.Layout;
+using Cabinet.Service.Search;
 
 namespace Cabinet.Service.Collection;
 
@@ -15,15 +18,19 @@ namespace Cabinet.Service.Collection;
 /// </summary>
 public sealed class CollectionState
 {
+    private const int VersionLength = 16;
+
     private readonly ConcurrentDictionary<string, Lazy<CachedLayout>> _layouts = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, Lazy<CachedCards>> _cards = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, Lazy<CachedLayout>> _locationLayouts = new(StringComparer.Ordinal);
+    private readonly Lazy<CachedNames> _names;
 
     /// <summary>Creates a view of a collection that has been synced.</summary>
     /// <param name="items">The items to draw.</param>
     /// <param name="version">The identifier of the collection version; it changes whenever the collection does.</param>
     /// <param name="capturedAtUtc">When the collection was read from its source.</param>
     public CollectionState(IReadOnlyList<CabinetItem> items, string version, DateTimeOffset capturedAtUtc)
-        : this(items, version, (DateTimeOffset?)capturedAtUtc, null, null)
+        : this(items, version, (DateTimeOffset?)capturedAtUtc, null, null, LocationBook.Empty)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(version);
     }
@@ -33,7 +40,8 @@ public sealed class CollectionState
         string? version,
         DateTimeOffset? capturedAtUtc,
         CollectionSnapshot? snapshot,
-        CollectionSnapshot? cardSnapshot)
+        CollectionSnapshot? cardSnapshot,
+        LocationBook locations)
     {
         ArgumentNullException.ThrowIfNull(items);
 
@@ -42,6 +50,8 @@ public sealed class CollectionState
         CapturedAtUtc = capturedAtUtc;
         Snapshot = snapshot;
         CardSnapshot = cardSnapshot ?? snapshot;
+        Locations = locations;
+        _names = new Lazy<CachedNames>(() => CachedNames.From(SearchNames.Build(CardSnapshot)));
     }
 
     /// <summary>Creates the view of a stored collection: its items are mapped in a fixed order and its version is derived from them.</summary>
@@ -61,7 +71,7 @@ public sealed class CollectionState
 
         var items = SnapshotMapper.ToCabinetItems(snapshot, rules);
 
-        return new CollectionState(items, SnapshotMapper.Version(items, rules, snapshot), snapshot.CapturedAtUtc, snapshot, snapshot);
+        return new CollectionState(items, SnapshotMapper.Version(items, rules, snapshot), snapshot.CapturedAtUtc, snapshot, snapshot, LocationBook.Empty);
     }
 
     /// <summary>
@@ -81,12 +91,26 @@ public sealed class CollectionState
 
         var effective = overlay.Effective(snapshot);
         var items = SnapshotMapper.ToCabinetItems(effective, rules, overlay);
+        var locations = LocationBook.From(overlay, snapshot.Items.Select(item => item.CollectionId));
+        var version = WithLocations(SnapshotMapper.Version(items, rules, effective, overlay), locations);
 
-        return new CollectionState(items, SnapshotMapper.Version(items, rules, effective, overlay), snapshot.CapturedAtUtc, snapshot, effective);
+        return new CollectionState(items, version, snapshot.CapturedAtUtc, snapshot, effective, locations);
+    }
+
+    private static string WithLocations(string mapperVersion, LocationBook locations)
+    {
+        if (locations.Order.Count == 0)
+        {
+            return mapperVersion;
+        }
+
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes($"{mapperVersion}\n{locations.Text}"));
+
+        return Convert.ToHexStringLower(hash)[..VersionLength];
     }
 
     /// <summary>The view before any collection has been synced: no items and no version.</summary>
-    public static CollectionState Empty { get; } = new([], null, null, null, null);
+    public static CollectionState Empty { get; } = new([], null, null, null, null, LocationBook.Empty);
 
     /// <summary>The items to draw.</summary>
     public IReadOnlyList<CabinetItem> Items { get; }
@@ -100,7 +124,13 @@ public sealed class CollectionState
     /// </summary>
     public CollectionSnapshot? CardSnapshot { get; }
 
-    /// <summary>The collection version, or null before the first sync.</summary>
+    /// <summary>The owner's locations in the owner's order and the location of every entry; empty for a view made without owner locations.</summary>
+    public LocationBook Locations { get; }
+
+    /// <summary>
+    /// The collection version, or null before the first sync. It changes whenever anything drawn, shown on a card or used to
+    /// group or filter changes, including the order of the owner's locations and the location of every copy.
+    /// </summary>
     public string? Version { get; }
 
     /// <summary>When the collection was read from its source, or null before the first sync.</summary>
@@ -138,19 +168,53 @@ public sealed class CollectionState
         return _cards.GetOrAdd(design.Name, _ => new Lazy<CachedCards>(() => BuildCards(design, options))).Value;
     }
 
+    /// <summary>
+    /// The serialised cabinets of this collection, one per storage location that holds games, for one section design, built on
+    /// first use and kept with the view, so each design's location cabinets are built at most once per collection version
+    /// however many visitors ask. The document names the entity tag of the single big cabinet of the same collection and
+    /// design, and its own entity tag is that one marked as the by-location payload. A view without owner locations holds none.
+    /// </summary>
+    /// <param name="design">The section design for the requested profile.</param>
+    /// <param name="options">The layout settings the cabinet is built with.</param>
+    public CachedLayout LocationLayoutsFor(SectionDesign design, LayoutOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(design);
+        ArgumentNullException.ThrowIfNull(options);
+
+        return _locationLayouts.GetOrAdd(design.Name, _ => new Lazy<CachedLayout>(() => BuildLocationLayouts(design, options))).Value;
+    }
+
+    /// <summary>
+    /// The serialised other titles of the owned games, built on first use and kept with the view, so they are built at most once
+    /// per collection version however many visitors ask. A view that was not made from a stored collection holds none.
+    /// </summary>
+    public CachedNames NamesIndex => _names.Value;
+
+    private CachedLayout BuildLocationLayouts(SectionDesign design, LayoutOptions options)
+    {
+        var tag = LayoutTag(design, options);
+        var locations = CardSnapshot is null
+            ? []
+            : LocationLayouts.Build(Items, CardSnapshot, Locations, design, options);
+
+        return new CachedLayout(LocationLayouts.Serialize(tag, locations), CachedLayout.ByLocationTag(tag));
+    }
+
+    private string LayoutTag(SectionDesign design, LayoutOptions options) =>
+        $"\"{CabinetLayoutEngine.LayoutVersion}-{options.Fingerprint}-collection-{Version ?? "empty"}-{design.Name}\"";
+
     private CachedCards BuildCards(SectionDesign design, LayoutOptions options)
     {
-        var cards = CardRecords.Build(Items, CardSnapshot, design);
+        var cards = CardRecords.Build(Items, CardSnapshot, design, Locations);
 
-        return CachedCards.From(new CardsDocument(LayoutFor(design, options).ETag, cards));
+        return CachedCards.From(new CardsDocument(LayoutFor(design, options).ETag, cards, CardsDocument.ListLocations(Locations)));
     }
 
     private CachedLayout Build(SectionDesign design, LayoutOptions options)
     {
         var layout = CabinetLayoutEngine.Build(Items, design, options);
-        var eTag = $"\"{CabinetLayoutEngine.LayoutVersion}-{options.Fingerprint}-collection-{Version ?? "empty"}-{design.Name}\"";
 
-        return new CachedLayout(LayoutJson.Serialize(layout), eTag);
+        return new CachedLayout(LayoutJson.Serialize(layout), LayoutTag(design, options));
     }
 }
 

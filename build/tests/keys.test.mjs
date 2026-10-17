@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const source = readFileSync(new URL('../../Cabinet.Service/wwwroot/js/keys.js', import.meta.url), 'utf8');
-const { nextBox } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+const { nextBox, nearestBox, readingOrder } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 
 /**
  * Builds the rectangle of one box.
@@ -154,4 +154,46 @@ test('down in the last section and up in the first section stay where they are',
 
   assert.equal(nextBox(rects, 1, 'ArrowDown'), 1);
   assert.equal(nextBox(rects, 0, 'ArrowUp'), 0);
+});
+
+test('the nearest box is the one that overlaps first, then the one with the smallest gap', () => {
+  const from = box(100, 100, 40, 100, '0:0');
+  const rects = [box(300, 100, 40, 100, '0:0'), box(150, 100, 40, 100, '0:0'), box(110, 120, 20, 20, '0:0')];
+
+  assert.equal(nearestBox(rects, from), 2);
+  assert.equal(nearestBox(rects.slice(0, 2), from), 1);
+});
+
+test('the nearest box measures a gap in both directions and settles a tie by the centres', () => {
+  const from = box(0, 0, 40, 40, '0:0');
+  const rects = [box(200, 0, 40, 40, '0:0'), box(60, 60, 40, 40, '0:0'), box(0, 90, 40, 40, '0:0')];
+
+  assert.equal(nearestBox(rects, from), 1);
+  assert.equal(nearestBox([box(0, 100, 40, 40, '0:0'), box(0, 100, 40, 40, '0:0')], from), 0);
+});
+
+test('with no candidates the nearest box is -1', () => {
+  assert.equal(nearestBox([], box(0, 0, 10, 10, '0:0')), -1);
+});
+
+test('reading order goes by top, then by left, and treats tops within two pixels as one row', () => {
+  const rects = [box(200, 100, 40, 100, '0:0'), box(0, 101, 40, 90, '0:0'), box(100, 300, 40, 100, '0:1'), box(100, 100, 40, 100, '0:0'), box(0, 300, 40, 100, '0:1')];
+
+  assert.deepEqual(readingOrder(rects), [1, 3, 0, 4, 2]);
+});
+
+test('reading order gives the same boxes in the same order however the input is shuffled', () => {
+  const rects = [box(200, 100, 40, 100, 'a'), box(0, 101, 40, 90, 'b'), box(100, 300, 40, 100, 'c'), box(100, 100, 40, 100, 'd'), box(0, 300, 40, 100, 'e')];
+  const expected = readingOrder(rects).map((index) => rects[index].shelf);
+  const shuffles = [[4, 2, 0, 3, 1], [1, 0, 3, 2, 4], [3, 4, 1, 0, 2]];
+
+  for (const shuffle of shuffles) {
+    const shuffled = shuffle.map((index) => rects[index]);
+
+    assert.deepEqual(readingOrder(shuffled).map((index) => shuffled[index].shelf), expected);
+  }
+});
+
+test('reading order of nothing is nothing', () => {
+  assert.deepEqual(readingOrder([]), []);
 });

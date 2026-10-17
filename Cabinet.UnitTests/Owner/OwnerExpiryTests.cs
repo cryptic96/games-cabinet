@@ -14,6 +14,8 @@ public sealed class OwnerExpiryTests
     private const string CabinetA = "Cabinet A";
     private const int Kept = 100;
     private const int Leaving = 101;
+    private const int Game = 100;
+    private const string ShelfB = "Shelf B";
 
     [Fact]
     public async Task A_game_missing_from_an_accepted_collection_is_stamped_kept_for_29_days_and_removed_on_the_30th()
@@ -184,6 +186,123 @@ public sealed class OwnerExpiryTests
         added.Data!.Games.Single(game => game.GameId == Leaving).AbsentSinceUtc.Should().NotBeNull();
     }
 
+    [Fact]
+    public void A_per_copy_choice_is_stamped_when_its_entry_is_not_listed_cleared_when_listed_again_and_dropped_after_30_days()
+    {
+        var data = DataWith(new OwnerGame(Game, ShelfB, null, null, 7002));
+        var now = OwnerTestKit.Start;
+
+        var stamped = OwnerExpiry.Reconcile(data, Games(Game, Leaving), Copies((7001, Leaving)), now)!;
+        var cleared = OwnerExpiry.Reconcile(stamped, Games(Game), Copies((7001, Leaving), (7002, Game)), now.AddDays(5))!;
+        var restamped = OwnerExpiry.Reconcile(cleared, Games(Game, Leaving), Copies((7001, Leaving)), now.AddDays(6))!;
+        var forgotten = OwnerExpiry.Reconcile(restamped, Games(Game, Leaving), Copies((7001, Leaving)), now.AddDays(36))!;
+
+        stamped.Games.Should().ContainSingle().Which.AbsentSinceUtc.Should().Be(now);
+        cleared.Games.Should().ContainSingle().Which.AbsentSinceUtc.Should().BeNull();
+        restamped.Games.Should().ContainSingle().Which.AbsentSinceUtc.Should().Be(now.AddDays(6));
+        forgotten.Games.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_game_wide_choice_is_listed_while_its_game_is_whichever_entries_the_game_has()
+    {
+        var data = DataWith(new OwnerGame(Game, ShelfB, null, null));
+
+        var withNewEntry = OwnerExpiry.Reconcile(data, Games(Game), Copies((7009, Game)), OwnerTestKit.Start);
+        var withoutGame = OwnerExpiry.Reconcile(data, Games(), Copies(), OwnerTestKit.Start);
+
+        withNewEntry.Should().BeNull();
+        withoutGame!.Games.Should().ContainSingle().Which.AbsentSinceUtc.Should().Be(OwnerTestKit.Start);
+    }
+
+    [Fact]
+    public void A_re_added_copy_takes_over_the_absent_copys_choices()
+    {
+        var picture = new PictureSetting(PictureChoice.MainPicture, true, null, null, null);
+        var data = DataWith(new OwnerGame(Game, ShelfB, null, picture, 7002));
+
+        var result = OwnerExpiry.Reconcile(data, Games(Game), Copies((7009, Game)), OwnerTestKit.Start)!;
+
+        result.Games.Should().ContainSingle().Which.Should().Be(new OwnerGame(Game, ShelfB, null, picture, 7009));
+    }
+
+    [Fact]
+    public void A_stamped_copys_choices_are_handed_over_while_they_are_still_kept_and_not_after_they_expire()
+    {
+        var stamped = OwnerTestKit.Start.AddDays(-10);
+        var expired = OwnerTestKit.Start.AddDays(-30);
+
+        var kept = OwnerExpiry.Reconcile(DataWith(new OwnerGame(Game, ShelfB, stamped, null, 7002)), Games(Game), Copies((7009, Game)), OwnerTestKit.Start)!;
+        var lost = OwnerExpiry.Reconcile(DataWith(new OwnerGame(Game, ShelfB, expired, null, 7002)), Games(Game), Copies((7009, Game)), OwnerTestKit.Start)!;
+
+        kept.Games.Should().ContainSingle().Which.Should().Be(new OwnerGame(Game, ShelfB, null, null, 7009));
+        lost.Games.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void With_two_new_copies_the_lowest_new_collection_id_takes_the_choices()
+    {
+        var data = DataWith(new OwnerGame(Game, ShelfB, null, null, 7002));
+
+        var result = OwnerExpiry.Reconcile(data, Games(Game), Copies((7011, Game), (7009, Game)), OwnerTestKit.Start)!;
+
+        result.Games.Should().ContainSingle().Which.CollectionId.Should().Be(7009);
+    }
+
+    [Fact]
+    public void A_new_copy_that_already_has_its_own_choice_is_left_alone_and_the_absent_copy_waits_its_30_days()
+    {
+        var own = new OwnerGame(Game, "Cabinet A", null, null, 7009);
+        var data = DataWith(new OwnerGame(Game, ShelfB, null, null, 7002), own);
+
+        var result = OwnerExpiry.Reconcile(data, Games(Game), Copies((7009, Game)), OwnerTestKit.Start)!;
+
+        result.Games.Should().Equal(
+            new OwnerGame(Game, ShelfB, OwnerTestKit.Start, null, 7002),
+            own);
+    }
+
+    [Fact]
+    public void A_new_copy_covered_by_a_game_wide_choice_takes_nothing_over()
+    {
+        var wide = new OwnerGame(Game, "Cabinet A", null, null);
+        var data = DataWith(wide, new OwnerGame(Game, ShelfB, null, null, 7002));
+
+        var result = OwnerExpiry.Reconcile(data, Games(Game), Copies((7009, Game)), OwnerTestKit.Start)!;
+
+        result.Games.Should().Equal(wide, new OwnerGame(Game, ShelfB, OwnerTestKit.Start, null, 7002));
+    }
+
+    [Fact]
+    public void A_choice_is_never_handed_to_a_copy_of_another_game()
+    {
+        var data = DataWith(new OwnerGame(Game, ShelfB, null, null, 7002));
+
+        var result = OwnerExpiry.Reconcile(data, Games(Game, Leaving), Copies((7009, Leaving), (7001, Game)), OwnerTestKit.Start)!;
+
+        result.Games.Should().Equal(
+            new OwnerGame(Game, ShelfB, null, null, 7001));
+    }
+
+    [Fact]
+    public async Task A_copy_removed_and_added_again_on_BGG_comes_back_to_its_shelf_on_the_next_sync()
+    {
+        var harness = OwnerTestKit.Harness(snapshot: OwnerTestKit.Snapshot([OwnerTestKit.Base(7002, Game, "Game 100")]));
+        await harness.AddAsync("Shelf B");
+        var shelf = harness.Data.Locations.Single().Id;
+        await harness.Service.MutateAsync(
+            harness.Service.Revision,
+            data => LocationEdits.Assign(data, Game, 7002, [7002], shelf, "Game 100", false),
+            CancellationToken.None);
+
+        harness.Publisher.Publish(OwnerTestKit.Snapshot([OwnerTestKit.Base(7001, Leaving, "Game 101")]));
+        harness.Clock.Advance(TimeSpan.FromDays(2));
+        harness.Publisher.Publish(OwnerTestKit.Snapshot([OwnerTestKit.Base(7001, Leaving, "Game 101"), OwnerTestKit.Base(7009, Game, "Game 100")]));
+
+        harness.Data.Games.Should().ContainSingle(entry => entry.GameId == Game)
+            .Which.Should().Match<OwnerGame>(entry => entry.CollectionId == 7009 && entry.LocationId == shelf && entry.AbsentSinceUtc == null);
+    }
+
     private static async Task<OwnerHarness> HarnessWithLeavingGamePlacedAsync()
     {
         var harness = OwnerTestKit.Harness(snapshot: OwnerTestKit.Listing(Kept, Leaving));
@@ -193,4 +312,11 @@ public sealed class OwnerExpiryTests
 
         return harness;
     }
+
+    private static OwnerData DataWith(params OwnerGame[] games) => OwnerData.Empty with { Games = OwnerGames.Ordered(games) };
+
+    private static HashSet<int> Games(params int[] gameIds) => [.. gameIds];
+
+    private static Dictionary<long, int> Copies(params (long CollectionId, int GameId)[] entries) =>
+        entries.ToDictionary(entry => entry.CollectionId, entry => entry.GameId);
 }

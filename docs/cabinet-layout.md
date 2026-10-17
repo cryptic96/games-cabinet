@@ -133,6 +133,19 @@ game, with a minimum of two rows, so a section that has just opened, or a whole
 cabinet with a few games, does not show a tall hollow stretch of empty shelves.
 The same holds for the desktop cabinet with balancing off.
 
+A last section of a cabinet that does not balance its sections is also drawn
+without empty shelves above or between its boxes. When a shelf row without a game
+lies above a row that holds one, or between two rows that do, that empty row is
+left out, so the section keeps only its rows that hold a game, with a minimum of
+two. If only one row holds a game, the section adds the nearest row above it, or
+the row below when the game is on the first row. The kept rows are drawn touching,
+so the boxes stand on the bottom shelf, and the top, the sides and the plinth
+follow the shorter height. Nothing about the boxes changes: each cubby keeps its
+place in the design and its games stand exactly as they would have. A last
+section filled from the top down to its last row, with no empty row in between, is
+drawn as before, and so is every section of a cabinet whose sections are
+balanced.
+
 The furniture follows the rows that are drawn: the moulded top, the side boards
 and the plinth are drawn around the rows that are shown, and the space the page
 reserves for the section is exactly that height. A cabinet with no games shows
@@ -230,9 +243,11 @@ keeps the stricter promise too.
 
 The one thing that also changes is how much of a section is drawn. Where sections
 are filled in turn, that is the last section only. A game that lands in a row below
-the last section's last used row adds that row, and any empty rows above it, to
-the drawn section, so the section grows taller by whole rows and nothing that was
-already drawn moves. A game that opens a new section gives the section before it
+the last section's last used row adds that row to the drawn section, and the empty
+rows above it as well when the section was filled from the top, so the section
+grows taller by whole rows. In a sparse last section the rows that hold no game
+stay out, and a game landing in one of them brings that row back and moves the
+rows below it lower; no game changes its place in its cubby. A game that opens a new section gives the section before it
 all of its rows and starts the new last section with two rows. Neither changes any
 game's place. On the balanced desktop cabinet every section is drawn down to its
 last used row, so a change in the rows a section needs is part of the movement
@@ -429,7 +444,7 @@ cubby, series stood together and the desktop was retuned.
 The tests keep the full layout of the samples of 0, 1, 5, 12 and 65 games on
 both designs, and a digest of the layout of the 400-game sample. They live in
 `Cabinet.UnitTests/Layout/Golden/`, next to a record of the layout version they
-were made at, which is 16. Any change to the arrangement or to a section design shows up as
+were made at, which is 17. Any change to the arrangement or to a section design shows up as
 a difference from those files, in the tests and in review. Series that run on
 from cubby to cubby without leaving a cubby out are why the recorded layouts
 changed from the version before: in the sample of 400 games several series used
@@ -444,6 +459,14 @@ phone layouts differ from the version before only in their version number and in
 the options fingerprint, which now includes the balancing setting; every phone
 placement is the same.
 
+Version 17 draws a sparse last section of a cabinet that does not balance its
+sections with only the shelf rows that hold a game, at least two. The recorded
+layouts of 1 and 5 games on the phone design changed: their one section went from
+three and six drawn shelf rows to two and three, with the boxes on the bottom shelf.
+Every other recorded layout, including all the desktop ones, differs from the
+version before only in its version number, and so do the digests of the layout
+of 400 games.
+
 An intended change needs two steps. Raise `CabinetLayoutEngine.LayoutVersion`,
 then record the layouts again from the repository root:
 
@@ -457,6 +480,53 @@ changes go into one release, the version is raised only once for the release:
 record the layouts once under a temporary higher version, then put the intended
 version back and record again. Look at the changed files before committing them. The switch is for local use only and is never set in
 the automated workflows.
+
+## Location cabinets
+
+Besides the one big cabinet, the server can draw one cabinet per storage location, so
+a visitor can look at the games of one place at a time. They are served from their own
+address next to the layout, with the same rules for entity tags, revalidation and
+unknown profile names, and they carry only what the page draws: each location's
+identifier and name, its sections and the colour table. The payload also names the
+entity tag of the big cabinet of the same collection and profile, so the page can tell
+that the cards and the location cabinets come from one version of the collection and
+never mixes two.
+
+How they are built:
+
+- The layout engine runs once for each location, on the games kept there and nothing
+  else. A location's cabinet therefore depends only on its own games and the settings:
+  adding a game to one location never moves a game in another, and the cabinet of a
+  location is drawn identically whether its neighbour holds three games or thirty.
+- The locations come in the owner's order. Games that have no location are drawn in
+  one more cabinet, called "Unknown location" on the page, which always comes last
+  and exists only when some game has no location. A location that holds no game gets
+  no cabinet. An owner who has not set up any locations gets no location cabinets at
+  all, and an owner who has locations but has placed no game gets only the Unknown
+  location cabinet.
+- Every cabinet follows the same rules as the big one, applied to its own games. The
+  few-games rule counts the games of that location alone, so a location with fewer
+  than `Layout:FewGamesThreshold` games shows every box facing out, while the same game
+  may stand as a spine in the big cabinet. Balancing across sections happens per
+  location on the desktop design when a location needs more than one section, and
+  never on the phone design. The short last section applies to every location cabinet,
+  so a location with one or two games is a short, complete piece of furniture of at
+  least two shelf rows.
+- An expansion is paired with its base game again among the games of its own location.
+  One that follows its base game is kept in the base game's location and stands
+  beside it. One the owner keeps somewhere else is drawn in its own location, alone and
+  labelled with its base game's name when that base game stands elsewhere, and it stands beside a base game of the same location when it expands one
+  that is kept there.
+- The cabinets are built lazily, once per collection version, screen profile and
+  settings, and kept with the collection like the big cabinet, so concurrent first
+  requests share one build and a visit costs no layout work. The entity tag is the big
+  cabinet's tag marked as the by-location payload, so a repeat request for an
+  unchanged collection is answered as not modified.
+
+Because each cabinet is a separate run, the same game can face out in one view and
+stand as a spine in the other: which boxes face out depends on how many games share a
+cabinet and on the games around it. Neither view is wrong; they are different
+cabinets.
 
 ## What the page shows
 

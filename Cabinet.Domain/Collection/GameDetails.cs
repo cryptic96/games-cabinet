@@ -30,6 +30,7 @@ public sealed record FamilyLink(int Id, string Name);
 /// <param name="EstimateModelVersion">The version of the estimate that produced <paramref name="EstimatedSize"/>, or null when there is none.</param>
 /// <param name="Families">The game's BGG family links; null when the details were read before families were.</param>
 /// <param name="DetailsVersion">What the build that read these details knew to read, or null for details read before versions existed.</param>
+/// <param name="AlternateNames">The other titles the source lists for the game, cleaned and without duplicates; null when the details were read before they were.</param>
 public sealed record GameDetails(
     DateTimeOffset EnrichedAtUtc,
     int? MinPlayers,
@@ -48,13 +49,15 @@ public sealed record GameDetails(
     BoxSizeClass? EstimatedSize = null,
     int? EstimateModelVersion = null,
     IReadOnlyList<FamilyLink>? Families = null,
-    int? DetailsVersion = null)
+    int? DetailsVersion = null,
+    IReadOnlyList<string>? AlternateNames = null)
 {
     /// <summary>
     /// What the details step reads from the source today. It is raised whenever the step starts reading something new, so
     /// every stored game is read once more and gains the new field; details with another version are due again.
+    /// Version 2 adds the alternate names.
     /// </summary>
-    public const int CurrentDetailsVersion = 1;
+    public const int CurrentDetailsVersion = 2;
 
     /// <summary>Whether another set of details says exactly the same, comparing the lists by their contents.</summary>
     /// <param name="other">The details to compare with; null is never the same.</param>
@@ -77,7 +80,8 @@ public sealed record GameDetails(
         && Designers.SequenceEqual(other.Designers)
         && Mechanics.SequenceEqual(other.Mechanics)
         && ExpandsGames.SequenceEqual(other.ExpandsGames)
-        && (Families is null ? other.Families is null : other.Families is not null && Families.SequenceEqual(other.Families));
+        && (Families is null ? other.Families is null : other.Families is not null && Families.SequenceEqual(other.Families))
+        && (AlternateNames is null ? other.AlternateNames is null : other.AlternateNames is not null && AlternateNames.SequenceEqual(other.AlternateNames));
 }
 
 /// <summary>The answer of a details source: the details of the games it knows or the reason there are none.</summary>

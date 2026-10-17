@@ -1,12 +1,15 @@
 using System.Globalization;
 using System.Net;
+using System.Text.RegularExpressions;
 using Cabinet.Domain.Owner;
 using Cabinet.FakeBgg;
 using Cabinet.FakeBgg.Testing;
 using Cabinet.IntegrationTests.Infrastructure;
+using Cabinet.Repository.Storage;
 using Cabinet.Service.Owner;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Cabinet.IntegrationTests;
 
@@ -129,6 +132,38 @@ public sealed class OwnerLocationListPostTests
         Locations(factory).Should().BeEmpty();
         service.State.Should().BeOfType<OwnerDataState.Ready>().Which.Data.Games.Should().BeEmpty();
         service.State.Should().BeOfType<OwnerDataState.Ready>().Which.Data.Changes[0].Text.Should().Contain("Deleted location \"Shelf B\"").And.Contain("now not placed");
+    }
+
+    [Fact]
+    public async Task A_locations_game_count_and_its_delete_confirmation_count_copies()
+    {
+        const string cabinetId = "a1b2c3d4";
+        const string shelfId = "e5f6a7b8";
+        using var storage = new TemporaryDirectory();
+        CopiesCollectionSeed.Write(storage.FullPath, null, new OwnerLocation(cabinetId, "Cabinet A"), new OwnerLocation(shelfId, "Shelf B"));
+        var copies = CopiesCollectionSeed.ThreeCopyEntries;
+        new OwnerDataStore(storage.FullPath, NullLogger<OwnerDataStore>.Instance).Save(OwnerData.Empty with
+        {
+            Locations = [new OwnerLocation(cabinetId, "Cabinet A"), new OwnerLocation(shelfId, "Shelf B")],
+            Games =
+            [
+                new OwnerGame(CopiesCollectionSeed.ThreeCopiesGameId, shelfId, null, null, copies[0]),
+                new OwnerGame(CopiesCollectionSeed.ThreeCopiesGameId, cabinetId, null, null, copies[1]),
+                new OwnerGame(CopiesCollectionSeed.ThreeCopiesGameId, shelfId, null, null, copies[2]),
+                new OwnerGame(CopiesCollectionSeed.OneCopyGameId, shelfId, null, null, CopiesCollectionSeed.OneCopyEntry),
+            ],
+        });
+        await using var factory = new CabinetWebApplicationFactory(new Dictionary<string, string?> { ["Storage:Directory"] = storage.FullPath });
+        using var session = new OwnerSession(factory);
+
+        var page = await session.GetAsync(LocationsPath);
+        var confirming = await session.GetAsync($"{LocationsPath}?confirm={shelfId}");
+
+        Regex.Matches(page.Body, "<span class=\"loc-count\">([^<]+)</span>")
+            .Select(match => match.Groups[1].Value)
+            .Take(2)
+            .Should().Equal("1 game", "4 games");
+        confirming.Body.Should().Contain("4 games will become not placed.");
     }
 
     [Fact]

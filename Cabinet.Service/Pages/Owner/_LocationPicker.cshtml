@@ -1,7 +1,7 @@
 @using Cabinet.Service.Owner
 @model Cabinet.Service.Pages.Owner.LocationPickerModel
 @{
-    var selectId = string.Concat("picker-", Model.GameId);
+    var selectId = Model.CopyLabel is null ? string.Concat("picker-", Model.GameId) : string.Concat("picker-", Model.GameId, "-", Model.CollectionId);
 }
 <div class="game-picker">
     @if (Model.VisibleLabel is not null)
@@ -11,11 +11,12 @@
     <form method="post" asp-page="/Owner/Locations" asp-page-handler="Assign" class="game-form">
         <input type="hidden" name="revision" value="@Model.Revision" data-page-revision />
         <input type="hidden" name="gameId" value="@Model.GameId" />
+        <input type="hidden" name="collectionId" value="@Model.CollectionId" />
         @if (Model.ReturnTo is not null)
         {
             <input type="hidden" name="returnTo" value="@Model.ReturnTo" />
         }
-        <select id="@selectId" name="locationId" aria-label="@OwnerStrings.PickerLabel(Model.Title)" data-picker>
+        <select id="@selectId" name="locationId" aria-label="@Model.AccessibleName" data-picker>
             @foreach (var option in Model.Options)
             {
                 <option value="@option.Value" selected="@option.Selected">@option.Text</option>
@@ -23,5 +24,9 @@
         </select>
         <button type="submit" class="owner-btn" data-save>@OwnerStrings.SaveButton</button>
     </form>
+    @if (Model.Hint is not null)
+    {
+        <p class="owner-hint picker-hint" data-follow-hint dir="auto" hidden="@(!Model.HintVisible)">@Model.Hint</p>
+    }
     <div class="row-status" role="status"></div>
 </div>

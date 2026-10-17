@@ -1435,6 +1435,15 @@ function drawPlacements(placements) {
 
 const { renderCabinet } = await import(pathToFileURL(join(PAGE_FOLDER, 'render.js')).href);
 
+/**
+ * Imports a script from the temporary copy of the script folder, so its own relative imports resolve.
+ * @param {string} name The file name inside the script folder.
+ * @returns {Promise<object>} The module's exports.
+ */
+function loadPageScriptFromFolder(name) {
+  return import(pathToFileURL(join(PAGE_FOLDER, name)).href);
+}
+
 test('every drawn box carries its collection entry next to its game, and two copies of one game are two boxes with one name', () => {
   const placements = [
     { gameId: 7, entryId: 70, title: 'Invented Lighthouse', label: 'Invented Lighthouse' },
@@ -1452,6 +1461,106 @@ test('every drawn box carries its collection entry next to its game, and two cop
   });
   assert.notEqual(buttons[0].dataset.entryId, buttons[1].dataset.entryId);
   assert.equal(buttons[0].getAttribute('aria-label'), buttons[1].getAttribute('aria-label'));
+});
+
+test('every box ends with an empty veil that screen readers skip, and the veil stays last when a failed picture is replaced by the generated cover', () => {
+  const [spine, cover, plain] = drawPlacements([
+    { gameId: 1, entryId: 10, title: 'Invented Lighthouse', label: 'Invented Lighthouse' },
+    { kind: 'cover', gameId: 2, entryId: 20, title: 'Invented Orchard', label: 'Invented Orchard', xMm: 40, widthMm: 220, art: artWith() },
+    { kind: 'cover', gameId: 3, entryId: 30, title: 'Invented Harbour', label: 'Invented Harbour', xMm: 300, widthMm: 220 },
+  ]);
+
+  for (const box of [spine, cover, plain]) {
+    const veil = box.children.at(-1);
+
+    assert.equal(veil.className, 'placement-veil');
+    assert.equal(veil.getAttribute('aria-hidden'), 'true');
+    assert.equal(veil.children.length, 0);
+    assert.equal(veil.textContent, '');
+    assert.equal(box.querySelectorAll('.placement-veil').length, 1);
+  }
+
+  const failure = cover.children[0].listeners.find((listener) => listener.type === 'error');
+  const previous = globalThis.document;
+  globalThis.document = cover.page;
+
+  try {
+    failure.handler();
+  } finally {
+    globalThis.document = previous;
+  }
+
+  assert.equal(cover.children.at(-1).className, 'placement-veil');
+  assert.equal(cover.querySelectorAll('.placement-veil').length, 1);
+  assert.equal(cover.children[0].className, 'cover-plate');
+});
+
+test('a box is drawn in shadow only when the fourth argument says so, with the attribute set before the box is inserted, and the box keeps its name', () => {
+  const placements = [
+    { gameId: 1, entryId: 10, title: 'Invented Lighthouse', label: 'Invented Lighthouse' },
+    { gameId: 2, entryId: 20, title: 'Invented Orchard', label: 'Invented Orchard', xMm: 40 },
+  ];
+  const previous = globalThis.document;
+  const page = createFakeDocument();
+  const mount = page.createElement('div');
+
+  globalThis.document = page;
+
+  try {
+    renderCabinet(mount, layoutWith(placements), COPY, (placement) => placement.entryId === 20);
+  } finally {
+    globalThis.document = previous;
+  }
+
+  const [lit, shadowed] = mount.descendants().filter((node) => node.tagName === 'BUTTON');
+
+  assert.equal(lit.dataset.dim, undefined);
+  assert.equal(shadowed.dataset.dim, '');
+  assert.equal(shadowed.getAttribute('aria-label'), 'Invented Orchard');
+  assert.equal(shadowed.title, 'Invented Orchard');
+  assert.equal(shadowed.getAttribute('aria-disabled'), null);
+  assert.equal(shadowed.disabled, undefined);
+  assert.equal(shadowed.children.at(-1).className, 'placement-veil');
+});
+
+test('a page without the filter bar draws every box in the light and its stand-in controller never throws', async () => {
+  const { NO_FILTERS } = await loadPageScriptFromFolder('filters.js');
+  const placements = [
+    { gameId: 1, entryId: 10, title: 'Invented Lighthouse', label: 'Invented Lighthouse' },
+    { gameId: 2, entryId: 20, title: 'Invented Orchard', label: 'Invented Orchard', xMm: 40 },
+  ];
+  const draw = (...extra) => {
+    const previous = globalThis.document;
+    const page = createFakeDocument();
+    const mount = page.createElement('div');
+
+    globalThis.document = page;
+
+    try {
+      renderCabinet(mount, layoutWith(placements), COPY, ...extra);
+    } finally {
+      globalThis.document = previous;
+    }
+
+    return mount.descendants().filter((node) => node.tagName === 'BUTTON');
+  };
+
+  for (const boxes of [draw(NO_FILTERS.dimOf), draw()]) {
+    assert.equal(boxes.length, 2);
+
+    for (const box of boxes) {
+      assert.equal(box.dataset.dim, undefined);
+      assert.equal(box.children.at(-1).className, 'placement-veil');
+    }
+  }
+
+  assert.doesNotThrow(() => NO_FILTERS.rebuild([]));
+  assert.doesNotThrow(() => NO_FILTERS.rebuild([{ entryId: 1 }], 'anything'));
+  assert.doesNotThrow(() => NO_FILTERS.apply());
+  assert.doesNotThrow(() => NO_FILTERS.apply('anything'));
+  assert.equal(NO_FILTERS.dimOf({ entryId: 1, title: 'x' }), false);
+  assert.equal(NO_FILTERS.state.q, '');
+  assert.equal(Object.isFrozen(NO_FILTERS), true);
 });
 
 test('an expansion whose base game is not known says it is an expansion in its name and on a second line, and a blank title reads as an untitled game', () => {
@@ -1575,7 +1684,8 @@ test('a cover with valid art is one image and nothing else, with the title kept 
   assert.equal(cover.dataset.art, 'true');
   assert.equal(cover.dataset.fit, 'width');
   assert.equal(cover.dataset.pattern, undefined);
-  assert.equal(cover.children.length, 1);
+  assert.equal(cover.children.length, 2);
+  assert.equal(cover.children.at(-1).className, 'placement-veil');
   assert.equal(cover.querySelector('.cover-plate'), null);
   assert.equal(cover.querySelector('.placement-label'), null);
   assert.equal(cover.textContent, '');

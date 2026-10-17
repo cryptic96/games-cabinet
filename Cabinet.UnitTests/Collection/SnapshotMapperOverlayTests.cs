@@ -182,6 +182,68 @@ public sealed class SnapshotMapperOverlayTests
         versions.Distinct().Should().HaveCount(versions.Length);
     }
 
+    [Fact]
+    public void Each_copy_is_drawn_from_its_own_choice_and_a_game_wide_choice_applies_to_copies_with_none()
+    {
+        var snapshot = TwoCopies();
+        var gameWide = new OwnerGame(GameId, null, null, new PictureSetting(PictureChoice.MainPicture, true, null, null, null));
+        var ownChoice = new OwnerGame(GameId, null, null, new PictureSetting(PictureChoice.OwnedEdition, true, null, null, null), 2);
+
+        var plain = ArtOf(snapshot, OwnerOverlay.From(snapshot, OwnerData.Empty));
+        var everyCopy = ArtOf(snapshot, OwnerOverlay.From(snapshot, OwnerData.Empty with { Games = [gameWide] }));
+        var mixed = ArtOf(snapshot, OwnerOverlay.From(snapshot, OwnerData.Empty with { Games = [gameWide, ownChoice] }));
+        var onlyOne = ArtOf(snapshot, OwnerOverlay.From(snapshot, OwnerData.Empty with { Games = [ownChoice] }));
+
+        plain.Should().Equal(new Dictionary<long, string> { [1] = "/art/2222222222222222-600.webp", [2] = "/art/2222222222222222-600.webp" });
+        everyCopy.Should().Equal(new Dictionary<long, string> { [1] = "/art/2222222222222222-600.webp", [2] = "/art/2222222222222222-600.webp" });
+        mixed.Should().Equal(new Dictionary<long, string> { [1] = "/art/2222222222222222-600.webp", [2] = "/art/1111111111111111-600.webp" });
+        onlyOne.Should().Equal(new Dictionary<long, string> { [1] = "/art/2222222222222222-600.webp", [2] = "/art/1111111111111111-600.webp" });
+    }
+
+    [Fact]
+    public void Changing_only_one_copys_choice_changes_the_version_and_that_copys_art_alone()
+    {
+        var snapshot = TwoCopies();
+        var before = OwnerOverlay.From(snapshot, OwnerData.Empty);
+        var after = OwnerOverlay.From(
+            snapshot,
+            OwnerData.Empty with { Games = [new OwnerGame(GameId, null, null, new PictureSetting(PictureChoice.OwnedEdition, true, null, null, null), 2)] });
+
+        var itemsBefore = SnapshotMapper.ToCabinetItems(snapshot, ArtRules.Default, before);
+        var itemsAfter = SnapshotMapper.ToCabinetItems(snapshot, ArtRules.Default, after);
+
+        SnapshotMapper.Version(itemsAfter, ArtRules.Default, snapshot, after)
+            .Should().NotBe(SnapshotMapper.Version(itemsBefore, ArtRules.Default, snapshot, before));
+        itemsAfter.Single(item => item.CollectionId == 1).Should().BeEquivalentTo(itemsBefore.Single(item => item.CollectionId == 1));
+        itemsAfter.Single(item => item.CollectionId == 2).Art.Should().NotBeEquivalentTo(itemsBefore.Single(item => item.CollectionId == 2).Art);
+    }
+
+    [Fact]
+    public void A_choice_for_one_copy_gives_a_different_version_than_the_same_choice_for_the_other_copy()
+    {
+        var snapshot = TwoCopies();
+        var setting = new PictureSetting(PictureChoice.OwnedEdition, true, null, null, null);
+        var first = OwnerOverlay.From(snapshot, OwnerData.Empty with { Games = [new OwnerGame(GameId, null, null, setting, 1)] });
+        var second = OwnerOverlay.From(snapshot, OwnerData.Empty with { Games = [new OwnerGame(GameId, null, null, setting, 2)] });
+
+        VersionWith(snapshot, first).Should().NotBe(VersionWith(snapshot, second));
+    }
+
+    private static Dictionary<long, string> ArtOf(CollectionSnapshot snapshot, OwnerOverlay overlay) =>
+        SnapshotMapper.Explain(snapshot, ArtRules.Default, overlay)
+            .ToDictionary(trace => trace.Item.CollectionId, trace => trace.Mapped.Art!.Variants[0].Url);
+
+    private static CollectionSnapshot TwoCopies() =>
+        new(
+            CollectionSnapshot.CurrentSchemaVersion,
+            Moment,
+            [Item(), Item() with { CollectionId = 2 }],
+            new[]
+            {
+                Record(VersionUrl, "1111111111111111", 600, 800, ThreeDFeatures),
+                Record(MainUrl, "2222222222222222", 600, 800, FlatFeatures),
+            }.ToDictionary(record => record.SourceUrl, StringComparer.Ordinal));
+
     private static void AssertUnchanged(CollectionSnapshot snapshot, OwnerOverlay overlay)
     {
         var plain = SnapshotMapper.Explain(snapshot, ArtRules.Default).Single();

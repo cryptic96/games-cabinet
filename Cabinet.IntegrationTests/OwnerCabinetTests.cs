@@ -237,7 +237,7 @@ public sealed partial class OwnerCabinetTests
             var data = Owner.State is OwnerDataState.Ready ready ? ready.Data : null;
             var overlay = OwnerOverlay.From(snapshot, data);
 
-            return snapshot.Items.Select(item => item.GameId).Distinct().Count(id => overlay.EffectiveLocationId(id) is null);
+            return snapshot.Items.Select(item => item.CollectionId).Count(entry => overlay.EntryLocationId(entry) is null);
         }
 
         public async ValueTask DisposeAsync()

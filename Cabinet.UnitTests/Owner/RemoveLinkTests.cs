@@ -13,6 +13,9 @@ public sealed class RemoveLinkTests
     private const string OwnedUrl = "https://cf.example.org/owned.jpg";
     private const string MainUrl = "https://cf.example.org/main.jpg";
     private const int GameId = 7;
+    private const long FirstCopy = 7001;
+    private const long SecondCopy = 7002;
+    private static readonly long[] Copies = [FirstCopy, SecondCopy];
     private static readonly DateTimeOffset Moment = new(2030, 1, 10, 0, 0, 0, TimeSpan.Zero);
 
     [Fact]
@@ -80,6 +83,49 @@ public sealed class RemoveLinkTests
         _ = PictureEdits.RemoveLink(data, GameId, "Invented Game");
 
         data.Games.Single().Picture!.Link.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Removing_the_link_of_one_copy_leaves_the_link_of_the_other_copy_and_both_places()
+    {
+        var data = OwnerData.Empty with
+        {
+            Games =
+            [
+                new OwnerGame(GameId, "loc1", null, new PictureSetting(PictureChoice.Link, true, OwnedUrl, MainUrl, WorkingLink()), FirstCopy),
+                new OwnerGame(GameId, "loc2", null, new PictureSetting(PictureChoice.Link, true, OwnedUrl, MainUrl, WorkingLink()), SecondCopy),
+            ],
+        };
+
+        var change = PictureEdits.RemoveLink(data, GameId, SecondCopy, Copies, "Invented Game");
+
+        change.Changed.Should().BeTrue();
+        change.LogText.Should().Be("Removed the picture link of Invented Game (copy 2 of 2)");
+        change.Data.Games.Single(game => game.CollectionId == FirstCopy).Picture!.Link.Should().NotBeNull();
+        change.Data.Games.Single(game => game.CollectionId == SecondCopy).Picture.Should().BeNull();
+        change.Data.Games.Select(game => game.LocationId).Should().Equal("loc1", "loc2");
+    }
+
+    [Fact]
+    public void Removing_the_link_of_one_copy_when_the_link_holds_for_every_copy_splits_it_and_keeps_the_other_copys_link()
+    {
+        var data = With(PictureChoice.Link, isChecked: true, WorkingLink());
+
+        var change = PictureEdits.RemoveLink(data, GameId, SecondCopy, Copies, "Invented Game");
+
+        change.Changed.Should().BeTrue();
+        change.Data.Games.Where(game => game.Picture?.Link is not null).Select(game => game.CollectionId).Should().Equal(FirstCopy);
+    }
+
+    [Fact]
+    public void A_copy_without_a_link_has_nothing_to_remove_even_when_another_copy_has_one()
+    {
+        var data = OwnerData.Empty with
+        {
+            Games = [new OwnerGame(GameId, null, null, new PictureSetting(PictureChoice.Link, true, OwnedUrl, MainUrl, WorkingLink()), FirstCopy)],
+        };
+
+        PictureEdits.RemoveLink(data, GameId, SecondCopy, Copies, "Invented Game").IsNone.Should().BeTrue();
     }
 
     private static OwnerData With(PictureChoice choice, bool isChecked, PictureLink? link) =>

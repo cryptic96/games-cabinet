@@ -7,7 +7,8 @@ namespace Cabinet.UnitTests.Layout;
 /// <summary>
 /// Pins how sections are drawn only down to their last used shelf row: never fewer than two rows, and the section height
 /// always matching the rows that are drawn. When sections are filled in turn, which is what the phone design always does,
-/// only the last section is trimmed and every earlier one is whole; on the balanced desktop cabinet every section is
+/// only the last section is trimmed and every earlier one is whole; a last section filled from the top is drawn down to its
+/// last used row, and a sparse one keeps only the rows that hold a game; on the balanced desktop cabinet every section is
 /// drawn down to its last used row.
 /// </summary>
 public class TrimmedSectionTests
@@ -49,13 +50,19 @@ public class TrimmedSectionTests
         }
 
         var last = layout.Sections[^1];
-        var usedRows = RowsUsed(last, design!);
-        var expectedRows = Math.Min(design!.Rows.Count, Math.Max(CabinetLayoutEngine.MinTrimmedRows, usedRows));
+        var kept = KeptRows(FilledRows(last, design!), design!.Rows.Count);
 
-        RowTops(last).Should().HaveCount(expectedRows);
-        last.HeightMm.Should().Be(HeightOfRows(design, expectedRows));
-        last.Cubbies.Select(cubby => cubby.Index).Should().Equal(Enumerable.Range(0, last.Cubbies.Count));
-        last.Cubbies.Should().HaveCount(design.Cubbies.Count(cubby => cubby.YMm <= TopOfRow(design, expectedRows - 1)));
+        RowTops(last).Should().HaveCount(kept.Count);
+        last.HeightMm.Should().Be(kept.Sum(row => design.Rows[row].HeightMm) + (design.FrameMm * (kept.Count - 1)));
+        last.Cubbies.Select(cubby => cubby.Index).Should().Equal(
+            design.Cubbies.Where(cubby => kept.Contains(RowOfCubby(design, cubby.Index))).Select(cubby => cubby.Index));
+
+        if (kept.SequenceEqual(Enumerable.Range(0, kept.Count)))
+        {
+            last.Cubbies.Select(cubby => cubby.YMm).Should().Equal(
+                design.Cubbies.Where(cubby => cubby.YMm <= TopOfRow(design, kept.Count - 1)).Select(cubby => cubby.YMm));
+        }
+
         LayoutAssertions.AssertValid(layout, items);
     }
 
@@ -175,6 +182,31 @@ public class TrimmedSectionTests
 
     private static List<int> RowTops(LayoutSection section) =>
         section.Cubbies.Select(cubby => cubby.YMm).Distinct().Order().ToList();
+
+    private static int RowOfCubby(SectionDesign design, int cubbyIndex) =>
+        design.Cubbies.Select(cubby => cubby.YMm).Distinct().Order().ToList().IndexOf(design.Cubbies[cubbyIndex].YMm);
+
+    private static List<int> FilledRows(LayoutSection section, SectionDesign design) =>
+        [.. section.Cubbies.Where(cubby => cubby.Placements.Count > 0).Select(cubby => RowOfCubby(design, cubby.Index)).Distinct().Order()];
+
+    private static List<int> KeptRows(List<int> filled, int designRows)
+    {
+        var kept = new List<int>(filled);
+        var minimum = Math.Min(CabinetLayoutEngine.MinTrimmedRows, designRows);
+
+        if (kept.Count == 0)
+        {
+            return [.. Enumerable.Range(0, minimum)];
+        }
+
+        if (kept.Count < minimum)
+        {
+            kept.Add(kept[0] > 0 ? kept[0] - 1 : kept[0] + 1);
+            kept.Sort();
+        }
+
+        return kept;
+    }
 
     private static int RowsUsed(LayoutSection section, SectionDesign design)
     {

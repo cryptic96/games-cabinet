@@ -10,7 +10,7 @@ namespace Cabinet.Service.Pages.Owner;
 /// <summary>What one side of the restore comparison holds.</summary>
 /// <param name="SavedAtUtc">When the data was last saved, or null when it never was.</param>
 /// <param name="Figures">The counts of locations, placed games and picture choices.</param>
-/// <param name="NotInCollection">How many games with decisions the collection does not list now.</param>
+/// <param name="NotInCollection">How many choices, for a game or for one copy, that the collection does not list now.</param>
 public sealed record RestoreSide(DateTimeOffset? SavedAtUtc, OwnerDataFigures Figures, int NotInCollection);
 
 /// <summary>A checked file shown next to what the server holds now, waiting for the owner to restore it or keep the current data.</summary>
@@ -257,7 +257,8 @@ public class SettingsModel : OwnerPage
             return Page();
         }
 
-        var result = await _owner.RestoreAsync(candidate.Data, candidate.Source, OwnedGameIds(), cancellationToken);
+        var owned = OwnedCopies();
+        var result = await _owner.RestoreAsync(candidate.Data, candidate.Source, owned?.GameIds, owned?.Copies, cancellationToken);
 
         if (result.Outcome != OwnerOutcome.Saved)
         {
@@ -374,7 +375,7 @@ public class SettingsModel : OwnerPage
             return null;
         }
 
-        var owned = OwnedGameIds();
+        var owned = OwnedCopies();
         var current = _owner.State is OwnerDataState.Ready ready ? ready.Data : null;
 
         return new RestorePreview(
@@ -384,12 +385,16 @@ public class SettingsModel : OwnerPage
             current is null ? new RestoreSide(null, default, 0) : SideOf(current, owned));
     }
 
-    private static RestoreSide SideOf(OwnerData data, IReadOnlySet<int>? owned) =>
+    private static RestoreSide SideOf(OwnerData data, OwnedSet? owned) =>
         new(
             data.SavedAtUtc,
             OwnerDataFigures.From(data),
-            owned is null ? 0 : data.Games.Count(game => !owned.Contains(game.GameId)));
+            owned is null ? 0 : data.Games.Count(game => !OwnerExpiry.IsListed(game, owned.GameIds, owned.Copies)));
 
-    private HashSet<int>? OwnedGameIds() =>
-        _collection.Current.Snapshot is { } snapshot ? [.. snapshot.Items.Select(item => item.GameId)] : null;
+    private OwnedSet? OwnedCopies() =>
+        _collection.Current.Snapshot is { } snapshot
+            ? new OwnedSet(snapshot.Items.Select(item => item.GameId).ToHashSet(), CollectionPublisher.ListedCopies(snapshot))
+            : null;
+
+    private sealed record OwnedSet(IReadOnlySet<int> GameIds, IReadOnlyDictionary<long, int> Copies);
 }

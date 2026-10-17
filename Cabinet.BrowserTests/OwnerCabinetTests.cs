@@ -1,13 +1,10 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Cabinet.BrowserTests.Infrastructure;
-using Cabinet.Domain.Owner;
 using Cabinet.FakeBgg;
 using Cabinet.FakeBgg.Testing;
 using Cabinet.IntegrationTests.Infrastructure;
-using Cabinet.Service.Owner;
 using FluentAssertions;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Playwright;
 
 namespace Cabinet.BrowserTests;
@@ -30,8 +27,7 @@ public sealed class OwnerCabinetTests : CabinetPageTest
     private const string Boxes = "#cabinet .placement:not([data-kind=\"moreMarker\"])";
     private const string FailedToLoad = "Failed to load resource";
     private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
-
-    private HttpClient? _publicClient;
+    private static readonly JsonSerializerOptions WebOptions = new(JsonSerializerDefaults.Web);
 
     [Fact]
     public async Task At_the_owner_address_an_unplaced_box_carries_the_tag_and_its_card_ends_with_an_Edit_link_to_its_pictures_view()
@@ -78,6 +74,55 @@ public sealed class OwnerCabinetTests : CabinetPageTest
         await Expect(Page).ToHaveURLAsync(new Regex($@"{PicturesPath}\?game={target.GameId}$"));
         await Expect(Page.Locator(".pic-row")).ToHaveCountAsync(1);
         await Expect(Page.Locator(".pic-row .game-title")).ToHaveTextAsync(CafeBase);
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task The_bar_sits_below_the_strip_and_tags_stay_above_the_shadow()
+    {
+        var host = await StartHostAsync();
+        var dimmed = host.Card(CafeBase);
+        await Page.SetViewportSizeAsync(1440, 900);
+
+        await GotoOwnerCabinetAsync();
+        await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
+
+        var strip = await RectOf(".owner-bar[data-variant=\"strip\"]");
+        var bar = await RectOf(".filter-bar");
+        bar.Top.Should().BeGreaterThanOrEqualTo(strip.Bottom - 0.5, "the filter bar sits below the owner strip");
+
+        await Page.Locator("#filter-q").FillAsync(QuarryBase);
+        var box = Box(dimmed);
+        await Expect(box).ToHaveAttributeAsync("data-dim", string.Empty);
+        await Expect(box).ToHaveAttributeAsync("data-unplaced", string.Empty);
+        await Page.WaitForFunctionAsync(
+            "(id) => { const box = document.querySelector('#cabinet .placement[data-game-id=\"' + id + '\"]'); return Number(getComputedStyle(box.querySelector(':scope > .placement-veil')).opacity) === 1; }",
+            dimmed.GameId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+        var reading = JsonSerializer.Deserialize<TagReading>((await box.EvaluateAsync<JsonElement>(
+            """
+            (box) => {
+              const tag = box.querySelector(':scope > .placement-tag');
+              const veil = box.querySelector(':scope > .placement-veil');
+              tag.style.setProperty('pointer-events', 'auto');
+              veil.style.setProperty('pointer-events', 'auto');
+              const rect = tag.getBoundingClientRect();
+              const top = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+              return {
+                tagLevel: getComputedStyle(tag).zIndex,
+                veilLevel: getComputedStyle(veil).zIndex,
+                tagWidth: rect.width,
+                topIsTag: top === tag,
+                visibility: getComputedStyle(tag).visibility,
+              };
+            }
+            """)).GetRawText(), WebOptions)!;
+
+        reading.TagLevel.Should().Be("2");
+        reading.VeilLevel.Should().Be("1");
+        reading.TagWidth.Should().BeGreaterThan(0);
+        reading.Visibility.Should().Be("visible");
+        reading.TopIsTag.Should().BeTrue("the corner tag lies above the shadow of a dimmed box");
         ConsoleErrors.Should().BeEmpty();
     }
 
@@ -465,6 +510,8 @@ public sealed class OwnerCabinetTests : CabinetPageTest
         return new RectReading(edges[0], edges[1], edges[2], edges[3]);
     }
 
+    private sealed record TagReading(string TagLevel, string VeilLevel, double TagWidth, bool TopIsTag, string Visibility);
+
     private sealed record RectReading(double Left, double Top, double Right, double Bottom)
     {
         public double Width => Right - Left;
@@ -480,17 +527,7 @@ public sealed class OwnerCabinetTests : CabinetPageTest
         await Page.WaitForSelectorAsync("#cabinet .placement", new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached });
     }
 
-    private async Task<OwnerHost> StartHostAsync()
-    {
-        var clock = SyncHarness.NewClock();
-        var factory = SyncHarness.CreateFactory(ScriptedBggHandler.ForCollection(Collection()), clock);
-
-        await StartAsync(factory);
-        _publicClient = factory.CreatePublicClient();
-        await SyncRounds.PressAndWait(_publicClient, clock, advance: false);
-
-        return new OwnerHost(factory.ServingServices.GetRequiredService<OwnerDataService>(), await ReadCardsAsync());
-    }
+    private Task<OwnerHost> StartHostAsync() => OwnerHost.SyncAsync(factory => StartAsync(factory), Collection());
 
     private static IReadOnlyList<FakeBggItem> Collection()
     {
@@ -516,56 +553,4 @@ public sealed class OwnerCabinetTests : CabinetPageTest
             null,
             null,
             baseObjectId);
-
-    private async Task<IReadOnlyList<CardReading>> ReadCardsAsync()
-    {
-        using var response = await _publicClient!.GetAsync("/cabinet/cards?profile=desktop", TestContext.Current.CancellationToken);
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
-
-        return
-        [
-            .. document.RootElement.GetProperty("cards").EnumerateArray().Select(card => new CardReading(
-                card.GetProperty("gameId").GetInt32(),
-                card.GetProperty("title").GetString()!)),
-        ];
-    }
-
-    private sealed record CardReading(int GameId, string Title);
-
-    private sealed class OwnerHost(OwnerDataService owner, IReadOnlyList<CardReading> cards)
-    {
-        public OwnerDataService Owner { get; } = owner;
-
-        public IReadOnlyList<CardReading> Cards { get; } = cards;
-
-        public CardReading Card(string title) => Cards.First(card => string.Equals(card.Title, title, StringComparison.Ordinal));
-
-        public async Task PlaceAsync(CardReading card, string locationId)
-        {
-            var result = await Owner.MutateAsync(
-                Owner.Revision,
-                data => LocationEdits.Assign(data, card.GameId, locationId, card.Title),
-                TestContext.Current.CancellationToken);
-
-            result.Outcome.Should().Be(OwnerOutcome.Saved);
-        }
-
-        public async Task<IReadOnlyList<string>> SeedAsync(params string[] names)
-        {
-            var ids = new List<string>();
-
-            foreach (var name in names)
-            {
-                var result = await Owner.MutateAsync(
-                    Owner.Revision,
-                    data => LocationEdits.Add(data, name, OwnerDataService.NewId),
-                    TestContext.Current.CancellationToken);
-
-                result.Outcome.Should().Be(OwnerOutcome.Saved);
-                ids.Add(result.Data!.Locations[^1].Id);
-            }
-
-            return ids;
-        }
-    }
 }

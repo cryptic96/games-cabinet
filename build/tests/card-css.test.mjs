@@ -84,6 +84,25 @@ test('every pressable row is as many rulings tall as the hit rows say', () => {
 
   assert.ok(declares('.exp-row', minimum));
   assert.ok(declares('.card-link', minimum));
+  assert.ok(declares('.card-where-link', minimum));
+});
+
+test('the location link is a quiet underlined button that packs its line to the start and wraps over whole rulings', () => {
+  assert.ok(declares('.card-where-link', 'background: transparent'));
+  assert.ok(declares('.card-where-link', 'border: 0'));
+  assert.ok(declares('.card-where-link', 'color: var(--ink)'));
+  assert.ok(declares('.card-where-link', 'font-size: 16px'));
+  assert.ok(declares('.card-where-link', 'font-weight: 400'));
+  assert.ok(declares('.card-where-link', 'line-height: var(--ruling)'));
+  assert.ok(declares('.card-where-link', 'text-decoration: underline'));
+  assert.ok(declares('.card-where-link', 'text-underline-offset: 3px'));
+  assert.ok(declares('.card-where-link', 'display: grid'));
+  assert.ok(declares('.card-where-link', 'align-content: start'));
+  assert.ok(declares('.card-where-link', '-webkit-tap-highlight-color: transparent'));
+  assert.ok(declares('.card-where-chev', 'width: 14px'));
+  assert.ok(declares('.card-where-chev', 'margin-inline-start: 4px'));
+  assert.ok(declares('.card-where-link:hover', 'background: rgb(42 26 16 / 0.06)'));
+  assert.ok(declares('.card-where-link:active', 'background: rgb(42 26 16 / 0.06)'));
 });
 
 test('the focus ring inside the card is ink, never the accent colour', () => {
@@ -108,6 +127,25 @@ test('a swap row packs its text to its first ruling instead of centring it in th
 
 test('the card has no punched hole', () => {
   assert.doesNotMatch(stripped, /card-hole/);
+});
+
+test('switching the view names the cabinet area, keeps the root still and fades over the look token', () => {
+  assert.ok(declares('html[data-switching-view] #cabinet', 'view-transition-name: cabinet-area'));
+  assert.ok(declares('html[data-switching-view]::view-transition-group(root)', 'animation: none'));
+  assert.ok(declares('html[data-switching-view]::view-transition-group(cabinet-area)', 'animation-duration: var(--look-fade)'));
+});
+
+test('switching the view fades through the wall: the old view out in the first half, the new one in during the second', () => {
+  assert.ok(declares('html[data-switching-view]::view-transition-old(cabinet-area)', 'animation-duration: calc(var(--look-fade) / 2)'));
+  assert.ok(declares('html[data-switching-view]::view-transition-new(cabinet-area)', 'animation-delay: calc(var(--look-fade) / 2)'));
+  assert.ok(declares('html[data-switching-view]::view-transition-new(cabinet-area)', 'animation-duration: calc(var(--look-fade) / 2)'));
+});
+
+test('the cabinet area takes its view-transition name only while a switch is under way', () => {
+  const names = rules().filter((rule) => /view-transition-name:\s*cabinet-area/.test(rule.body));
+
+  assert.equal(names.length, 1);
+  assert.deepEqual(names[0].selectors, ['html[data-switching-view] #cabinet']);
 });
 
 test('the chip takes its colour from the row, and the text and paper never take an art colour', () => {

@@ -81,9 +81,9 @@ else
             <ul class="game-list" role="list">
                 @foreach (var game in Model.Games)
                 {
-                    <li class="game-row" id="game-@game.GameId" data-game-id="@game.GameId" data-base-id="@game.BaseGameId" data-nested="@(game.FollowsBase ? "true" : "false")">
+                    <li class="game-row" id="@game.Anchor" data-game-id="@game.GameId" data-entry-id="@game.CollectionId" data-base-id="@game.BaseGameId" data-base-entry-id="@game.BaseEntryId" data-nested="@(game.FollowsBase ? "true" : "false")">
                         <label class="game-pick">
-                            <input type="checkbox" class="game-check" value="@game.GameId" aria-label="@OwnerStrings.SelectLabel(game.Title)" />
+                            <input type="checkbox" class="game-check" value="@game.CollectionId" aria-label="@OwnerStrings.SelectLabel(game.Title)" />
                         </label>
                         @if (game.CoverUrl is not null)
                         {
@@ -95,6 +95,10 @@ else
                         }
                         <div class="game-text">
                             <span class="game-title" dir="auto">@game.Title</span>
+                            @if (game.CopyLabel is not null)
+                            {
+                                <span class="pic-tag pic-tag-plain" dir="auto">@game.CopyLabel</span>
+                            }
                             <span class="game-meta">
                                 <span class="game-where" dir="auto" data-unplaced="@(game.EffectiveLocation is null ? "true" : null)">@(game.EffectiveLocation ?? OwnerStrings.NotPlaced)</span>
                                 @if (game.IsExpansion)
@@ -107,7 +111,7 @@ else
                                 }
                             </span>
                         </div>
-                        <partial name="_LocationPicker" model="LocationPickerModel.For(game, Model.Locations, Model.Revision)" />
+                        <partial name="_LocationPicker" model="LocationPickerModel.For(game, Model.Locations, Model.Revision, withHint: true)" />
                     </li>
                 }
             </ul>

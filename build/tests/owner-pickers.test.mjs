@@ -61,7 +61,7 @@ function pickerPage() {
   const form = {
     parentElement: { querySelector: () => region },
     getAttribute: () => '?handler=Assign',
-    elements: { gameId: { value: '7' } },
+    elements: { gameId: { value: '7' }, collectionId: { value: '70' } },
     querySelector: () => ({ hidden: false }),
     addEventListener() {},
   };
@@ -109,6 +109,8 @@ test('a choice waiting when the page goes to the background is sent at once, beh
   assert.equal(page.fetched.length, 1);
   assert.equal(page.fetched[0].keepalive, true);
   assert.equal(page.fetched[0].body.get('locationId'), 'b');
+  assert.equal(page.fetched[0].body.get('gameId'), '7');
+  assert.equal(page.fetched[0].body.get('collectionId'), '70');
 });
 
 test('a choice made with a pointer waits its turn in the queue', async () => {

@@ -1,6 +1,6 @@
 /**
  * The script side of the games list on the locations page: ticking rows, the selection dock that slides up while any row is
- * ticked, and the dialog of buttons that asks where the ticked games go. A move is one request for every ticked game and one
+ * ticked, and the dialog of buttons that asks where the ticked games go. A move is one request for every ticked copy and one
  * change on the server, so one Undo takes all of it back. The dock then shows what happened, with Undo and Dismiss, until the
  * owner ticks a row again. Every name and title is written with `textContent`, never as markup.
  */
@@ -33,9 +33,9 @@ const LOCATION_TARGET = 'location:';
  */
 export function gameStates(doc) {
   return Array.from(doc.querySelectorAll('.game-row')).map((row) => ({
-    id: row.dataset.gameId,
+    id: row.dataset.entryId,
     own: row.querySelector('select[name="locationId"]')?.value ?? '',
-    baseId: row.dataset.baseId || null,
+    baseId: row.dataset.baseEntryId || null,
   }));
 }
 
@@ -121,7 +121,7 @@ export function initPlacing(doc, hooks) {
    * @returns {boolean}
    */
   function followsBase(row) {
-    return Boolean(row.dataset.baseId);
+    return Boolean(row.dataset.baseEntryId);
   }
 
   /**
@@ -131,6 +131,20 @@ export function initPlacing(doc, hooks) {
    */
   function pickerOf(row) {
     return row.querySelector('select[name="locationId"]');
+  }
+
+  /**
+   * Tells whether the copies of the base game an expansion row follows are shown in more than one place.
+   * @param {HTMLElement} row The expansion's row.
+   * @param {Map<string, string>} shown Where each copy is shown now, by collection entry.
+   * @returns {boolean}
+   */
+  function baseCopiesDiffer(row, shown) {
+    const places = gameRows()
+      .filter((candidate) => candidate.dataset.gameId === row.dataset.baseId)
+      .map((candidate) => shown.get(candidate.dataset.entryId) ?? '');
+
+    return new Set(places).size > 1;
   }
 
   /**
@@ -238,7 +252,7 @@ export function initPlacing(doc, hooks) {
     const names = new Map(hooks.locations().map((location) => [location.id, location.name]));
 
     for (const row of gameRows()) {
-      const id = shown.get(row.dataset.gameId) ?? '';
+      const id = shown.get(row.dataset.entryId) ?? '';
       const where = row.querySelector('.game-where');
       const follow = row.querySelector('.game-follow');
 
@@ -250,8 +264,14 @@ export function initPlacing(doc, hooks) {
         where.dataset.unplaced = 'true';
       }
 
+      const hint = row.querySelector('[data-follow-hint]');
+
       if (follow) {
         follow.hidden = pickerOf(row).value !== '';
+      }
+
+      if (hint) {
+        hint.hidden = pickerOf(row).value !== '' || !baseCopiesDiffer(row, shown);
       }
     }
   }
@@ -325,7 +345,7 @@ export function initPlacing(doc, hooks) {
     const previous = moving.map((row) => ({ row, own: pickerOf(row).value }));
 
     hooks.enqueue(async () => {
-      const result = await postOwner(HANDLERS.bulkMove, { gameIds: moving.map((row) => row.dataset.gameId), target });
+      const result = await postOwner(HANDLERS.bulkMove, { collectionIds: moving.map((row) => row.dataset.entryId), target });
 
       if (result.outcome === 'noChange') {
         showDone(OWNER_TEXT.nothingToChange, null);

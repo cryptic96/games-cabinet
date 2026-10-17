@@ -107,13 +107,13 @@ public sealed class OwnerLocationListTests : CabinetPageTest
 
         var item = Page.Locator(".loc-item").Nth(1);
         var delete = item.GetByRole(AriaRole.Button, new() { Name = "Delete Shelf B" });
-        await Expect(item.Locator(".loc-count")).ToHaveTextAsync("2 games");
+        await Expect(item.Locator(".loc-count")).ToHaveTextAsync("3 games");
         await delete.ClickAsync();
 
         var dialog = Page.Locator("dialog.owner-dialog[open]");
         await Expect(dialog).ToBeVisibleAsync();
         await Expect(dialog.Locator("h3")).ToHaveTextAsync("Delete \"Shelf B\"?");
-        await Expect(dialog.Locator(".warning-line")).ToHaveTextAsync("2 games will become not placed. They aren't moved anywhere else.");
+        await Expect(dialog.Locator(".warning-line")).ToHaveTextAsync("3 games will become not placed. They aren't moved anywhere else.");
         await Expect(dialog.GetByRole(AriaRole.Button, new() { Name = "Keep it" })).ToBeFocusedAsync();
         await SaveScreenshotAsync("owner-locations-dialog-1440");
 
@@ -141,7 +141,7 @@ public sealed class OwnerLocationListTests : CabinetPageTest
         await dialog.GetByRole(AriaRole.Button, new() { Name = "Delete location" }).ClickAsync();
 
         await Expect(Page.Locator(".loc-item")).ToHaveCountAsync(1);
-        await Expect(Page.Locator("#new-location-status")).ToContainTextAsync("Deleted \"Shelf B\". 2 games are now not placed.");
+        await Expect(Page.Locator("#new-location-status")).ToContainTextAsync("Deleted \"Shelf B\". 3 games are now not placed.");
         await Expect(Page.Locator("#new-location-status button")).ToHaveTextAsync("Undo");
         await Expect(Page.Locator("#new-location")).ToBeFocusedAsync();
         (await ReadCardsAsync()).Where(card => card.Location == "Shelf B").Should().BeEmpty();

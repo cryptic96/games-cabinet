@@ -57,7 +57,8 @@ public sealed record PictureSetting(
 /// <param name="LocationId">The location the game is kept in, or null when it has no location of its own.</param>
 /// <param name="AbsentSinceUtc">When the game stopped being owned, or null while it is owned; its decisions are kept for a while.</param>
 /// <param name="Picture">The picture decision, or null when the owner made none.</param>
-public sealed record OwnerGame(int GameId, string? LocationId, DateTimeOffset? AbsentSinceUtc, PictureSetting? Picture);
+/// <param name="CollectionId">The collection entry this choice is for, or null for every copy of the game, the form older files have.</param>
+public sealed record OwnerGame(int GameId, string? LocationId, DateTimeOffset? AbsentSinceUtc, PictureSetting? Picture, long? CollectionId = null);
 
 /// <summary>The three counts that say what a copy of the owner data holds, which the owner compares before a copy replaces another.</summary>
 /// <param name="Locations">How many locations there are.</param>
@@ -73,7 +74,7 @@ public readonly record struct OwnerDataFigures(int Locations, int PlacedGames, i
 
         return new OwnerDataFigures(
             data.Locations.Count,
-            data.Games.Count(game => game.LocationId is not null),
+            data.Games.Where(game => game.LocationId is not null).Select(game => game.GameId).Distinct().Count(),
             data.Games.Count(game => game.Picture is { } picture && picture.Choice != PictureChoice.Automatic));
     }
 }
@@ -93,7 +94,7 @@ public sealed record ChangeEntry(DateTimeOffset AtUtc, string Text);
 /// <param name="SavedAtUtc">When the data was last saved, or null before the first save.</param>
 /// <param name="Look">The look of the cabinet for every visitor.</param>
 /// <param name="Locations">The locations in the order the owner set.</param>
-/// <param name="Games">The per-game decisions, sorted by game identifier.</param>
+/// <param name="Games">The per-game and per-copy decisions, sorted by game identifier and then by collection entry, the choice that holds for every copy first.</param>
 /// <param name="LastDownloadAtUtc">When the owner last downloaded a backup, or null when never.</param>
 /// <param name="ChangesSinceDownload">How many changes were saved since that download.</param>
 /// <param name="Changes">The change log, newest first.</param>
@@ -113,7 +114,7 @@ public sealed record OwnerData(
     public const string KindMarker = "games-cabinet-owner-data";
 
     /// <summary>The stored shape this build writes and understands.</summary>
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
 
     /// <summary>The most locations the owner can have.</summary>
     public const int MaxLocations = 50;
@@ -177,30 +178,55 @@ public interface IOwnerDataStore
 }
 
 /// <summary>
-/// The thirty-day rule: what the owner decided for a game is kept for a while after the game leaves the collection, in case
-/// it was only a hiccup or the owner takes it back, and forgotten once the game stayed away for thirty days of accepted collections.
+/// The thirty-day rule: what the owner decided for a copy of a game is kept for a while after the copy leaves the collection,
+/// in case it was only a hiccup or the owner takes it back, and forgotten once it stayed away for thirty days of accepted
+/// collections. A choice for one copy is judged by its collection entry, a choice for every copy by its game. When a game is
+/// removed on BGG and added again it gets a new collection entry, so a new copy of the same game that has no choice of its
+/// own takes over the kept choices of the absent one.
 /// </summary>
 public static class OwnerExpiry
 {
-    /// <summary>How long a game may be missing from accepted collections before its owner data is removed.</summary>
+    /// <summary>How long a copy may be missing from accepted collections before its owner data is removed.</summary>
     public static readonly TimeSpan AbsentAfter = TimeSpan.FromDays(30);
 
-    /// <summary>Works out the owner data after an accepted collection that lists these games.</summary>
+    /// <summary>Tells whether the accepted collection lists what a choice is for: its collection entry for one copy, its game for every copy.</summary>
+    /// <param name="game">The choice.</param>
+    /// <param name="listedGameIds">Every game the collection lists.</param>
+    /// <param name="listedCollectionIds">Every collection entry the collection lists, with the game each belongs to.</param>
+    public static bool IsListed(OwnerGame game, IReadOnlySet<int> listedGameIds, IReadOnlyDictionary<long, int> listedCollectionIds)
+    {
+        ArgumentNullException.ThrowIfNull(game);
+        ArgumentNullException.ThrowIfNull(listedGameIds);
+        ArgumentNullException.ThrowIfNull(listedCollectionIds);
+
+        return game.CollectionId is { } collectionId
+            ? listedCollectionIds.ContainsKey(collectionId)
+            : listedGameIds.Contains(game.GameId);
+    }
+
+    /// <summary>Works out the owner data after an accepted collection that lists these games and copies.</summary>
     /// <param name="data">The owner data as it is.</param>
     /// <param name="listedGameIds">Every game the accepted collection lists, base games and expansions.</param>
+    /// <param name="listedCollectionIds">Every collection entry the accepted collection lists, with the game each belongs to.</param>
     /// <param name="now">The moment the collection was accepted.</param>
     /// <returns>The new owner data, or null when nothing needs to change.</returns>
-    public static OwnerData? Reconcile(OwnerData data, IReadOnlySet<int> listedGameIds, DateTimeOffset now)
+    public static OwnerData? Reconcile(
+        OwnerData data,
+        IReadOnlySet<int> listedGameIds,
+        IReadOnlyDictionary<long, int> listedCollectionIds,
+        DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(listedGameIds);
+        ArgumentNullException.ThrowIfNull(listedCollectionIds);
 
-        var changed = false;
-        var games = new List<OwnerGame>(data.Games.Count);
+        var handedOver = HandOver(data.Games, listedGameIds, listedCollectionIds, now);
+        var changed = !ReferenceEquals(handedOver, data.Games);
+        var games = new List<OwnerGame>(handedOver.Count);
 
-        foreach (var game in data.Games)
+        foreach (var game in handedOver)
         {
-            var next = Next(game, listedGameIds.Contains(game.GameId), now);
+            var next = Next(game, IsListed(game, listedGameIds, listedCollectionIds), now);
             changed |= !ReferenceEquals(next, game);
 
             if (next is not null)
@@ -211,6 +237,51 @@ public static class OwnerExpiry
 
         return changed ? data with { Games = games } : null;
     }
+
+    private static IReadOnlyList<OwnerGame> HandOver(
+        IReadOnlyList<OwnerGame> games,
+        IReadOnlySet<int> listedGameIds,
+        IReadOnlyDictionary<long, int> listedCollectionIds,
+        DateTimeOffset now)
+    {
+        var replaced = new Dictionary<OwnerGame, OwnerGame?>(ReferenceEqualityComparer.Instance);
+
+        foreach (var byGame in games.Where(game => game.CollectionId is not null).GroupBy(game => game.GameId))
+        {
+            if (games.Any(game => game.GameId == byGame.Key && game.CollectionId is null))
+            {
+                continue;
+            }
+
+            var donors = byGame
+                .Where(game => !IsListed(game, listedGameIds, listedCollectionIds) && !IsExpired(game, now))
+                .OrderBy(game => game.CollectionId)
+                .ToList();
+            var withOwn = byGame.Select(game => game.CollectionId!.Value).ToHashSet();
+            var recipients = listedCollectionIds
+                .Where(entry => entry.Value == byGame.Key && !withOwn.Contains(entry.Key))
+                .Select(entry => entry.Key)
+                .Order()
+                .ToList();
+
+            foreach (var (donor, recipient) in donors.Zip(recipients))
+            {
+                replaced[donor] = donor with { CollectionId = recipient, AbsentSinceUtc = null };
+            }
+        }
+
+        if (replaced.Count == 0)
+        {
+            return games;
+        }
+
+        var handed = games.Select(game => replaced.TryGetValue(game, out var next) ? next! : game);
+
+        return OwnerGames.Ordered(handed);
+    }
+
+    private static bool IsExpired(OwnerGame game, DateTimeOffset now) =>
+        game.AbsentSinceUtc is { } since && now - since >= AbsentAfter;
 
     private static OwnerGame? Next(OwnerGame game, bool listed, DateTimeOffset now)
     {

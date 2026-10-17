@@ -26,6 +26,7 @@ public sealed class OwnerPlacingTests : CabinetPageTest
     private const string MoveToName = "Move to...";
     private const string BulkMoveFragment = "handler=BulkMove";
 
+    private readonly TemporaryDirectory _storage = new();
     private HttpClient? _publicClient;
 
     [Fact]
@@ -97,6 +98,58 @@ public sealed class OwnerPlacingTests : CabinetPageTest
         cards = await ReadCardsAsync();
         cards.Single(card => card.EntryId == first.EntryId).Location.Should().BeNull();
         cards.Single(card => card.EntryId == second.EntryId).Location.Should().BeNull();
+        AssertCleanConsole();
+    }
+
+    [Fact]
+    public async Task Ticking_two_copies_moves_only_those_copies()
+    {
+        const string cabinetId = "a1b2c3d4";
+        const string shelfId = "e5f6a7b8";
+        CopiesCollectionSeed.Write(_storage.FullPath, null, new OwnerLocation(cabinetId, "Cabinet A"), new OwnerLocation(shelfId, "Shelf B"));
+        var factory = await StartAsync(new Dictionary<string, string?> { ["Storage:Directory"] = _storage.FullPath });
+        var owner = factory.ServingServices.GetRequiredService<OwnerDataService>();
+        var copies = CopiesCollectionSeed.ThreeCopyEntries;
+        var placed = await owner.MutateAsync(
+            owner.Revision,
+            data => LocationEdits.Assign(data, CopiesCollectionSeed.ThreeCopiesGameId, copies[1], copies, cabinetId, CopiesCollectionSeed.ThreeCopiesTitle),
+            TestContext.Current.CancellationToken);
+        await Page.SetViewportSizeAsync(1440, 900);
+        await GotoLocationsAsync();
+        var changesBefore = owner.State is OwnerDataState.Ready before ? before.Data.Changes.Count : -1;
+        var first = Entry(copies[0]);
+        var second = Entry(copies[1]);
+        var third = Entry(copies[2]);
+
+        placed.Outcome.Should().Be(OwnerOutcome.Saved);
+        await Expect(second.Locator(".game-where")).ToHaveTextAsync("Cabinet A");
+
+        await first.Locator(".game-check").CheckAsync();
+        await third.Locator(".game-check").CheckAsync();
+
+        await Expect(Page.Locator("#dock-count")).ToHaveTextAsync("2 selected");
+        await Page.GetByRole(AriaRole.Button, new() { Name = MoveToName }).ClickAsync();
+        await Page.Locator(MoveDialog).GetByRole(AriaRole.Button, new() { Name = "Shelf B" }).ClickAsync();
+
+        var status = Page.Locator("#dock-status");
+        await Expect(status).ToContainTextAsync("Moved 2 games to Shelf B");
+        await Expect(first.Locator(".game-where")).ToHaveTextAsync("Shelf B");
+        await Expect(third.Locator(".game-where")).ToHaveTextAsync("Shelf B");
+        await Expect(second.Locator(".game-where")).ToHaveTextAsync("Cabinet A");
+        await Expect(first.Locator("select")).ToHaveValueAsync(shelfId);
+        await Expect(second.Locator("select")).ToHaveValueAsync(cabinetId);
+        await Expect(third.Locator("select")).ToHaveValueAsync(shelfId);
+        PlacesOf(owner).Should().Equal((copies[0], shelfId), (copies[1], cabinetId), (copies[2], shelfId));
+        ChangeCountOf(owner).Should().Be(changesBefore + 1);
+
+        await status.GetByRole(AriaRole.Button, new() { Name = "Undo" }).ClickAsync();
+
+        await Expect(status).ToContainTextAsync("Undone.");
+        await Expect(first.Locator(".game-where")).ToHaveTextAsync("Not placed");
+        await Expect(third.Locator(".game-where")).ToHaveTextAsync("Not placed");
+        await Expect(second.Locator(".game-where")).ToHaveTextAsync("Cabinet A");
+        PlacesOf(owner).Should().Equal((copies[1], cabinetId));
+        ChangeCountOf(owner).Should().Be(changesBefore);
         AssertCleanConsole();
     }
 
@@ -436,6 +489,16 @@ public sealed class OwnerPlacingTests : CabinetPageTest
         }
     }
 
+    private ILocator Entry(long entryId) => Page.Locator($".game-row[data-entry-id='{entryId}']");
+
+    private static IReadOnlyList<(long Entry, string? Location)> PlacesOf(OwnerDataService owner) =>
+        owner.State is OwnerDataState.Ready ready
+            ? [.. ready.Data.Games.Where(game => game.LocationId is not null).Select(game => (game.CollectionId ?? 0, game.LocationId))]
+            : [];
+
+    private static int ChangeCountOf(OwnerDataService owner) =>
+        owner.State is OwnerDataState.Ready ready ? ready.Data.Changes.Count : -1;
+
     private ILocator Row(CardReading card) => Page.Locator($"#game-{card.GameId}");
 
     private async Task CheckAsync(CardReading card)
@@ -490,6 +553,15 @@ public sealed class OwnerPlacingTests : CabinetPageTest
 
         errors.Should().BeEmpty();
         RequestHosts.Should().OnlyContain(host => host == $"127.0.0.1:{OwnerPort}");
+    }
+
+    /// <inheritdoc />
+    public override async ValueTask DisposeAsync()
+    {
+        _publicClient?.Dispose();
+        await base.DisposeAsync();
+        _storage.Dispose();
+        GC.SuppressFinalize(this);
     }
 
     private sealed record CardReading(long EntryId, int GameId, string Title, bool IsExpansion, string? Location);

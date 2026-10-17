@@ -545,7 +545,94 @@ Plans:
   4. Every game's storage location is visible to every visitor, whether it was read from BGG or entered by the owner.
   5. A visitor can toggle between one big cabinet and one cabinet per storage location, with games that have no location placed in an "Unknown location" cabinet.
 
-**Plans**: TBD
+**Plans:** 31/34 plans executed
+
+Plans:
+**Wave 1**
+
+- [x] 07-01-PLAN.md — Tracer: typing a name puts every other game in shadow, in place (count, Clear, keys)
+- [x] 07-02-PLAN.md — A sparse last section stands short and complete (layout version 17)
+- [x] 07-03-PLAN.md — Each copy of a game gets its own place: the owner-data format gate and the per-copy data (owner-gated)
+- [x] 07-04-PLAN.md — The sync keeps BGG's other titles and the owned edition's name
+- [x] 07-05-PLAN.md — The BGG access check counts edition names and other titles, without recording them
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 07-06-PLAN.md — Every string in both languages, pinned by one fixture, and a CI job for the filter tests
+- [x] 07-07-PLAN.md — The keyboard follows the light
+- [x] 07-08-PLAN.md — The Locations page shows and places every copy
+- [x] 07-09-PLAN.md — A copy that leaves and comes back keeps its place
+- [x] 07-10-PLAN.md — Every copy's place and the owner's order reach the page
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 07-11-PLAN.md — Players and time: "we are five, about an hour" in two taps
+- [x] 07-12-PLAN.md — The Locations page knows every copy: edition names, bulk moves and counts
+- [x] 07-13-PLAN.md — A picture chosen for one copy is drawn on that copy's box
+- [x] 07-14-PLAN.md — One cabinet per storage location, built and cached on the server
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [x] 07-15-PLAN.md — The desktop bar stays put: two quiet rows, pinned, with a shadow only once stuck
+- [x] 07-16-PLAN.md — The Pictures page shows and sets every copy
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [x] 07-17-PLAN.md — "Where is it?": the location filter
+- [x] 07-18-PLAN.md — A picture link belongs to one copy
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [x] 07-19-PLAN.md — A Dutch or other title finds the game too
+- [x] 07-20-PLAN.md — Each copy's linked picture is kept healthy on its own
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [x] 07-21-PLAN.md — Filters last for the tab, and the first frame is already in shadow
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [x] 07-22-PLAN.md — Tracer for "By location" on the page: one cabinet per place, named on the wall
+
+**Wave 9** *(blocked on Wave 8 completion)*
+
+- [x] 07-23-PLAN.md — The view is remembered and switches softly
+- [x] 07-24-PLAN.md — The screen-reader list follows the view and the filters
+
+**Wave 10** *(blocked on Wave 9 completion)*
+
+- [x] 07-25-PLAN.md — On a phone, a Filters sheet that dims the cabinet with every tap
+- [x] 07-26-PLAN.md — "Show on shelf" from the card
+
+**Wave 11** *(blocked on Wave 10 completion)*
+
+- [x] 07-27-PLAN.md — On a phone, the slim bar stays one row and gets out of the way
+
+**Wave 12** *(blocked on Wave 11 completion)*
+
+- [x] 07-28-PLAN.md — The bar and the shadow read right on every wall, at every hour: measured
+- [x] 07-29-PLAN.md — The shadow stays above the lights, the owner keeps the tags, and nothing breaks any visitor's settings
+
+**Wave 13** *(blocked on Wave 12 completion)*
+
+- [x] 07-30-PLAN.md — The build round: screenshots, measurements and a Critic pass before the owner looks (owner-gated)
+
+**Wave 14** *(blocked on Wave 13 completion)*
+
+- [x] 07-31-PLAN.md — The owner decides, the choices land, and the guides describe the filters (owner-gated)
+
+**Wave 15** *(blocked on Wave 14 completion)*
+
+- [ ] 07-32-PLAN.md — Release v0.9.0, part one: pull request, the owner's merge and tag, and a verified draft (owner-gated)
+
+**Wave 16** *(blocked on Wave 15 completion)*
+
+- [ ] 07-33-PLAN.md — Release v0.9.0, part two: the owner publishes the verified draft, and the container runs it (owner-gated)
+
+**Wave 17** *(blocked on Wave 16 completion)*
+
+- [ ] 07-34-PLAN.md — The device round on the deployed release (owner-gated)
+
 **UI hint**: yes
 
 ### Phase 8: Public Hardening & Go-Public
@@ -579,5 +666,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. Game Detail, Accessibility & Language | 16/16 | Complete    | 2026-10-12 |
 | 6. Owner Tools & Persistence | 30/30 | Complete    | 2026-10-13 |
 | 6.1. Selectable Cabinet Finishes & Lighting (INSERTED) | 21/21 | Complete    | 2026-10-15 |
-| 7. Game-Night Filters & Location Cabinets | 0/0 | Not started | - |
+| 7. Game-Night Filters & Location Cabinets | 31/34 | In Progress|  |
 | 8. Public Hardening & Go-Public | 0/0 | Not started | - |

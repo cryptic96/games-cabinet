@@ -386,18 +386,21 @@ public sealed class OwnerDataService : IOwnerArtReferences
     /// Replaces all the owner data with a document that passed the restore check. There is no merging. The data that is stored
     /// now, readable or not, is kept as an earlier version first, and when that cannot be done nothing is replaced. The
     /// document is stored under a revision higher than both its own and the one it replaces, with one log line that does not
-    /// count toward the download reminder; the reminder's own state comes from the document. A game in the document that the
-    /// collection does not list gets its thirty days from now, and one it does list loses any stamp. The chance to undo ends, the
+    /// count toward the download reminder; the reminder's own state comes from the document. A choice in the document for a
+    /// copy that the collection does not list gets its thirty days from now, and one it does list loses any stamp; a choice for
+    /// every copy of a game is judged by the game. The chance to undo ends, the
     /// link pictures are asked for again and the change is announced.
     /// </summary>
     /// <param name="document">The checked document, whose links carry no fetched record.</param>
     /// <param name="source">Where the document came from, for the log line.</param>
-    /// <param name="ownedGameIds">Every game the collection lists now, or null while there is no collection yet, which stamps no game.</param>
+    /// <param name="ownedGameIds">Every game the collection lists now, or null while there is no collection yet, which stamps nothing.</param>
+    /// <param name="ownedCollectionIds">Every collection entry the collection lists now, with the game each belongs to, or null while there is no collection yet.</param>
     /// <param name="cancellationToken">Cancels the wait for a turn.</param>
     public async Task<OwnerResult> RestoreAsync(
         OwnerData document,
         RestoreSource source,
         IReadOnlySet<int>? ownedGameIds,
+        IReadOnlyDictionary<long, int>? ownedCollectionIds,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(document);
@@ -408,7 +411,7 @@ public sealed class OwnerDataService : IOwnerArtReferences
         {
             var current = State as OwnerDataState.Ready;
             var now = _time.GetUtcNow();
-            var next = Restored(document, current?.Data.Revision ?? 0, source, ownedGameIds, now);
+            var next = Restored(document, current?.Data.Revision ?? 0, source, ownedGameIds, ownedCollectionIds, now);
 
             try
             {
@@ -437,17 +440,23 @@ public sealed class OwnerDataService : IOwnerArtReferences
     }
 
     /// <summary>
-    /// Applies the thirty-day rule after an accepted collection: a game the collection no longer lists is stamped with the
-    /// time of that first collection, a game that is listed again loses its stamp and keeps its decisions, and a game whose
-    /// stamp is thirty days old is forgotten.
+    /// Applies the thirty-day rule after an accepted collection: a choice for a copy the collection no longer lists is stamped
+    /// with the time of that first collection, one that is listed again loses its stamp and keeps its decisions, and one whose
+    /// stamp is thirty days old is forgotten. A choice for every copy of a game is judged by the game. A new copy of a game
+    /// that has no choice of its own takes over the kept choices of an absent copy of the same game.
     /// </summary>
     /// <param name="listedGameIds">Every game the accepted collection lists, base games and expansions.</param>
+    /// <param name="listedCollectionIds">Every collection entry the accepted collection lists, with the game each belongs to.</param>
     /// <param name="cancellationToken">Cancels the wait for a turn.</param>
-    public Task ReconcileAsync(IReadOnlySet<int> listedGameIds, CancellationToken cancellationToken)
+    public Task ReconcileAsync(
+        IReadOnlySet<int> listedGameIds,
+        IReadOnlyDictionary<long, int> listedCollectionIds,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(listedGameIds);
+        ArgumentNullException.ThrowIfNull(listedCollectionIds);
 
-        return MutateSystemAsync(data => OwnerExpiry.Reconcile(data, listedGameIds, _time.GetUtcNow()), cancellationToken);
+        return MutateSystemAsync(data => OwnerExpiry.Reconcile(data, listedGameIds, listedCollectionIds, _time.GetUtcNow()), cancellationToken);
     }
 
     /// <summary>
@@ -496,18 +505,20 @@ public sealed class OwnerDataService : IOwnerArtReferences
         long currentRevision,
         RestoreSource source,
         IReadOnlySet<int>? ownedGameIds,
+        IReadOnlyDictionary<long, int>? ownedCollectionIds,
         DateTimeOffset now)
     {
         var line = new ChangeEntry(now, source == RestoreSource.File ? RestoredFromFileLog : RestoredEarlierVersionLog);
         var games = document.Games
-            .Select(game => ownedGameIds is null ? game : game with { AbsentSinceUtc = ownedGameIds.Contains(game.GameId) ? null : now })
-            .OrderBy(game => game.GameId);
+            .Select(game => ownedGameIds is null || ownedCollectionIds is null
+                ? game
+                : game with { AbsentSinceUtc = OwnerExpiry.IsListed(game, ownedGameIds, ownedCollectionIds) ? null : now });
 
         return document with
         {
             Revision = NextRevision(Math.Max(document.Revision, currentRevision)),
             SavedAtUtc = now,
-            Games = [.. games],
+            Games = OwnerGames.Ordered(games),
             Changes = [line, .. document.Changes.Take(OwnerData.MaxStoredChanges - 1)],
         };
     }

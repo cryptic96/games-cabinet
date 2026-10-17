@@ -1,3 +1,5 @@
+using Cabinet.Domain.Collection;
+using Cabinet.Repository.Images;
 using Cabinet.Service.Owner;
 using FluentAssertions;
 using Microsoft.Extensions.Time.Testing;
@@ -99,6 +101,34 @@ public sealed class StagedItemsTests
         first.Should().BeTrue();
         second.Should().BeFalse();
         items.TryGet(token, out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Links_staged_for_two_copies_of_one_game_are_kept_apart_and_each_names_its_copy()
+    {
+        var clock = new FakeTimeProvider(Moment);
+        var items = new StagedItems<StagedLink>(clock);
+        var first = items.Stage(Link(7001));
+        var second = items.Stage(Link(7002));
+
+        items.TryGet(first, out var forFirst).Should().BeTrue();
+        items.TryGet(second, out var forSecond).Should().BeTrue();
+        items.Remove(first).Should().BeTrue();
+
+        first.Should().NotBe(second);
+        forFirst.GameId.Should().Be(forSecond.GameId);
+        forFirst.CollectionId.Should().Be(7001);
+        forSecond.CollectionId.Should().Be(7002);
+        items.TryGet(second, out var stillThere).Should().BeTrue();
+        stillThere.CollectionId.Should().Be(7002);
+    }
+
+    private static StagedLink Link(long collectionId)
+    {
+        var record = new ImageRecord("https://cf.example.org/link.jpg", ImageStatus.Ok, Moment, [new ArtFile(240, 320, "0123456789abcdef-240.webp")], null);
+        var art = new EncodedArt(240, 320, "0123456789abcdef-240.webp", [1, 2, 3]);
+
+        return new StagedLink(100, collectionId, new ProcessedLink(record.SourceUrl, [art], record), art);
     }
 
     private static (StagedItems<string> Items, FakeTimeProvider Clock) Create()

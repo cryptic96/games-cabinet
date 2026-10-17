@@ -63,7 +63,7 @@ export function initPickers(doc, hooks) {
 
         const result = await postOwner(
           form.getAttribute('action'),
-          { gameId: form.elements.gameId.value, locationId: value },
+          { gameId: form.elements.gameId.value, collectionId: form.elements.collectionId.value, locationId: value },
           { keepalive: options.keepalive === true },
         );
 
@@ -173,13 +173,13 @@ export function initGamesToolbar(doc) {
   }
 
   /**
-   * Counts the games that are shown in no location and writes the count into the switch's label. The rows that are shown do not
-   * change here, so a game the owner just placed stays in the list until the owner searches or switches again.
+   * Counts the copies that are shown in no location and writes the count into the switch's label. The rows that are shown do not
+   * change here, so a copy the owner just placed stays in the list until the owner searches or switches again.
    */
   function refreshCount() {
     const shown = effectiveLocationIds(gameStates(doc));
 
-    unplacedIds = new Set(Array.from(shown).filter(([, id]) => id === '').map(([gameId]) => gameId));
+    unplacedIds = new Set(Array.from(shown).filter(([, id]) => id === '').map(([entryId]) => entryId));
     unplacedText.textContent = unplacedLabel(unplacedIds.size);
   }
 
@@ -212,7 +212,7 @@ export function initGamesToolbar(doc) {
 
   const finder = createFinder(input, gameRows, {
     debounceMs: 250,
-    accepts: (row) => !unplacedSwitch.checked || unplacedIds.has(row.dataset.gameId),
+    accepts: (row) => !unplacedSwitch.checked || unplacedIds.has(row.dataset.entryId),
     onApply,
   });
 

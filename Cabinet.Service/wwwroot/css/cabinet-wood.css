@@ -69,6 +69,7 @@
   --room-on-accent: var(--ink);
   --room-muted: color-mix(in srgb, var(--room-text) 70%, var(--room));
   --room-line: color-mix(in srgb, var(--room-text) 60%, var(--room));
+  --room-wash: color-mix(in srgb, var(--room-text) 8%, transparent);
   --room-lit-alpha: 0;
   --room-falloff: none;
   --room-k: 0;

@@ -101,6 +101,40 @@ public abstract class CabinetPageTest : PageTest
     }
 
     /// <summary>
+    /// Waits until the view switch is offered: shown in the bar at a full-bar width, or, below it, present in the Filters sheet while
+    /// the owner has locations. The switch is hidden by the page while the owner has no location, whichever bar is shown.
+    /// </summary>
+    protected async Task ExpectViewSwitchAvailableAsync()
+    {
+        await Page.WaitForFunctionAsync("() => { const toggle = document.querySelector('.filter-view'); return toggle !== null && !toggle.hidden; }");
+    }
+
+    /// <summary>
+    /// Picks a segment of the view switch, 0 for all together and 1 for by location. Below the full bar the switch lives in the
+    /// Filters sheet, so the sheet is opened for the tap and closed again with its primary button.
+    /// </summary>
+    /// <param name="segment">The segment to tap.</param>
+    protected async Task ChooseViewAsync(int segment)
+    {
+        var opener = Page.Locator(".filter-bar .filter-open");
+        var inSheet = await opener.IsVisibleAsync();
+
+        if (inSheet)
+        {
+            await opener.ClickAsync();
+            await Assertions.Expect(Page.Locator("dialog.filter-dialog[open]")).ToBeVisibleAsync();
+        }
+
+        await Page.Locator(".filter-view-segment").Nth(segment).ClickAsync();
+
+        if (inSheet)
+        {
+            await Page.Locator(".filter-done").ClickAsync();
+            await Assertions.Expect(Page.Locator("dialog.filter-dialog[open]")).ToHaveCountAsync(0);
+        }
+    }
+
+    /// <summary>
     /// Makes the page's requests for the card data fail with a network error, the given number of times, and lets every later one
     /// through to the host. Call it before opening the cabinet page.
     /// </summary>

@@ -46,7 +46,7 @@ public sealed class OwnerRestoreTests
         var harness = OwnerTestKit.Harness(snapshot: OwnerTestKit.Listing(100, 101));
         await harness.AddAsync(CabinetA);
 
-        var result = await harness.Service.RestoreAsync(FileData(), RestoreSource.File, new HashSet<int> { 100, 101 }, CancellationToken.None);
+        var result = await harness.Service.RestoreAsync(FileData(), RestoreSource.File, new HashSet<int> { 100, 101 }, new Dictionary<long, int>(), CancellationToken.None);
 
         result.Outcome.Should().Be(OwnerOutcome.Saved);
         harness.Store.KeptAt.Should().ContainSingle().Which.Should().Be(harness.Clock.GetUtcNow());
@@ -62,7 +62,7 @@ public sealed class OwnerRestoreTests
         harness.Clock.Advance(TimeSpan.FromMinutes(1));
         var kept = harness.Store.KeptAt.Count;
 
-        await harness.Service.RestoreAsync(FileData(), RestoreSource.File, new HashSet<int> { 100, 101 }, CancellationToken.None);
+        await harness.Service.RestoreAsync(FileData(), RestoreSource.File, new HashSet<int> { 100, 101 }, new Dictionary<long, int>(), CancellationToken.None);
 
         harness.Store.KeptAt.Should().HaveCount(kept + 1);
     }
@@ -73,7 +73,7 @@ public sealed class OwnerRestoreTests
         var store = new InMemoryOwnerDataStore { State = new OwnerDataState.Unreadable("malformed"), FileExists = true };
         var harness = OwnerTestKit.Harness(store);
 
-        var result = await harness.Service.RestoreAsync(FileData(), RestoreSource.File, null, CancellationToken.None);
+        var result = await harness.Service.RestoreAsync(FileData(), RestoreSource.File, null, null, CancellationToken.None);
 
         result.Outcome.Should().Be(OwnerOutcome.Saved);
         store.KeptAt.Should().ContainSingle();
@@ -90,9 +90,9 @@ public sealed class OwnerRestoreTests
         await harness.AddAsync("Crate C");
         var current = harness.Service.Revision;
 
-        await harness.Service.RestoreAsync(FileData() with { Revision = 10 }, RestoreSource.File, null, CancellationToken.None);
+        await harness.Service.RestoreAsync(FileData() with { Revision = 10 }, RestoreSource.File, null, null, CancellationToken.None);
         var afterLarger = harness.Service.Revision;
-        await harness.Service.RestoreAsync(FileData() with { Revision = 1 }, RestoreSource.File, null, CancellationToken.None);
+        await harness.Service.RestoreAsync(FileData() with { Revision = 1 }, RestoreSource.File, null, null, CancellationToken.None);
 
         current.Should().BeLessThan(10);
         afterLarger.Should().Be(11);
@@ -110,7 +110,7 @@ public sealed class OwnerRestoreTests
             Changes = [new ChangeEntry(OwnerTestKit.Start.AddDays(-2), "Added location \"Cabinet A\"")],
         };
 
-        await harness.Service.RestoreAsync(file, RestoreSource.File, null, CancellationToken.None);
+        await harness.Service.RestoreAsync(file, RestoreSource.File, null, null, CancellationToken.None);
 
         harness.Data.Changes.Select(change => change.Text).Should().Equal("Restored from file", "Added location \"Cabinet A\"");
         harness.Data.Changes[0].AtUtc.Should().Be(harness.Clock.GetUtcNow());
@@ -124,7 +124,7 @@ public sealed class OwnerRestoreTests
     {
         var harness = OwnerTestKit.Harness();
 
-        await harness.Service.RestoreAsync(FileData(), RestoreSource.EarlierVersion, null, CancellationToken.None);
+        await harness.Service.RestoreAsync(FileData(), RestoreSource.EarlierVersion, null, null, CancellationToken.None);
 
         harness.Data.Changes[0].Text.Should().Be("Restored an earlier version");
     }
@@ -137,7 +137,7 @@ public sealed class OwnerRestoreTests
             .Select(index => new ChangeEntry(OwnerTestKit.Start.AddMinutes(-index), $"Change {index}"))
             .ToList();
 
-        await harness.Service.RestoreAsync(FileData() with { Changes = fullLog }, RestoreSource.File, null, CancellationToken.None);
+        await harness.Service.RestoreAsync(FileData() with { Changes = fullLog }, RestoreSource.File, null, null, CancellationToken.None);
 
         harness.Data.Changes.Should().HaveCount(OwnerData.MaxStoredChanges);
         harness.Data.Changes[0].Text.Should().Be("Restored from file");
@@ -157,7 +157,7 @@ public sealed class OwnerRestoreTests
             ],
         };
 
-        await harness.Service.RestoreAsync(file, RestoreSource.File, new HashSet<int> { 100 }, CancellationToken.None);
+        await harness.Service.RestoreAsync(file, RestoreSource.File, new HashSet<int> { 100 }, new Dictionary<long, int>(), CancellationToken.None);
 
         harness.Data.Games.Single(game => game.GameId == 100).AbsentSinceUtc.Should().BeNull();
         harness.Data.Games.Single(game => game.GameId == 101).AbsentSinceUtc.Should().Be(harness.Clock.GetUtcNow());
@@ -168,7 +168,7 @@ public sealed class OwnerRestoreTests
     {
         var harness = OwnerTestKit.Harness();
 
-        await harness.Service.RestoreAsync(FileData(), RestoreSource.File, null, CancellationToken.None);
+        await harness.Service.RestoreAsync(FileData(), RestoreSource.File, null, null, CancellationToken.None);
 
         harness.Data.Games.Should().OnlyContain(game => game.AbsentSinceUtc == null);
     }
@@ -184,7 +184,7 @@ public sealed class OwnerRestoreTests
         harness.Service.LinkWorkRequested += () => asked++;
         harness.Service.Changed += () => announced++;
 
-        await harness.Service.RestoreAsync(FileData(), RestoreSource.File, null, CancellationToken.None);
+        await harness.Service.RestoreAsync(FileData(), RestoreSource.File, null, null, CancellationToken.None);
 
         harness.Service.UndoableRevision.Should().BeNull();
         asked.Should().Be(1);
@@ -199,7 +199,7 @@ public sealed class OwnerRestoreTests
         var before = harness.Data;
         harness.Store.FailNextSave = true;
 
-        var result = await harness.Service.RestoreAsync(FileData(), RestoreSource.File, null, CancellationToken.None);
+        var result = await harness.Service.RestoreAsync(FileData(), RestoreSource.File, null, null, CancellationToken.None);
 
         result.Outcome.Should().Be(OwnerOutcome.Refused);
         result.StatusKey.Should().Be("save-failed");

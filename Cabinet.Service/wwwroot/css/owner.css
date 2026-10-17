@@ -23,13 +23,14 @@
 /**
  * The mark on a box whose game has no place: a small two-tone dog-ear in the top-left corner, paper-coloured with an ink fold, so
  * it reads on a cream box and on a navy one alike. It is one element placed over the corner; it takes no space, no pointer input
- * and no text, and it leaves the box's geometry, order and focus ring as they are.
+ * and no text, and it leaves the box's geometry, order and focus ring as they are. It sits one level above the shadow of a dimmed box,
+ * so the owner still sees which games have no place while the cabinet is filtered.
  */
 .placement-tag {
   position: absolute;
   top: 0;
   left: 0;
-  z-index: 1;
+  z-index: 2;
   width: var(--tag-size);
   height: var(--tag-size);
   pointer-events: none;
@@ -814,12 +815,27 @@ header > .header-aside {
   border-color: var(--paper-label);
 }
 
+/**
+ * The chip that names the game an expansion follows can be as long as that game's title, so it stays on one line inside its border
+ * and ends in an ellipsis when the column is narrower than the name; the picker below it holds the same name in full.
+ */
+.game-follow {
+  max-inline-size: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .game-picker {
   display: flex;
   grid-area: form;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+}
+
+.picker-hint {
+  margin: 0;
 }
 
 .picker-label {
@@ -1183,6 +1199,14 @@ header > .header-aside {
   font-weight: 600;
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+
+/**
+ * The copy label of a game owned more than once shares the baseline of the title and the year, whether or not the row also carries
+ * the button that confirms the picture. The tag's own top alignment would pin it to the top of a row made taller by that button.
+ */
+.pic-head .pic-tag {
+  align-self: baseline;
 }
 
 .pic-year {

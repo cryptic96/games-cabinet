@@ -270,7 +270,15 @@ function drawGeneratedCover(button, placement, lines) {
   const plate = document.createElement('span');
   plate.className = 'cover-plate';
   plate.append(...lines);
-  button.append(plate);
+
+  const veil = button.querySelector('.' + VEIL_CLASS);
+
+  if (veil === null) {
+    button.append(plate);
+  } else {
+    veil.remove();
+    button.append(plate, veil);
+  }
 }
 
 /**
@@ -316,20 +324,28 @@ function drawArtCover(button, placement, art, lines) {
   button.append(image);
 }
 
+/** The class of the empty node that carries the shadow of a box; every box ends with one. */
+const VEIL_CLASS = 'placement-veil';
+
 /**
  * Builds the button for one placement.
  * @param {object} placement One placement from the layout.
  * @param {object} copy The visitor-facing strings.
  * @param {object[]} palette The colour table of the layout.
+ * @param {(placement: object) => boolean} dimOf Tells whether the box is drawn in shadow.
  * @returns {HTMLButtonElement}
  */
-function buildPlacement(placement, copy, palette) {
+function buildPlacement(placement, copy, palette, dimOf) {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'placement';
   button.dataset.kind = placement.kind;
   button.dataset.gameId = String(placement.gameId);
   button.dataset.entryId = String(placement.entryId);
+
+  if (dimOf(placement)) {
+    button.dataset.dim = '';
+  }
 
   if (placement.familyId !== undefined) {
     button.dataset.familyId = String(placement.familyId);
@@ -373,6 +389,11 @@ function buildPlacement(placement, copy, palette) {
     button.append(...lines);
   }
 
+  const veil = document.createElement('span');
+  veil.className = VEIL_CLASS;
+  veil.setAttribute('aria-hidden', 'true');
+  button.append(veil);
+
   return button;
 }
 
@@ -386,9 +407,12 @@ const BOARD_TONE_COUNT = 6;
  * @param {object[]} palette The colour table of the layout.
  * @param {object} section The section the cubby belongs to.
  * @param {number[]} rowTops The distinct cubby tops of the section in ascending order.
+ * @param {(placement: object) => boolean} dimOf Tells whether a box is drawn in shadow.
+ * @param {number} ordinal The number of the section on the page, which the keyboard reads from the shelf value to walk from one section
+ * to the next.
  * @returns {HTMLDivElement}
  */
-function buildCubby(cubby, copy, palette, section, rowTops) {
+function buildCubby(cubby, copy, palette, section, rowTops, dimOf, ordinal) {
   const element = document.createElement('div');
   element.className = 'cubby';
   element.dataset.board = String((section.index * 2 + rowTops.indexOf(cubby.yMm)) % BOARD_TONE_COUNT);
@@ -402,8 +426,8 @@ function buildCubby(cubby, copy, palette, section, rowTops) {
   setNumber(element, '--w', cubby.widthMm);
   setNumber(element, '--h', cubby.heightMm);
 
-  const shelf = section.index + ':' + rowTops.indexOf(cubby.yMm);
-  const boxes = cubby.placements.map((placement) => buildPlacement(placement, copy, palette));
+  const shelf = ordinal + ':' + rowTops.indexOf(cubby.yMm);
+  const boxes = cubby.placements.map((placement) => buildPlacement(placement, copy, palette, dimOf));
 
   for (const box of boxes) {
     box.dataset.shelf = shelf;
@@ -457,9 +481,11 @@ function buildLight(section) {
  * @param {object} section One section from the layout.
  * @param {object} copy The visitor-facing strings.
  * @param {object[]} palette The colour table of the layout.
+ * @param {(placement: object) => boolean} dimOf Tells whether a box is drawn in shadow.
+ * @param {number} [ordinal] The number of the section on the page; the section's own index when the page holds one cabinet.
  * @returns {HTMLDivElement}
  */
-function buildSection(section, copy, palette) {
+function buildSection(section, copy, palette, dimOf, ordinal = section.index) {
   const element = document.createElement('div');
   element.className = 'section';
   setNumber(element, '--section-w', section.widthMm + 2 * section.frameMm);
@@ -470,7 +496,7 @@ function buildSection(section, copy, palette) {
 
   const body = document.createElement('div');
   body.className = 'section-body';
-  body.append(...section.cubbies.map((cubby) => buildCubby(cubby, copy, palette, section, rowTops)));
+  body.append(...section.cubbies.map((cubby) => buildCubby(cubby, copy, palette, section, rowTops, dimOf, ordinal)));
   element.append(
     buildDecoration('section-floor'),
     body,
@@ -488,7 +514,93 @@ function buildSection(section, copy, palette) {
  * @param {HTMLElement} mount The element that holds the cabinet.
  * @param {object} layout The layout JSON.
  * @param {object} copy The visitor-facing strings.
+ * @param {(placement: object) => boolean} [dimOf] Tells whether a box is drawn in shadow; by default none is. The shadow is decided
+ * here, while the box is built, so a cabinet drawn during a search never shows a lit frame first.
  */
-export function renderCabinet(mount, layout, copy) {
-  mount.replaceChildren(...layout.sections.map((section) => buildSection(section, copy, layout.palette ?? [])));
+export function renderCabinet(mount, layout, copy, dimOf = () => false) {
+  mount.replaceChildren(...layout.sections.map((section) => buildSection(section, copy, layout.palette ?? [], dimOf)));
+}
+
+/**
+ * Counts the top-level games a group of sections draws: every box except the marker that counts hidden expansions and the
+ * expansions that stand beside or on their base game, which belong to that base game's entry.
+ * @param {object[]} sections The sections of one location.
+ * @returns {number}
+ */
+function topLevelCount(sections) {
+  const nested = ['moreMarker', 'expansionLayer', 'expansionSpine'];
+  let count = 0;
+
+  for (const section of sections) {
+    for (const cubby of section.cubbies ?? []) {
+      count += (cubby.placements ?? []).filter((placement) => !nested.includes(placement.kind)).length;
+    }
+  }
+
+  return count;
+}
+
+/**
+ * Builds the heading of one location group: the name as plain text and, after it, the count of its games. The count written here
+ * is what the boxes drawn tell; the filters write the exact one once the card data is held.
+ * @param {string} id The id the heading carries, so the group can name it.
+ * @param {string} name The location name.
+ * @param {number} total How many games the group holds.
+ * @param {object} copy The visitor-facing strings.
+ * @returns {HTMLHeadingElement}
+ */
+function buildLocationHeading(id, name, total, copy) {
+  const heading = document.createElement('h2');
+  heading.id = id;
+  heading.className = 'location-heading';
+
+  const label = document.createElement('span');
+  label.className = 'location-name';
+  label.setAttribute('dir', 'auto');
+  label.textContent = name;
+
+  const count = document.createElement('span');
+  count.className = 'location-count';
+  count.textContent = copy.locationHeadingCount(total, total, false);
+
+  heading.append(label, count);
+
+  return heading;
+}
+
+/**
+ * Replaces the content of the mount with one cabinet per storage location: for each location a group holding its heading and its
+ * sections. The groups come in the order the document gives, and the sections are numbered across all groups so the keyboard can
+ * walk from the last shelf of one location into the first of the next.
+ * @param {HTMLElement} mount The element that holds the cabinet.
+ * @param {{ palette?: object[], locations: { id?: string, name?: string, sections: object[] }[] }} doc The by-location document.
+ * @param {object} copy The visitor-facing strings.
+ * @param {(placement: object) => boolean} [dimOf] Tells whether a box is drawn in shadow; by default none is.
+ */
+export function renderLocations(mount, doc, copy, dimOf = () => false) {
+  const palette = doc.palette ?? [];
+  let ordinal = 0;
+
+  mount.replaceChildren(
+    ...doc.locations.map((location, position) => {
+      const group = document.createElement('section');
+      group.className = 'location-group';
+
+      const name = typeof location.name === 'string' && location.name !== '' ? location.name : copy.unknownLocation;
+      const heading = buildLocationHeading('location-' + position, name, topLevelCount(location.sections), copy);
+
+      group.setAttribute('aria-labelledby', heading.id);
+
+      group.dataset.locationId = typeof location.id === 'string' ? location.id : 'unknown';
+
+      group.append(heading);
+
+      for (const section of location.sections) {
+        group.append(buildSection(section, copy, palette, dimOf, ordinal));
+        ordinal += 1;
+      }
+
+      return group;
+    }),
+  );
 }

@@ -284,7 +284,7 @@ public sealed class BggThingParserTests
     {
         var parsed = Parse(Answer(Item(1, string.Empty), Item(2, Link("boardgamefamily", 7001, "Series: Example Saga"))));
 
-        GameDetails.CurrentDetailsVersion.Should().Be(1);
+        GameDetails.CurrentDetailsVersion.Should().Be(2);
         parsed.Games.Values.Should().OnlyContain(details => details.DetailsVersion == GameDetails.CurrentDetailsVersion);
     }
 
@@ -292,6 +292,52 @@ public sealed class BggThingParserTests
     public void A_game_without_family_links_gets_an_empty_list()
     {
         Parse(Answer(Item(1, Link("boardgamedesigner", 1, "Invented Designer 1")))).Games[1].Families.Should().NotBeNull().And.BeEmpty();
+    }
+
+    [Fact]
+    public void Alternate_names_are_cleaned_deduplicated_and_blank_or_over_long_ones_dropped()
+    {
+        var exactlyLongest = new string('b', BggThingParser.MaxAlternateNameLength);
+        var tooLong = new string('c', BggThingParser.MaxAlternateNameLength + 1);
+
+        var details = Parse(Answer(
+            Item(
+                1,
+                Alternate("Voorbeeld\u202e Spel")
+                + Alternate("   ")
+                + Alternate("Voorbeeld Spel")
+                + Alternate("Ex\u00e4mple Gam\u00e9")
+                + Alternate(tooLong)
+                + Alternate(exactlyLongest)))).Games[1];
+
+        details.AlternateNames.Should().Equal("Voorbeeld Spel", "Ex\u00e4mple Gam\u00e9", exactlyLongest);
+        details.DetailsVersion.Should().Be(GameDetails.CurrentDetailsVersion);
+    }
+
+    [Fact]
+    public void The_primary_name_is_never_an_alternate_name()
+    {
+        var details = Parse(Answer(Item(1, Alternate("Other Title")))).Games[1];
+
+        details.AlternateNames.Should().Equal("Other Title");
+    }
+
+    [Fact]
+    public void An_entry_with_no_alternate_names_gets_an_empty_list()
+    {
+        Parse(Answer(Item(1, string.Empty))).Games[1].AlternateNames.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void More_than_thirty_alternate_names_are_cut_to_the_first_thirty()
+    {
+        var names = string.Concat(Enumerable.Range(1, 45).Select(index => Alternate($"Other Title {index}")));
+
+        var details = Parse(Answer(Item(1, names))).Games[1];
+
+        BggThingParser.MaxAlternateNames.Should().Be(30);
+        details.AlternateNames.Should().HaveCount(30).And.StartWith("Other Title 1", "Other Title 2");
+        details.AlternateNames![29].Should().Be("Other Title 30");
     }
 
     private static (int? MinPlayers, int? MaxPlayers, int? PlayingTime, int? MinPlayTime, int? MaxPlayTime, int? MinAge) Counts(GameDetails details) =>
@@ -323,6 +369,9 @@ public sealed class BggThingParserTests
 
     private static string Item(int id, string content) =>
         $"<item type=\"boardgame\" id=\"{id}\"><name type=\"primary\" value=\"Example {id}\" />{content}</item>";
+
+    private static string Alternate(string value) =>
+        $"<name type=\"alternate\" sortindex=\"1\" value=\"{value}\" />";
 
     private static string Value(string name, string value) => $"<{name} value=\"{value}\" />";
 

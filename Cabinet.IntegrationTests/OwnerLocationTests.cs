@@ -124,7 +124,7 @@ public sealed class OwnerLocationTests
     {
         using var storage = new TemporaryDirectory();
         var path = Path.Combine(storage.FullPath, "owner-data.json");
-        var content = Encoding.UTF8.GetBytes("{\"kind\":\"games-cabinet-owner-data\",\"schemaVersion\":3,\"revision\":7}");
+        var content = Encoding.UTF8.GetBytes("{\"kind\":\"games-cabinet-owner-data\",\"schemaVersion\":4,\"revision\":7}");
         await File.WriteAllBytesAsync(path, content, TestContext.Current.CancellationToken);
         await using var factory = SyncHarness.CreateFactory(new ScriptedBggHandler(), SyncHarness.NewClock(), StorageSettings(storage));
         var service = factory.ServingServices.GetRequiredService<OwnerDataService>();
@@ -208,6 +208,7 @@ public sealed class OwnerLocationTests
             $"{LocationsPath}?handler=Assign",
             [
                 Field("gameId", game.GameId.ToString(CultureInfo.InvariantCulture)),
+                Field("collectionId", game.EntryId.ToString(CultureInfo.InvariantCulture)),
                 Field("locationId", LocationIdOf(afterAdd.Body, LocationName)),
                 Field("revision", OwnerSession.FieldValue(afterAdd.Body, "revision")),
             ]);
@@ -242,6 +243,7 @@ public sealed class OwnerLocationTests
             $"{LocationsPath}?handler=Assign",
             [
                 Field("gameId", game.GameId.ToString(CultureInfo.InvariantCulture)),
+                Field("collectionId", game.EntryId.ToString(CultureInfo.InvariantCulture)),
                 Field("locationId", LocationIdOf(afterAdd.Body, LocationName)),
                 Field("revision", added.Json.GetProperty("revision").GetInt64().ToString(CultureInfo.InvariantCulture)),
             ]);
@@ -401,7 +403,7 @@ public sealed class OwnerLocationTests
     }
 
     [Fact]
-    public async Task A_game_that_is_not_in_the_collection_or_a_location_that_is_not_in_the_list_is_refused()
+    public async Task A_game_a_copy_of_another_game_or_a_location_that_is_not_in_the_list_is_refused()
     {
         using var storage = new TemporaryDirectory();
         var clock = SyncHarness.NewClock();
@@ -411,16 +413,35 @@ public sealed class OwnerLocationTests
             StorageSettings(storage));
         using var client = factory.CreatePublicClient();
         await SyncRounds.PressAndWait(client, clock, advance: false);
-        var game = (await ReadCards(client)).Cards.First(card => !card.IsExpansion);
+        var cards = (await ReadCards(client)).Cards;
+        var game = cards.First(card => !card.IsExpansion);
+        var other = cards.First(card => card.GameId != game.GameId);
         using var session = new OwnerSession(factory);
 
-        var unknownGame = await session.PostJsonAsync($"{LocationsPath}?handler=Assign", [Field("gameId", "987654"), Field("locationId", ""), Field("revision", "0")]);
+        var unknownGame = await session.PostJsonAsync(
+            $"{LocationsPath}?handler=Assign",
+            [Field("gameId", "987654"), Field("collectionId", game.EntryId.ToString(CultureInfo.InvariantCulture)), Field("locationId", ""), Field("revision", "0")]);
+        var foreignCopy = await session.PostJsonAsync(
+            $"{LocationsPath}?handler=Assign",
+            [
+                Field("gameId", game.GameId.ToString(CultureInfo.InvariantCulture)),
+                Field("collectionId", other.EntryId.ToString(CultureInfo.InvariantCulture)),
+                Field("locationId", ""),
+                Field("revision", "0"),
+            ]);
         var unknownLocation = await session.PostJsonAsync(
             $"{LocationsPath}?handler=Assign",
-            [Field("gameId", game.GameId.ToString(CultureInfo.InvariantCulture)), Field("locationId", "nope"), Field("revision", "0")]);
+            [
+                Field("gameId", game.GameId.ToString(CultureInfo.InvariantCulture)),
+                Field("collectionId", game.EntryId.ToString(CultureInfo.InvariantCulture)),
+                Field("locationId", "nope"),
+                Field("revision", "0"),
+            ]);
 
         unknownGame.Status.Should().Be(HttpStatusCode.UnprocessableEntity);
         unknownGame.JsonText("status").Should().Be("unknown-game");
+        foreignCopy.Status.Should().Be(HttpStatusCode.UnprocessableEntity);
+        foreignCopy.JsonText("status").Should().Be("unknown-game");
         unknownLocation.Status.Should().Be(HttpStatusCode.UnprocessableEntity);
         unknownLocation.JsonText("status").Should().Be("unknown-location");
     }

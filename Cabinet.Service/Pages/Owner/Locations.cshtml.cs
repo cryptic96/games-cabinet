@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Routing;
 
 namespace Cabinet.Service.Pages.Owner;
 
-/// <summary>One game on the locations page, with what the picker next to it needs.</summary>
+/// <summary>One copy of a game on the locations page, with what the picker next to it needs.</summary>
 /// <param name="GameId">The game.</param>
 /// <param name="Title">The title to show.</param>
 /// <param name="IsExpansion">Whether the game is an expansion.</param>
@@ -22,6 +22,11 @@ namespace Cabinet.Service.Pages.Owner;
 /// <param name="SwatchColour">The colour of the game's spine as a hexadecimal colour, or null when it has none.</param>
 /// <param name="CoverWidth">The width of the stored picture in pixels, or zero without a picture.</param>
 /// <param name="CoverHeight">The height of the stored picture in pixels, or zero without a picture.</param>
+/// <param name="CollectionId">The collection entry of this copy.</param>
+/// <param name="CopyLabel">The tag that tells this copy apart from the other copies of its game, or null for a game owned once.</param>
+/// <param name="BaseEntryId">The collection entry of the first copy of the owned base game an expansion stands beside, or null for any other game.</param>
+/// <param name="IsFirstCopy">Whether this is the copy with the lowest collection entry of its game.</param>
+/// <param name="BaseCopiesDiffer">Whether the copies of the owned base game an expansion stands beside are not all shown in the same place.</param>
 public sealed record LocationGameRow(
     int GameId,
     string Title,
@@ -34,15 +39,23 @@ public sealed record LocationGameRow(
     string? CoverUrl = null,
     string? SwatchColour = null,
     int CoverWidth = 0,
-    int CoverHeight = 0)
+    int CoverHeight = 0,
+    long CollectionId = 0,
+    string? CopyLabel = null,
+    long? BaseEntryId = null,
+    bool IsFirstCopy = true,
+    bool BaseCopiesDiffer = false)
 {
     /// <summary>Whether the game is an expansion that stands beside an owned base game, so that no location of its own means it follows the base.</summary>
     public bool FollowsBase => BaseGameId is not null;
+
+    /// <summary>The anchor of this row: the first copy of a game keeps the anchor of the game, every other copy has its own.</summary>
+    public string Anchor => IsFirstCopy ? $"game-{GameId}" : $"game-{GameId}-{CollectionId}";
 }
 
 /// <summary>
-/// The owner's locations page: the list of locations with a form to add one, and every game with a picker that says where it
-/// is kept. Every post goes through the single owner-data writer and is answered by <see cref="OwnerResponses"/>, so the page
+/// The owner's locations page: the list of locations with a form to add one, and every copy of every game with a picker that
+/// says where it is kept. Every post goes through the single owner-data writer and is answered by <see cref="OwnerResponses"/>, so the page
 /// works with and without scripts.
 /// </summary>
 public class LocationsModel : OwnerPage
@@ -96,13 +109,13 @@ public class LocationsModel : OwnerPage
     /// <summary>Whether the panel of the list is open: while it is empty and while the owner is working in it.</summary>
     public bool PanelOpen { get; private set; }
 
-    /// <summary>Every owned game once, by title.</summary>
+    /// <summary>Every owned copy of every game, by title, the copies of one game together in collection order.</summary>
     public IReadOnlyList<LocationGameRow> Games { get; private set; } = [];
 
     /// <summary>Whether the page opens showing only the games that are not placed yet.</summary>
     public bool FilterUnplaced { get; private set; }
 
-    /// <summary>How many games are shown in no location.</summary>
+    /// <summary>How many copies are shown in no location.</summary>
     public int UnplacedCount => Games.Count(game => game.EffectiveLocationId is null);
 
     /// <summary>The words for the outcome of the post that sent the browser here, or null.</summary>
@@ -248,44 +261,45 @@ public class LocationsModel : OwnerPage
         return RespondAtItem(result, result.Outcome == OwnerOutcome.Saved ? neighbour : id, null, AddAnchor);
     }
 
-    /// <summary>Puts a game in a location, or takes it out of the one it is in.</summary>
+    /// <summary>Puts one copy of a game in a location, or takes it out of the one it is in.</summary>
     /// <param name="revision">The revision the form was built from.</param>
-    /// <param name="gameId">The game to move.</param>
+    /// <param name="gameId">The game the copy belongs to.</param>
+    /// <param name="collectionId">The collection entry of the copy to move; it has to be an entry of that game in the collection.</param>
     /// <param name="locationId">The location to put it in; empty for none of its own.</param>
     /// <param name="returnTo">The page a form posted without script goes back to: <c>pictures</c> for the single-game view, and the locations page for anything else.</param>
     /// <param name="cancellationToken">Cancels the wait for the writer.</param>
-    public async Task<IActionResult> OnPostAssignAsync(long revision, int gameId, string? locationId, string? returnTo, CancellationToken cancellationToken)
+    public async Task<IActionResult> OnPostAssignAsync(long revision, int gameId, long collectionId, string? locationId, string? returnTo, CancellationToken cancellationToken)
     {
         var snapshot = _collection.Current.Snapshot;
 
         var result = await _owner.MutateAsync(
             revision,
-            data => AssignInSnapshot(data, snapshot, gameId, locationId),
+            data => AssignInSnapshot(data, snapshot, gameId, collectionId, locationId),
             cancellationToken);
 
         if (!string.Equals(returnTo, PicturesReturn, StringComparison.Ordinal))
         {
-            return OwnerResponses.For(this, result, PagePath, RowAnchor(gameId));
+            return OwnerResponses.For(this, result, PagePath, RowAnchor(snapshot, gameId, collectionId));
         }
 
         var known = snapshot?.Items.Any(item => item.GameId == gameId) == true;
 
-        return OwnerResponses.For(this, result, PicturesPagePath, RowAnchor(gameId), game: known ? gameId : null);
+        return OwnerResponses.For(this, result, PicturesPagePath, PicturesModel.RowId(collectionId), game: known ? gameId : null);
     }
 
     /// <summary>
-    /// Moves the ticked games in one change: into one location, to no location of their own, or back to following their base game.
-    /// Every game must be in the collection and the target must be one of the owner's locations or one of the two fixed words;
-    /// otherwise nothing moves.
+    /// Moves the ticked copies in one change: into one location, to no location of their own, or back to following their base game.
+    /// Every copy must be an entry of the collection and the target must be one of the owner's locations or one of the two fixed
+    /// words; otherwise nothing moves. Copies that were not ticked stay where they are, even when they belong to a ticked game.
     /// </summary>
     /// <param name="revision">The revision the page was built from.</param>
-    /// <param name="gameIds">The ticked games.</param>
+    /// <param name="collectionIds">The collection entries of the ticked copies.</param>
     /// <param name="target">Where they go: <c>location:{id}</c>, <c>not-placed</c> or <c>same-as-base</c>.</param>
     /// <param name="cancellationToken">Cancels the wait for the writer.</param>
-    public async Task<IActionResult> OnPostBulkMoveAsync(long revision, int[]? gameIds, string? target, CancellationToken cancellationToken)
+    public async Task<IActionResult> OnPostBulkMoveAsync(long revision, long[]? collectionIds, string? target, CancellationToken cancellationToken)
     {
         var snapshot = _collection.Current.Snapshot;
-        var ids = gameIds ?? [];
+        var ids = collectionIds ?? [];
 
         var result = await _owner.MutateAsync(
             revision,
@@ -310,9 +324,10 @@ public class LocationsModel : OwnerPage
             ? done[RefusedPrefix.Length..]
             : null;
 
-    private static OwnerChange AssignInSnapshot(OwnerData data, CollectionSnapshot? snapshot, int gameId, string? locationId)
+    private static OwnerChange AssignInSnapshot(OwnerData data, CollectionSnapshot? snapshot, int gameId, long collectionId, string? locationId)
     {
-        var item = snapshot?.Items.FirstOrDefault(candidate => candidate.GameId == gameId);
+        var copies = snapshot?.Items.Where(candidate => candidate.GameId == gameId).OrderBy(candidate => candidate.CollectionId).ToList() ?? [];
+        var item = copies.FirstOrDefault(candidate => candidate.CollectionId == collectionId);
 
         if (snapshot is null || item is null)
         {
@@ -321,10 +336,10 @@ public class LocationsModel : OwnerPage
 
         var followsBase = OwnerOverlay.From(snapshot, data).OwnedBaseGameId(gameId) is not null;
 
-        return LocationEdits.Assign(data, gameId, locationId, TitleOf(item), followsBase);
+        return LocationEdits.Assign(data, gameId, collectionId, [.. copies.Select(copy => copy.CollectionId)], locationId, TitleOf(item), followsBase);
     }
 
-    private static OwnerChange BulkMoveInSnapshot(OwnerData data, CollectionSnapshot? snapshot, int[] gameIds, string? target)
+    private static OwnerChange BulkMoveInSnapshot(OwnerData data, CollectionSnapshot? snapshot, long[] collectionIds, string? target)
     {
         var moveTarget = ParseTarget(target);
 
@@ -338,21 +353,43 @@ public class LocationsModel : OwnerPage
             return OwnerChange.Refused(data, "unknown-game");
         }
 
-        var titles = new Dictionary<int, string>();
+        var entries = snapshot.Items.GroupBy(item => item.CollectionId).ToDictionary(group => group.Key, group => group.First());
+        var copies = new List<(int GameId, long CollectionId)>(collectionIds.Length);
 
-        foreach (var item in snapshot.Items)
+        foreach (var id in collectionIds)
+        {
+            if (!entries.TryGetValue(id, out var entry))
+            {
+                return OwnerChange.Refused(data, "unknown-game");
+            }
+
+            copies.Add((entry.GameId, id));
+        }
+
+        var titles = new Dictionary<int, string>();
+        var entriesOf = new Dictionary<int, List<long>>();
+
+        foreach (var item in snapshot.Items.OrderBy(item => item.CollectionId))
         {
             titles.TryAdd(item.GameId, TitleOf(item));
+
+            if (!entriesOf.TryGetValue(item.GameId, out var held))
+            {
+                entriesOf[item.GameId] = held = [];
+            }
+
+            held.Add(item.CollectionId);
         }
 
         var overlay = OwnerOverlay.From(snapshot, data);
 
         return LocationEdits.MoveMany(
             data,
-            gameIds,
+            copies,
             moveTarget,
             gameId => titles.GetValueOrDefault(gameId),
-            gameId => overlay.OwnedBaseGameId(gameId) is not null);
+            gameId => overlay.OwnedBaseGameId(gameId) is not null,
+            gameId => entriesOf.TryGetValue(gameId, out var held) ? held : []);
     }
 
     private static MoveTarget? ParseTarget(string? target) => target switch
@@ -364,7 +401,14 @@ public class LocationsModel : OwnerPage
         _ => null,
     };
 
-    private static string RowAnchor(int gameId) => $"game-{gameId}";
+    private static string GameAnchor(int gameId) => $"game-{gameId}";
+
+    private static string RowAnchor(CollectionSnapshot? snapshot, int gameId, long collectionId)
+    {
+        var first = snapshot?.Items.Where(item => item.GameId == gameId).Select(item => item.CollectionId).DefaultIfEmpty(collectionId).Min();
+
+        return first == collectionId ? GameAnchor(gameId) : $"{GameAnchor(gameId)}-{collectionId}";
+    }
 
     private static string TitleOf(SnapshotItem item) =>
         string.IsNullOrWhiteSpace(item.Title) ? $"Game {item.GameId}" : item.Title.Trim();
@@ -377,9 +421,9 @@ public class LocationsModel : OwnerPage
         {
             var overlay = OwnerOverlay.From(snapshot, data);
 
-            foreach (var gameId in snapshot.Items.Select(item => item.GameId).Distinct())
+            foreach (var item in snapshot.Items)
             {
-                if (overlay.EffectiveLocationId(gameId) is { } locationId)
+                if (overlay.EntryLocationId(item.CollectionId) is { } locationId)
                 {
                     counts[locationId] = counts.GetValueOrDefault(locationId) + 1;
                 }
@@ -468,16 +512,13 @@ public class LocationsModel : OwnerPage
         Games = Nested(RowsOf(snapshot, ready.Data, _collection.Current.Items));
     }
 
-    /// <summary>
-    /// Builds the location row of one game, with the choices its picker needs, or null when the collection does not hold it. The
-    /// pictures page uses it to show the same picker the games list uses.
-    /// </summary>
+    /// <summary>Builds the location row of one copy of a game, or null when the collection does not hold that entry.</summary>
     /// <param name="snapshot">The synced collection.</param>
     /// <param name="data">The owner data.</param>
     /// <param name="shown">The items the cabinet draws, which give each game's small picture.</param>
-    /// <param name="gameId">The game.</param>
-    internal static LocationGameRow? RowFor(CollectionSnapshot snapshot, OwnerData data, IEnumerable<CabinetItem> shown, int gameId) =>
-        RowsOf(snapshot, data, shown).FirstOrDefault(row => row.GameId == gameId);
+    /// <param name="collectionId">The collection entry of the copy.</param>
+    internal static LocationGameRow? RowForCopy(CollectionSnapshot snapshot, OwnerData data, IEnumerable<CabinetItem> shown, long collectionId) =>
+        RowsOf(snapshot, data, shown).FirstOrDefault(row => row.CollectionId == collectionId);
 
     private static List<LocationGameRow> RowsOf(CollectionSnapshot snapshot, OwnerData data, IEnumerable<CabinetItem> shown)
     {
@@ -496,37 +537,66 @@ public class LocationsModel : OwnerPage
             covers.TryAdd(cabinetItem.BggId, cabinetItem);
         }
 
-        return snapshot.Items
+        var firstEntries = snapshot.Items
             .GroupBy(item => item.GameId)
-            .Select(group => group.First())
-            .Select(item => RowOf(item, overlay, titles, covers))
-            .ToList();
+            .ToDictionary(group => group.Key, group => group.Min(item => item.CollectionId));
+        var splitGames = snapshot.Items
+            .GroupBy(item => item.GameId)
+            .Where(group => group.Select(item => overlay.EntryLocationId(item.CollectionId)).Distinct().Count() > 1)
+            .Select(group => group.Key)
+            .ToHashSet();
+        var rows = new List<LocationGameRow>(snapshot.Items.Count);
+
+        foreach (var group in snapshot.Items.GroupBy(item => item.GameId))
+        {
+            var copies = group.OrderBy(item => item.CollectionId).ToList();
+            var labels = CopyLabels.Of(copies);
+
+            for (var index = 0; index < copies.Count; index++)
+            {
+                var label = labels[index];
+
+                rows.Add(RowOf(copies[index], overlay, titles, covers, firstEntries, splitGames, label, index == 0));
+            }
+        }
+
+        return rows;
     }
 
     private static LocationGameRow RowOf(
         SnapshotItem item,
         OwnerOverlay overlay,
         IReadOnlyDictionary<int, string> titles,
-        IReadOnlyDictionary<int, CabinetItem> covers)
+        IReadOnlyDictionary<int, CabinetItem> covers,
+        IReadOnlyDictionary<int, long> firstEntries,
+        IReadOnlySet<int> splitGames,
+        string? copyLabel,
+        bool isFirstCopy)
     {
         var baseId = overlay.OwnedBaseGameId(item.GameId);
         var shown = covers.GetValueOrDefault(item.GameId);
         var variant = CoverOf(shown);
         var swatch = shown?.Colour?.Background;
+        long? baseEntry = baseId is { } owned && firstEntries.TryGetValue(owned, out var entry) ? entry : null;
 
         return new LocationGameRow(
             item.GameId,
             titles[item.GameId],
             item.Kind == ItemKind.Expansion,
-            overlay.OwnLocationId(item.GameId),
+            overlay.EntryOwnLocationId(item.CollectionId),
             baseId is { } id && titles.TryGetValue(id, out var baseTitle) ? baseTitle : null,
-            overlay.EffectiveLocationName(item.GameId),
+            overlay.EntryLocationName(item.CollectionId),
             baseId,
-            overlay.EffectiveLocationId(item.GameId),
+            overlay.EntryLocationId(item.CollectionId),
             variant?.Url,
             RgbColour.TryParseHex(swatch, out _) ? swatch : null,
             variant?.Width ?? 0,
-            variant?.Height ?? 0);
+            variant?.Height ?? 0,
+            item.CollectionId,
+            copyLabel,
+            baseEntry,
+            isFirstCopy,
+            baseId is { } following && splitGames.Contains(following));
     }
 
     /// <summary>The small stored picture an item is drawn from, at the width the owner pages show, or null when it has none.</summary>
@@ -546,20 +616,24 @@ public class LocationsModel : OwnerPage
 
     private static List<LocationGameRow> Nested(List<LocationGameRow> rows)
     {
-        var present = rows.Select(row => row.GameId).ToHashSet();
+        var present = rows.Select(row => row.CollectionId).ToHashSet();
         var under = rows
-            .Where(row => row.BaseGameId is { } baseId && present.Contains(baseId))
-            .ToLookup(row => row.BaseGameId!.Value);
+            .Where(row => row.BaseEntryId is { } baseEntry && present.Contains(baseEntry))
+            .ToLookup(row => row.BaseEntryId!.Value);
         var top = rows
-            .Where(row => row.BaseGameId is not { } baseId || !present.Contains(baseId))
+            .Where(row => row.BaseEntryId is not { } baseEntry || !present.Contains(baseEntry))
             .OrderBy(row => row.Title, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(row => row.GameId);
+            .ThenBy(row => row.GameId)
+            .ThenBy(row => row.CollectionId);
         var ordered = new List<LocationGameRow>(rows.Count);
 
         foreach (var row in top)
         {
             ordered.Add(row);
-            ordered.AddRange(under[row.GameId].OrderBy(child => child.Title, StringComparer.OrdinalIgnoreCase).ThenBy(child => child.GameId));
+            ordered.AddRange(under[row.CollectionId]
+                .OrderBy(child => child.Title, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(child => child.GameId)
+                .ThenBy(child => child.CollectionId));
         }
 
         return ordered;

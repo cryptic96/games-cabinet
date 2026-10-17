@@ -21,3 +21,7 @@ Decide what the last section of a phone layout should do when it holds only a fe
 - **Fill from the top in the last section:** keep the full piece but put the boxes on the top shelf and leave the empty cubbies below, like a half-filled real shelf.
 
 Either way keep the default look drawn pixel for pixel as before for every collection that does not end in a sparse last section, and say in the layout guide what the last section does. Cover it with a synthetic collection that ends in one or two boxes at phone width, and check the desktop layout and the balancing of section heights are unchanged.
+
+## Resolution
+
+Done: a sparse last section of a cabinet that does not balance its sections keeps only its shelf rows that hold a game, at least two, with its boxes on the bottom shelf (layout version 17). A last section filled from the top and every balanced section are drawn as before.

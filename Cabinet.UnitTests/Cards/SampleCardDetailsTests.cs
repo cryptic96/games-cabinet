@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Cabinet.Domain.Cards;
 using Cabinet.Domain.Collection;
 using Cabinet.Domain.Layout;
+using Cabinet.Domain.Owner;
 using Cabinet.Domain.Samples;
 using FluentAssertions;
 
@@ -94,6 +95,44 @@ public sealed class SampleCardDetailsTests
 
         snapshot.Items.Select(item => (item.CollectionId, item.GameId, item.Title, item.Kind))
             .Should().Equal(items.Select(item => (item.CollectionId, item.BggId, item.Title, item.Kind)));
+    }
+
+    [Fact]
+    public void The_sample_location_book_has_stable_invented_places()
+    {
+        var items = ItemsOf("65");
+
+        var first = SampleCardDetails.LocationBookFor("65", items);
+        var second = SampleCardDetails.LocationBookFor("65", items);
+        var snapshot = SampleCardDetails.SnapshotFor("65", items);
+        var nameOf = first.Order.ToDictionary(location => location.Id, location => location.Name);
+
+        first.Order.Select(location => location.Name).Should().Equal("Cabinet A", "Cabinet B", "Shelf A", "Shelf B", "Shelf C", "Lent out");
+        first.Order.Should().Equal(second.Order);
+        first.EntryLocations.Should().Equal(second.EntryLocations);
+        first.Order.Select(location => location.Id).Should().OnlyHaveUniqueItems().And.OnlyContain(id => OwnerLocation.IsWellFormedId(id));
+        first.EntryLocations.Should().NotBeEmpty();
+        foreach (var item in snapshot.Items)
+        {
+            var placed = first.LocationOf(item.CollectionId);
+
+            (placed is null ? null : nameOf[placed]).Should().Be(item.Location);
+        }
+
+        first.EntryLocations.Count.Should().BeInRange(items.Count / 4, items.Count * 3 / 4);
+    }
+
+    [Fact]
+    public void The_edge_sample_location_book_keeps_the_long_and_right_to_left_names()
+    {
+        var items = ItemsOf("edge");
+
+        var book = SampleCardDetails.LocationBookFor("edge", items);
+        var snapshot = SampleCardDetails.SnapshotFor("edge", items);
+
+        book.Order.Select(location => location.Name).Should().Contain("رف 5، يمين").And.Contain("Стеллаж 3, полка 2");
+        book.EntryLocations.Count.Should().Be(items.Count);
+        snapshot.Items.Select(item => item.Location).Should().OnlyContain(name => book.Order.Any(location => location.Name == name));
     }
 
     private static IReadOnlyList<CabinetItem> ItemsOf(string sample)

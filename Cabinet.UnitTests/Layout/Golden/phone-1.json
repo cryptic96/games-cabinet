@@ -1,5 +1,5 @@
 {
-  "layoutVersion": 16,
+  "layoutVersion": 17,
   "profile": "phone",
   "optionsFingerprint": "334acc9b71de0655",
   "palette": [
@@ -56,29 +56,13 @@
     {
       "index": 0,
       "widthMm": 640,
-      "heightMm": 1000,
+      "heightMm": 680,
       "frameMm": 20,
       "cubbies": [
         {
-          "index": 0,
-          "xMm": 0,
-          "yMm": 0,
-          "widthMm": 270,
-          "heightMm": 300,
-          "placements": []
-        },
-        {
-          "index": 1,
-          "xMm": 290,
-          "yMm": 0,
-          "widthMm": 350,
-          "heightMm": 300,
-          "placements": []
-        },
-        {
           "index": 2,
           "xMm": 0,
-          "yMm": 320,
+          "yMm": 0,
           "widthMm": 260,
           "heightMm": 280,
           "placements": []
@@ -86,7 +70,7 @@
         {
           "index": 3,
           "xMm": 280,
-          "yMm": 320,
+          "yMm": 0,
           "widthMm": 180,
           "heightMm": 280,
           "placements": []
@@ -94,7 +78,7 @@
         {
           "index": 4,
           "xMm": 480,
-          "yMm": 320,
+          "yMm": 0,
           "widthMm": 160,
           "heightMm": 280,
           "placements": []
@@ -102,7 +86,7 @@
         {
           "index": 5,
           "xMm": 0,
-          "yMm": 620,
+          "yMm": 300,
           "widthMm": 290,
           "heightMm": 380,
           "placements": [
@@ -124,7 +108,7 @@
         {
           "index": 6,
           "xMm": 310,
-          "yMm": 620,
+          "yMm": 300,
           "widthMm": 330,
           "heightMm": 380,
           "placements": []

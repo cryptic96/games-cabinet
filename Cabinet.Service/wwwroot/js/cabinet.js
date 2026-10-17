@@ -3,7 +3,7 @@
  * renderer, and shows loading and error states. The profile follows one media query; nothing else listens to resize.
  */
 import './language.js';
-import { renderCabinet } from './render.js';
+import { renderCabinet, renderLocations } from './render.js';
 import { COPY, pageLanguage } from './copy.js';
 import { initSyncStatus, fetchStatus } from './sync.js';
 import { startLive } from './live.js';
@@ -11,6 +11,10 @@ import { initCardDialog } from './detail.js';
 import { indexPlacements, recordFromPlacement } from './card-flow.js';
 import { initRoving } from './keys.js';
 import { initGamesList } from './games-list.js';
+import { initFilters, NO_FILTERS } from './filters.js';
+import { isActive } from './filter-rules.js';
+import { readFilters, readView } from './filter-state.js';
+import { initLocationsView } from './locations-view.js';
 import { initLook } from './look.js';
 import { applyLookStatus } from './look-switch.js';
 
@@ -38,6 +42,69 @@ let cardRecords = new Map();
 let drawnPlacements = new Map();
 let drawnPalette = [];
 let cardsFailed = false;
+let cardLocations = [];
+let drawnLayout = null;
+let drawnEtag = null;
+
+const filterBar = document.querySelector('.filter-bar');
+
+/**
+ * Gives the records the filters judge: every card record while the card data is held, plus a least record for each drawn box the
+ * card data does not hold. A box carries the id of its family, which the least record keeps so the family can still be found.
+ * @returns {object[]}
+ */
+function filterRecords() {
+  const records = [...cardRecords.values()];
+
+  for (const [key, placement] of drawnPlacements) {
+    if (!cardRecords.has(key)) {
+      records.push({ ...recordFromPlacement(placement), familyId: placement.familyId });
+    }
+  }
+
+  return records;
+}
+
+/**
+ * Gives the tab's session storage, where the filters are kept, or null when the browser does not let the page have it.
+ * @returns {Storage | null}
+ */
+function tabStorage() {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Gives the device's local storage, where the chosen view is remembered, or null when the browser does not let the page have it.
+ * @returns {Storage | null}
+ */
+function deviceStorage() {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+const tabStore = tabStorage();
+const deviceStore = deviceStorage();
+
+const filters = filterBar === null || mount === null
+  ? NO_FILTERS
+  : initFilters({ bar: filterBar, mount, copy: COPY, language: pageLanguage(), getRecords: filterRecords, initial: readFilters(tabStore), storage: tabStore });
+
+const viewToggle = document.querySelector('.filter-view');
+
+/**
+ * Gives the view the visitor chose: the one big cabinet, or one cabinet per storage location.
+ * @returns {'all' | 'location'}
+ */
+function currentView() {
+  return locationsView === null ? 'all' : locationsView.view;
+}
 
 /** The waits before the second and third request for the card data after a failed one, in milliseconds. */
 const CARD_RETRY_DELAYS_MS = [1500, 4000];
@@ -51,6 +118,14 @@ const CARD_ATTEMPTS = CARD_RETRY_DELAYS_MS.length + 1;
  */
 function announce(name, detail = {}) {
   document.dispatchEvent(new CustomEvent(name, { detail }));
+}
+
+/**
+ * Gives the invented collection the mount shows, when it shows one.
+ * @returns {string | undefined}
+ */
+function currentSample() {
+  return mount === null ? undefined : mount.dataset.sample;
 }
 
 /**
@@ -109,21 +184,33 @@ function pause(milliseconds) {
 }
 
 /**
+ * Starts a request for the card data at normal priority, for a draw that waits for it. A network failure gives null instead of an
+ * error, so a request nobody has asked about yet never ends as an unhandled rejection.
+ * @returns {Promise<Response | null>}
+ */
+function startCardsRequest() {
+  return fetch(cardsUrl()).catch(() => null);
+}
+
+/**
  * Asks for the card data once and keeps it when it belongs to the layout on screen.
  * @param {number} epoch The load counter when the layout was drawn.
  * @param {string | null} etag The entity tag of the layout on screen, when the response carried one.
+ * @param {Promise<Response | null> | null} [started] A request that is already under way, used instead of a new one.
+ * @param {boolean} [beforeDraw] Whether a draw follows, which applies the filters itself; the boxes on screen are then left alone
+ * until that draw swaps them.
  * @returns {Promise<'loaded' | 'superseded' | 'stale' | 'failed'>} Loaded when the data is kept, superseded when a newer load took
  * over, stale when the data belongs to a different layout, failed when the request or its answer was not usable.
  */
-async function requestCards(epoch, etag) {
+async function requestCards(epoch, etag, started = null, beforeDraw = false) {
   try {
-    const response = await fetch(cardsUrl(), { priority: 'low' });
+    const response = started === null ? await fetch(cardsUrl(), { priority: 'low' }) : await started;
 
     if (epoch !== latestLoad) {
       return 'superseded';
     }
 
-    if (!response.ok) {
+    if (response === null || !response.ok) {
       return 'failed';
     }
 
@@ -138,7 +225,10 @@ async function requestCards(epoch, etag) {
     }
 
     cardRecords = new Map(body.cards.map((record) => [String(record.entryId), record]));
+    cardLocations = body.locations ?? [];
+    filters.enableCardFilters();
     gamesList?.showCards(body.cards);
+    filters.rebuild(filterRecords(), body.locations ?? [], { layoutEtag: etag, quiet: beforeDraw });
     announce('cabinet:cards', { records: body.cards });
 
     return 'loaded';
@@ -151,23 +241,26 @@ async function requestCards(epoch, etag) {
  * Fetches the card data of the layout just drawn and keeps it in memory so a tap finds it ready. It tries again when the
  * data belongs to a different layout than the one on screen, and again after a short wait when the request failed. It never
  * shows anything: a card without its data still opens with what the drawn box knows, and says that the details could not be
- * loaded once every attempt has failed. A newer load or redraw supersedes it.
+ * loaded once every attempt has failed, which is also when the filters that need the details step aside. A newer load or redraw
+ * supersedes it.
  * @param {number} epoch The load counter when the layout was drawn.
  * @param {string | null} etag The entity tag of the layout on screen, when the response carried one.
- * @returns {Promise<void>}
+ * @param {Promise<Response | null> | null} [started] A request for the card data that is already under way; the first attempt uses it.
+ * @returns {Promise<'loaded' | 'superseded' | 'failed'>} How it ended.
  */
-async function fetchCards(epoch, etag) {
+async function fetchCards(epoch, etag, started = null) {
+  const beforeDraw = started !== null;
   let failures = 0;
 
   for (let attempt = 0; attempt < CARD_ATTEMPTS; attempt += 1) {
-    const outcome = await requestCards(epoch, etag);
+    const outcome = await requestCards(epoch, etag, attempt === 0 ? started : null, beforeDraw);
 
     if (outcome === 'superseded') {
-      return;
+      return 'superseded';
     }
 
     if (outcome === 'loaded') {
-      return;
+      return 'loaded';
     }
 
     if (outcome === 'failed' && attempt < CARD_ATTEMPTS - 1) {
@@ -175,25 +268,172 @@ async function fetchCards(epoch, etag) {
       failures += 1;
 
       if (epoch !== latestLoad) {
-        return;
+        return 'superseded';
       }
     }
   }
 
   cardsFailed = true;
+  filters.disableCardFilters();
+
+  return 'failed';
 }
 
 /**
- * Remembers what the layout just drawn holds and starts fetching the card data that goes with it.
+ * Tells the filters what the layout about to be drawn holds, so the boxes are built already in the light or in shadow.
+ * @param {object} layout The layout about to be drawn, or the sections of every location put together.
+ * @param {string | null} etag The entity tag of the layout response, which tells the filters when the collection changed.
+ * @param {object | null} doc The by-location document about to be drawn, or null when the combined layout is.
+ */
+function prepareFilters(layout, etag, doc) {
+  drawnPlacements = indexPlacements(layout);
+  filters.setView(doc === null ? 'all' : 'location', doc);
+  filters.rebuild(filterRecords(), undefined, { layoutEtag: etag });
+}
+
+/**
+ * Puts the sections of every location of a by-location document in one layout, which is what the boxes are indexed by.
+ * @param {{ palette?: object[], locations: { sections: object[] }[] }} doc The by-location document.
+ * @returns {{ sections: object[], palette: object[] }}
+ */
+function layoutOfLocations(doc) {
+  return { sections: doc.locations.flatMap((location) => location.sections), palette: doc.palette ?? [] };
+}
+
+/**
+ * Tells whether a draw has to wait for the card data: any filter set, the search included, needs the details to be judged, so the
+ * first frame is already in shadow instead of showing every box in the light first. The location view waits too, because only the card
+ * data says whether the owner still has any location to show a cabinet for.
+ * @returns {boolean}
+ */
+function drawWaitsForCards() {
+  return isActive(filters.state) || currentView() === 'location';
+}
+
+/**
+ * Puts the cabinet on screen in place of what is there and shows the bar in the same task, with no await between, so nothing shifts
+ * under the reader and no frame shows a box in the light that is about to go into shadow. The bar is shown when at least one box was
+ * drawn. With a by-location document the cabinet is drawn as one group per location, otherwise as the one big cabinet.
+ * @param {object} layout The combined layout, kept so the view can be switched back without asking for it again.
+ * @param {string | null} etag The entity tag of the layout response.
+ * @param {object | null} doc The by-location document to draw, or null to draw the combined layout.
+ * @returns {object} The layout that was drawn, which is the combined one or the sections of every location put together.
+ */
+function paint(layout, etag, doc) {
+  const drawn = doc === null ? layout : layoutOfLocations(doc);
+
+  drawnLayout = layout;
+  drawnEtag = etag;
+  prepareFilters(drawn, etag, doc);
+
+  if (doc === null) {
+    renderCabinet(mount, layout, COPY, filters.dimOf);
+  } else {
+    renderLocations(mount, doc, COPY, filters.dimOf);
+    filters.showHeadings();
+  }
+
+  filters.showBar(drawnPlacements.size > 0);
+  roving.refresh();
+  announce('cabinet:drawn');
+
+  return drawn;
+}
+
+/**
+ * Draws the cabinet and then does what follows a draw.
+ * @param {object} layout The layout to draw.
+ * @param {string | null} etag The entity tag of the layout response.
+ * @param {'loaded' | 'failed' | null} settled How the wait for the card data ended, or null when the draw did not wait for it.
+ * @param {object | null} [doc] The by-location document to draw instead of the combined layout.
+ */
+function drawCabinet(layout, etag, settled, doc = null) {
+  afterDraw(paint(layout, etag, doc), etag, settled);
+}
+
+/**
+ * Draws the view the visitor switched to from the layout already held, with the filters as they are. The card data is held already or
+ * its request is under way, so nothing is asked for again.
+ * @param {'all' | 'location'} view The view chosen.
+ * @param {object | null} doc The by-location document for the location view.
+ */
+function switchView(view, doc) {
+  if (drawnLayout !== null) {
+    paint(drawnLayout, drawnEtag, view === 'location' ? doc : null);
+
+    if (cardRecords.size === 0) {
+      gamesList?.showTitles(drawnPlacements);
+    }
+  }
+}
+
+const locationsView = viewToggle === null || mount === null
+  ? null
+  : initLocationsView({
+    toggle: viewToggle,
+    copy: COPY,
+    getProfile: currentProfile,
+    getSample: currentSample,
+    getLayoutEtag: () => drawnEtag,
+    onSwitch: switchView,
+    initialView: readView(deviceStore),
+    storage: deviceStore,
+    closeCard: () => (cardControls === null ? Promise.resolve() : cardControls.closeCard({ path: 'fade' })),
+    cabinet: mount,
+    bar: filterBar,
+  });
+
+/**
+ * Puts the page back on the all-together view without a word and without touching what the device remembers, when the location view
+ * is on but the card data lists no location: the owner has none, or deleted the last one. The switch is hidden by the filters.
+ */
+function leaveLocationViewWithoutLocations() {
+  if (currentView() === 'location' && cardLocations.length === 0) {
+    locationsView.setView('all');
+  }
+}
+
+/**
+ * Gives the by-location document a draw needs while the location view is on, or null in the other view. When the document cannot be
+ * had the draw goes on with the all-together cabinet and the caller says so after drawing, unless the request was quiet.
+ * @param {string | null} etag The entity tag of the layout the document must belong to.
+ * @param {boolean} quiet Whether to leave the view alone and draw nothing when the document cannot be had.
+ * @param {Promise<object | null> | null} [started] A request for the document that is already under way.
+ * @returns {Promise<{ doc: object | null, usable: boolean, failed: boolean }>} The document, whether the draw can go on (false only
+ * when a quiet request failed), and whether the location view could not be had and the all-together cabinet is drawn instead.
+ */
+async function documentForView(etag, quiet, started = null) {
+  if (currentView() !== 'location') {
+    return { doc: null, usable: true, failed: false };
+  }
+
+  const doc = await locationsView.fetchDocument(etag, started);
+
+  if (doc !== null) {
+    return { doc, usable: true, failed: false };
+  }
+
+  return { doc: null, usable: !quiet, failed: !quiet };
+}
+
+/**
+ * Remembers what the layout just drawn holds and, unless the draw already waited for the card data, starts fetching it.
  * @param {object} layout The layout drawn.
  * @param {string | null} etag The entity tag of the layout response.
+ * @param {'loaded' | 'failed' | null} settled How the wait for the card data ended, or null when the draw did not wait for it.
  */
-function afterDraw(layout, etag) {
+function afterDraw(layout, etag, settled) {
   drawnPlacements = indexPlacements(layout);
   drawnPalette = layout.palette ?? [];
-  cardsFailed = false;
-  gamesList?.showTitles(drawnPlacements);
-  fetchCards(latestLoad, etag);
+  cardsFailed = settled === 'failed';
+
+  if (settled !== 'loaded') {
+    gamesList?.showTitles(drawnPlacements);
+  }
+
+  if (settled === null) {
+    fetchCards(latestLoad, etag);
+  }
 }
 
 /**
@@ -223,6 +463,8 @@ function showError() {
   retry.textContent = COPY.retry;
   retry.addEventListener('click', load);
 
+  filters.showBar(false);
+
   const message = document.createElement('div');
   message.className = 'cabinet-message';
   message.append(heading, body, retry);
@@ -238,10 +480,14 @@ async function load() {
   latestLoad += 1;
   const thisLoad = latestLoad;
   cardRecords = new Map();
+  cardLocations = [];
   cardsFailed = false;
+  drawnLayout = null;
   showLoading();
 
   try {
+    const startedCards = drawWaitsForCards() ? startCardsRequest() : null;
+    const startedDocument = currentView() === 'location' ? locationsView.requestDocument() : null;
     const response = await fetch(layoutUrl());
 
     if (thisLoad !== latestLoad) {
@@ -259,10 +505,26 @@ async function load() {
       return;
     }
 
-    renderCabinet(mount, layout, COPY);
-    roving.refresh();
-    announce('cabinet:drawn');
-    afterDraw(layout, response.headers.get('ETag'));
+    const etag = response.headers.get('ETag');
+    const settled = startedCards === null ? null : await fetchCards(thisLoad, etag, startedCards);
+
+    if (settled === 'superseded') {
+      return;
+    }
+
+    leaveLocationViewWithoutLocations();
+
+    const { doc, failed } = await documentForView(etag, false, startedDocument);
+
+    if (thisLoad !== latestLoad) {
+      return;
+    }
+
+    drawCabinet(layout, etag, settled, doc);
+
+    if (failed) {
+      locationsView.fallBack();
+    }
   } catch {
     if (thisLoad === latestLoad) {
       showError();
@@ -308,6 +570,7 @@ async function redraw() {
   const thisRedraw = latestLoad;
 
   try {
+    const startedCards = drawWaitsForCards() ? startCardsRequest() : null;
     const fetched = await fetchLayout();
 
     if (thisRedraw !== latestLoad) {
@@ -319,14 +582,30 @@ async function redraw() {
     }
 
     const { layout, etag } = fetched;
+    const settled = startedCards === null ? null : await fetchCards(thisRedraw, etag, startedCards);
+
+    if (settled === 'superseded') {
+      return false;
+    }
+
+    leaveLocationViewWithoutLocations();
+
+    const { doc, usable } = await documentForView(etag, true);
+
+    if (thisRedraw !== latestLoad) {
+      return false;
+    }
+
+    if (!usable) {
+      return abandonRedraw();
+    }
 
     const active = document.activeElement;
     const focused = mount.contains(active) ? { entryId: active.dataset.entryId, kind: active.dataset.kind } : undefined;
+    const scrolledTo = window.scrollY;
 
-    renderCabinet(mount, layout, COPY);
-    roving.refresh();
-    announce('cabinet:drawn');
-    afterDraw(layout, etag);
+    drawCabinet(layout, etag, settled, doc);
+    keepScroll(scrolledTo);
 
     const filling = document.querySelector('.cabinet-filling');
 
@@ -347,6 +626,18 @@ async function redraw() {
     return true;
   } catch {
     return thisRedraw === latestLoad ? abandonRedraw() : false;
+  }
+}
+
+/**
+ * Puts the page back where it was scrolled to after the cabinet was swapped, when the new page is tall enough to hold that place.
+ * @param {number} top The scroll position before the swap, in pixels.
+ */
+function keepScroll(top) {
+  const reachable = document.documentElement.scrollHeight - window.innerHeight >= top;
+
+  if (reachable && Math.abs(window.scrollY - top) > 1) {
+    window.scrollTo({ top, left: 0, behavior: 'instant' });
   }
 }
 

@@ -19,7 +19,7 @@ for (const name of readdirSync(new URL('../../Cabinet.Service/wwwroot/js/', impo
   copyFileSync(new URL('../../Cabinet.Service/wwwroot/js/' + name, import.meta.url), join(FOLDER, name));
 }
 
-const { orderEntries, entryName, titleOnlyEntries, initGamesList } = await import(pathToFileURL(join(FOLDER, 'games-list.js')).href);
+const { orderEntries, entryName, groupHeading, titleOnlyEntries, initGamesList } = await import(pathToFileURL(join(FOLDER, 'games-list.js')).href);
 const { copyFor } = await import(pathToFileURL(join(FOLDER, 'copy.js')).href);
 
 const en = copyFor('en');
@@ -317,14 +317,18 @@ function startList({ copy = en, language = 'en' } = {}) {
   const opened = [];
 
   heading.className = 'games-list-heading';
+  heading.textContent = 'All games';
   list.className = 'games-list-items';
   section.append(heading, list);
+  page.listeners = {};
+  page.addEventListener = (type, handler) => (page.listeners[type] ??= []).push(handler);
+  page.fire = (type, detail) => (page.listeners[type] ?? []).forEach((handler) => handler({ detail }));
   page.createElement = (tag) => new FakeElement(page, tag);
   globalThis.document = page;
 
   const controls = initGamesList({ section, copy, language, openCard: (entryId, from) => opened.push({ entryId, opener: from.opener }) });
 
-  return { page, section, heading, list, controls, opened, buttons: () => list.querySelectorAll('BUTTON') };
+  return { page, section, heading, list, controls, opened, buttons: () => section.querySelectorAll('BUTTON') };
 }
 
 const SMALL = [
@@ -479,4 +483,179 @@ test('the Dutch list writes Dutch entry names around untouched titles', () => {
 
   assert.equal(buttons()[0].textContent, `Lantern & Harbour (2019), 2${DASH}4 spelers, vrij licht`);
   assert.equal(buttons()[1].textContent, 'Night Market, uitbreiding op Lantern & Harbour');
+});
+
+test('a location phrase closes the entry name after the weight word, in both languages, and is left out when not given', () => {
+  const stored = record(1, 'Lantern & Harbour', { year: 2019, minPlayers: 2, maxPlayers: 4, weight: 2.4 });
+
+  assert.equal(entryName(stored, en, undefined, ', stored in Shelf B'), `Lantern & Harbour (2019), 2${DASH}4 players, medium-light, stored in Shelf B`);
+  assert.equal(entryName(stored, nl, undefined, nl.listStoredIn('Shelf B')), `Lantern & Harbour (2019), 2${DASH}4 spelers, vrij licht, staat in Shelf B`);
+  assert.equal(entryName(stored, en, undefined), entryName(stored, en, undefined, undefined));
+  assert.equal(entryName(record(3, 'Quiet Quarry'), en, undefined, en.listUnknownEntry()), 'Quiet Quarry, unknown location');
+});
+
+test('the group headings count the games, or the matching ones while filtering, and the unknown group has its own words', () => {
+  const shelf = { id: 'b', name: 'Shelf B', shown: 3, total: 14 };
+
+  assert.equal(groupHeading(shelf, en, false), 'Shelf B, 14 games');
+  assert.equal(groupHeading(shelf, en, true), 'Shelf B, 3 games');
+  assert.equal(groupHeading({ id: null, name: null, shown: 1, total: 2 }, en, false), 'Unknown location, 2 games');
+  assert.equal(groupHeading({ id: null, name: null, shown: 1, total: 2 }, en, true), 'Unknown location, 1 game');
+});
+
+/**
+ * Builds a filter event detail for the plain list.
+ * @param {object[]} entries The entries, each with its boxes.
+ * @param {object} [more] The other fields.
+ * @returns {object}
+ */
+const detailOf = (entries, more = {}) => {
+  const lit = new Set(more.lit ?? entries.flatMap((entry) => entry.boxes));
+  const shown = entries.filter((entry) => entry.boxes.some((box) => lit.has(box))).length;
+
+  return { active: false, count: { lit: shown, total: entries.length }, view: 'all', entries, hasLocations: false, ...more, lit };
+};
+
+const PLACED = [
+  record(1, 'Lantern & Harbour', { location: 'Shelf B', locationId: 'b', expansions: [link(record(2, 'Night Market'))] }),
+  record(2, 'Night Market', { isExpansion: true, location: 'Cabinet A', locationId: 'a', bases: [link(record(1, 'Lantern & Harbour'))] }),
+  record(3, 'Quiet Quarry'),
+  record(4, 'Brass Bay', { location: 'Cabinet A', locationId: 'a' }),
+];
+
+const ENTRIES = [
+  { entryId: '4', boxes: ['4'] },
+  { entryId: '1', boxes: ['1', '2'] },
+  { entryId: '3', boxes: ['3'] },
+];
+
+test('an entry says where it is stored after the facts, and unknown location for a game without one, only while the owner has locations', () => {
+  const { controls, buttons, page } = startList();
+
+  controls.showCards(PLACED);
+  page.fire('cabinet:filtered', detailOf(ENTRIES, { hasLocations: true }));
+
+  assert.deepEqual(buttons().map((button) => button.textContent), [
+    'Brass Bay, stored in Cabinet A',
+    'Lantern & Harbour, stored in Shelf B',
+    'Night Market, expansion for Lantern & Harbour, stored in Cabinet A',
+    'Quiet Quarry, unknown location',
+  ]);
+
+  page.fire('cabinet:filtered', detailOf(ENTRIES, { hasLocations: false }));
+
+  assert.deepEqual(buttons().map((button) => button.textContent), ['Brass Bay', 'Lantern & Harbour', 'Night Market, expansion for Lantern & Harbour', 'Quiet Quarry']);
+});
+
+test('while filtering the list holds only the matching entries under the bar count, and clearing restores the full list and its heading', () => {
+  const { controls, buttons, heading, page } = startList();
+
+  controls.showCards(PLACED);
+  page.fire('cabinet:filtered', detailOf(ENTRIES, { active: true, lit: ['3'] }));
+
+  assert.deepEqual(buttons().map((button) => button.textContent), ['Quiet Quarry']);
+  assert.equal(heading.textContent, '1 of 3 games');
+  assert.equal(buttons()[0].getAttribute('id'), 'games-list-start');
+
+  page.fire('cabinet:filtered', detailOf(ENTRIES, { active: true, lit: [] }));
+
+  assert.equal(buttons().length, 0);
+  assert.equal(heading.textContent, 'No games match');
+
+  page.fire('cabinet:filtered', detailOf(ENTRIES));
+
+  assert.equal(buttons().length, 4);
+  assert.equal(heading.textContent, 'All games');
+});
+
+test('without card data the list keeps the drawn titles, filters them by the event and never mentions a place', () => {
+  const { controls, buttons, heading, page } = startList();
+
+  controls.showTitles([placement(1, 'Lantern & Harbour'), placement(2, 'Night Market', { isExpansion: true, baseTitle: 'Orchard' }), placement(3, 'Quiet Quarry')]);
+  page.fire('cabinet:filtered', detailOf([{ entryId: '1', boxes: ['1'] }, { entryId: '2', boxes: ['2'] }, { entryId: '3', boxes: ['3'] }], { active: true, lit: ['2'] }));
+
+  assert.equal(buttons().length, 1);
+  assert.match(buttons()[0].textContent, /^Night Market/);
+  assert.match(buttons()[0].textContent, /Orchard/);
+  assert.equal(heading.textContent, '1 of 3 games');
+});
+
+/**
+ * Builds the grouped entries of the by-location view.
+ * @returns {object}
+ */
+const grouped = () => ({
+  view: 'location',
+  groups: [
+    { id: 'b', name: 'Shelf B', entries: [{ entryId: '1', boxes: ['1'] }] },
+    { id: 'a', name: 'Cabinet A', entries: [{ entryId: '4', boxes: ['4'] }, { entryId: '2', boxes: ['2'] }] },
+    { id: null, name: null, entries: [{ entryId: '3', boxes: ['3'] }] },
+  ],
+});
+
+/**
+ * Gives the headings and the entries under each of the groups of the list.
+ * @param {object} section The list section.
+ * @returns {{ title: string, names: string[] }[]}
+ */
+function groupsShown(section) {
+  const host = section.querySelector('.games-list-groups');
+  const out = [];
+
+  for (const child of host.children) {
+    if (child.tagName === 'H3') {
+      out.push({ title: child.textContent, names: [] });
+    } else {
+      out[out.length - 1].names = child.querySelectorAll('BUTTON').map((button) => button.textContent);
+    }
+  }
+
+  return out;
+}
+
+test('by location the list has one heading per location in the owner order with its own entries, the unknown group last', () => {
+  const { controls, section, heading, list, page } = startList();
+
+  controls.showCards(PLACED);
+  page.fire('cabinet:filtered', detailOf([], { view: 'location', entries: grouped(), hasLocations: true, count: { lit: 4, total: 4 }, lit: ['1', '2', '3', '4'] }));
+
+  assert.equal(heading.textContent, 'All games');
+  assert.equal(list.hidden, true);
+  assert.deepEqual(groupsShown(section), [
+    { title: 'Shelf B, 1 game', names: ['Lantern & Harbour, stored in Shelf B'] },
+    { title: 'Cabinet A, 2 games', names: ['Brass Bay, stored in Cabinet A', 'Night Market, expansion for Lantern & Harbour, stored in Cabinet A'] },
+    { title: 'Unknown location, 1 game', names: ['Quiet Quarry, unknown location'] },
+  ]);
+  assert.equal(section.querySelectorAll('BUTTON')[0].getAttribute('id'), 'games-list-start');
+});
+
+test('by location while filtering only groups with a match keep their heading, with the matching count', () => {
+  const { controls, section, heading, page } = startList();
+
+  controls.showCards(PLACED);
+  page.fire('cabinet:filtered', detailOf([], { view: 'location', entries: grouped(), hasLocations: true, active: true, count: { lit: 1, total: 4 }, lit: ['2'] }));
+
+  assert.equal(heading.textContent, '1 of 4 games');
+  assert.deepEqual(groupsShown(section), [
+    { title: 'Cabinet A, 1 game', names: ['Night Market, expansion for Lantern & Harbour, stored in Cabinet A'] },
+  ]);
+
+  page.fire('cabinet:filtered', detailOf([], { view: 'location', entries: grouped(), hasLocations: true, active: true, count: { lit: 0, total: 4 }, lit: [] }));
+
+  assert.equal(heading.textContent, 'No games match');
+  assert.deepEqual(groupsShown(section), []);
+});
+
+test('switching back from by location restores the single list in the same pass', () => {
+  const { controls, section, list, buttons, page } = startList();
+
+  controls.showCards(PLACED);
+  page.fire('cabinet:filtered', detailOf([], { view: 'location', entries: grouped(), hasLocations: true, count: { lit: 4, total: 4 }, lit: ['1', '2', '3', '4'] }));
+  buttons()[2].focus();
+  page.fire('cabinet:filtered', detailOf(ENTRIES));
+
+  assert.equal(list.hidden, false);
+  assert.deepEqual(groupsShown(section), []);
+  assert.equal(list.querySelectorAll('BUTTON').length, 4);
+  assert.equal(page.activeElement.dataset.entryId, '2');
 });

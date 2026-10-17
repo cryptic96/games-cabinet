@@ -2,13 +2,17 @@ using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Cabinet.Domain.Collection;
+using Cabinet.Domain.Layout;
 using Cabinet.Domain.Owner;
 using Cabinet.FakeBgg;
 using Cabinet.FakeBgg.Testing;
 using Cabinet.IntegrationTests.Infrastructure;
+using Cabinet.Repository.Storage;
 using Cabinet.Service.Owner;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Cabinet.IntegrationTests;
 
@@ -24,7 +28,11 @@ public sealed partial class OwnerPictureChoiceTests
     private const string LayoutPath = "/cabinet/layout?profile=desktop";
     private const string ChoosePath = "/owner/pictures?handler=Choose";
     private const string ImageHost = "https://example.org/images/";
+    private const int ThreeCopiesGameId = 5101;
+    private const int OtherGameId = 5102;
+    private const long OtherGameEntry = 7101;
 
+    private static readonly long[] ThreeCopies = [7001, 7002, 7003];
     private static readonly byte[] FlatCover = SyntheticArt.Encode(SyntheticArtKind.FlatCover);
     private static readonly byte[] ColouredCover = SyntheticArt.Encode(SyntheticArtKind.CoverColouredField);
 
@@ -50,8 +58,126 @@ public sealed partial class OwnerPictureChoiceTests
         after.CoverUrl.Should().Be(before.CoverUrl);
         after.Colour.Should().Be(before.Colour);
         host.Changes.Take(2).Select(change => change.Text).Should().Equal(
-            $"Picture of {host.Title}: back to Automatic",
-            $"Picture of {host.Title}: main picture");
+            $"Picture of {host.Title} (copy 1 of 2): back to Automatic",
+            $"Picture of {host.Title} (copy 1 of 2): main picture");
+    }
+
+    [Fact]
+    public async Task A_choice_saved_for_one_copy_changes_only_that_copys_box()
+    {
+        const int gameId = 5101;
+        const string versionUrl = "https://cf.example.org/version.jpg";
+        const string mainUrl = "https://cf.example.org/main.jpg";
+        long[] copies = [7001, 7002, 7003];
+        using var storage = new TemporaryDirectory();
+        var moment = new DateTimeOffset(2030, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var images = new Dictionary<string, ImageRecord>
+        {
+            [versionUrl] = new(versionUrl, ImageStatus.Ok, moment, [new ArtFile(600, 800, "1111111111111111-600.webp")], new ArtFeatures(0.0, 1.0, 0.0, 0.0, 4)),
+            [mainUrl] = new(mainUrl, ImageStatus.Ok, moment, [new ArtFile(600, 800, "2222222222222222-600.webp")], new ArtFeatures(0.3, 0.70, 0.60, 0.50, 1)),
+        };
+        new SnapshotStore(storage.FullPath, NullLogger<SnapshotStore>.Instance).Save(new CollectionSnapshot(
+            CollectionSnapshot.CurrentSchemaVersion,
+            moment,
+            [.. copies.Select(copy => new SnapshotItem(copy, gameId, "Quiet Quarry", ItemKind.Base, 2015, null, null, versionUrl, mainUrl))],
+            images,
+            null));
+        await using var factory = new CabinetWebApplicationFactory(new Dictionary<string, string?> { ["Storage:Directory"] = storage.FullPath });
+        using var client = factory.CreatePublicClient();
+        var owner = factory.ServingServices.GetRequiredService<OwnerDataService>();
+        var before = await CoversAsync(client);
+        var layoutBefore = await LayoutTagAsync(client);
+
+        var saved = await owner.MutateAsync(
+            owner.Revision,
+            data => PictureEdits.Choose(data, gameId, copies[1], copies, PictureChoice.MainPicture, "Quiet Quarry", versionUrl, mainUrl),
+            TestContext.Current.CancellationToken);
+        var after = await CoversAsync(client);
+
+        saved.Outcome.Should().Be(OwnerOutcome.Saved);
+        before.Values.Should().OnlyContain(cover => cover.Contains("1111111111111111", StringComparison.Ordinal));
+        after[7001].Should().Be(before[7001]);
+        after[7003].Should().Be(before[7003]);
+        after[7002].Should().Contain("2222222222222222");
+        (await LayoutTagAsync(client)).Should().NotBe(layoutBefore);
+    }
+
+    [Fact]
+    public async Task Posting_a_copys_choice_changes_only_that_copy()
+    {
+        using var storage = new TemporaryDirectory();
+        WriteThreeCopies(storage);
+        await using var factory = new CabinetWebApplicationFactory(new Dictionary<string, string?> { ["Storage:Directory"] = storage.FullPath });
+        using var client = factory.CreatePublicClient();
+        using var session = new OwnerSession(factory);
+        var owner = factory.ServingServices.GetRequiredService<OwnerDataService>();
+        var before = await CoversAsync(client);
+        var layoutBefore = await LayoutTagAsync(client);
+
+        var chosen = await session.PostJsonAsync(
+            ChoosePath,
+            [Field("gameId", ThreeCopiesGameId), Field("collectionId", ThreeCopies[1]), Field("choice", "MainPicture"), Field("revision", owner.Revision.ToString(CultureInfo.InvariantCulture))]);
+        var after = await CoversAsync(client);
+
+        chosen.JsonText("outcome").Should().Be("saved");
+        chosen.JsonText("choice").Should().Be("MainPicture");
+        after[ThreeCopies[0]].Should().Be(before[ThreeCopies[0]]);
+        after[ThreeCopies[2]].Should().Be(before[ThreeCopies[2]]);
+        after[ThreeCopies[1]].Should().Contain("2222222222222222");
+        (await LayoutTagAsync(client)).Should().NotBe(layoutBefore);
+    }
+
+    [Fact]
+    public async Task A_collection_id_that_is_not_an_entry_of_the_posted_game_is_refused_by_every_picture_handler()
+    {
+        using var storage = new TemporaryDirectory();
+        WriteThreeCopies(storage);
+        await using var factory = new CabinetWebApplicationFactory(new Dictionary<string, string?> { ["Storage:Directory"] = storage.FullPath });
+        using var session = new OwnerSession(factory);
+        var owner = factory.ServingServices.GetRequiredService<OwnerDataService>();
+        var before = owner.Revision;
+        var revision = before.ToString(CultureInfo.InvariantCulture);
+
+        var choose = await session.PostJsonAsync(
+            ChoosePath,
+            [Field("gameId", ThreeCopiesGameId), Field("collectionId", OtherGameEntry), Field("choice", "MainPicture"), Field("revision", revision)]);
+        var looksRight = await session.PostJsonAsync(
+            "/owner/pictures?handler=LooksRight",
+            [Field("gameId", ThreeCopiesGameId), Field("collectionId", OtherGameEntry), Field("revision", revision)]);
+        var missing = await session.PostJsonAsync(
+            ChoosePath,
+            [Field("gameId", ThreeCopiesGameId), Field("choice", "MainPicture"), Field("revision", revision)]);
+
+        choose.Status.Should().Be(HttpStatusCode.UnprocessableEntity);
+        choose.JsonText("status").Should().Be("unknown-game");
+        looksRight.Status.Should().Be(HttpStatusCode.UnprocessableEntity);
+        looksRight.JsonText("status").Should().Be("unknown-game");
+        missing.JsonText("status").Should().Be("unknown-game");
+        owner.Revision.Should().Be(before);
+    }
+
+    [Fact]
+    public async Task The_pictures_page_lists_a_row_for_every_copy_with_its_tag_and_returns_a_copys_form_post_to_that_row()
+    {
+        using var storage = new TemporaryDirectory();
+        WriteThreeCopies(storage, ["Deluxe edition", null, null]);
+        await using var factory = new CabinetWebApplicationFactory(new Dictionary<string, string?> { ["Storage:Directory"] = storage.FullPath });
+        using var session = new OwnerSession(factory);
+
+        var page = await session.GetAsync("/owner/pictures?view=all");
+        var saved = await session.PostFormAsync(
+            ChoosePath,
+            [
+                Field("gameId", ThreeCopiesGameId),
+                Field("collectionId", ThreeCopies[1]),
+                Field("choice", "MainPicture"),
+                Field("revision", OwnerSession.FieldValue(page.Body, "revision")),
+            ]);
+
+        page.Body.Should().Contain($"id=\"entry-{ThreeCopies[0]}\"").And.Contain($"id=\"entry-{ThreeCopies[1]}\"").And.Contain($"id=\"entry-{ThreeCopies[2]}\"");
+        page.Body.Should().Contain(">Deluxe edition<").And.Contain(">Copy 2 of 3<").And.Contain(">Copy 3 of 3<");
+        Regex.Matches(page.Body, "type=\"radio\"").Count.Should().Be(4 * 4);
+        saved.Location.Should().Be($"/owner/pictures?done=saved#entry-{ThreeCopies[1]}");
     }
 
     [Fact]
@@ -78,7 +204,7 @@ public sealed partial class OwnerPictureChoiceTests
         var again = await host.Session.PostJsonAsync(ChoosePath, host.Fields("MainPicture"));
         var noLink = await host.Session.PostJsonAsync(ChoosePath, host.Fields("Link"));
         var number = await host.Session.PostJsonAsync(ChoosePath, host.Fields("99"));
-        var unknownGame = await host.Session.PostJsonAsync(ChoosePath, [Field("gameId", "1"), Field("choice", "MainPicture"), Field("revision", host.Revision)]);
+        var unknownGame = await host.Session.PostJsonAsync(ChoosePath, [Field("gameId", "1"), Field("collectionId", host.CollectionId), Field("choice", "MainPicture"), Field("revision", host.Revision)]);
 
         again.JsonText("outcome").Should().Be("noChange");
         noLink.Status.Should().Be(HttpStatusCode.UnprocessableEntity);
@@ -110,7 +236,7 @@ public sealed partial class OwnerPictureChoiceTests
         var undone = await host.Session.PostJsonAsync("/owner/pictures?handler=Undo", [Field("revision", host.Revision)]);
 
         saved.Status.Should().Be(HttpStatusCode.Found);
-        saved.Location.Should().Be($"/owner/pictures?done=saved#game-{host.GameId}");
+        saved.Location.Should().Be($"/owner/pictures?done=saved#entry-{host.CollectionId}");
         undone.JsonText("outcome").Should().Be("saved");
         host.State.Games.Should().BeEmpty();
     }
@@ -132,7 +258,7 @@ public sealed partial class OwnerPictureChoiceTests
         rows.Should().BeGreaterThan(1);
         Regex.Matches(page.Body, "type=\"radio\"").Count.Should().Be(rows * 4);
         Regex.Matches(page.Body, ">Save picture<").Count.Should().Be(rows);
-        page.Body.Should().Contain($"id=\"game-{host.GameId}\"");
+        page.Body.Should().Contain($"id=\"entry-{host.CollectionId}\"");
     }
 
     [Fact]
@@ -160,9 +286,49 @@ public sealed partial class OwnerPictureChoiceTests
         expansions.Any(expansion => ownedBasesOf(expansion) == 0).Should().BeTrue("an expansion with no owned base");
     }
 
+    private static void WriteThreeCopies(TemporaryDirectory storage, string?[]? editions = null)
+    {
+        const string versionUrl = "https://cf.example.org/version.jpg";
+        const string mainUrl = "https://cf.example.org/main.jpg";
+        var moment = new DateTimeOffset(2030, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var images = new Dictionary<string, ImageRecord>
+        {
+            [versionUrl] = new(versionUrl, ImageStatus.Ok, moment, [new ArtFile(600, 800, "1111111111111111-600.webp")], new ArtFeatures(0.0, 1.0, 0.0, 0.0, 4)),
+            [mainUrl] = new(mainUrl, ImageStatus.Ok, moment, [new ArtFile(600, 800, "2222222222222222-600.webp")], new ArtFeatures(0.3, 0.70, 0.60, 0.50, 1)),
+        };
+        var items = ThreeCopies
+            .Select((copy, index) => new SnapshotItem(copy, ThreeCopiesGameId, "Quiet Quarry", ItemKind.Base, 2015, null, null, versionUrl, mainUrl, editions?[index]))
+            .Append(new SnapshotItem(OtherGameEntry, OtherGameId, "Hollow Harbour", ItemKind.Base, 2018, null, null, versionUrl, mainUrl));
+
+        new SnapshotStore(storage.FullPath, NullLogger<SnapshotStore>.Instance).Save(new CollectionSnapshot(
+            CollectionSnapshot.CurrentSchemaVersion,
+            moment,
+            [.. items],
+            images,
+            null));
+    }
+
+    private static async Task<Dictionary<long, string>> CoversAsync(HttpClient client)
+    {
+        using var response = await client.GetAsync(CardsPath, TestContext.Current.CancellationToken);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+
+        return document.RootElement.GetProperty("cards").EnumerateArray()
+            .ToDictionary(card => card.GetProperty("entryId").GetInt64(), card => card.GetProperty("cover").GetProperty("url").GetString()!);
+    }
+
+    private static async Task<string> LayoutTagAsync(HttpClient client)
+    {
+        using var response = await client.GetAsync(LayoutPath, TestContext.Current.CancellationToken);
+
+        return response.Headers.ETag!.Tag;
+    }
+
     private static bool IsUnusable(SyntheticArtKind? kind) => kind is null or SyntheticArtKind.Undecodable;
 
     private static KeyValuePair<string, string> Field(string name, string value) => new(name, value);
+
+    private static KeyValuePair<string, string> Field(string name, long value) => new(name, value.ToString(CultureInfo.InvariantCulture));
 
     private static string VersionUrl(FakeBggItem item) => $"{ImageHost}version-{BggXml.VersionId(item)}.jpg";
 
@@ -194,7 +360,7 @@ public sealed partial class OwnerPictureChoiceTests
         return host;
     }
 
-    [GeneratedRegex("<li class=\"pic-row\" id=\"game-\\d+\"")]
+    [GeneratedRegex("<li class=\"pic-row\" id=\"entry-\\d+\"")]
     private static partial Regex GameRows();
 
     [GeneratedRegex("<a href=\"[^\"]*\" aria-current=\"page\">([^<]*)</a>")]
@@ -211,6 +377,8 @@ public sealed partial class OwnerPictureChoiceTests
         public string Title { get; private set; } = string.Empty;
 
         public string GameId => item.ObjectId.ToString(CultureInfo.InvariantCulture);
+
+        public string CollectionId { get; private set; } = string.Empty;
 
         public string MainColour { get; private set; } = string.Empty;
 
@@ -229,6 +397,7 @@ public sealed partial class OwnerPictureChoiceTests
             using var response = await client.GetAsync(CardsPath, TestContext.Current.CancellationToken);
             using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
             Title = CardOf(document).GetProperty("title").GetString()!;
+            CollectionId = CardOf(document).GetProperty("entryId").GetInt64().ToString(CultureInfo.InvariantCulture);
 
             using var snapshot = JsonDocument.Parse(File.ReadAllText(Path.Combine(storage.FullPath, "snapshot.json")));
             var record = snapshot.RootElement.GetProperty("images").GetProperty(MainUrl(item));
@@ -239,6 +408,7 @@ public sealed partial class OwnerPictureChoiceTests
         public List<KeyValuePair<string, string>> Fields(string choice) =>
         [
             Field("gameId", GameId),
+            Field("collectionId", CollectionId),
             Field("choice", choice),
             Field("revision", Revision),
         ];

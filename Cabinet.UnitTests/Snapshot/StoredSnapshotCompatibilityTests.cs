@@ -61,6 +61,51 @@ public sealed class StoredSnapshotCompatibilityTests : IDisposable
     }
 
     [Fact]
+    public void A_stored_collection_without_alternate_names_or_an_edition_name_loads_in_the_same_schema()
+    {
+        File.WriteAllText(
+            SnapshotPath,
+            """
+            {
+              "schemaVersion": 2,
+              "capturedAtUtc": "2030-01-01T00:00:00Z",
+              "items": [ { "collectionId": 7, "gameId": 11, "title": "First Example", "kind": "base" } ],
+              "games": {
+                "11": { "enrichedAtUtc": "2030-01-01T00:00:00Z", "designers": [], "mechanics": [], "expandsGames": [], "detailsVersion": 1 }
+              }
+            }
+            """);
+
+        var loaded = CreateStore().Load();
+
+        loaded.Should().NotBeNull();
+        loaded!.SchemaVersion.Should().Be(2);
+        loaded.Items.Single().VersionName.Should().BeNull();
+        loaded.Games![11].AlternateNames.Should().BeNull();
+        File.Exists(SnapshotPath + ".bad").Should().BeFalse();
+    }
+
+    [Fact]
+    public void Alternate_names_and_an_edition_name_round_trip_unchanged_and_keep_the_schema_version()
+    {
+        var moment = new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero);
+        var snapshot = new CollectionSnapshot(
+            CollectionSnapshot.CurrentSchemaVersion,
+            moment,
+            [new SnapshotItem(7, 11, "First Example", ItemKind.Base, null, null, null, VersionName: "First Example Deluxe edition")],
+            Games: new Dictionary<int, GameDetails>
+            {
+                [11] = new(moment, null, null, null, null, null, null, null, null, null, [], [], [], null, DetailsVersion: GameDetails.CurrentDetailsVersion, AlternateNames: ["Voorbeeldspel", "Ex\u00e4mple"]),
+            });
+        var store = CreateStore();
+
+        store.Save(snapshot);
+
+        store.Load().Should().BeEquivalentTo(snapshot, options => options.WithStrictOrdering());
+        File.ReadAllText(SnapshotPath).Should().Contain("\"schemaVersion\":2").And.Contain("\"alternateNames\"").And.Contain("\"versionName\"");
+    }
+
+    [Fact]
     public void A_stored_collection_with_a_member_this_build_does_not_know_still_loads()
     {
         File.WriteAllText(

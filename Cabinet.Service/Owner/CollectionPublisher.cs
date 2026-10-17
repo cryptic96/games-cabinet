@@ -63,7 +63,10 @@ public sealed class CollectionPublisher
 
         if (reconcile)
         {
-            _owner?.ReconcileAsync(snapshot.Items.Select(item => item.GameId).ToHashSet(), CancellationToken.None).GetAwaiter().GetResult();
+            _owner?.ReconcileAsync(
+                snapshot.Items.Select(item => item.GameId).ToHashSet(),
+                ListedCopies(snapshot),
+                CancellationToken.None).GetAwaiter().GetResult();
         }
 
         return changed;
@@ -79,6 +82,15 @@ public sealed class CollectionPublisher
                 Replace(snapshot);
             }
         }
+    }
+
+    /// <summary>Maps every collection entry a collection lists to its game.</summary>
+    /// <param name="snapshot">The synced collection.</param>
+    public static Dictionary<long, int> ListedCopies(CollectionSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        return snapshot.Items.GroupBy(item => item.CollectionId).ToDictionary(group => group.Key, group => group.First().GameId);
     }
 
     private bool Replace(CollectionSnapshot snapshot)

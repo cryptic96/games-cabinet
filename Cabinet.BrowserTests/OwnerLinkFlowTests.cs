@@ -153,6 +153,86 @@ public sealed class OwnerLinkFlowTests : CabinetPageTest
     }
 
     [Fact]
+    public async Task A_link_pasted_on_the_second_copys_row_is_checked_and_used_for_that_copy_alone()
+    {
+        await Page.SetViewportSizeAsync(1440, 900);
+        await StartHostAsync();
+        await GotoPicturesAsync();
+        var copies = Page.Locator(".pic-row", new PageLocatorOptions { Has = Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = RowTitle, Exact = true }) });
+        var first = copies.Nth(0);
+        var second = copies.Nth(1);
+        var secondEntry = long.Parse(await second.GetAttributeAsync("data-entry-id") ?? string.Empty, System.Globalization.CultureInfo.InvariantCulture);
+
+        await second.Locator("summary").ClickAsync();
+        await second.GetByLabel("Picture link").FillAsync(LinkUrl);
+        await second.GetByRole(AriaRole.Button, new() { Name = "Check link" }).ClickAsync();
+
+        var preview = second.Locator(".pic-preview");
+        await Expect(preview).ToBeVisibleAsync();
+        await Expect(preview).ToHaveAttributeAsync("id", $"pic-preview-{secondEntry}");
+        await Expect(first.Locator(".pic-preview")).ToHaveCountAsync(0);
+
+        await preview.GetByRole(AriaRole.Button, new() { Name = "Use this" }).ClickAsync();
+
+        await Expect(second.Locator("label.pic-tile[data-kind=Link] input")).ToBeCheckedAsync();
+        await Expect(second.Locator("[data-mark=yours]")).ToHaveTextAsync("Yours");
+        await Expect(first.Locator("[data-mark=yours]")).ToHaveCountAsync(0);
+        await Expect(first.Locator("label.pic-tile[data-kind=Link] input")).Not.ToBeCheckedAsync();
+        var linked = Owner.State is OwnerDataState.Ready ready ? ready.Data.Games.Where(game => game.Picture?.Link is not null).ToList() : [];
+        linked.Should().ContainSingle().Which.CollectionId.Should().Be(secondEntry);
+        AssertCleanConsole();
+    }
+
+    [Fact]
+    public async Task A_link_for_the_second_copy_lands_on_that_copy()
+    {
+        await Page.SetViewportSizeAsync(1440, 900);
+        await StartHostAsync(background: true, thirdCopy: true);
+        var before = await CoversByEntryAsync(RowTitle);
+        before.Should().HaveCount(3);
+        await GotoPicturesAsync();
+        var copies = Page.Locator(".pic-row", new PageLocatorOptions { Has = Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = RowTitle, Exact = true }) });
+        await Expect(copies).ToHaveCountAsync(3);
+        var entries = new List<long>();
+
+        for (var index = 0; index < 3; index++)
+        {
+            entries.Add(long.Parse(await copies.Nth(index).GetAttributeAsync("data-entry-id") ?? string.Empty, System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        var secondEntry = entries.Order().ElementAt(1);
+        var second = Page.Locator($".pic-row[data-entry-id='{secondEntry}']");
+        await second.Locator("summary").ClickAsync();
+        await second.GetByLabel("Picture link").FillAsync(LinkUrl);
+
+        await second.GetByRole(AriaRole.Button, new() { Name = "Check link" }).ClickAsync();
+        await Expect(second.Locator(".pic-preview")).ToBeVisibleAsync();
+        await second.GetByRole(AriaRole.Button, new() { Name = "Use this" }).ClickAsync();
+
+        await Expect(second.Locator("label.pic-tile[data-kind=Link] input")).ToBeCheckedAsync();
+        await Expect(second.Locator("[data-mark=yours]")).ToHaveTextAsync("Yours");
+
+        foreach (var other in entries.Where(entry => entry != secondEntry))
+        {
+            var row = Page.Locator($".pic-row[data-entry-id='{other}']");
+            await Expect(row.Locator("[data-mark=yours]")).ToHaveCountAsync(0);
+            await Expect(row.Locator("label.pic-tile[data-kind=Link] input")).Not.ToBeCheckedAsync();
+        }
+
+        var linked = Owner.State is OwnerDataState.Ready ready ? ready.Data.Games.Where(game => game.Picture?.Link is not null).ToList() : [];
+        linked.Should().ContainSingle().Which.CollectionId.Should().Be(secondEntry);
+        var after = await CoversByEntryAsync(RowTitle);
+        after[secondEntry].Should().NotBe(before[secondEntry]).And.StartWith("/art/");
+
+        foreach (var other in entries.Where(entry => entry != secondEntry))
+        {
+            after[other].Should().Be(before[other], "the other copies keep their own pictures");
+        }
+
+        AssertCleanConsole();
+    }
+
+    [Fact]
     public async Task Discarding_a_preview_removes_it_returns_focus_to_the_field_and_changes_nothing()
     {
         await Page.SetViewportSizeAsync(1440, 900);
@@ -251,19 +331,20 @@ public sealed class OwnerLinkFlowTests : CabinetPageTest
             ExtraHTTPHeaders = new Dictionary<string, string> { ["Accept-Encoding"] = "identity" },
         });
         var page = await plain.NewPageAsync();
+        var firstCopy = page.Locator(".pic-row").First;
         var gameId = (await CardsAsync()).First(card => card.Title == RowTitle).GameId;
         await page.GotoAsync($"http://127.0.0.1:{OwnerPort}/owner/pictures?game={gameId}");
-        await page.Locator("summary").ClickAsync();
+        await firstCopy.Locator("summary").ClickAsync();
 
-        await page.GetByLabel("Picture link").FillAsync("not a link");
-        await page.GetByRole(AriaRole.Button, new() { Name = "Check link" }).ClickAsync();
+        await firstCopy.GetByLabel("Picture link").FillAsync("not a link");
+        await firstCopy.GetByRole(AriaRole.Button, new() { Name = "Check link" }).ClickAsync();
 
         await Expect(page.Locator("#owner-notice")).ToHaveTextAsync(Refusals["not-a-link"].Message);
         await Expect(page.Locator("#owner-notice")).ToHaveAttributeAsync("role", "alert");
 
-        await page.Locator("summary").ClickAsync();
-        await page.GetByLabel("Picture link").FillAsync(TooLargeUrl);
-        await page.GetByRole(AriaRole.Button, new() { Name = "Check link" }).ClickAsync();
+        await firstCopy.Locator("summary").ClickAsync();
+        await firstCopy.GetByLabel("Picture link").FillAsync(TooLargeUrl);
+        await firstCopy.GetByRole(AriaRole.Button, new() { Name = "Check link" }).ClickAsync();
 
         await Expect(page.Locator("#owner-notice")).ToHaveTextAsync(Refusals["too-large"].Message);
         await plain.CloseAsync();
@@ -352,7 +433,7 @@ public sealed class OwnerLinkFlowTests : CabinetPageTest
         await row.Locator("summary").ClickAsync();
         await Expect(row.Locator("[data-current-link]")).ToHaveTextAsync("Current link: example.org/.../linked-picture.png");
         await Expect(row.GetByRole(AriaRole.Button, new() { Name = "Remove link" })).ToBeVisibleAsync();
-        var kept = Owner.State is OwnerDataState.Ready ready ? ready.Data.Games.Single().Picture : null;
+        var kept = Owner.State is OwnerDataState.Ready ready ? ready.Data.Games.Single(game => game.Picture?.Choice == PictureChoice.Automatic).Picture : null;
         kept!.Choice.Should().Be(PictureChoice.Automatic);
         kept.Link!.Url.Should().Be(LinkUrl);
         kept.Link.Record!.Files.Should().NotBeEmpty();
@@ -363,7 +444,7 @@ public sealed class OwnerLinkFlowTests : CabinetPageTest
         await Expect(status).ToContainTextAsync("Saved");
         await Expect(linkTile.Locator("input")).ToBeCheckedAsync();
         await Expect(row.Locator("[data-mark=yours]")).ToHaveTextAsync("Yours");
-        ((Owner.State as OwnerDataState.Ready)!.Data.Games.Single().Picture!.Choice).Should().Be(PictureChoice.Link);
+        (Owner.State as OwnerDataState.Ready)!.Data.Games.Should().OnlyContain(game => game.Picture!.Choice == PictureChoice.Link);
         ConsoleErrors.Where(error => !error.Contains("Failed to load resource", StringComparison.Ordinal)).Should().BeEmpty();
     }
 
@@ -396,7 +477,7 @@ public sealed class OwnerLinkFlowTests : CabinetPageTest
         await Expect(row.GetByRole(AriaRole.Button, new() { Name = "Check link" })).ToBeFocusedAsync();
         var data = (Owner.State as OwnerDataState.Ready)!.Data;
         data.Games.Should().BeEmpty();
-        data.Changes[0].Text.Should().Be($"Removed the picture link of {RowTitle}");
+        data.Changes[0].Text.Should().Be($"Removed the picture link of {RowTitle} (copy 1 of 2)");
         (await CoverOfAsync(RowTitle)).Should().Be(before);
         await SaveScreenshotAsync("owner-link-removed-1440");
 
@@ -426,28 +507,29 @@ public sealed class OwnerLinkFlowTests : CabinetPageTest
             ExtraHTTPHeaders = new Dictionary<string, string> { ["Accept-Encoding"] = "identity" },
         });
         var page = await plain.NewPageAsync();
+        var firstCopy = page.Locator(".pic-row").First;
         var gameId = (await CardsAsync()).First(card => card.Title == RowTitle).GameId;
         await page.GotoAsync($"http://127.0.0.1:{OwnerPort}/owner/pictures?game={gameId}");
-        await page.Locator("summary").ClickAsync();
-        await page.GetByLabel("Picture link").FillAsync(LinkUrl);
-        await page.GetByRole(AriaRole.Button, new() { Name = "Check link" }).ClickAsync();
+        await firstCopy.Locator("summary").ClickAsync();
+        await firstCopy.GetByLabel("Picture link").FillAsync(LinkUrl);
+        await firstCopy.GetByRole(AriaRole.Button, new() { Name = "Check link" }).ClickAsync();
         await page.GetByRole(AriaRole.Button, new() { Name = "Use this" }).ClickAsync();
         await Expect(page.Locator("#owner-notice")).ToHaveTextAsync("Saved.");
-        await page.Locator("summary").ClickAsync();
-        await Expect(page.Locator("[data-current-link]")).ToBeVisibleAsync();
+        await firstCopy.Locator("summary").ClickAsync();
+        await Expect(firstCopy.Locator("[data-current-link]")).ToBeVisibleAsync();
 
-        await page.GetByRole(AriaRole.Button, new() { Name = "Remove link" }).ClickAsync();
+        await firstCopy.GetByRole(AriaRole.Button, new() { Name = "Remove link" }).ClickAsync();
 
-        await Expect(page).ToHaveURLAsync(new Regex($@"/owner/pictures\?done=link-removed&game={gameId}#game-{gameId}$"));
+        await Expect(page).ToHaveURLAsync(new Regex($@"/owner/pictures\?done=link-removed&game={gameId}#entry-\d+$"));
         await Expect(page.Locator("#owner-notice")).ToHaveTextAsync("Link removed.");
         await Expect(page.Locator(".owner-notice").GetByRole(AriaRole.Button, new() { Name = "Undo" })).ToBeVisibleAsync();
-        await Expect(page.Locator("input[value=Automatic]")).ToBeCheckedAsync();
-        await Expect(page.Locator("label.pic-tile[data-kind=Link] .pic-sub")).ToHaveTextAsync("None yet");
+        await Expect(page.Locator("input[value=Automatic]").First).ToBeCheckedAsync();
+        await Expect(page.Locator("label.pic-tile[data-kind=Link] .pic-sub").First).ToHaveTextAsync("None yet");
         (Owner.State as OwnerDataState.Ready)!.Data.Games.Should().BeEmpty();
 
         await page.Locator(".owner-notice").GetByRole(AriaRole.Button, new() { Name = "Undo" }).ClickAsync();
 
-        await Expect(page.Locator("input[value=Link]")).ToBeCheckedAsync();
+        await Expect(page.Locator("input[value=Link]").First).ToBeCheckedAsync();
         await plain.CloseAsync();
     }
 
@@ -589,14 +671,15 @@ public sealed class OwnerLinkFlowTests : CabinetPageTest
             ExtraHTTPHeaders = new Dictionary<string, string> { ["Accept-Encoding"] = "identity" },
         });
         var page = await plain.NewPageAsync();
+        var firstCopy = page.Locator(".pic-row").First;
         var gameId = (await CardsAsync()).First(card => card.Title == RowTitle).GameId;
         await page.GotoAsync($"http://127.0.0.1:{OwnerPort}/owner/pictures?game={gameId}");
 
-        await page.Locator("summary").ClickAsync();
-        await page.GetByLabel("Picture link").FillAsync(LinkUrl);
-        await page.GetByRole(AriaRole.Button, new() { Name = "Check link" }).ClickAsync();
+        await firstCopy.Locator("summary").ClickAsync();
+        await firstCopy.GetByLabel("Picture link").FillAsync(LinkUrl);
+        await firstCopy.GetByRole(AriaRole.Button, new() { Name = "Check link" }).ClickAsync();
 
-        await Expect(page).ToHaveURLAsync(new Regex($@"/owner/pictures\?game={gameId}&preview=[0-9a-f]{{32}}#game-{gameId}$"));
+        await Expect(page).ToHaveURLAsync(new Regex($@"/owner/pictures\?game={gameId}&preview=[0-9a-f]{{32}}#entry-\d+$"));
         var preview = page.Locator(".pic-preview");
         await Expect(preview.GetByRole(AriaRole.Heading, new() { Name = "Preview" })).ToBeVisibleAsync();
         await Expect(preview.Locator("svg")).ToHaveCountAsync(2);
@@ -604,14 +687,14 @@ public sealed class OwnerLinkFlowTests : CabinetPageTest
         await Expect(preview.Locator("[data-preview-verdict]")).Not.ToBeEmptyAsync();
         var boxImage = preview.Locator("svg image");
         await Expect(boxImage).ToHaveAttributeAsync("href", new Regex("^/owner/preview/[0-9a-f]{32}$"));
-        (await page.Locator("details.pic-linkbox").EvaluateAsync<bool>("element => element.open")).Should().BeTrue();
+        (await firstCopy.Locator("details.pic-linkbox").EvaluateAsync<bool>("element => element.open")).Should().BeTrue();
         await preview.GetByRole(AriaRole.Button, new() { Name = "Use this" }).ClickAsync();
 
-        await Expect(page).ToHaveURLAsync(new Regex($@"/owner/pictures\?done=saved&game={gameId}#game-{gameId}$"));
+        await Expect(page).ToHaveURLAsync(new Regex($@"/owner/pictures\?done=saved&game={gameId}#entry-\d+$"));
         await Expect(page.Locator("#owner-notice")).ToHaveTextAsync("Saved.");
-        await Expect(page.Locator("input[value=Link]")).ToBeCheckedAsync();
+        await Expect(page.Locator("input[value=Link]").First).ToBeCheckedAsync();
         await Expect(page.Locator(".pic-preview")).ToHaveCountAsync(0);
-        await Expect(page.Locator("label.pic-tile[data-kind=Link] img")).ToHaveAttributeAsync("src", new Regex("^/art/"));
+        await Expect(page.Locator("label.pic-tile[data-kind=Link] img").First).ToHaveAttributeAsync("src", new Regex("^/art/"));
         await plain.CloseAsync();
     }
 
@@ -641,7 +724,7 @@ public sealed class OwnerLinkFlowTests : CabinetPageTest
     private OwnerDataService Owner => _factory!.ServingServices.GetRequiredService<OwnerDataService>();
 
     private ILocator RowOf(string title) =>
-        Page.Locator(".pic-row", new PageLocatorOptions { Has = Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = title, Exact = true }) });
+        Page.Locator(".pic-row", new PageLocatorOptions { Has = Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = title, Exact = true }) }).First;
 
     private async Task GotoPicturesAsync()
     {
@@ -722,9 +805,15 @@ public sealed class OwnerLinkFlowTests : CabinetPageTest
         Action<ScriptedImageHandler>? script = null,
         IReadOnlyDictionary<string, string?>? extraSettings = null,
         bool lanternWithoutSize = false,
-        bool background = false)
+        bool background = false,
+        bool thirdCopy = false)
     {
         var items = SyntheticBggCollection.Create(5);
+
+        if (thirdCopy)
+        {
+            items = [.. items, items[0] with { CollId = SyntheticBggCollection.FirstCollId + 90, Location = null }];
+        }
 
         if (lanternWithoutSize)
         {
@@ -792,6 +881,18 @@ public sealed class OwnerLinkFlowTests : CabinetPageTest
                 card.GetProperty("title").GetString()!,
                 card.TryGetProperty("cover", out var cover) && cover.ValueKind == JsonValueKind.Object ? cover.GetProperty("url").GetString() : null)),
         ];
+    }
+
+    private async Task<Dictionary<long, string?>> CoversByEntryAsync(string title)
+    {
+        var json = await _publicClient!.GetStringAsync(CardsPath, TestContext.Current.CancellationToken);
+        using var document = JsonDocument.Parse(json);
+
+        return document.RootElement.GetProperty("cards").EnumerateArray()
+            .Where(card => card.GetProperty("title").GetString() == title)
+            .ToDictionary(
+                card => card.GetProperty("entryId").GetInt64(),
+                card => card.TryGetProperty("cover", out var cover) && cover.ValueKind == JsonValueKind.Object ? cover.GetProperty("url").GetString() : null);
     }
 
     private async Task<string?> CoverOfAsync(string title) => (await CardsAsync()).First(card => card.Title == title).CoverUrl;

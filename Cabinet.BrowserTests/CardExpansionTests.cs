@@ -67,7 +67,7 @@ public sealed class CardExpansionTests : CabinetPageTest
         await Expect(Page.Locator("#card-title")).ToBeFocusedAsync();
         await Expect(Page.Locator(".card[data-swap]")).ToHaveCountAsync(0);
         await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(1);
-        await Expect(Page.Locator("dialog")).ToHaveCountAsync(1);
+        await Expect(Page.Locator("dialog.card-dialog")).ToHaveCountAsync(1);
         (await Page.EvaluateAsync<double>("document.querySelector('.card').scrollTop")).Should().Be(0);
         Page.Url.Should().Be(address);
 
