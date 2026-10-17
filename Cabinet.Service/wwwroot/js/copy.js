@@ -391,7 +391,7 @@ const ENGLISH = Object.freeze({
    */
   playersSuffix(players) {
     if (players === MAX_PLAYERS_CHIP) {
-      return `${players} or more players`;
+      return `${players}+ players`;
     }
 
     return `${players} ${players === 1 ? 'player' : 'players'}`;
@@ -788,7 +788,7 @@ const DUTCH = Object.freeze({
    */
   playersSuffix(players) {
     if (players === MAX_PLAYERS_CHIP) {
-      return `${players} of meer spelers`;
+      return `${players}+ spelers`;
     }
 
     return `${players} ${players === 1 ? 'speler' : 'spelers'}`;

@@ -32,7 +32,7 @@ public sealed class FilterBarTests : CabinetPageTest
         (await group.Locator("input[type=radio]:checked").EvaluateAllAsync<string[]>("(radios) => radios.map((radio) => radio.value)")).Should().Equal(string.Empty);
         (await Page.GetByRole(AriaRole.Radio, new PageGetByRoleOptions { Name = "5 players" }).CountAsync()).Should().Be(1);
         (await Page.GetByRole(AriaRole.Radio, new PageGetByRoleOptions { Name = "1 player", Exact = true }).CountAsync()).Should().Be(1);
-        (await Page.GetByRole(AriaRole.Radio, new PageGetByRoleOptions { Name = "8 or more players" }).CountAsync()).Should().Be(1);
+        (await Page.GetByRole(AriaRole.Radio, new PageGetByRoleOptions { Name = "8+ players" }).CountAsync()).Should().Be(1);
         (await Page.GetByRole(AriaRole.Radio, new PageGetByRoleOptions { Name = "Any", Exact = true }).CountAsync()).Should().BeGreaterThan(0);
 
         var expected = ExpectedLit(cards, players: 5, minutes: null);
