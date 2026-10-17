@@ -106,6 +106,30 @@ motion gets no fade.
   order and the same labels, in every look. The focus ring on a box is drawn
   to stay visible on every wood and on painted backs.
 
+## Shadow, filter chrome and marks that sit on the look
+
+Some things on the page follow every look without being part of it:
+
+- **The shadow over a game that does not match a filter.** A dimmed box wears a
+  dark veil, a modifier drawn over the box and above the cubby lights, so a lit
+  cubby never brightens a game that is in shadow. Pointing at a dimmed box
+  lifts the veil a little (a peek) so its title can be read. The veil has a
+  fixed strength on every wood, chosen so the label still reads.
+- **The search bar and the phone sheet are wall chrome.** They take their text,
+  lines and focus ring from the wall of the chosen wood, by day and in the
+  evening, and stand on the wall rather than on the furniture; when the bar is
+  stuck to the top of the page it gets a solid fill and a soft shadow so boxes
+  do not show through it.
+- **A found or open box wears the furniture ring.** The box that Show on shelf
+  scrolls to (and, with reduced motion, the box of the open card) is outlined in
+  the same light colour as the keyboard focus ring, so it reads against the
+  cabinet on every wood. The outline is 3px, so it stays distinct from the 2px
+  focus ring.
+- **Switching between "All together" and "By location" fades through the wall.**
+  The old view fades out and the new one fades in, one after the other, so the
+  two layouts are never drawn over each other. With reduced motion the views
+  swap at once.
+
 ## Where the look is stored
 
 The look is part of the owner data, in the same file as the storage locations

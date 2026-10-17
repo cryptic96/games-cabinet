@@ -131,6 +131,13 @@ is left as it is. The same holds when the stored file cannot be read at the
 moment of the save, because its format is then unknown. The upgrade therefore
 never replaces the only file an earlier release can read.
 
+The release that brings a location and a picture for each copy of a game moves
+the owner data to a new format in this way: its first save keeps a copy of the
+older file in `owner-data-versions/`, and a rollback to an earlier release
+follows the steps below. The copy to restore is the newest file there whose
+header reads `"schemaVersion":2,`, the format from before choices were made for
+each copy.
+
 Once the new release has saved, the file is in the new format and the previous
 release cannot read it. A rollback to that release therefore opens the recovery
 panel on every owner page, and its earlier versions include the copy taken at
@@ -148,6 +155,7 @@ names the older format, for example `"schemaVersion":1,` for the first format:
 
 ```sh
 grep -l '"schemaVersion":1,' /var/lib/cabinet/owner-data-versions/owner-data.*.json
+grep -l '"schemaVersion":2,' /var/lib/cabinet/owner-data-versions/owner-data.*.json
 sudo systemctl stop cabinet
 sudo cp /var/lib/cabinet/owner-data-versions/owner-data.<yyyyMMddTHHmmssZ>.json /var/lib/cabinet/owner-data.json
 sudo chown cabinet:cabinet /var/lib/cabinet/owner-data.json

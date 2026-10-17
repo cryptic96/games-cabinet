@@ -161,6 +161,13 @@ Things worth knowing:
 - **Invented storage locations:** the card shows a "Stored in" row only when the game has a location. For the synced collection, locations come only from the owner pages (see "Running the owner tools locally"): the sync never reads them from BGG, so the fake's invented locations are not used. The invented collections (`?sample=65`, `?sample=400`, `?sample=edge`) keep their own invented locations, including ones in several scripts, so the row can be seen without any owner data.
 - **A walk through the whole thing:** start the fake with 65 games, start the cabinet in Development against it, press sync once, then open a few boxes with the mouse, with Tab and the arrow keys and Enter, and with the skip link, in both languages.
 
+### Seeing the filters and the location cabinets locally
+
+- **On the invented samples:** open `http://127.0.0.1:5080/?sample=65` (or `?sample=400`, which has groups big enough to fill several columns) after starting the cabinet in Development. The search box and the game-night filters are in the bar above the cabinet; the sample games carry invented players, play times and storage locations, so every filter has something to find. Choose "By location" in the bar's view switch to see one cabinet per place under its own heading; the choice is remembered in the browser, so clear the site's stored data in the browser's developer tools to start again. On a narrow window (under 64 rem) the bar becomes a search box and a Filters button that opens a sheet.
+- **On the synced collection with owner data:** start the fake and the cabinet as above, press sync once, then give a few games invented places on the Locations page of the owner tools ("Cabinet A", "Shelf B" and "Lent out" are good) and place only some of them: the games that are left over show up under "Unknown location". Own a game twice (the fake's collections of five entries or more include one) to see the per-copy locations and pictures on the owner pages. The cabinet on the owner port also shows the filter bar, so a filter can be tried next to the corner marks for games that are not placed yet.
+- **Show on shelf:** open a card, press Show on shelf, and the page switches to "By location", scrolls to the box and outlines it for a couple of seconds; any press, tap or key clears the outline early.
+- **The shadow:** with a filter on, games that do not match sit under a dark veil. Pointing at one lifts the veil a little so the title can be read.
+
 ### Running the owner tools locally
 
 The owner tools are a second set of pages on a second port, served by the same host. In the Development environment the committed development settings open that port on `127.0.0.1:5082` and allow only loopback addresses, so nothing else on the network can reach it. Start the fake and the cabinet as described above, then open:
@@ -228,7 +235,7 @@ Run them:
 dotnet test --project Cabinet.BrowserTests
 ```
 
-CI runs the suite as four parallel jobs, each with a filter that picks its slice: the classes whose names start with `Look`, the classes whose names start with `Owner`, every other class, and the single WebKit test. The same filters work locally, for example `dotnet test --project Cabinet.BrowserTests --no-build --filter-class "Cabinet.BrowserTests.Look*"`. A new test class lands in the "every other class" slice unless its name starts with `Look` or `Owner`,, so a new class needs no change to the workflow. The WebKit test runs only where `CABINET_WEBKIT=1` is set and WebKit has been installed with the same installer command as Chromium; the other slices leave it out with `--filter-not-trait "Engine=WebKit"`.
+CI runs the suite as five parallel jobs, each with a filter that picks its slice: the classes whose names start with `Look`, the classes whose names start with `Owner`, the classes whose names start with `Filter` (the search, the filters, the phone sheet and the location view), every other class, and the single WebKit test. The same filters work locally, for example `dotnet test --project Cabinet.BrowserTests --no-build --filter-class "Cabinet.BrowserTests.Look*"`. A new test class lands in the "every other class" slice unless its name starts with `Look`, `Owner` or `Filter`, so a new class needs no change to the workflow. The WebKit test runs only where `CABINET_WEBKIT=1` is set and WebKit has been installed with the same installer command as Chromium; the other slices leave it out with `--filter-not-trait "Engine=WebKit"`.
 
 Set `CABINET_SCREENSHOT_DIR` to a directory to keep the screenshots the tests take; without it they are not written. A screenshot covers the whole page, except while a card is open, when only the visible window is saved, because a full-page capture resizes the window and would disturb the open card.
 
@@ -249,7 +256,7 @@ The geometry and look tests measure real text, and the font the browser picks fo
 FONTCONFIG_FILE=/path/to/dejavu.conf dotnet test --project Cabinet.BrowserTests
 ```
 
-Run the suite this way before pushing a change that moves text or boxes, and once with your normal fonts. Do not run two browser suites at the same time on one machine: each browser watches files, and several at once exhaust the system's file-watch limit and fail for reasons unrelated to the change.
+Run the suite this way before pushing a change that moves text or boxes (the bar's geometry tests and the look tests in particular), and once with your normal fonts. Do not run two browser suites at the same time on one machine: each browser watches files, and several at once exhaust the system's file-watch limit and fail for reasons unrelated to the change.
 
 The test host serves module scripts without a content type when the browser accepts compressed responses, so the shared base class asks for the identity encoding. A new browser test should derive from `CabinetPageTest` to inherit that, the recording of console errors and request hosts, and the screenshot helper.
 
