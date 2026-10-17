@@ -55,11 +55,11 @@ public sealed partial class FilterSlimBarTests : CabinetPageTest
           document.body.append(probe);
           const hint = probe.getBoundingClientRect().width;
           probe.remove();
-          const colour = getComputedStyle(field, '::placeholder').color;
+          const opacity = getComputedStyle(field, '::placeholder').opacity;
           return {
             hint,
             room: field.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
-            hintDrawn: colour !== 'rgba(0, 0, 0, 0)',
+            hintDrawn: opacity !== '0',
             glyph: getComputedStyle(document.querySelector('.filter-glass')).display,
           };
         }
@@ -182,17 +182,12 @@ public sealed partial class FilterSlimBarTests : CabinetPageTest
 
             foreach (var width in new[] { 320, 360, 390, 414, 430 })
             {
-                await Page.SetViewportSizeAsync(width, 844);
-                await Page.WaitForTimeoutAsync(200);
-
-                var reading = await Page.EvaluateAsync<JsonElement>(ReadHint);
-                var fits = reading.GetProperty("hint").GetDouble() <= reading.GetProperty("room").GetDouble();
-                var glyph = reading.GetProperty("glyph").GetString() != "none";
-                var hintDrawn = reading.GetProperty("hintDrawn").GetBoolean();
-
-                (fits ? hintDrawn && !glyph : !hintDrawn && glyph).Should().BeTrue(
-                    $"{language} at {width} px: the hint is drawn whole, or replaced by the magnifier, never clipped ({reading})");
+                await ExpectHintWholeOrReplacedAsync($"{language} at {width} px", width);
             }
+
+            await Page.EmulateMediaAsync(new PageEmulateMediaOptions { ForcedColors = ForcedColors.Active });
+            await ExpectHintWholeOrReplacedAsync($"{language} at 390 px in forced colours", 390);
+            await Page.EmulateMediaAsync(new PageEmulateMediaOptions { ForcedColors = ForcedColors.None });
 
             await Page.SetViewportSizeAsync(390, 844);
             await Page.Locator(IconClear).ClickAsync();
@@ -389,6 +384,20 @@ public sealed partial class FilterSlimBarTests : CabinetPageTest
         {
             await Expect(icon).Not.ToHaveAttributeAsync("data-highlighted", string.Empty);
         }
+    }
+
+    private async Task ExpectHintWholeOrReplacedAsync(string context, int width)
+    {
+        await Page.SetViewportSizeAsync(width, 844);
+        await Page.WaitForTimeoutAsync(200);
+
+        var reading = await Page.EvaluateAsync<JsonElement>(ReadHint);
+        var fits = reading.GetProperty("hint").GetDouble() <= reading.GetProperty("room").GetDouble();
+        var glyph = reading.GetProperty("glyph").GetString() != "none";
+        var hintDrawn = reading.GetProperty("hintDrawn").GetBoolean();
+
+        (fits ? hintDrawn && !glyph : !hintDrawn && glyph).Should().BeTrue(
+            $"{context}: the hint is drawn whole, or replaced by the magnifier, never clipped ({reading})");
     }
 
     private async Task ChooseLanguageAsync(string language)

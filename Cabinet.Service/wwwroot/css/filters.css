@@ -695,7 +695,8 @@
  * On a phone, while a filter is in use, the status group takes room from the search field and the hint would be cut in the middle
  * of a word. In that one state, and only while the field is too narrow to show the whole hint, the hint steps aside and a magnifier
  * at the start of the field says what the field is; the label stays, so assistive technology still hears "Search games". The field
- * keeps the room for the glyph whether or not it holds text, so typing never moves the text.
+ * keeps the room for the glyph whether or not it holds text, so typing never moves the text. The hint is hidden with its opacity,
+ * not its colour, because forced colours override the colour of a hint but never its opacity.
  */
 .filter-search {
   container-type: inline-size;
@@ -708,7 +709,7 @@
     }
 
     .filter-bar[data-active] #filter-q::placeholder {
-      color: transparent;
+      opacity: 0;
     }
 
     .filter-bar[data-active] .filter-glass {
