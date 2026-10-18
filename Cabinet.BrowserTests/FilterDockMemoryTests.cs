@@ -14,7 +14,8 @@ namespace Cabinet.BrowserTests;
 /// only ever says what the visitor chose at such a width: a width change, a fly-over and the page itself never write it, the page never
 /// loads with a fly-over, storage that throws keeps the choice in memory, and the value is apart from the tab's filters and the view.
 /// With nothing stored no filter option is visible at any width, the cabinet never shifts sideways while it loads, and a page that
-/// has no cabinet to filter (before the first sync, a failed load, an empty collection) gives up the dock's column.
+/// has no cabinet to filter (before the first sync, a failed load, an empty collection) gives up the dock's column; before the first
+/// sync the note that the cabinet is being filled stands centred over the empty cabinet.
 /// </summary>
 [Trait("Category", "Browser")]
 public sealed class FilterDockMemoryTests : CabinetPageTest
@@ -338,8 +339,8 @@ public sealed class FilterDockMemoryTests : CabinetPageTest
         (await Page.Locator(Boxes).CountAsync()).Should().Be(0);
         (await RenderedAsync(".filter-rail", "#filter-panel", ".filter-bar")).Should().BeEmpty("a page with nothing to filter has no dock");
         var pagePad = await Page.EvaluateAsync<double>("() => parseFloat(getComputedStyle(document.body).paddingLeft)");
-        var shownLeft = await shown.EvaluateAsync<double>("(element) => element.getBoundingClientRect().left");
-        shownLeft.Should().BeApproximately(pagePad, Tolerance, "the column collapsed, so the page starts at its padding from the screen edge");
+        var columnLeft = await Page.Locator("body > main").EvaluateAsync<double>("(element) => element.getBoundingClientRect().left");
+        columnLeft.Should().BeApproximately(pagePad, Tolerance, "the column collapsed, so the page starts at its padding from the screen edge");
         ConsoleErrors.Where(error => !error.Contains("net::ERR_FAILED", StringComparison.Ordinal))
             .Should().BeEmpty("only the layout request the test broke on purpose is reported");
 
@@ -353,6 +354,29 @@ public sealed class FilterDockMemoryTests : CabinetPageTest
             await Expect(Page.Locator(RailMenu)).ToHaveAttributeAsync("aria-expanded", "false");
         }
     }
+
+    [Theory]
+    [InlineData(DockWidths.Push)]
+    [InlineData(390)]
+    public async Task The_filling_note_stands_centred_over_the_empty_cabinet(int width)
+    {
+        await Page.SetViewportSizeAsync(width, 900);
+        await StartAsync(new Dictionary<string, string?>());
+        _started = true;
+
+        await Page.GotoAsync($"http://127.0.0.1:{PublicPort}/");
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await Expect(Page.Locator("main .cabinet-filling")).ToBeVisibleAsync();
+        await Page.WaitForSelectorAsync("#cabinet .section", new PageWaitForSelectorOptions { State = WaitForSelectorState.Visible });
+
+        var note = await CentreAsync("main .cabinet-filling");
+        var cabinet = await CentreAsync("#cabinet .section");
+        note.Should().BeApproximately(cabinet, 3, "the note that the cabinet is being filled stands centred over the empty cabinet");
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    private Task<double> CentreAsync(string selector) =>
+        Page.Locator(selector).First.EvaluateAsync<double>("(element) => { const box = element.getBoundingClientRect(); return box.left + box.width / 2; }");
 
     private async Task<string[]> RenderedAsync(params string[] selectors) =>
         await Page.EvaluateAsync<string[]>(
