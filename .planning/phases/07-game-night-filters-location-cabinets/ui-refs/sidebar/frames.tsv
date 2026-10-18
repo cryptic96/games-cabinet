@@ -1,0 +1,58 @@
+file	direction	url	source	viewed
+S0-current-brown-1440-en.png	current	http://127.0.0.1:5090/base-desk-en-rest.html	sample-65 snapshot	viewed
+S0-current-birch-1440-en.png	current	http://127.0.0.1:5090/base-desk-en-rest.html	sample-65 snapshot	viewed
+S0-current-brown-1280-en.png	current	http://127.0.0.1:5090/base-desk-en-rest.html	sample-65 snapshot	viewed
+S0-current-brown-390-en.png	current	http://127.0.0.1:5090/base-phone-en-rest.html	sample-65 snapshot	viewed
+S0-current-birch-390-en.png	current	http://127.0.0.1:5090/base-phone-en-rest.html	sample-65 snapshot	viewed
+S0-current-sheet-brown-390-en.png	current	http://127.0.0.1:5090/base-phone-en-filter.html	sample-65 snapshot	viewed
+SA-closed-brown-1440-en.png	S-A	http://127.0.0.1:5090/SA-desk-en-rest.html	sample-65 snapshot	viewed
+SA-closed-birch-1440-en.png	S-A	http://127.0.0.1:5090/SA-desk-en-rest.html	sample-65 snapshot	viewed
+SA-open-brown-1440-en.png	S-A	http://127.0.0.1:5090/SA-desk-en-filter.html	sample-65 snapshot	viewed
+SA-open-birch-1440-en.png	S-A	http://127.0.0.1:5090/SA-desk-en-filter.html	sample-65 snapshot	viewed
+SA-open-brown-1440-nl.png	S-A	http://127.0.0.1:5090/SA-desk-nl-filter.html	sample-65 snapshot	viewed
+SA-scrolled-filtering-brown-1440-en.png	S-A	http://127.0.0.1:5090/SA-desk-en-filter.html	sample-65 snapshot	viewed
+SA-scrolled-filtering-birch-1440-en.png	S-A	http://127.0.0.1:5090/SA-desk-en-filter.html	sample-65 snapshot	viewed
+SA-closed-brown-390-en.png	S-A	http://127.0.0.1:5090/SA-phone-en-rest.html	sample-65 snapshot	viewed
+SA-closed-birch-390-en.png	S-A	http://127.0.0.1:5090/SA-phone-en-rest.html	sample-65 snapshot	viewed
+SA-open-brown-390-en.png	S-A	http://127.0.0.1:5090/SA-phone-en-filter.html	sample-65 snapshot	viewed
+SA-open-birch-390-en.png	S-A	http://127.0.0.1:5090/SA-phone-en-filter.html	sample-65 snapshot	viewed
+SA-open-brown-390-nl.png	S-A	http://127.0.0.1:5090/SA-phone-nl-filter.html	sample-65 snapshot	viewed
+SA-open-forced-1440-en.png	S-A	http://127.0.0.1:5090/SA-desk-en-filter.html	sample-65 snapshot (forced colours)	viewed
+SA-menu-active-brown-1440-en-crop.png	S-A	http://127.0.0.1:5090/SA-desk-en-filter.html	sample-65 snapshot	viewed
+SA-menu-active-birch-1440-en-crop.png	S-A	http://127.0.0.1:5090/SA-desk-en-filter.html	sample-65 snapshot	viewed
+SA-menu-active-brown-390-en-crop.png	S-A	http://127.0.0.1:5090/SA-phone-en-filter.html	sample-65 snapshot	viewed
+SA-menu-active-brown-390-nl-crop.png	S-A	http://127.0.0.1:5090/SA-phone-nl-filter.html	sample-65 snapshot	viewed
+SA-menu-active-forced-1440-en-crop.png	S-A	http://127.0.0.1:5090/SA-desk-en-filter.html	sample-65 snapshot (forced colours)	viewed
+SA-drawer-edge-brown-1440-en-crop.png	S-A	http://127.0.0.1:5090/SA-desk-en-filter.html	sample-65 snapshot	viewed
+SA-drawer-edge-birch-1440-en-crop.png	S-A	http://127.0.0.1:5090/SA-desk-en-filter.html	sample-65 snapshot	viewed
+SA-focus-menu-brown-1440-en-crop.png	S-A	http://127.0.0.1:5090/SA-desk-en-filter.html	sample-65 snapshot	viewed
+SA-focus-menu-birch-1440-en-crop.png	S-A	http://127.0.0.1:5090/SA-desk-en-filter.html	sample-65 snapshot	viewed
+SA-focus-chip-brown-390-en-crop.png	S-A	http://127.0.0.1:5090/SA-phone-en-filter.html	sample-65 snapshot	viewed
+SA-focus-chip-birch-390-en-crop.png	S-A	http://127.0.0.1:5090/SA-phone-en-filter.html	sample-65 snapshot	viewed
+SB-closed-brown-1440-en.png	S-B	http://127.0.0.1:5090/SB-desk-en-rest.html	sample-65 snapshot	viewed
+SB-closed-birch-1440-en.png	S-B	http://127.0.0.1:5090/SB-desk-en-rest.html	sample-65 snapshot	viewed
+SB-open-brown-1440-en.png	S-B	http://127.0.0.1:5090/SB-desk-en-filter.html	sample-65 snapshot	viewed
+SB-open-birch-1440-en.png	S-B	http://127.0.0.1:5090/SB-desk-en-filter.html	sample-65 snapshot	viewed
+SB-open-brown-1440-nl.png	S-B	http://127.0.0.1:5090/SB-desk-nl-filter.html	sample-65 snapshot	viewed
+SB-open-scrolled-brown-1440-en.png	S-B	http://127.0.0.1:5090/SB-desk-en-filter.html	sample-65 snapshot	viewed
+SB-closed-brown-1280-en.png	S-B	http://127.0.0.1:5090/SB-desk-en-rest.html	sample-65 snapshot	viewed
+SB-open-smallcolumns-brown-1280-en.png	S-B	http://127.0.0.1:5090/SB-desk-en-filter.html	sample-65 snapshot (today's column rule)	viewed
+SB-open-onecolumn-brown-1280-en.png	S-B	http://127.0.0.1:5090/SB-desk-en-filter.html	sample-65 snapshot	viewed
+SB-open-brown-1920-en.png	S-B	http://127.0.0.1:5090/SB-desk-en-filter.html	sample-65 snapshot	viewed
+SB-open-smallcolumns-brown-1920-en.png	S-B	http://127.0.0.1:5090/SB-desk-en-filter.html	sample-65 snapshot (today's column rule)	viewed
+SB-flyout-brown-1280-en.png	S-B	http://127.0.0.1:5090/SB-desk-en-filter.html	sample-65 snapshot	viewed
+SB-flyout-brown-1440-en.png	S-B	http://127.0.0.1:5090/SB-desk-en-filter.html	sample-65 snapshot	viewed
+SB-closed-brown-390-en.png	S-B	http://127.0.0.1:5090/SB-phone-en-rest.html	sample-65 snapshot	viewed
+SB-closed-birch-390-en.png	S-B	http://127.0.0.1:5090/SB-phone-en-rest.html	sample-65 snapshot	viewed
+SB-open-brown-390-en.png	S-B	http://127.0.0.1:5090/SB-phone-en-filter.html	sample-65 snapshot	viewed
+SB-open-birch-390-en.png	S-B	http://127.0.0.1:5090/SB-phone-en-filter.html	sample-65 snapshot	viewed
+SB-open-brown-390-nl.png	S-B	http://127.0.0.1:5090/SB-phone-nl-filter.html	sample-65 snapshot	viewed
+SB-rail-active-brown-1440-en-crop.png	S-B	http://127.0.0.1:5090/SB-desk-en-filter.html	sample-65 snapshot	viewed
+SB-rail-active-birch-1440-en-crop.png	S-B	http://127.0.0.1:5090/SB-desk-en-filter.html	sample-65 snapshot	viewed
+SB-rail-active-forced-1440-en-crop.png	S-B	http://127.0.0.1:5090/SB-desk-en-filter.html	sample-65 snapshot (forced colours)	viewed
+SB-panel-edge-brown-1440-en-crop.png	S-B	http://127.0.0.1:5090/SB-desk-en-filter.html	sample-65 snapshot	viewed
+SB-panel-edge-birch-1440-en-crop.png	S-B	http://127.0.0.1:5090/SB-desk-en-filter.html	sample-65 snapshot	viewed
+SB-focus-rail-brown-1440-en-crop.png	S-B	http://127.0.0.1:5090/SB-desk-en-filter.html	sample-65 snapshot	viewed
+SB-focus-rail-birch-1440-en-crop.png	S-B	http://127.0.0.1:5090/SB-desk-en-filter.html	sample-65 snapshot	viewed
+SB-menu-active-brown-390-en-crop.png	S-B	http://127.0.0.1:5090/SB-phone-en-filter.html	sample-65 snapshot	viewed
+SB-menu-active-birch-390-en-crop.png	S-B	http://127.0.0.1:5090/SB-phone-en-filter.html	sample-65 snapshot	viewed
