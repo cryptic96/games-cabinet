@@ -13,7 +13,8 @@ namespace Cabinet.BrowserTests;
 /// stands: each box is judged by its own place, so an expansion kept apart from its base lights while the base dims; the list holds
 /// the owner's places that hold a game in the owner's order and ends with the unknown choice; the choice combines with the players
 /// chips; two copies of one game each answer for their own place and show it on their card; and with no owner places the control
-/// is not there.
+/// is not there, even in the open panel. The tests run at the width where the open filter panel stands beside the cabinet, so the
+/// panel is opened first and the boxes stay reachable while it is open.
 /// </summary>
 [Trait("Category", "Browser")]
 public sealed class FilterLocationTests : CabinetPageTest
@@ -37,6 +38,7 @@ public sealed class FilterLocationTests : CabinetPageTest
         var document = await LoadDocumentAsync("/cabinet/cards?profile=desktop&sample=65");
         var offered = (document.Locations ?? []).Where(place => place.Games > 0).ToList();
         var all = await BoxIdsAsync(Boxes);
+        await OpenFilterPanelAsync();
 
         await Expect(Page.Locator(Select)).ToBeVisibleAsync();
         await Expect(Page.Locator("label[for=\"filter-loc\"]")).ToHaveTextAsync("Location");
@@ -90,6 +92,7 @@ public sealed class FilterLocationTests : CabinetPageTest
 
         unplaced.Should().NotBeEmpty();
         unplaced.Count.Should().BeLessThan(all.Count);
+        await OpenFilterPanelAsync();
 
         await Page.Locator(Select).SelectOptionAsync("unknown");
 
@@ -121,6 +124,7 @@ public sealed class FilterLocationTests : CabinetPageTest
 
         await GotoCabinetAsync("/");
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await OpenFilterPanelAsync();
 
         await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
         await Expect(Page.Locator(Select)).ToBeHiddenAsync();
@@ -140,6 +144,7 @@ public sealed class FilterLocationTests : CabinetPageTest
 
         await GotoCabinetAsync("/");
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await OpenFilterPanelAsync();
 
         await Expect(Page.Locator(Select)).ToBeVisibleAsync();
         (await OptionTextsAsync()).Should().Equal("Any location", "Cabinet A", "Unknown location");
@@ -147,6 +152,7 @@ public sealed class FilterLocationTests : CabinetPageTest
         await host.DeleteLocationAsync(ids[0]);
         await Page.ReloadAsync();
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await OpenFilterPanelAsync();
 
         await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
         await Expect(Page.Locator(Select)).ToBeHiddenAsync();
@@ -166,6 +172,7 @@ public sealed class FilterLocationTests : CabinetPageTest
         var copyThree = Entry(FilterFixture.QuarryEntries[2]);
         var cabinetA = new[] { copyOne, copyThree, Entry(FilterFixture.HarbourEntry), Entry(FilterFixture.TallyEntry), Entry(FilterFixture.TallyExpansionEntry) };
         var shelfB = new[] { copyTwo, Entry(FilterFixture.HarbourExpansionEntry), Entry(FilterFixture.KettleEntry) };
+        await OpenFilterPanelAsync();
 
         await Expect(Page.Locator(Select)).ToBeVisibleAsync();
         (await OptionTextsAsync()).Should().Equal("Any location", "Cabinet A", "Shelf B", "Unknown location");
