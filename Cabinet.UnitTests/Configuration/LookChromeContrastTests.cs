@@ -233,6 +233,55 @@ public partial class LookChromeContrastTests
         SpineColour.ContrastRatio(flat, text).Should().BeGreaterThanOrEqualTo(TextContrast, $"{wood} by {hour}: the label on a filled choice, a highlighted Clear and the primary sheet button");
     }
 
+    /// <summary>
+    /// The desktop filter dock reads on every wall by day and in the evening. The rail and the panel open beside the cabinet stand on
+    /// the wall under the brightest part of the falloff; the panel that lies over the cabinet stands on the flat wall colour it is
+    /// filled with. Every pair the dock draws is measured on the surface it is drawn on: the symbols, the filled rail button, the
+    /// phone's filled count, both counts, the muted rest count and "of 52" (never on a wash or a fill), the heading, legends and
+    /// controls, the hover wash, the outlined and dashed borders with the muted symbol of a button that is off, and the focus ring.
+    /// </summary>
+    /// <param name="wood">The wood whose wall is drawn.</param>
+    /// <param name="hour">The light state of the page, which never changes a wall token.</param>
+    [Theory]
+    [MemberData(nameof(WoodsByHour))]
+    public void The_rail_and_the_panel_read_on_every_wall_by_day_and_in_the_evening(string wood, string hour)
+    {
+        var tokens = Sheets.Value.ForWood(wood);
+        var docked = BrightestWall(tokens);
+        var room = StyleSheetTokens.Colour(tokens, "--room");
+        var flyOver = room;
+        var text = StyleSheetTokens.Colour(tokens, "--room-text");
+        var muted = StyleSheetTokens.Colour(tokens, "--room-muted");
+        var line = StyleSheetTokens.Colour(tokens, "--room-line");
+        var ring = StyleSheetTokens.Colour(tokens, "--room-ring");
+        var label = $"{wood} by {hour}";
+        var pairs = new List<ContrastPair>
+        {
+            new("rail symbols and the three-line symbol on the docked wall", text, docked, GraphicContrast),
+            new("a filled rail button's symbol on its fill", room, text, GraphicContrast),
+            new("the phone's filled count on its pill", room, text, TextContrast),
+            new("the rail's count number and the panel's count while filtering on the docked wall", text, docked, TextContrast),
+            new("the panel's count while filtering on the fly-over fill", text, flyOver, TextContrast),
+            new("the rail's \"of 52\" and the panel's rest count on the docked wall", muted, docked, TextContrast),
+            new("the panel's rest count on the fly-over fill", muted, flyOver, TextContrast),
+            new("the panel heading, legends and controls on the docked wall", text, docked, TextContrast),
+            new("the panel heading, legends and controls on the fly-over fill", text, flyOver, TextContrast),
+            new("a hovered rail button on the wash over the docked wall", text, WashOver(tokens, docked), TextContrast),
+            new("a hovered panel head button on the wash over the fly-over fill", text, WashOver(tokens, flyOver), TextContrast),
+            new("the three-line and rail Clear borders on the docked wall", line, docked, GraphicContrast),
+            new("the three-line and panel Clear borders on the fly-over fill", line, flyOver, GraphicContrast),
+            new("the dashed border of a button that is off on the docked wall", line, docked, GraphicContrast),
+            new("the muted symbol of a button that is off on the docked wall", muted, docked, TextContrast),
+            new("the focus ring on the docked wall", ring, docked, GraphicContrast),
+            new("the focus ring on the fly-over fill", ring, flyOver, GraphicContrast),
+        };
+
+        foreach (var pair in pairs)
+        {
+            SpineColour.ContrastRatio(pair.Foreground, pair.Background).Should().BeGreaterThanOrEqualTo(pair.Minimum, $"{label}: {pair.Name}");
+        }
+    }
+
     [Theory]
     [MemberData(nameof(Woods))]
     public void The_evening_changes_no_wall_token(string wood)
@@ -287,4 +336,11 @@ public partial class LookChromeContrastTests
 
     private static RgbColour? HaloOrNull(IReadOnlyDictionary<string, string> tokens) =>
         StyleSheetTokens.Resolve(tokens, "--ring-halo") == "transparent" ? null : StyleSheetTokens.Colour(tokens, "--ring-halo");
+
+    /// <summary>One colour drawn on one surface, with the contrast it must reach there.</summary>
+    /// <param name="Name">What is drawn and where, for the failure message.</param>
+    /// <param name="Foreground">The colour that is drawn.</param>
+    /// <param name="Background">The surface it is drawn on.</param>
+    /// <param name="Minimum">The lowest contrast ratio allowed.</param>
+    private sealed record ContrastPair(string Name, RgbColour Foreground, RgbColour Background, double Minimum);
 }
