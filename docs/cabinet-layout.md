@@ -160,10 +160,23 @@ asks again only when the screen crosses that width.
 
 On the page, sections sit in centred rows: one column up to 80rem wide screens
 (1280 pixels), two columns from there, and three from 118rem (1888 pixels),
-never more. A desktop section is drawn between 37rem and 40rem wide, so a lone
-section, or a last row with fewer sections than columns, sits in the middle. On
-phones the sections form a single column. Sections in a row start at the same
-height, so a shorter last section lines up with its neighbours.
+never more. A section is never wider than 40rem, so a lone section, or a last
+row with fewer sections than columns, sits in the middle. On a desktop screen
+the filters fold into a narrow rail at the left edge, so beside the rail a
+desktop section is a little narrower, from about 35.75rem to 40rem wide.
+
+While the filter panel is open beside the cabinet and pushes it aside, the
+column count no longer follows the screen width but the space the cabinet has
+left: two columns when each section can be at least 30rem wide, three when each
+can be at least 37rem. That keeps the sections readable instead of squeezing
+three narrow ones in, and lets two sections grow back to their full width on a
+wide screen. When the panel lies over the cabinet instead, or is folded, the
+cabinet keeps the columns it has beside the rail.
+
+On phones the sections form a single column. The layout the page asks for
+still depends only on the screen width: opening or folding the filters never
+asks for a new layout. Sections in a row start at the same height, so a shorter
+last section lines up with its neighbours.
 
 ## Settings
 

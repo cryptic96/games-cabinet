@@ -590,3 +590,72 @@ test('a location group is a full-width centred row of sections in the structure 
   assert.equal(valueOf(heading, 'flex'), '0 0 100%');
   assert.equal(allRules.design.concat(allRules.wood, allRules.modifiers).some((rule) => /location-group/.test(rule.selector)), false);
 });
+
+/**
+ * Lists every rule of a block of style text like rules() does, with the media, container, supports and layer conditions it sits
+ * inside, outermost first.
+ * @param {string} text The style text.
+ * @param {string[]} [context] The conditions around the text.
+ * @returns {{ selector: string, declarations: { name: string, value: string }[], context: string[] }[]}
+ */
+function rulesWithContext(text, context = []) {
+  const found = [];
+
+  for (const item of items(text)) {
+    if (item.body === null) {
+      continue;
+    }
+
+    if (/^@(media|container|supports|layer)\b/.test(item.prelude)) {
+      found.push(...rulesWithContext(item.body, [...context, item.prelude.replace(/\s+/g, ' ')]));
+    } else {
+      found.push({ selector: item.prelude, declarations: declarations(item.body), context });
+    }
+  }
+
+  return found;
+}
+
+test('the room around the cabinet is a named size container and the open panel\'s column rule lives in the structure layer', () => {
+  const structure = rulesWithContext(sheets.structure);
+  const room = structure.filter((rule) => rule.selector === '.cabinet-room');
+  const pushed = structure.filter((rule) => rule.selector === 'html[data-filter-dock="push"] .cabinet');
+  const basisOf = (rule) => rule?.declarations.find(({ name }) => name === '--section-basis')?.value;
+  const inside = (condition) => pushed.find((rule) => rule.context.includes(condition));
+
+  assert.equal(room.length, 1, 'one rule makes the room a container');
+  assert.deepEqual(room[0].context, ['@layer structure']);
+  assert.equal(room[0].declarations.find(({ name }) => name === 'container')?.value, 'cabinet-room / inline-size');
+
+  assert.equal(pushed.length, 3, 'the open panel\'s rule has a floor, a two-column and a three-column form');
+  assert.ok(
+    pushed.every((rule) => rule.context[0] === '@layer structure' && rule.context[1] === '@media (min-width: 90rem)'),
+    'the open panel\'s rule applies only from the width at which the panel pushes',
+  );
+  assert.equal(basisOf(pushed.find((rule) => rule.context.length === 2)), 'min(40rem, 100%)');
+  assert.equal(basisOf(inside('@container cabinet-room (min-width: 61.5rem)')), 'min(40rem, calc((100% - var(--column-gap)) / 2))');
+  assert.equal(basisOf(inside('@container cabinet-room (min-width: 114rem)')), 'min(40rem, calc((100% - 2 * var(--column-gap)) / 3))');
+  assert.ok(
+    sheets.structure.indexOf('html[data-filter-dock="push"] .cabinet') > sheets.structure.indexOf('@media (min-width: 118rem)'),
+    'the open panel\'s rule follows the screen-width rules it replaces',
+  );
+
+  const basisRules = structure.filter((rule) => rule.declarations.some(({ name }) => name === '--section-basis'));
+
+  assert.ok(
+    basisRules.every((rule) => rule.selector === '.cabinet' || rule.selector === 'html[data-filter-dock="push"] .cabinet'),
+    'a location group sets no basis of its own, so it follows the cabinet\'s',
+  );
+});
+
+test('the filter sheet leaves the cabinet\'s room and its column basis to the structure layer', () => {
+  const filters = rules(readCss('filters.css'));
+
+  assert.ok(filters.length > 0);
+
+  for (const rule of filters) {
+    assert.doesNotMatch(rule.selector, /cabinet-room/, `filters.css: ${rule.selector}`);
+    assert.equal(rule.declarations.some(({ name }) => name === '--section-basis'), false, `filters.css: ${rule.selector} sets the section basis`);
+    assert.equal(rule.declarations.some(({ name, value }) => /^container(-name)?$/.test(name) && /cabinet-room/.test(value)), false, rule.selector);
+  }
+});
