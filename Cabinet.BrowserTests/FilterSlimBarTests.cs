@@ -9,9 +9,11 @@ namespace Cabinet.BrowserTests;
 
 /// <summary>
 /// Proves in a real browser how the slim bar of a phone behaves: while a filter is in use it shows the short count and an icon Clear
-/// and stays one row from 390 px wide, wrapping its status group onto a second row only at 320 px, in both languages. It slides out of
-/// the way after a little scrolling down and comes back after a little scrolling up, with one passive scroll listener and nothing but
-/// a transform, and it never leaves while a filter is in use, its field has focus, or a sheet or a card is open.
+/// and stays one row from 390 px wide, wrapping its status group onto a second row only at 320 px, in both languages. Its Filters
+/// button wears the three-line symbol and, while filtering, a filled count, with the word stepping aside on a narrow bar. It slides out
+/// of the way after a little scrolling down and comes back after a little scrolling up, with one passive scroll listener and nothing
+/// but a transform, and it never leaves while a filter is in use, its field has focus, or a sheet or a card is open. On a desktop the
+/// dock at the left edge takes its place and never slides.
 /// </summary>
 [Trait("Category", "Browser")]
 public sealed partial class FilterSlimBarTests : CabinetPageTest
@@ -48,19 +50,48 @@ public sealed partial class FilterSlimBarTests : CabinetPageTest
     private const string ReadHint = """
         () => {
           const field = document.querySelector('#filter-q');
-          const style = getComputedStyle(field);
-          const probe = document.createElement('span');
-          probe.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font:' + style.font;
-          probe.textContent = field.placeholder;
-          document.body.append(probe);
-          const hint = probe.getBoundingClientRect().width;
-          probe.remove();
+          const search = document.querySelector('.filter-bar .filter-search');
           const opacity = getComputedStyle(field, '::placeholder').opacity;
           return {
-            hint,
-            room: field.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+            search: search.clientWidth,
+            threshold: 9.75 * parseFloat(getComputedStyle(document.documentElement).fontSize),
             hintDrawn: opacity !== '0',
             glyph: getComputedStyle(document.querySelector('.filter-glass')).display,
+          };
+        }
+        """;
+
+    private const string ReadFiltersButton = """
+        () => {
+          const button = document.querySelector('.filter-bar .filter-open');
+          const word = button.querySelector('.filter-open-text').getBoundingClientRect();
+          const pill = button.querySelector('.filter-open-count');
+          const probe = document.createElement('span');
+          probe.style.backgroundColor = 'var(--room-text)';
+          probe.style.color = 'var(--room)';
+          button.parentElement.append(probe);
+          const wanted = getComputedStyle(probe);
+          const wantedFill = wanted.backgroundColor;
+          const wantedInk = wanted.color;
+          probe.remove();
+          const pillStyle = getComputedStyle(pill);
+          const box = button.getBoundingClientRect();
+          return {
+            symbol: button.querySelector('svg use')?.getAttribute('href') ?? '',
+            symbolBeforeWord: button.querySelector('svg')?.compareDocumentPosition(button.querySelector('.filter-open-text')) === Node.DOCUMENT_POSITION_FOLLOWING,
+            wordWidth: word.width,
+            wordHeight: word.height,
+            pillShown: pill.getClientRects().length > 0,
+            pillText: pill.textContent,
+            pillHeight: pill.getBoundingClientRect().height,
+            pillAfterWord: pill.getBoundingClientRect().left >= word.left,
+            pillHidden: pill.getAttribute('aria-hidden'),
+            pillFill: pillStyle.backgroundColor,
+            pillInk: pillStyle.color,
+            wantedFill,
+            wantedInk,
+            width: box.width,
+            height: box.height,
           };
         }
         """;
@@ -81,13 +112,22 @@ public sealed partial class FilterSlimBarTests : CabinetPageTest
     private const string RecordScrollListeners = """
         () => {
           window.__scrollListeners = [];
+          window.__liveScrollListeners = new Set();
           for (const target of [window, document]) {
-            const original = target.addEventListener.bind(target);
+            const add = target.addEventListener.bind(target);
+            const remove = target.removeEventListener.bind(target);
             target.addEventListener = (type, listener, options) => {
               if (type === 'scroll') {
                 window.__scrollListeners.push({ passive: typeof options === 'object' && options !== null && options.passive === true });
+                window.__liveScrollListeners.add(listener);
               }
-              return original(type, listener, options);
+              return add(type, listener, options);
+            };
+            target.removeEventListener = (type, listener, options) => {
+              if (type === 'scroll') {
+                window.__liveScrollListeners.delete(listener);
+              }
+              return remove(type, listener, options);
             };
           }
         }
@@ -110,6 +150,7 @@ public sealed partial class FilterSlimBarTests : CabinetPageTest
             resting.Bar.Height.Should().BeApproximately(SlimHeight, 0.5, $"{language} with no filter");
             resting.StatusDisplay.Should().Be("none", $"{language}: neither the count nor Clear is drawn with no filter");
             await Expect(Page.Locator(Count)).ToHaveTextAsync(string.Empty);
+            await ExpectFiltersButtonAsync(language, active: 0, wordShown: true);
 
             await Page.Locator(Field).FillAsync("a");
             await Expect(Page.Locator(Bar)).ToHaveAttributeAsync("data-active", string.Empty);
@@ -119,7 +160,9 @@ public sealed partial class FilterSlimBarTests : CabinetPageTest
             many.Status!.Top.Should().BeInRange(many.Search.Top - 0.5, many.Search.Bottom, $"{language}: the status shares the row of the field");
             many.Overflow.Should().BeLessThanOrEqualTo(0, $"{language}");
             await ExpectIconClearAsync(language, highlighted: false);
+            await ExpectFiltersButtonAsync(language, active: 1, wordShown: false);
             await Expect(Page.Locator(Live)).ToHaveTextAsync(text.FullCount(), new LocatorAssertionsToHaveTextOptions { Timeout = 5000 });
+            await SaveScreenshotAsync($"filter-slim-filtering-{language}");
 
             await Page.Locator(Field).FillAsync(await FindUniqueTitleAsync());
             await Expect(Page.Locator(Count)).ToHaveTextAsync(text.One(total));
@@ -130,12 +173,37 @@ public sealed partial class FilterSlimBarTests : CabinetPageTest
             await Expect(Page.Locator(Count)).ToHaveTextAsync(text.None(total));
             (await ReadBarAsync()).Bar.Height.Should().BeApproximately(SlimHeight, 0.5, $"{language} with nothing matching");
             await ExpectIconClearAsync(language, highlighted: true);
+            await ExpectFiltersButtonAsync(language, active: 1, wordShown: false);
             await Expect(Page.Locator(Live)).ToHaveTextAsync(text.NoMatch, new LocatorAssertionsToHaveTextOptions { Timeout = 5000 });
 
             await Page.Locator(IconClear).ClickAsync();
             await Expect(Page.Locator(Field)).ToHaveValueAsync(string.Empty);
             await Expect(Page.Locator(Bar)).Not.ToHaveAttributeAsync("data-active", string.Empty);
             (await ReadBarAsync()).Bar.Height.Should().BeApproximately(SlimHeight, 0.5, $"{language} after Clear");
+            await ExpectFiltersButtonAsync(language, active: 0, wordShown: true);
+        }
+
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task In_a_tablet_window_the_word_stays_while_filtering()
+    {
+        await OpenAsync(DockWidths.Tablet, 1024);
+
+        foreach (var language in new[] { "en", "nl" })
+        {
+            await ChooseLanguageAsync(language);
+            await ExpectFiltersButtonAsync(language, active: 0, wordShown: true);
+
+            await Page.Locator(Field).FillAsync("a");
+            await Expect(Page.Locator(Bar)).ToHaveAttributeAsync("data-active", string.Empty);
+            await ExpectFiltersButtonAsync(language, active: 1, wordShown: true);
+            (await ReadBarAsync()).Bar.Height.Should().BeApproximately(SlimHeight, 0.5, $"{language}: the tablet bar stays one row");
+            await SaveScreenshotAsync($"filter-slim-tablet-filtering-{language}");
+
+            await Page.Locator(IconClear).ClickAsync();
+            await Expect(Page.Locator(Bar)).Not.ToHaveAttributeAsync("data-active", string.Empty);
         }
 
         ConsoleErrors.Should().BeEmpty();
@@ -198,20 +266,32 @@ public sealed partial class FilterSlimBarTests : CabinetPageTest
     }
 
     [Fact]
-    public async Task On_a_desktop_the_text_Clear_stays_and_the_count_keeps_its_words()
+    public async Task On_a_desktop_the_panel_has_the_text_Clear_and_the_rail_the_two_line_count()
     {
-        await OpenAsync(1280, 900);
+        await OpenAsync(DockWidths.Over, 900);
+        await OpenFilterPanelAsync();
 
         await Page.Locator(Field).FillAsync("qqzzqq");
 
         await Expect(Page.Locator(Count)).ToHaveTextAsync("No games match");
         await Expect(Page.Locator(TextClear)).ToBeVisibleAsync();
         await Expect(Page.Locator(TextClear)).ToHaveTextAsync("Clear");
-        await Expect(Page.Locator(IconClear)).ToBeHiddenAsync();
+        await Expect(Page.Locator(TextClear)).ToHaveAttributeAsync("data-highlighted", string.Empty);
+        await ExpectNoRenderedBoxAsync(".filter-bar .filter-open", "the slim bar's Filters button");
+        await ExpectNoRenderedBoxAsync(IconClear, "the slim bar's icon Clear");
 
         await Page.Locator(Field).FillAsync("a");
 
         await Expect(Page.Locator(Count)).ToHaveTextAsync(FullCountPattern());
+        await FoldFilterPanelAsync();
+
+        await Expect(Page.Locator(".filter-rail .filter-rail-count")).ToBeVisibleAsync();
+        await Expect(Page.Locator(".filter-rail .filter-rail-count-number")).ToHaveTextAsync(NumberPattern());
+        await Expect(Page.Locator(".filter-rail .filter-rail-count-of")).ToHaveTextAsync(OfPattern());
+        await Expect(Page.Locator(".filter-rail .filter-rail-clear")).ToBeVisibleAsync();
+        await Expect(Page.Locator(".filter-rail .filter-rail-clear")).ToHaveAttributeAsync("aria-label", "Clear filters");
+        await ExpectNoRenderedBoxAsync(".filter-bar .filter-open", "the slim bar's Filters button with the panel folded");
+        await ExpectNoRenderedBoxAsync(IconClear, "the slim bar's icon Clear with the panel folded");
         ConsoleErrors.Should().BeEmpty();
     }
 
@@ -323,27 +403,36 @@ public sealed partial class FilterSlimBarTests : CabinetPageTest
     }
 
     [Fact]
-    public async Task The_full_bar_never_slides_and_the_listener_follows_the_width()
+    public async Task The_dock_never_slides_and_the_listener_exists_only_on_a_phone()
     {
-        await OpenAsync(1280, 900, recordScroll: true);
+        await OpenAsync(DockWidths.Over, 600, recordScroll: true);
 
-        (await Page.EvaluateAsync<int>("() => window.__scrollListeners.length")).Should().Be(0);
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-filter-dock", "rail");
+        (await Page.EvaluateAsync<int>("() => window.__liveScrollListeners.size")).Should().Be(0, "the dock registers no scroll listener");
         var reach = await Page.EvaluateAsync<double>("() => document.documentElement.scrollHeight - window.innerHeight");
-        reach.Should().BeGreaterThan(300, "the page can be scrolled well past the bar");
+        reach.Should().BeGreaterThan(300, "the page can be scrolled well past the top");
         await ScrollToAsync(Math.Min(600, reach));
         await Task.Delay(150, TestContext.Current.CancellationToken);
-        (await ReadAwayAsync()).Away.Should().BeFalse();
+        (await ReadAwayAsync()).Away.Should().BeFalse("the dock never slides");
+        (await ReadAwayAsync()).Transform.Should().Be("none");
         (await Page.Locator(Bar).EvaluateAsync<string>("(bar) => getComputedStyle(bar).position")).Should().Be("sticky");
 
-        await Page.SetViewportSizeAsync(390, 844);
-        await Page.WaitForFunctionAsync("() => window.__scrollListeners.length === 1");
+        await Page.SetViewportSizeAsync(DockWidths.Phone, 844);
+        await Page.WaitForFunctionAsync("() => window.__liveScrollListeners.size === 1");
+        var listeners = await Page.EvaluateAsync<JsonElement>("() => window.__scrollListeners");
+        listeners[listeners.GetArrayLength() - 1].GetProperty("passive").GetBoolean().Should().BeTrue("the phone's one listener is passive");
         await Page.WaitForFunctionAsync("() => document.documentElement.scrollHeight - window.innerHeight > 400");
         await ScrollToAsync(0);
         await ScrollToAsync(300);
         await Expect(Page.Locator(Bar)).ToHaveAttributeAsync("data-away", string.Empty);
 
-        await Page.SetViewportSizeAsync(1280, 900);
+        await Page.SetViewportSizeAsync(DockWidths.Over, 600);
         await Expect(Page.Locator(Bar)).Not.ToHaveAttributeAsync("data-away", string.Empty);
+        await Page.WaitForFunctionAsync("() => window.__liveScrollListeners.size === 0");
+        await ScrollToAsync(0);
+        await ScrollToAsync(Math.Min(600, reach));
+        await Task.Delay(150, TestContext.Current.CancellationToken);
+        (await ReadAwayAsync()).Away.Should().BeFalse("the dock never slides after the width came back");
         ConsoleErrors.Should().BeEmpty();
     }
 
@@ -363,6 +452,60 @@ public sealed partial class FilterSlimBarTests : CabinetPageTest
 
     [GeneratedRegex(@"^\d+ of \d+ games?$")]
     private static partial Regex FullCountPattern();
+
+    [GeneratedRegex(@"^\d+$")]
+    private static partial Regex NumberPattern();
+
+    [GeneratedRegex(@"^of \d+$")]
+    private static partial Regex OfPattern();
+
+    private async Task ExpectFiltersButtonAsync(string language, int active, bool wordShown)
+    {
+        var button = Page.Locator(".filter-bar .filter-open");
+        var name = active == 0 ? "Filters" : language == "nl" ? $"Filters · {active} actief" : $"Filters · {active} active";
+        var context = $"{language} with {active} filters in use";
+
+        await Expect(button).ToHaveAccessibleNameAsync(name);
+        var reading = await Page.EvaluateAsync<JsonElement>(ReadFiltersButton);
+        reading.GetProperty("symbol").GetString().Should().EndWith("#i-menu", context);
+        reading.GetProperty("symbolBeforeWord").GetBoolean().Should().BeTrue($"{context}: the symbol stands before the word");
+        reading.GetProperty("height").GetDouble().Should().BeApproximately(44, 0.5, context);
+        reading.GetProperty("width").GetDouble().Should().BeGreaterThanOrEqualTo(88 - 0.5, context);
+
+        if (wordShown)
+        {
+            reading.GetProperty("wordWidth").GetDouble().Should().BeGreaterThan(1, $"{context}: the word shows ({reading})");
+        }
+        else
+        {
+            reading.GetProperty("wordWidth").GetDouble().Should().BeLessThanOrEqualTo(1, $"{context}: the word is visually hidden ({reading})");
+            reading.GetProperty("wordHeight").GetDouble().Should().BeLessThanOrEqualTo(1, $"{context}: the word is visually hidden ({reading})");
+        }
+
+        if (active == 0)
+        {
+            reading.GetProperty("pillShown").GetBoolean().Should().BeFalse($"{context}: no filled count at rest");
+
+            return;
+        }
+
+        reading.GetProperty("pillShown").GetBoolean().Should().BeTrue($"{context}: the filled count shows");
+        reading.GetProperty("pillText").GetString().Should().Be(active.ToString(CultureInfo.InvariantCulture), context);
+        reading.GetProperty("pillHidden").GetString().Should().Be("true", $"{context}: the name carries the number, not the count");
+        reading.GetProperty("pillHeight").GetDouble().Should().BeApproximately(20, 0.5, context);
+        reading.GetProperty("pillFill").GetString().Should().Be(reading.GetProperty("wantedFill").GetString(), $"{context}: the count is filled with the wall text");
+        reading.GetProperty("pillInk").GetString().Should().Be(reading.GetProperty("wantedInk").GetString(), $"{context}: the number is drawn in the wall colour");
+
+        if (wordShown)
+        {
+            reading.GetProperty("pillAfterWord").GetBoolean().Should().BeTrue($"{context}: the count follows the word");
+        }
+    }
+
+    private async Task ExpectNoRenderedBoxAsync(string selector, string what)
+    {
+        (await Page.Locator(selector).EvaluateAsync<int>("(element) => element.getClientRects().length")).Should().Be(0, $"{what} has no rendered box on a desktop");
+    }
 
     private async Task ExpectIconClearAsync(string language, bool highlighted)
     {
@@ -392,12 +535,12 @@ public sealed partial class FilterSlimBarTests : CabinetPageTest
         await Page.WaitForTimeoutAsync(200);
 
         var reading = await Page.EvaluateAsync<JsonElement>(ReadHint);
-        var fits = reading.GetProperty("hint").GetDouble() <= reading.GetProperty("room").GetDouble();
+        var roomy = reading.GetProperty("search").GetDouble() >= reading.GetProperty("threshold").GetDouble();
         var glyph = reading.GetProperty("glyph").GetString() != "none";
         var hintDrawn = reading.GetProperty("hintDrawn").GetBoolean();
 
-        (hintDrawn ? fits && !glyph : glyph).Should().BeTrue(
-            $"{context}: the hint is drawn whole, or replaced by the magnifier, never clipped ({reading})");
+        (roomy ? hintDrawn && !glyph : glyph && !hintDrawn).Should().BeTrue(
+            $"{context}: the hint is drawn whole while the field is at least as wide as the hint's threshold, and replaced by the magnifier below it ({reading})");
     }
 
     private async Task ChooseLanguageAsync(string language)

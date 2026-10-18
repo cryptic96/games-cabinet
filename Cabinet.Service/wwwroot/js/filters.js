@@ -271,8 +271,8 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
   }
 
   /**
-   * Writes the Filters button of the slim bar: its text with the number of filters in use, and for assistive technology the word
-   * that tells what the number means.
+   * Writes the Filters button of the slim bar: its word, the filled count of filters in use (hidden while none is) and, for assistive
+   * technology, the rest of its name, which says the number and what it means, so the name never depends on the filled count.
    */
   function showFiltersButton() {
     if (openButton === null) {
@@ -280,10 +280,16 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
     }
 
     const active = activeFilters();
-    const text = copy.filtersButton(active);
+    const text = copy.filtersButton;
+    const pill = openButton.querySelector('.filter-open-count');
 
     openButton.querySelector('.filter-open-text').textContent = text;
     openButton.querySelector('.filter-open-suffix').textContent = copy.filtersButtonName(active).slice(text.length);
+
+    if (pill !== null) {
+      pill.textContent = active === 0 ? '' : String(active);
+      pill.hidden = active === 0;
+    }
   }
 
   /**

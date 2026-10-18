@@ -429,14 +429,8 @@ const ENGLISH = Object.freeze({
     return `Show ${englishGames(count)}`;
   },
 
-  /**
-   * The visible text of the Filters button: the number of filters in use after a dot, nothing while none is.
-   * @param {number} active How many filters are in use.
-   * @returns {string}
-   */
-  filtersButton(active) {
-    return active === 0 ? 'Filters' : `Filters · ${active}`;
-  },
+  /** The visible word of the Filters button; the number of filters in use stands beside it in its own filled count. */
+  filtersButton: 'Filters',
 
   /**
    * The accessible name of the Filters button, which spells out what the number means.
@@ -854,14 +848,8 @@ const DUTCH = Object.freeze({
     return `Toon ${dutchGames(count)}`;
   },
 
-  /**
-   * The visible text of the Filters button: the number of filters in use after a dot, nothing while none is.
-   * @param {number} active How many filters are in use.
-   * @returns {string}
-   */
-  filtersButton(active) {
-    return active === 0 ? 'Filters' : `Filters · ${active}`;
-  },
+  /** The visible word of the Filters button; the number of filters in use stands beside it in its own filled count. */
+  filtersButton: 'Filters',
 
   /**
    * The accessible name of the Filters button, which spells out what the number means.

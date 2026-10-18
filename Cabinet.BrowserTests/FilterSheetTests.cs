@@ -112,8 +112,9 @@ public sealed partial class FilterSheetTests : CabinetPageTest
         await Expect(Page.Locator(OpenSheet)).ToHaveCountAsync(1);
         var shown = await LitCountOfTheBarAsync();
         await Expect(Page.Locator(Done)).ToHaveTextAsync($"Show {Games(shown)}");
-        await Expect(Page.Locator($"{Bar} .filter-open-text")).ToHaveTextAsync("Filters · 1");
-        await Expect(Page.Locator($"{Bar} .filter-open-suffix")).ToHaveTextAsync(" active");
+        await Expect(Page.Locator($"{Bar} .filter-open-text")).ToHaveTextAsync("Filters");
+        await Expect(Page.Locator($"{Bar} .filter-open-count")).ToHaveTextAsync("1");
+        await Expect(Page.Locator($"{Bar} .filter-open-suffix")).ToHaveTextAsync(" · 1 active");
         var dimmed = await Page.Locator(Dimmed).CountAsync();
 
         await Page.Locator(Done).ClickAsync();
