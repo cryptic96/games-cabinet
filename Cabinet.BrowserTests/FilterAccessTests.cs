@@ -329,7 +329,7 @@ public sealed class FilterAccessTests : CabinetPageTest
         ExpectSystemEdge(over, "the panel over the cabinet");
         over.Background.Should().Be(over.Canvas, "the panel over the cabinet stands on the system background");
         await Page.Keyboard.PressAsync("Escape");
-        await Page.WaitForFunctionAsync("() => document.documentElement.dataset.filterDock === 'rail'");
+        await Page.WaitForFunctionAsync("() => document.documentElement.dataset.filterDock === 'rail' && window.history.state === null");
 
         await Page.SetViewportSizeAsync(DockWidths.Phone, 844);
         var pill = Page.Locator($"{Bar} .filter-open .filter-open-count");

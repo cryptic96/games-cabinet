@@ -113,6 +113,12 @@ public sealed partial class FilterFocusRingTests : CabinetPageTest, IDisposable
         }
         """;
 
+    /// <summary>
+    /// The fly-over has folded and its history step is gone. Leaving the page or crossing a width while the step is still being
+    /// removed races that history traversal, and the browser aborts the next navigation.
+    /// </summary>
+    private const string FoldedWithNoHistoryStep = "() => document.documentElement.dataset.filterDock === 'rail' && window.history.state === null";
+
     private const string ReadSymbol = """
         (selector) => {
           const button = document.querySelector(selector);
@@ -185,6 +191,8 @@ public sealed partial class FilterFocusRingTests : CabinetPageTest, IDisposable
         problems.AddRange(await CheckAsync(wood, ring, "the fly-over search field", "#filter-q", string.Empty));
         problems.AddRange(await CheckAsync(wood, ring, "a fly-over players chip", $"{PlayersGroup} input[value=\"4\"]", ChipHost));
         await SaveScreenshotAsync($"filter-ring-over-{wood}");
+        await Page.Keyboard.PressAsync("Escape");
+        await Page.WaitForFunctionAsync(FoldedWithNoHistoryStep);
 
         await OpenAsync(DockWidths.Phone, ViewportHeightOfAPhone);
         await ChooseSomethingToClearAsync();
