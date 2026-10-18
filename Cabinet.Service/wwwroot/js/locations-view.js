@@ -1,5 +1,5 @@
 /**
- * The view switch at the start of the filter bar: all games together in one cabinet, or one cabinet per storage location. This module
+ * The view switch among the filters: all games together in one cabinet, or one cabinet per storage location. This module
  * owns the choice of view and the by-location document. The document is fetched the first time the visitor asks for the location view
  * and kept while it still belongs to the layout on screen, and the view on screen stays as it is until the document has arrived. The
  * page draws; this module only tells it which view to draw and hands it the document.
@@ -8,6 +8,10 @@
  * and never when the page fell back to another view. A switch is a short cross-fade of the cabinet area alone, started only when the
  * document is in hand, instant when the visitor prefers less motion or the browser has no view transitions, and an open card is closed
  * before it starts. Afterwards the page scrolls up when the cabinet's top has gone above the bar, and never down.
+ *
+ * Below the desktop width the bar is the slim bar pinned above the cabinet. From the desktop width the filters stand in the dock at
+ * the left edge, beside the cabinet, so nothing covers the top of the page there: the bar's edge that the switch's scroll and Show on
+ * shelf keep clear of is the viewport's top, the same zero the page's bar height token holds from that width.
  */
 import { writeView } from './filter-state.js';
 
@@ -34,7 +38,8 @@ const BAR_GAP_PX = 16;
  * swap. The page scrolls only when the cabinet's top has gone above the bar's bottom, to the position that puts the cabinet's top a
  * little under the bar; that position is always above the current one, so the page never scrolls down.
  * @param {number} cabinetTop The cabinet's top edge, in pixels from the top of the viewport.
- * @param {number} barBottom The bar's bottom edge, in pixels from the top of the viewport.
+ * @param {number} barBottom The bar's bottom edge, in pixels from the top of the viewport; zero from the desktop width, where no bar
+ * covers the top of the page.
  * @param {number} scrollY The current vertical scroll position of the page.
  * @returns {number | null} The scroll position to go to, or null when the page stays where it is.
  */
@@ -60,7 +65,8 @@ const FOUND_MARKER = 'data-found';
  * @param {number} edges.headingTop The top edge of the location's heading.
  * @param {number} edges.boxTop The top edge of the box.
  * @param {number} edges.boxBottom The bottom edge of the box.
- * @param {number} edges.barBottom The bottom edge of the bar while it is pinned, otherwise zero.
+ * @param {number} edges.barBottom The bottom edge of the bar while it is pinned, otherwise zero, and always zero from the desktop
+ * width, where no bar covers the top of the page.
  * @param {number} edges.viewportHeight The height of the viewport.
  * @param {number} edges.scrollY The current vertical scroll position of the page.
  * @returns {number} The scroll position to go to.

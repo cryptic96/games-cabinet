@@ -9,8 +9,8 @@ namespace Cabinet.BrowserTests;
 
 /// <summary>
 /// Proves in a real browser that the location on a card is a quiet button that takes the visitor to the game's box on its shelf: the
-/// card closes, the by-location view is shown when it is not, the page scrolls to the box with the location's heading under the bar
-/// when both fit and the box centred otherwise, and the box is outlined for two seconds with its veil lifted, whatever the filters
+/// card closes, the by-location view is shown when it is not, the page scrolls to the box with the location's heading 16 px under the
+/// slim bar on a phone or under the viewport top on a desktop when both fit and the box centred otherwise, and the box is outlined for two seconds with its veil lifted, whatever the filters
 /// do. The outline goes at the next press and never by moving the pointer, a payload that is slow or fails is handled without a
 /// stray outline, and a game with no place has no button.
 /// </summary>
@@ -33,45 +33,124 @@ public sealed class FilterShowOnShelfTests : CabinetPageTest
     private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
     private static readonly JsonSerializerOptions WebOptions = new(JsonSerializerDefaults.Web);
 
-    private const string InstallRecorder = """
+    /// <summary>
+    /// Records every box Show on shelf outlines. The outline and the furniture ring are read when the mark is set. The veil is read on
+    /// every frame while the mark is on until its fade has ended at 0, so a value caught in the middle of the fade is never taken for
+    /// the answer. The landing is measured only once the box's top has stayed the same for two frames, so a layout that is still
+    /// moving is never measured. The edge of the bar the landing keeps clear of is the viewport's top from the desktop width, where
+    /// the filters stand in the dock beside the cabinet, and the pinned slim bar's bottom below it.
+    /// </summary>
+    internal const string InstallRecorder = """
         (() => {
           const rec = { shown: [], cleared: [] };
           window.__found = rec;
+          const STILL_FRAMES = 2;
+          const MOST_FRAMES = 600;
+          const barEdge = () => {
+            if (matchMedia('(min-width: 64rem)').matches) {
+              return 0;
+            }
+            const bar = document.querySelector('.filter-bar');
+            return getComputedStyle(bar).position === 'sticky' ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;
+          };
+          const follow = (box, entry) => {
+            const veil = box.querySelector('.placement-veil');
+            const group = box.closest('.location-group');
+            const heading = group === null ? null : group.querySelector('.location-heading');
+            let last = null;
+            let still = 0;
+            let frames = 0;
+            let seen = null;
+            const frame = () => {
+              frames += 1;
+              if (entry.veil === null) {
+                if (box.hasAttribute('data-found')) {
+                  seen = getComputedStyle(veil).opacity;
+                  if (seen === '0') {
+                    entry.veil = seen;
+                  }
+                } else {
+                  entry.veil = seen ?? 'not read while marked';
+                }
+              }
+              if (!entry.settled) {
+                const rect = box.getBoundingClientRect();
+                still = last !== null && Math.abs(rect.top - last) < 0.01 ? still + 1 : 0;
+                last = rect.top;
+                if (still >= STILL_FRAMES) {
+                  entry.settled = true;
+                  entry.frames = frames;
+                  entry.top = rect.top;
+                  entry.bottom = rect.bottom;
+                  entry.left = rect.left;
+                  entry.right = rect.right;
+                  entry.headingTop = heading === null ? null : heading.getBoundingClientRect().top;
+                  entry.scrollY = scrollY;
+                }
+              }
+              if (entry.veil !== null && entry.settled) {
+                entry.done = true;
+              } else if (frames >= MOST_FRAMES) {
+                entry.veil = entry.veil ?? 'never 0 while marked';
+                entry.done = true;
+              } else {
+                requestAnimationFrame(frame);
+              }
+            };
+            requestAnimationFrame(frame);
+          };
           new MutationObserver((records) => {
             for (const record of records) {
               const box = record.target;
               if (box.hasAttribute('data-found')) {
-                const bar = document.querySelector('.filter-bar');
                 const group = box.closest('.location-group');
-                const heading = group === null ? null : group.querySelector('.location-heading');
-                const rect = box.getBoundingClientRect();
                 const style = getComputedStyle(box);
                 const entry = {
                   id: box.dataset.entryId,
                   kind: box.dataset.kind,
                   at: performance.now(),
-                  top: rect.top,
-                  bottom: rect.bottom,
-                  headingTop: heading === null ? null : heading.getBoundingClientRect().top,
-                  barBottom: bar.getBoundingClientRect().bottom,
-                  pinned: getComputedStyle(bar).position === 'sticky',
+                  barEdge: barEdge(),
                   viewport: window.innerHeight,
                   location: group === null ? null : group.dataset.locationId,
                   dimmed: box.hasAttribute('data-dim'),
                   outlineStyle: style.outlineStyle,
                   outlineWidth: style.outlineWidth,
                   outlineOffset: style.outlineOffset,
+                  outlineColor: style.outlineColor,
+                  woodLight: style.getPropertyValue('--wood-light').trim(),
                   zIndex: style.zIndex,
                   veil: null,
+                  settled: false,
+                  done: false,
+                  frames: 0,
+                  top: 0,
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  headingTop: null,
+                  scrollY: 0,
                 };
                 rec.shown.push(entry);
-                setTimeout(() => { entry.veil = getComputedStyle(box.querySelector('.placement-veil')).opacity; }, 500);
+                follow(box, entry);
               } else {
                 rec.cleared.push({ id: box.dataset.entryId, at: performance.now() });
               }
             }
           }).observe(document, { subtree: true, attributes: true, attributeFilter: ['data-found'] });
         })();
+        """;
+
+    /// <summary>
+    /// Finds a horizontal position in the gap between the filter dock and the cabinet, where a press lands on nothing but the page.
+    /// </summary>
+    private const string QuietSpotScript = """
+        () => {
+          const dock = Math.max(...[...document.querySelectorAll('.filter-rail, #filter-panel')]
+            .map((part) => part.getBoundingClientRect())
+            .filter((rect) => rect.width > 0)
+            .map((rect) => rect.right));
+          return (dock + document.getElementById('cabinet').getBoundingClientRect().left) / 2;
+        }
         """;
 
     private const string MeasureGroups = """
@@ -90,8 +169,9 @@ public sealed class FilterShowOnShelfTests : CabinetPageTest
     [Fact]
     public async Task Show_on_shelf_lands_on_the_box_outlined()
     {
-        var cards = await OpenSampleAsync(1440, 900);
+        var cards = await OpenSampleAsync(DockWidths.Push, 900);
         var pick = await PickBoxAsync(cards, tallest: false, lastGroupOnly: true);
+        await OpenFilterPanelAsync();
         await Page.Locator("#filter-q").FillAsync(NothingMatches);
         await Expect(Page.Locator(Boxes + "[data-dim]").First).ToBeAttachedAsync();
 
@@ -109,16 +189,17 @@ public sealed class FilterShowOnShelfTests : CabinetPageTest
 
         landing.Location.Should().Be(pick.LocationId, "the box stands in the cabinet of its own location");
         landing.Dimmed.Should().BeTrue("a filter that dims every box is on, and the answer is shown anyway");
-        landing.Top.Should().BeGreaterThanOrEqualTo(landing.PinnedBarBottom, "the box is not under the bar");
+        landing.Settled.Should().BeTrue("the landing is measured on a layout that has stopped moving");
+        landing.BarEdge.Should().Be(0, "on a desktop no bar covers the top of the page, so the landing reads below the viewport top");
+        landing.Top.Should().BeGreaterThanOrEqualTo(landing.BarEdge, "the box is not under the bar");
         landing.Bottom.Should().BeLessThanOrEqualTo(landing.Viewport, "the box is inside the viewport");
         landing.Fits.Should().BeTrue("a box in the first rows of a cabinet fits with its heading");
-        landing.HeadingTop!.Value.Should().BeApproximately(landing.PinnedBarBottom + 16, 1.5, "the heading is aligned under the bar");
+        landing.HeadingTop!.Value.Should().BeApproximately(landing.BarEdge + 16, 1.5, "the heading is aligned 16 px under the viewport top");
         landing.OutlineStyle.Should().Be("solid");
         landing.OutlineWidth.Should().Be("3px", "the furniture ring is 3px so it stays distinct from the 2px focus ring");
         landing.OutlineOffset.Should().Be("2px");
         landing.ZIndex.Should().Be("4");
-        await Page.WaitForFunctionAsync("() => window.__found.shown.length > 0 && window.__found.shown[0].veil !== null");
-        (await ReadShownAsync())[0].Veil.Should().Be("0", "the veil is lifted so the filter never hides the answer");
+        landing.Veil.Should().Be("0", "the veil is lifted so the filter never hides the answer, read once its fade has ended");
         await Expect(Page.Locator(Boxes + "[data-dim]").First).ToBeAttachedAsync();
         (await Page.Locator("#filter-q").InputValueAsync()).Should().Be(NothingMatches, "Show on shelf leaves the filter as it is");
         ConsoleErrors.Should().BeEmpty();
@@ -137,10 +218,10 @@ public sealed class FilterShowOnShelfTests : CabinetPageTest
         var landing = (await ReadShownAsync()).Single();
 
         landing.Fits.Should().BeFalse("the heading and the box do not both fit on a phone");
-        landing.Top.Should().BeGreaterThanOrEqualTo(landing.PinnedBarBottom);
+        landing.Top.Should().BeGreaterThanOrEqualTo(landing.BarEdge);
         landing.Bottom.Should().BeLessThanOrEqualTo(landing.Viewport);
         var centre = (landing.Top + landing.Bottom) / 2;
-        var middle = landing.PinnedBarBottom + ((landing.Viewport - landing.PinnedBarBottom) / 2);
+        var middle = landing.BarEdge + ((landing.Viewport - landing.BarEdge) / 2);
         centre.Should().BeApproximately(middle, 2, "the box is centred in the space below the bar");
         ConsoleErrors.Should().BeEmpty();
     }
@@ -149,7 +230,7 @@ public sealed class FilterShowOnShelfTests : CabinetPageTest
     public async Task An_expansion_that_follows_its_base_lands_on_its_own_box()
     {
         FilterFixture.Write(_storage.FullPath);
-        await Page.SetViewportSizeAsync(1440, 900);
+        await Page.SetViewportSizeAsync(DockWidths.Push, 900);
         await OwnerHost.StoredAsync(factory => StartAsync(factory), _storage.FullPath);
         await PrepareAsync();
         await GotoCabinetAsync("/");
@@ -169,7 +250,7 @@ public sealed class FilterShowOnShelfTests : CabinetPageTest
 
         landing.Location.Should().Be(FilterFixture.CabinetAId, "the expansion stands in its base's cabinet");
         (await Page.Locator($"{Groups}[data-location-id=\"{FilterFixture.CabinetAId}\"] .placement[data-entry-id=\"{baseEntry}\"]").CountAsync()).Should().BeGreaterThan(0, "its base stands in the same cabinet");
-        landing.Top.Should().BeGreaterThanOrEqualTo(landing.PinnedBarBottom);
+        landing.Top.Should().BeGreaterThanOrEqualTo(landing.BarEdge);
         landing.Bottom.Should().BeLessThanOrEqualTo(landing.Viewport);
         ConsoleErrors.Should().BeEmpty();
     }
@@ -177,7 +258,7 @@ public sealed class FilterShowOnShelfTests : CabinetPageTest
     [Fact]
     public async Task A_slow_or_failing_payload_is_handled()
     {
-        var cards = await OpenSampleAsync(1440, 900);
+        var cards = await OpenSampleAsync(DockWidths.Push, 900);
         var pick = await PickBoxAsync(cards, tallest: false, lastGroupOnly: false);
         var mode = "fail";
         var release = new TaskCompletionSource();
@@ -224,7 +305,7 @@ public sealed class FilterShowOnShelfTests : CabinetPageTest
         await Expect(Page.Locator(Groups).First).ToBeAttachedAsync();
         await Expect(Page.Locator(Found)).ToHaveAttributeAsync("data-entry-id", pick.Id);
         var landing = (await ReadShownAsync()).Single();
-        landing.Top.Should().BeGreaterThanOrEqualTo(landing.PinnedBarBottom);
+        landing.Top.Should().BeGreaterThanOrEqualTo(landing.BarEdge);
         landing.Bottom.Should().BeLessThanOrEqualTo(landing.Viewport);
         await Expect(Page.Locator(LocationRadio)).ToBeCheckedAsync();
     }
@@ -234,8 +315,9 @@ public sealed class FilterShowOnShelfTests : CabinetPageTest
     [InlineData(true)]
     public async Task The_outline_ignores_mouse_moves_and_clears_on_a_press(bool reducedMotion)
     {
-        var cards = await OpenSampleAsync(1440, 900);
+        var cards = await OpenSampleAsync(DockWidths.Push, 900);
         var pick = await PickBoxAsync(cards, tallest: false, lastGroupOnly: false);
+        await OpenFilterPanelAsync();
         await Page.Locator("fieldset[data-filter=\"players\"] input[value=\"4\"]").ClickAsync();
         await Page.WaitForFunctionAsync($"() => sessionStorage.getItem('{FiltersKey}') !== null");
         await Expect(Page.Locator(".filter-count")).Not.ToHaveTextAsync(string.Empty);
@@ -260,7 +342,8 @@ public sealed class FilterShowOnShelfTests : CabinetPageTest
         await Task.Delay(300, TestContext.Current.CancellationToken);
         await Expect(Page.Locator(Found)).ToHaveCountAsync(1);
 
-        await Page.Mouse.ClickAsync(4, 400);
+        var quiet = await Page.EvaluateAsync<double>(QuietSpotScript);
+        await Page.Mouse.ClickAsync((float)quiet, 400);
         await Expect(Page.Locator(Found)).ToHaveCountAsync(0);
 
         await ShowOnShelfAsync(pick.Id);
@@ -288,7 +371,7 @@ public sealed class FilterShowOnShelfTests : CabinetPageTest
     [Fact]
     public async Task A_game_with_no_place_has_no_link()
     {
-        var cards = await OpenSampleAsync(1440, 900);
+        var cards = await OpenSampleAsync(DockWidths.Push, 900);
         var unplaced = cards.First(card => !card.IsExpansion && card.Location is null);
         var placed = cards.First(card => !card.IsExpansion && card.Location is not null && card.LocationId is not null);
 
@@ -421,9 +504,17 @@ public sealed class FilterShowOnShelfTests : CabinetPageTest
         await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(0);
     }
 
-    private async Task<List<Landing>> ReadShownAsync()
+    private Task<List<Landing>> ReadShownAsync() => ReadLandingsAsync(Page);
+
+    /// <summary>
+    /// Reads the boxes Show on shelf outlined, once each landing has been measured on a still layout and its veil read after the fade.
+    /// </summary>
+    /// <param name="page">The page the recorder was installed on.</param>
+    /// <returns>The landings in the order they happened.</returns>
+    internal static async Task<List<Landing>> ReadLandingsAsync(IPage page)
     {
-        var json = await Page.EvaluateAsync<JsonElement>("() => window.__found.shown");
+        await page.WaitForFunctionAsync("() => window.__found.shown.every((entry) => entry.done)");
+        var json = await page.EvaluateAsync<JsonElement>("() => window.__found.shown");
 
         return JsonSerializer.Deserialize<List<Landing>>(json.GetRawText(), WebOptions)!;
     }
@@ -436,26 +527,50 @@ public sealed class FilterShowOnShelfTests : CabinetPageTest
 
     private sealed record ViewCard(long EntryId, string Title, bool IsExpansion, string? Location, string? LocationId);
 
-    private sealed record Landing(
+    /// <summary>One box Show on shelf outlined, as the recorder measured it.</summary>
+    /// <param name="Id">The box's entry id.</param>
+    /// <param name="Kind">The box's kind.</param>
+    /// <param name="At">When the outline was set, in milliseconds of the page's clock.</param>
+    /// <param name="BarEdge">The edge the landing keeps clear of: zero on a desktop, the pinned slim bar's bottom below it.</param>
+    /// <param name="Viewport">The viewport's height.</param>
+    /// <param name="Location">The id of the location group the box stands in, if any.</param>
+    /// <param name="Dimmed">Whether the box was in shadow when it was outlined.</param>
+    /// <param name="OutlineStyle">The computed outline style.</param>
+    /// <param name="OutlineWidth">The computed outline width.</param>
+    /// <param name="OutlineOffset">The computed outline offset.</param>
+    /// <param name="OutlineColor">The computed outline colour.</param>
+    /// <param name="WoodLight">The wood's light token as written in the style sheet.</param>
+    /// <param name="ZIndex">The computed stacking level.</param>
+    /// <param name="Veil">The veil's opacity once its fade had ended while the outline was on.</param>
+    /// <param name="Settled">Whether the box's top stayed the same for two frames before it was measured.</param>
+    /// <param name="Top">The box's top edge in the viewport.</param>
+    /// <param name="Bottom">The box's bottom edge in the viewport.</param>
+    /// <param name="Left">The box's left edge in the viewport.</param>
+    /// <param name="Right">The box's right edge in the viewport.</param>
+    /// <param name="HeadingTop">The top edge of the location's heading, if the box stands in a location group.</param>
+    internal sealed record Landing(
         string Id,
         string Kind,
         double At,
-        double Top,
-        double Bottom,
-        double? HeadingTop,
-        double BarBottom,
-        bool Pinned,
+        double BarEdge,
         double Viewport,
         string? Location,
         bool Dimmed,
         string OutlineStyle,
         string OutlineWidth,
         string OutlineOffset,
+        string OutlineColor,
+        string WoodLight,
         string ZIndex,
-        string? Veil)
+        string? Veil,
+        bool Settled,
+        double Top,
+        double Bottom,
+        double Left,
+        double Right,
+        double? HeadingTop)
     {
-        public double PinnedBarBottom => Pinned ? BarBottom : 0;
-
-        public bool Fits => HeadingTop is not null && Bottom - HeadingTop.Value <= Viewport - PinnedBarBottom - 32;
+        /// <summary>Whether the heading and the box both fit in the viewport below the bar's edge with a gap above and below.</summary>
+        public bool Fits => HeadingTop is not null && Bottom - HeadingTop.Value <= Viewport - BarEdge - 32;
     }
 }
