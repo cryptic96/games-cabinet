@@ -99,7 +99,17 @@ created: 2026-10-15
 | 07-29 | D-18 lights, D-33, stylesheet rules, access | `filters-css.test.mjs`; `--filter-method "*FilterDimTests.<method>"`, `*OwnerCabinetTests.<method>`, `*FilterAccessTests.<method>` |
 | 07-30, 07-31 | Review round | full suite, one browser suite at a time, DejaVu, lint |
 | 07-32, 07-33 | Release | local gates; CI jobs incl. `browser-filters`; draft verification; container evidence |
-| 07-34 | D-34 manual | device round on the deployed release |
+| 07-35 | Rail and panel tracer (amendment AM-2 to AM-6) | `--filter-method "*FilterDockGeometryTests.<method>"` (DejaVu); `filters-css.test.mjs` |
+| 07-36 | Fly-over modality, close routes, focus, width crossings, containing block | `filter-dock.test.mjs`, `filters-css.test.mjs`, `cabinet-layers.test.mjs`; `--filter-method "*FilterDockFocusTests.<method>"`, `*FilterDockResizeTests.<method>` |
+| 07-37 | Rail state, panel count line, phone Filters button, copy | `filter-copy.test.mjs`, `copy-parity.test.mjs`; `--filter-method "*FilterDockRailTests.<method>"`, `*FilterSlimBarTests.<method>` (DejaVu) |
+| 07-38 | Column rule, geometry per breakpoint, layout guide | `cabinet-layers.test.mjs`; `--filter-method "*FilterDockGeometryTests.<method>"` (DejaVu); `FilterBarGeometryTests` |
+| 07-39 | Remembered panel, head script, default folded, empty pages | `filter-state.test.mjs`, `filter-dock-head.test.mjs`; `--filter-method "*FilterDockMemoryTests.<method>"` |
+| 07-40 | Show on shelf, view fade, live redraw beside the dock; two hardened tests | `locations-view.test.mjs`, `card-css.test.mjs`; `--filter-method "*FilterDockFlowTests.<method>"`; `FilterShowOnShelfTests` repeated runs |
+| 07-41, 07-42 | Existing desktop-width filter tests moved to the panel | the migrated classes, one suite at a time (DejaVu) |
+| 07-43 | Rail and panel contrast, rings, access | `*LookChromeContrastTests`; `filters-css.test.mjs`; `FilterFocusRingTests`, `FilterAccessTests` |
+| 07-44, 07-45 | Build round 2 and the owner's answer | full suite, one browser suite at a time, DejaVu, lint; frames manifest check |
+| 07-46, 07-47 | Release of the rework | local gates; CI jobs incl. `browser-filters`; draft verification; container evidence |
+| 07-34 | D-34 manual | device round on the deployed release (moved last, after 07-47) |
 
 ---
 

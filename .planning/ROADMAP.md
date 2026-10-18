@@ -545,7 +545,7 @@ Plans:
   4. Every game's storage location is visible to every visitor, whether it was read from BGG or entered by the owner.
   5. A visitor can toggle between one big cabinet and one cabinet per storage location, with games that have no location placed in an "Unknown location" cabinet.
 
-**Plans:** 33/34 plans executed
+**Plans:** 33/47 plans executed
 
 Plans:
 **Wave 1**
@@ -629,9 +629,46 @@ Plans:
 
 - [x] 07-33-PLAN.md — Release v0.9.0, part two: the owner publishes the verified draft, and the container runs it (owner-gated)
 
-**Wave 17** *(blocked on Wave 16 completion)*
+**Wave 18** *(blocked on Wave 16 completion; owner-approved rework: the filter rail and panel on desktop)*
 
-- [ ] 07-34-PLAN.md — The device round on the deployed release (owner-gated)
+- [ ] 07-35-PLAN.md — Tracer: on a desktop the filters fold into a rail at the left and open into a panel beside the cabinet
+
+**Wave 19** *(blocked on Wave 18 completion)*
+
+- [ ] 07-36-PLAN.md — On a laptop the panel flies over the cabinet, every way to close it does one thing, and widths can change at any moment
+- [ ] 07-37-PLAN.md — The folded rail says what is filtered, the panel counts the games, and the phone's Filters button gets the three-line symbol
+
+**Wave 20** *(blocked on Wave 19 completion)*
+
+- [ ] 07-38-PLAN.md — Geometry at every width, no top bar on a desktop, and the cabinet's columns follow the room while the panel pushes
+- [ ] 07-39-PLAN.md — The panel is remembered per device, the first frame is already right, and nothing is open on a first visit
+- [ ] 07-40-PLAN.md — Show on shelf, the view switch and live redraws meet the dock; two flaky tests are hardened
+- [ ] 07-41-PLAN.md — The search, chip and keyboard tests reach the controls in the panel
+- [ ] 07-42-PLAN.md — The location, memory, list and owner-address tests reach the controls in the panel
+
+**Wave 21** *(blocked on Wave 20 completion)*
+
+- [ ] 07-43-PLAN.md — The rail and panel read on every wall at every hour, their rings stand outside, and visitors' settings are respected
+
+**Wave 22** *(blocked on Wave 21 completion)*
+
+- [ ] 07-44-PLAN.md — Build round 2: the rail and panel on synthetic data, measured, Critic-checked, before the owner looks (owner-gated)
+
+**Wave 23** *(blocked on Wave 22 completion)*
+
+- [ ] 07-45-PLAN.md — The owner decides on the rail and panel, the choices land, and the guides describe them (owner-gated)
+
+**Wave 24** *(blocked on Wave 23 completion)*
+
+- [ ] 07-46-PLAN.md — Release v0.10.0 (provisional), part one: pull request, the owner's merge and tag, and a verified draft (owner-gated)
+
+**Wave 25** *(blocked on Wave 24 completion)*
+
+- [ ] 07-47-PLAN.md — Release v0.10.0 (provisional), part two: the owner publishes the verified draft, and the container runs it (owner-gated)
+
+**Wave 26** *(blocked on Wave 25 completion)*
+
+- [ ] 07-34-PLAN.md — The device round on the deployed release (owner-gated; moved last, runs on the rail-and-panel release)
 
 **UI hint**: yes
 
