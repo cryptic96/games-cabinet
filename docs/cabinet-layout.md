@@ -165,13 +165,16 @@ row with fewer sections than columns, sits in the middle. On a desktop screen
 the filters fold into a narrow rail at the left edge, so beside the rail a
 desktop section is a little narrower, from about 35.75rem to 40rem wide.
 
-While the filter panel is open beside the cabinet and pushes it aside, the
-column count no longer follows the screen width but the space the cabinet has
-left: two columns when each section can be at least 30rem wide, three when each
-can be at least 37rem. That keeps the sections readable instead of squeezing
-three narrow ones in, and lets two sections grow back to their full width on a
-wide screen. When the panel lies over the cabinet instead, or is folded, the
-cabinet keeps the columns it has beside the rail.
+On screens 90rem (1440 pixels) and wider, the open filter panel stands beside
+the cabinet and pushes it aside. The column count then no longer follows the
+screen width but the space the cabinet has left: two columns when each section
+can be at least 30rem wide, three when each can be at least 37rem. At 1440
+pixels that is two sections of about 32rem, where the labels of the smallest
+boxes still read and titles are cut off only a few letters sooner. That keeps
+the sections readable instead of squeezing three narrow ones in, and lets two
+sections grow back to their full width on a wider screen. On narrower desktop screens the open panel
+lies over the cabinet instead, so the cabinet keeps the columns it has beside
+the rail, as it does while the panel is folded.
 
 On phones the sections form a single column. The layout the page asks for
 still depends only on the screen width: opening or folding the filters never
