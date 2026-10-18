@@ -545,7 +545,7 @@ Plans:
   4. Every game's storage location is visible to every visitor, whether it was read from BGG or entered by the owner.
   5. A visitor can toggle between one big cabinet and one cabinet per storage location, with games that have no location placed in an "Unknown location" cabinet.
 
-**Plans:** 36/47 plans executed
+**Plans:** 41/47 plans executed
 
 Plans:
 **Wave 1**
@@ -640,11 +640,11 @@ Plans:
 
 **Wave 20** *(blocked on Wave 19 completion)*
 
-- [ ] 07-38-PLAN.md — Geometry at every width, no top bar on a desktop, and the cabinet's columns follow the room while the panel pushes
-- [ ] 07-39-PLAN.md — The panel is remembered per device, the first frame is already right, and nothing is open on a first visit
-- [ ] 07-40-PLAN.md — Show on shelf, the view switch and live redraws meet the dock; two flaky tests are hardened
-- [ ] 07-41-PLAN.md — The search, chip and keyboard tests reach the controls in the panel
-- [ ] 07-42-PLAN.md — The location, memory, list and owner-address tests reach the controls in the panel
+- [x] 07-38-PLAN.md — Geometry at every width, no top bar on a desktop, and the cabinet's columns follow the room while the panel pushes
+- [x] 07-39-PLAN.md — The panel is remembered per device, the first frame is already right, and nothing is open on a first visit
+- [x] 07-40-PLAN.md — Show on shelf, the view switch and live redraws meet the dock; two flaky tests are hardened
+- [x] 07-41-PLAN.md — The search, chip and keyboard tests reach the controls in the panel
+- [x] 07-42-PLAN.md — The location, memory, list and owner-address tests reach the controls in the panel
 
 **Wave 21** *(blocked on Wave 20 completion)*
 
@@ -703,5 +703,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. Game Detail, Accessibility & Language | 16/16 | Complete    | 2026-10-12 |
 | 6. Owner Tools & Persistence | 30/30 | Complete    | 2026-10-13 |
 | 6.1. Selectable Cabinet Finishes & Lighting (INSERTED) | 21/21 | Complete    | 2026-10-15 |
-| 7. Game-Night Filters & Location Cabinets | 36/47 | In Progress|  |
+| 7. Game-Night Filters & Location Cabinets | 41/47 | In Progress|  |
 | 8. Public Hardening & Go-Public | 0/0 | Not started | - |
