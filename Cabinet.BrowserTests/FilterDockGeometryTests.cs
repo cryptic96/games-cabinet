@@ -18,6 +18,9 @@ public sealed class FilterDockGeometryTests : CabinetPageTest
     private const int PanelWidth = 336;
     private const int PageGap = 24;
     private const string Boxes = "#cabinet .placement";
+    private const string Cabinet = "#cabinet";
+    private const double Rem = 16;
+    private const double FullSection = 40 * Rem;
     private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
     private static readonly JsonSerializerOptions WebOptions = new(JsonSerializerDefaults.Web);
 
@@ -172,6 +175,25 @@ public sealed class FilterDockGeometryTests : CabinetPageTest
         ConsoleErrors.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Pushed_at_1440_the_columns_follow_the_room()
+    {
+        await OpenAsync("/?sample=400", DockWidths.Push, 900);
+
+        await ExpectSectionsAsync(Cabinet, 2, FullSection, "folded");
+
+        await OpenFilterPanelAsync();
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-filter-dock", "push");
+
+        var pushed = await ExpectSectionsAsync(Cabinet, 2, 32.25 * Rem, "pushed");
+        pushed.Room.Should().BeApproximately(66 * Rem, 1, "the room beside the pushed panel is the page column");
+
+        await FoldFilterPanelAsync();
+
+        await ExpectSectionsAsync(Cabinet, 2, FullSection, "folded again");
+        ConsoleErrors.Should().BeEmpty();
+    }
+
     private const string ReadPageFrame = """
         () => {
           const cabinet = document.getElementById('cabinet').getBoundingClientRect();
@@ -236,6 +258,46 @@ public sealed class FilterDockGeometryTests : CabinetPageTest
         }
         """;
 
+    private const string ReadSections = """
+        (parent) => {
+          const sections = [...document.querySelectorAll(parent)]
+            .flatMap((element) => [...element.children])
+            .filter((element) => element.classList.contains('section'))
+            .map((element) => element.getBoundingClientRect());
+          return {
+            widths: sections.map((rect) => rect.width),
+            firstRow: sections.filter((rect) => sections.length > 0 && Math.abs(rect.bottom - sections[0].bottom) <= 1).length,
+            room: document.querySelector('.cabinet-room').getBoundingClientRect().width,
+          };
+        }
+        """;
+
+    /// <summary>
+    /// Waits a moment for every section under the given parents to be drawn at the expected width, then checks the width and the
+    /// number of sections in the first row, so a width that never arrives fails with the widths that were measured.
+    /// </summary>
+    private async Task<SectionReading> ExpectSectionsAsync(string parent, int columns, double width, string label)
+    {
+        try
+        {
+            await Page.WaitForFunctionAsync(
+                $"([parent, width]) => ({ReadSections})(parent).widths.every((actual) => Math.abs(actual - width) <= 1)",
+                new object[] { parent, width },
+                new PageWaitForFunctionOptions { Timeout = 5000 });
+        }
+        catch (TimeoutException)
+        {
+        }
+
+        var reading = JsonSerializer.Deserialize<SectionReading>((await Page.EvaluateAsync<JsonElement>(ReadSections, parent)).GetRawText(), WebOptions)!;
+
+        reading.Widths.Should().NotBeEmpty(label);
+        reading.Widths.Should().OnlyContain(actual => Math.Abs(actual - width) <= 1, $"{label}: every section is {width / Rem}rem wide, measured {string.Join(", ", reading.Widths.Distinct())}");
+        reading.FirstRow.Should().Be(columns, $"{label}: the first row holds {columns} sections");
+
+        return reading;
+    }
+
     private async Task ExpectRailAgainstTheEdgesAsync(string label)
     {
         var rail = await Page.EvaluateAsync<JsonElement>(ReadRail);
@@ -293,6 +355,8 @@ public sealed class FilterDockGeometryTests : CabinetPageTest
     }
 
     private static bool Contains(string title, string fragment) => title.Contains(fragment, StringComparison.OrdinalIgnoreCase);
+
+    private sealed record SectionReading(List<double> Widths, int FirstRow, double Room);
 
     private sealed record CardLink(long? EntryId, int GameId, string Title);
 
