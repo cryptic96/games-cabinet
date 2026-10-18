@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Cabinet.BrowserTests.Infrastructure;
+using Cabinet.FakeBgg;
 using FluentAssertions;
 using Microsoft.Playwright;
 using SkiaSharp;
@@ -11,7 +12,9 @@ namespace Cabinet.BrowserTests;
 /// Proves in a real browser that the flows that cross the desktop filter dock land where they should: Show on shelf lands the found
 /// box in the page column beside a pushed panel or the folded rail, inside the viewport and ringed, with nothing above it but the
 /// viewport's top; and the view switch fades only the cabinet, under an open panel that is drawn exactly as it is at rest, and
-/// scrolls up to the cabinet's top when the visitor had scrolled past it.
+/// scrolls up to the cabinet's top when the visitor had scrolled past it; and a live redraw after an owner change keeps the dock as it
+/// is, folded, pushed or flying over, with its scroll position and focus, while the counts and Clear change in the same task as the
+/// new boxes. When the owner removes every location, the location controls go and the cabinet shows all games together.
 /// </summary>
 [Trait("Category", "Browser")]
 public sealed class FilterDockFlowTests : CabinetPageTest
@@ -23,6 +26,10 @@ public sealed class FilterDockFlowTests : CabinetPageTest
     private const string LocationRadio = "input[name=\"filter-view\"][value=\"location\"]";
     private const string NothingMatches = "zzzzqqqq";
     private const double HeadingGap = 16;
+    private const string PlayersFour = "#filter-panel fieldset[data-filter=\"players\"] input[value=\"4\"]";
+
+    /// <summary>A viewport low enough that the open panel is taller than it and scrolls inside itself.</summary>
+    private const int ShortViewport = 420;
 
     private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
     private static readonly JsonSerializerOptions WebOptions = new(JsonSerializerDefaults.Web);
@@ -85,6 +92,56 @@ public sealed class FilterDockFlowTests : CabinetPageTest
             return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
           };
           return { panel: box(document.getElementById('filter-panel')), view: box(document.querySelector('#filter-panel .filter-view')) };
+        }
+        """;
+
+    /// <summary>
+    /// Records, in the same task as every redraw that puts boxes on the page, the dock's state, the scroll positions of the dock and
+    /// the panel, the focused element and what the rail and the panel say, so a test can tell they were already right when the new
+    /// boxes appeared.
+    /// </summary>
+    private const string InstallRedrawRecorder = """
+        (() => {
+          const rec = { redraws: [] };
+          window.__redraw = rec;
+          new MutationObserver((records) => {
+            const drew = records.some((record) => [...record.addedNodes].some((node) => node instanceof Element && (node.matches('.placement') || node.querySelector('.placement') !== null)));
+            if (!drew) {
+              return;
+            }
+            const text = (selector) => document.querySelector(selector)?.textContent ?? null;
+            const hidden = (selector) => document.querySelector(selector)?.hidden ?? null;
+            rec.redraws.push({
+              dock: document.documentElement.dataset.filterDock ?? null,
+              dockScroll: document.querySelector('.filter-bar').scrollTop,
+              panelScroll: document.getElementById('filter-panel').scrollTop,
+              focus: document.activeElement?.id || document.activeElement?.getAttribute('data-group') || document.activeElement?.value || null,
+              railCount: text('.filter-rail-count-number'),
+              railCountHidden: hidden('.filter-rail-count'),
+              panelCount: text('#filter-panel .filter-count'),
+              panelClearHidden: hidden('#filter-panel .filter-clear'),
+              railClearHidden: hidden('.filter-rail-clear'),
+            });
+          }).observe(document, { childList: true, subtree: true });
+        })();
+        """;
+
+    /// <summary>Reads the same things the redraw recorder reads, as they stand now.</summary>
+    private const string ReadDockNowScript = """
+        () => {
+          const text = (selector) => document.querySelector(selector)?.textContent ?? null;
+          const hidden = (selector) => document.querySelector(selector)?.hidden ?? null;
+          return {
+            dock: document.documentElement.dataset.filterDock ?? null,
+            dockScroll: document.querySelector('.filter-bar').scrollTop,
+            panelScroll: document.getElementById('filter-panel').scrollTop,
+            focus: document.activeElement?.id || document.activeElement?.getAttribute('data-group') || document.activeElement?.value || null,
+            railCount: text('.filter-rail-count-number'),
+            railCountHidden: hidden('.filter-rail-count'),
+            panelCount: text('#filter-panel .filter-count'),
+            panelClearHidden: hidden('#filter-panel .filter-clear'),
+            railClearHidden: hidden('.filter-rail-clear'),
+          };
         }
         """;
 
@@ -208,6 +265,155 @@ public sealed class FilterDockFlowTests : CabinetPageTest
         (await Page.EvaluateAsync<double>("() => window.scrollY")).Should().Be(0, "with the cabinet's top in view a switch does not scroll");
         ConsoleErrors.Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task A_live_redraw_keeps_the_dock_as_it_is()
+    {
+        await Page.SetViewportSizeAsync(DockWidths.Push, ShortViewport);
+        var host = await OwnerHost.SyncAsync(factory => StartAsync(factory), SyntheticBggCollection.Create(60));
+        var places = await host.SeedAsync("Cabinet A", "Shelf B");
+
+        foreach (var game in host.Cards.DistinctBy(card => card.GameId).Take(30))
+        {
+            await host.PlaceAsync(game, places[1]);
+        }
+
+        await Page.AddInitScriptAsync(InstallRedrawRecorder);
+        await GotoCabinetAsync("/");
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
+        await OpenFilterPanelAsync();
+        await Page.Locator(PlayersFour).ClickAsync();
+        await Page.Locator("#filter-loc").SelectOptionAsync(places[1]);
+        await Expect(Page.Locator(Boxes + "[data-dim]").First).ToBeAttachedAsync();
+        await FoldFilterPanelAsync();
+
+        await Page.Locator(".filter-rail-button[data-group=\"players\"]").FocusAsync();
+        var folded = await RedrawAfterMovingALitGameAsync(host, places[0]);
+        folded.Dock.Should().Be("rail", "a redraw leaves the folded rail folded");
+        folded.Focus.Should().Be("players", "focus stays on the rail button");
+        folded.RailCountHidden.Should().BeFalse("the rail still shows the count while filtering");
+
+        await Page.Locator(".filter-rail .filter-menu").ClickAsync();
+        await Page.WaitForFunctionAsync("() => document.documentElement.dataset.filterDock === 'push'");
+        var pushedScroll = await ScrollTheDockAsync(".filter-bar");
+        await Page.Locator(PlayersFour).FocusAsync();
+        var pushed = await RedrawAfterMovingALitGameAsync(host, places[0]);
+        pushed.Dock.Should().Be("push", "a redraw leaves the pushed panel open");
+        pushed.DockScroll.Should().BeApproximately(pushedScroll, 1, "the panel keeps its own scroll position");
+        pushed.Focus.Should().Be("4", "focus stays on the chosen chip");
+        pushed.PanelClearHidden.Should().BeFalse("the panel's Clear stays while filtering");
+
+        await Page.SetViewportSizeAsync(DockWidths.Over, ShortViewport);
+        await Page.WaitForFunctionAsync("() => document.documentElement.dataset.filterDock === 'rail'");
+        await Page.Locator(".filter-rail .filter-menu").ClickAsync();
+        await Page.WaitForFunctionAsync("() => document.documentElement.dataset.filterDock === 'over' && history.state?.dock !== undefined");
+        await Page.WaitForFunctionAsync("() => document.getElementById('filter-panel').getAnimations().length === 0");
+        var overScroll = await ScrollTheDockAsync("#filter-panel");
+        await Page.Locator(PlayersFour).FocusAsync();
+        var over = await RedrawAfterMovingALitGameAsync(host, places[0]);
+        over.Dock.Should().Be("over", "the redraw ran while the fly-over was open, not after it folded");
+        over.PanelScroll.Should().BeApproximately(overScroll, 1, "the fly-over keeps its own scroll position");
+        over.Focus.Should().Be("4", "focus stays on the chosen chip inside the fly-over");
+        (await Page.Locator("#filter-panel").GetAttributeAsync("role")).Should().Be("dialog", "the fly-over is still modal");
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Removing_every_location_takes_the_location_controls_away()
+    {
+        await Page.SetViewportSizeAsync(DockWidths.Push, 900);
+        var host = await OwnerHost.SyncAsync(factory => StartAsync(factory), SyntheticBggCollection.Create(60));
+        var places = await host.SeedAsync("Cabinet A", "Shelf B");
+        var games = host.Cards.DistinctBy(card => card.GameId).Take(2).ToList();
+        await host.PlaceAsync(games[0], places[0]);
+        await host.PlaceAsync(games[1], places[1]);
+        await GotoCabinetAsync("/");
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
+        await OpenFilterPanelAsync();
+        await ChooseViewAsync(1);
+        await Expect(Page.Locator(Groups).First).ToBeAttachedAsync();
+        await Page.WaitForFunctionAsync("() => localStorage.getItem('cabinet-view') === 'location'");
+        await Expect(Page.Locator(".filter-rail-button[data-group=\"location\"]")).ToBeAttachedAsync();
+        await Expect(Page.Locator("#filter-panel .filter-view")).ToBeVisibleAsync();
+        await Expect(Page.Locator("#filter-panel .filter-location")).ToBeVisibleAsync();
+
+        await host.DeleteLocationAsync(places[0]);
+        await host.DeleteLocationAsync(places[1]);
+        host.TellOpenPages();
+
+        await Expect(Page.Locator(Groups)).ToHaveCountAsync(0, new LocatorAssertionsToHaveCountOptions { Timeout = 20000 });
+        (await Page.Locator("#cabinet .section").CountAsync()).Should().BeGreaterThan(0, "the cabinet shows all games together");
+        await Expect(Page.Locator("input[name=\"filter-view\"][value=\"all\"]")).ToBeCheckedAsync();
+        (await RenderedBoxesAsync(".filter-rail-button[data-group=\"location\"]")).Should().Be(0, "the Location rail button goes");
+        (await RenderedBoxesAsync("#filter-panel .filter-view")).Should().Be(0, "the View group goes");
+        (await RenderedBoxesAsync("#filter-panel .filter-location")).Should().Be(0, "the Location group goes");
+        (await DockStateAsync()).Should().Be("push", "the panel stays open");
+        (await Page.EvaluateAsync<string?>("() => localStorage.getItem('cabinet-view')")).Should().Be("location", "falling back to all together is not remembered");
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    /// <summary>
+    /// Moves one game the filters light out of the chosen place, tells the open page, and returns what the page showed in the task
+    /// that put the new boxes on the page. The game has no expansion, because a lit expansion box keeps its base game's entry in the
+    /// count. Before returning it checks that the rail's count, the panel's count line and the two Clear buttons already showed their
+    /// new state in that task: the numbers changed and they are the ones the page keeps afterwards.
+    /// </summary>
+    /// <param name="host">The running host.</param>
+    /// <param name="elsewhere">The location the game is moved to.</param>
+    /// <returns>The dock as it was when the redraw drew.</returns>
+    private async Task<DockReading> RedrawAfterMovingALitGameAsync(OwnerHost host, string elsewhere)
+    {
+        var lit = await Page.EvaluateAsync<int>("""
+            async () => {
+              const cards = (await (await fetch('/cabinet/cards?profile=desktop')).json()).cards;
+              const lit = new Set([...document.querySelectorAll('#cabinet .placement:not([data-dim]):not([data-kind="moreMarker"])')].map((box) => box.dataset.entryId));
+              return cards.find((card) => !card.isExpansion && card.expansions.length === 0 && lit.has(String(card.entryId))).gameId;
+            }
+            """);
+        var before = await ReadDockAsync(ReadDockNowScript);
+        await Page.EvaluateAsync("() => { window.__redraw.redraws.length = 0; }");
+
+        await host.PlaceAsync(host.Cards.First(card => card.GameId == lit), elsewhere);
+        host.TellOpenPages();
+
+        await Page.WaitForFunctionAsync("() => window.__redraw.redraws.length > 0", null, new PageWaitForFunctionOptions { Timeout = 20000 });
+        var json = await Page.EvaluateAsync<JsonElement>("() => window.__redraw.redraws[0]");
+        var drawn = JsonSerializer.Deserialize<DockReading>(json.GetRawText(), WebOptions)!;
+        var after = await ReadDockAsync(ReadDockNowScript);
+
+        drawn.RailCount.Should().NotBe(before.RailCount, "the rail's count changed with the redraw");
+        drawn.RailCount.Should().Be(after.RailCount, "the rail's count was already new when the boxes were drawn");
+        drawn.PanelCount.Should().NotBe(before.PanelCount, "the panel's count line changed with the redraw");
+        drawn.PanelCount.Should().Be(after.PanelCount, "the panel's count line was already new when the boxes were drawn");
+        drawn.RailClearHidden.Should().Be(after.RailClearHidden, "the rail's Clear was already right when the boxes were drawn");
+        drawn.PanelClearHidden.Should().Be(after.PanelClearHidden, "the panel's Clear was already right when the boxes were drawn");
+        drawn.Dock.Should().Be(after.Dock, "the dock did not change after the redraw either");
+
+        return drawn;
+    }
+
+    /// <summary>Scrolls the element that scrolls the open panel to a little below its top and returns where it came to rest.</summary>
+    /// <param name="scroller">The element that scrolls: the dock while the panel is pushed, the panel itself while it flies over.</param>
+    /// <returns>The scroll position.</returns>
+    private async Task<double> ScrollTheDockAsync(string scroller)
+    {
+        var position = await Page.Locator(scroller).EvaluateAsync<double>("(element) => { element.scrollTop = 120; return element.scrollTop; }");
+        position.Should().BeGreaterThan(0, "the panel is taller than the short viewport, so it scrolls inside itself");
+
+        return position;
+    }
+
+    private async Task<DockReading> ReadDockAsync(string script)
+    {
+        var json = await Page.EvaluateAsync<JsonElement>(script);
+
+        return JsonSerializer.Deserialize<DockReading>(json.GetRawText(), WebOptions)!;
+    }
+
+    private Task<int> RenderedBoxesAsync(string selector) =>
+        Page.EvaluateAsync<int>("(selector) => [...document.querySelectorAll(selector)].filter((element) => element.getClientRects().length > 0).length", selector);
 
     /// <summary>
     /// Compares two screenshots at points spread over the panel, leaving out the view switch itself (which is pressed) with a margin
@@ -369,6 +575,27 @@ public sealed class FilterDockFlowTests : CabinetPageTest
             box.GetProperty("right").GetDouble(),
             box.GetProperty("bottom").GetDouble());
     }
+
+    /// <summary>The dock and what it says, read in the page.</summary>
+    /// <param name="Dock">The dock's state: rail, push or over.</param>
+    /// <param name="DockScroll">How far the dock is scrolled inside itself.</param>
+    /// <param name="PanelScroll">How far the panel is scrolled inside itself.</param>
+    /// <param name="Focus">The focused element's id, rail group or value.</param>
+    /// <param name="RailCount">The number the rail's count shows.</param>
+    /// <param name="RailCountHidden">Whether the rail's count is hidden.</param>
+    /// <param name="PanelCount">The panel's count line.</param>
+    /// <param name="PanelClearHidden">Whether the panel's Clear is hidden.</param>
+    /// <param name="RailClearHidden">Whether the rail's Clear is hidden.</param>
+    private sealed record DockReading(
+        string? Dock,
+        double DockScroll,
+        double PanelScroll,
+        string? Focus,
+        string? RailCount,
+        bool? RailCountHidden,
+        string? PanelCount,
+        bool? PanelClearHidden,
+        bool? RailClearHidden);
 
     private sealed record MeasuredBox(string Id, double Span);
 

@@ -24,3 +24,10 @@ All passed on re-run. A red check that turns green on a re-run teaches people to
 ## Solution
 
 Find the waits that assume a fast machine: replace fixed timeouts and one-shot measurements with retrying assertions on the end state (dialog closed, section drawn, design applied), wait for the live-update connection to be up before publishing a look, and settle the Show on shelf landing on a stable layout (no layout shift for two frames) before measuring. Reproduce first by running the failing classes several times in a row with CPU throttling, and record the before and after failure rates.
+
+## Progress
+
+- **2026-10-18 (plan 07-40):** two of the tests on the list are hardened; the rest stays open.
+  - `FilterShowOnShelfTests.Show_on_shelf_lands_on_the_box_outlined`: the recorder no longer measures the landing in the same moment the outline is set. It measures once the found box's top has stayed the same for two animation frames, and it reads the veil on every frame while the box is marked until the fade has ended at 0, so a value caught in the 160 ms fade is never taken for the answer. The desktop landing now reads "below the viewport top" (the filters stand in the dock beside the cabinet).
+  - `LiveLookWebKitTests.A_design_change_keeps_the_section_in_the_middle_of_the_screen_where_it_was`: before publishing, the host sends the page the status it already shows until a spy on the page's live client has heard it, which proves a push gets through from end to end at that moment (a server that still counts the connection did not prove that: a page drawing 400 games can keep its main thread busy long enough for the connection to drop and come back). After the save the quiet period is let pass on the fake clock again, a bounded number of times, until the design is on the page, and the end state is read with retrying assertions.
+  - Still open: card dialogs that did not close in time, `BackButtonTests`, `SheetDragTests`, `CardSyncTests`, the sample-400 first draw in `DefaultLookIdentityTests`, and `LiveLookTests`.
