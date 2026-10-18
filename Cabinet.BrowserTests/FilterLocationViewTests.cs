@@ -9,9 +9,11 @@ using Microsoft.Playwright;
 namespace Cabinet.BrowserTests;
 
 /// <summary>
-/// Proves in a real browser that the view switch at the start of the filter bar draws one named cabinet per storage location, that the
-/// numbers on screen add up across those cabinets, that the keyboard walks from one cabinet into the next, and that a live redraw keeps
-/// the view. The switch stays hidden while the owner has no locations, and at rest only the segment of the view on screen is filled.
+/// Proves in a real browser that the view switch, the first group in the open filter panel after the search field and the count line,
+/// draws one named cabinet per storage location, that the numbers on screen add up across those cabinets, that the keyboard walks from
+/// one cabinet into the next, and that a live redraw keeps the view. The switch stays hidden while the owner has no locations, and at
+/// rest only the segment of the view on screen is filled. On a desktop the switch and the other controls are reached by opening the
+/// panel; below the desktop width they are in the Filters sheet.
 /// </summary>
 [Trait("Category", "Browser")]
 public sealed class FilterLocationViewTests : CabinetPageTest
@@ -39,9 +41,12 @@ public sealed class FilterLocationViewTests : CabinetPageTest
         groups.Should().HaveCountGreaterThan(1);
         await ExpectViewSwitchAvailableAsync();
 
-        if (width >= 1024)
+        if (width >= DockWidths.NarrowestDesktop)
         {
-            (await Page.EvaluateAsync<bool>("() => document.querySelector('.filter-bar').firstElementChild.firstElementChild.classList.contains('filter-view')")).Should().BeTrue("the switch is first in the bar");
+            await OpenFilterPanelAsync();
+            (await Page.EvaluateAsync<string[]>(PanelOrder)).Take(3).Should().Equal(["search", "count", "view"], "the switch is the first group in the panel, after the search field and the count line");
+            (await Page.EvaluateAsync<bool>("() => document.querySelector('#filter-panel .filter-panel-groups').firstElementChild.classList.contains('filter-view')")).Should().BeTrue("the switch opens the panel's groups");
+            await FoldFilterPanelAsync();
         }
 
         await Expect(Page.Locator("input[name=\"filter-view\"][value=\"all\"]")).ToBeCheckedAsync();
@@ -82,6 +87,7 @@ public sealed class FilterLocationViewTests : CabinetPageTest
         var cards = await LoadFamilyCardsAsync("desktop");
         var groups = ExpectedGroups(document);
         await Page.EvaluateAsync(RecordFiltered);
+        await OpenFilterPanelAsync();
 
         await ChooseViewAsync(1);
 
@@ -114,7 +120,7 @@ public sealed class FilterLocationViewTests : CabinetPageTest
 
         await Page.Locator(".filter-clear").ClickAsync();
 
-        await Expect(Page.Locator(".filter-count")).ToHaveTextAsync(string.Empty);
+        await Expect(Page.Locator(".filter-count")).ToHaveTextAsync($"{resting.Total} games");
         (await ReadAsync<Filtered>("() => window.__filtered")).Total.Should().Be(headingTotal);
         ConsoleErrors.Should().BeEmpty();
     }
@@ -155,6 +161,7 @@ public sealed class FilterLocationViewTests : CabinetPageTest
             return perGroup.Any(lit => lit == 0) && perGroup.Any(lit => lit > 0);
         });
         var litPerGroup = LitByGroup(document, FilterBarTests.ExpectedLit(cards, players, null));
+        await OpenFilterPanelAsync();
         await ChooseViewAsync(1);
         await Expect(Page.Locator(Groups)).ToHaveCountAsync(groups.Count);
         var mutedColour = await ColourOfAsync("--room-muted");
@@ -351,6 +358,7 @@ public sealed class FilterLocationViewTests : CabinetPageTest
 
         await GotoCabinetAsync("/");
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await OpenFilterPanelAsync();
 
         await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
         await Expect(Page.Locator(Switch)).ToBeHiddenAsync();
@@ -363,6 +371,7 @@ public sealed class FilterLocationViewTests : CabinetPageTest
     {
         await OpenSampleAsync(1280, 900);
         await ExpectViewSwitchAvailableAsync();
+        await OpenFilterPanelAsync();
         await RestAsync();
 
         var atRest = await ReadBarAsync();
@@ -464,6 +473,26 @@ public sealed class FilterLocationViewTests : CabinetPageTest
         }
         """;
 
+    private const string PanelOrder = """
+        () => {
+          const panel = document.querySelector('#filter-panel');
+          const units = [
+            ['search', '#filter-q'],
+            ['count', '.filter-count'],
+            ['note', '.filter-note'],
+            ['view', '.filter-view'],
+            ['players', 'fieldset[data-filter="players"]'],
+            ['time', 'fieldset[data-filter="time"]'],
+            ['location', '.filter-location'],
+          ];
+          return units
+            .map(([name, selector]) => [name, panel.querySelector(selector)])
+            .filter(([, element]) => element !== null && element.getClientRects().length > 0)
+            .sort(([, a], [, b]) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) ? -1 : 1)
+            .map(([name]) => name);
+        }
+        """;
+
     private const string ReadBar = """
         () => {
           const alphaOf = (colour) => {
@@ -511,7 +540,8 @@ public sealed class FilterLocationViewTests : CabinetPageTest
     private async Task RestAsync()
     {
         await Page.EvaluateAsync("() => { window.scrollTo(0, 0); document.activeElement?.blur(); }");
-        await Page.Mouse.MoveAsync(5, 700);
+        var viewport = Page.ViewportSize!;
+        await Page.Mouse.MoveAsync(viewport.Width - 5, viewport.Height - 5);
         await Page.EvaluateAsync("() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
     }
 

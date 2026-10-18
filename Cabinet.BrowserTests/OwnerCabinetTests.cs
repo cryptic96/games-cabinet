@@ -78,19 +78,23 @@ public sealed class OwnerCabinetTests : CabinetPageTest
     }
 
     [Fact]
-    public async Task The_bar_sits_below_the_strip_and_tags_stay_above_the_shadow()
+    public async Task The_strip_stands_beside_the_rail_and_tags_stay_above_the_shadow()
     {
         var host = await StartHostAsync();
         var dimmed = host.Card(CafeBase);
-        await Page.SetViewportSizeAsync(1440, 900);
+        await Page.SetViewportSizeAsync(DockWidths.Push, 900);
 
         await GotoOwnerCabinetAsync();
         await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
+        await Expect(Page.Locator(".filter-rail")).ToBeVisibleAsync();
 
+        (await Page.Locator(".owner-bar[data-variant=\"strip\"]").EvaluateAsync<bool>("(strip) => strip.closest('header') !== null")).Should().BeTrue("the owner strip stays in the header");
         var strip = await RectOf(".owner-bar[data-variant=\"strip\"]");
-        var bar = await RectOf(".filter-bar");
-        bar.Top.Should().BeGreaterThanOrEqualTo(strip.Bottom - 0.5, "the filter bar sits below the owner strip");
+        var rail = await RectOf(".filter-rail");
+        strip.Left.Should().BeGreaterThanOrEqualTo(rail.Right, "the owner strip stands in the page column, right of the rail");
+        (await Page.EvaluateAsync<int>(DockPartsAboveTheCabinet)).Should().Be(0, "nothing of the filter dock sits above the cabinet");
 
+        await OpenFilterPanelAsync();
         await Page.Locator("#filter-q").FillAsync(QuarryBase);
         var box = Box(dimmed);
         await Expect(box).ToHaveAttributeAsync("data-dim", string.Empty);
@@ -501,6 +505,17 @@ public sealed class OwnerCabinetTests : CabinetPageTest
         sizes.Should().OnlyContain(size => size >= 8 && size <= 12);
         await SaveScreenshotAsync($"owner-cabinet-synced-{games}-{width}");
     }
+
+    private const string DockPartsAboveTheCabinet = """
+        () => {
+          const cabinet = document.querySelector('#cabinet').getBoundingClientRect();
+          return [...document.querySelectorAll('.filter-bar, .filter-bar *')]
+            .map((element) => element.getBoundingClientRect())
+            .filter((rect) => rect.width > 0 && rect.height > 0)
+            .filter((rect) => rect.bottom <= cabinet.top + 0.5 && rect.right > cabinet.left + 0.5 && rect.left < cabinet.right - 0.5)
+            .length;
+        }
+        """;
 
     private async Task<RectReading> RectOf(string selector)
     {
