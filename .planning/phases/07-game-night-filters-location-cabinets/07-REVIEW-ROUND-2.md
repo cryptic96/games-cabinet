@@ -1,10 +1,10 @@
 # Review round 2: the filter rail and panel, built
 
-Status: DRAFT. The build round wrote this draft from the frames and the measurements. A senior-frontend Critic pass by the orchestrator comes next; its findings, any fixes and "Your questions" are added after it, before you see anything.
+Status: FINAL. The build round wrote this from the frames and the measurements; a separate senior-frontend Critic pass then looked at every frame, three defects it found were fixed and re-shot, and the questions for you are at the end ("Your questions"). Replying "all recommended" is a valid answer.
 
 Reviewed commit: 3de48e4aec9297d858b125d1faee5785b221f988
 
-That is the milestone branch's commit the whole suite ran on, with a clean tree, and the commit every frame was shot on (the footer of the full-page frames reads `3de48e4`). Nothing outside the planning folder changed after it in this step.
+That is the milestone branch's commit the whole suite ran on, with a clean tree, and the commit most frames were shot on (the footer of the full-page frames reads `3de48e4`). After the Critic pass three small fixes changed two stylesheets and two browser tests (see "Critic findings"); the eight frames they affect were shot again on the fixed build (their footer reads `92b3cff`, the build before the fix commits, with the fixed stylesheets in place) and the affected test groups ran again (see "After the fixes" below).
 
 Everything in the pictures is invented: the 65 and 400 sample collections, plus a local synthetic set (the fake BGG collection of 65 entries synced into a local host, with the invented places Cabinet A, Shelf B and Lent out, a game owned twice with one copy in each of Cabinet A and Shelf B, an expansion stored on Shelf B while its base game is in Cabinet A, one game Lent out and 14 games left unplaced). The filling message comes from a second local host that has never synced. `ui-refs/build-round-2/frames.tsv` lists every picture with the address the screenshot script drove (always 127.0.0.1) and its source; every frame was looked at before it was marked `viewed`.
 
@@ -15,7 +15,8 @@ Everything in the pictures is invented: the 65 and 400 sample collections, plus 
 - R1 to R7 are the values you may still tune by sight, with the recommended default.
 - P1 is the speed check of opening and folding the pushed panel. T1 is the side-by-side table of every new English and Dutch text.
 - C items are things the checks forced during the build; N items are notes from the build.
-- Critic findings and "Your questions" follow after the Critic pass.
+- D1 to D3 are the defects the Critic pass found and that are now fixed; K1 to K4 are its taste calls, which are yours to decide.
+- "Look at these first" lists the 14 frames that tell most of the story. "Your questions" lists every question by label with the recommended answer.
 
 ## Automated results
 
@@ -31,6 +32,21 @@ Everything in the pictures is invented: the 65 and 400 sample collections, plus 
 | Repository lint (repo rules, workflows, shell, secrets history, script tests) | all five passed |
 | Owner routes check | passed |
 
+### After the fixes
+
+The fixes touched the rail's Clear, the view switch's focus ring and the filling note, so the groups that cover them ran again on the final commit:
+
+| Check (final commit `d869435`) | Result |
+|---|---|
+| Unit tests | 2943 passed |
+| Page script tests (node) | 763 passed |
+| Browser tests of the filters (`Filter…`), normal fonts and the wide CI font | 198 passed in each (the 196 of before plus the two new filling-note cases) |
+| Browser tests of the look (`Look…`), normal fonts and the wide CI font | 191 passed in each |
+| Default-look identity check, both fonts | 5 passed in each |
+| Repository lint (repo rules, workflows, shell, secrets history, script tests) | all five passed |
+
+The two new checks were seen to fail on the build before the fixes (the rail's Clear read transparent; the note's centre was 344 px against the cabinet's 720 px) and pass after.
+
 No policy (CSP) violation and no sideways scrolling at 1024, 1280, 1440 and 1920 px with the rail, the pushed panel and the fly-over, in English and Dutch, plus 390 and 320 px, are proved by the access tests, which passed in both runs. The screenshot script also measured no sideways scroll on every desktop frame it took (0 px of overflow).
 
 ## M items: the screenshots
@@ -38,7 +54,7 @@ No policy (CSP) violation and no sideways scrolling at 1024, 1280, 1440 and 1920
 All shot with the wide-font configuration CI uses, desktop frames at 1 device pixel per CSS pixel and 900 px tall, phone frames at 2 device pixels per CSS pixel (390 by 844, touch), focus crops at 2 device pixels per CSS pixel so the ring can be judged. Filtering means players 4 and max. minutes 60 unless said otherwise; on the 65 sample that is "11 of 52 games".
 
 - **M1, the rail at rest on a first visit (AM-15 item 1).** `M1-rail-rest-…` at 1280 and 1440 on the four variants (Brown and Birch, by day and lit): 8 frames. Empty storage, as a first visitor has it: the dock is the folded rail, the cabinet starts 88 px from the edge (24 px from the rail), and no chip, search field, select or view switch is visible. Sections measure 35.75rem at 1280 and 40rem at 1440. Look at first: `M1-rail-rest-brown-day-1440-en.png`, `M1-rail-rest-birch-day-1440-en.png`. Tuning rows: R1, R2.
-- **M2, the rail while filtering (AM-15 item 2).** `M2-rail-filtering-{wall}-{day|lit}-1440-{en|nl}-crop`: the rail and the start of the cabinet on all five walls (brown, walnut, oak, birch, mahogany), by day and lit, English and Dutch (20 crops): filled Players and Max. minutes buttons, the two-line count "11 / of 52" ("van 52") and the icon Clear. `M2-rail-zero-brown-day-1440-en` and `M2-rail-zero-birch-lit-1440-en`: zero matches ("0 / of 52"). `M2-rail-van400-brown-day-1440-nl-crop`: the 400 sample in Dutch, where the second line reads "van 342" (the 400 sample has 342 list entries) and wraps at its space onto two lines, never clipped. 23 frames. Look at first: the brown and birch day crops in both languages and the two zero frames (see "What I noticed": the rail Clear at zero matches).
+- **M2, the rail while filtering (AM-15 item 2).** `M2-rail-filtering-{wall}-{day|lit}-1440-{en|nl}-crop`: the rail and the start of the cabinet on all five walls (brown, walnut, oak, birch, mahogany), by day and lit, English and Dutch (20 crops): filled Players and Max. minutes buttons, the two-line count "11 / of 52" ("van 52") and the icon Clear. `M2-rail-zero-brown-day-1440-en` and `M2-rail-zero-birch-lit-1440-en`: zero matches ("0 / of 52"), the rail's Clear now in the inverted fill (re-shot after D1). `M2-rail-van400-brown-day-1440-nl-crop`: the 400 sample in Dutch, where the second line reads "van 342" (the 400 sample has 342 list entries) and wraps at its space onto two lines, never clipped. 23 frames. Look at first: the brown and birch day crops in both languages and the two zero frames (see "What I noticed": the rail Clear at zero matches).
 - **M3, the panel pushing the cabinet (AM-15 item 3).** `M3-push-rest-…` and `M3-push-filtering-…` at 1440 and 1920, English and Dutch, Brown by day (8): at rest the count line reads "52 games" muted, filtering "11 of 52 games" strong. `M3-push-filtering-s400-brown-day-1920-en`: the 400 sample with two full 40rem sections. `M3-push-filtering-{brown-lit,birch-day,birch-lit}-1440-en`: the other three variants. 12 frames. The page column starts at 360 px in every pushed frame (the panel's 336 px plus 24 px). Look at first: `M3-push-rest-brown-day-1440-en.png`, `M3-push-filtering-birch-day-1440-en.png`.
 - **M4, the fly-over (AM-15 item 4).** `M4-flyover-filtering-…` at 1280 in English and Dutch on Brown by day, at 1024 on Brown by day, and at 1280 on the other three variants; two crops of the shadow edge at 1280 on Brown and Birch by day (`M4-flyover-shadow-edge-…-crop`). 8 frames. The panel lies over the start of the cabinet on the wall's own fill, with no scrim, and the uncovered cabinet stays live. Tuning row: R4.
 - **M5, the column rule and the legibility question (AM-15 item 5; decides L1).** `M5-push-s65-…` and `M5-push-s400-…` pushed at 1440 on both samples, English and Dutch, the four variants (16): two sections of 32.25rem each. `M5-label-smallest-spine-…-crop` and `M5-label-smallest-cover-…-crop`, pushed at 1440 on the 400 sample, English and Dutch, Brown by day (4): the thinnest base-game spine on the page (13 by 50 px) and the smallest generated cover (38 by 48 px), each at true size (1 device pixel per CSS pixel, the worst case). `M5-push-s400-brown-day-1680/1920/2304-en` (3): 39.75rem, 40rem and three of 39rem. `M5-folded-s400-brown-day-1280/1920-en` (2): folded, 35.75rem two columns and 36.67rem three columns. 25 frames. Every measured width matches the contract's worked values. Look at first: `M5-push-s400-brown-day-1440-en.png` next to `M5-folded-s400-brown-day-1920-en.png`, then the four label crops.
@@ -46,20 +62,20 @@ All shot with the wide-font configuration CI uses, desktop frames at 1 device pi
 - **M7, By location and Show on shelf (AM-15 item 7).** `M7-by-location-push-s400-…` pushed at 1440 on the 400 sample, the four variants (4): the location cabinets follow the room (32.25rem sections). `M7-show-on-shelf-push-brown-day-1440-en` and `M7-show-on-shelf-rail-brown-day-1440-en` (2): a card opened, Show on shelf pressed, the found box outlined with the 3 px furniture ring; with the panel pushed the box lands at x 829 (the panel ends at 336), with the rail at x 678 (the rail ends at 64), both well inside the 900 px window. 6 frames.
 - **M8, the view switch mid-fade with the fly-over open (AM-15 item 8).** `M8-view-switch-mid-fade-flyover-…` at 1280, the four variants (4). The browser's animation clock was slowed 12 times through the developer protocol (the shipped CSS is unchanged) and each frame was taken about 800 ms after pressing "By location", while the page reported the switch still running. The fading cabinet sits behind the panel; the panel stays sharp and on top.
 - **M9, a returning visitor remembered open (AM-15 item 9).** `M9-returning-first-paint-…` and `M9-returning-settled-…` at 1440, the four variants (8), plus the same pair at 1280 on Brown by day (2). For the first-paint frame the page scripts were held back, so it shows what the browser paints before any page script runs: the head script has already reserved the 21rem column at 1440 (the title starts at 360 px) and the 4rem rail column at 1280 (88 px); the cabinet and the dock's contents are not drawn yet. In the settled frame the title and the cabinet start at exactly the same x (360 at 1440, 88 at 1280): no sideways jump. 10 frames.
-- **M10, focus states (AM-15 item 10).** Crops on Brown and Birch by day: both three-line buttons (rail and panel head), the four rail buttons, the rail Clear, the panel Clear, the search field, a chip ("4", chosen), a view segment ("By location") and the location select. 24 crops, `M10-focus-…`. Every ring is the wall's 2 px ring 2 px outside the control.
+- **M10, focus states (AM-15 item 10).** Crops on Brown and Birch by day: both three-line buttons (rail and panel head), the four rail buttons, the rail Clear, the panel Clear, the search field, a chip ("4", chosen), a view segment ("By location") and the location select. 24 crops, `M10-focus-…`. Every ring is the wall's 2 px ring 2 px outside the control. The two `M10-focus-view-segment-…` crops were re-shot after D3: a band of the wall colour now keeps the ring whole where it passes the chosen "All together" segment.
 - **M11, forced colours (AM-15 item 11).** `M11-rail-filtering-forced-day-1440-en`, `M11-push-filtering-forced-day-1440-en`, `M11-flyover-filtering-forced-day-1280-en`: the dock's edge as a 1 px system line, the filled rail buttons and chosen chips with the system outline, the dimmed boxes outlined and greyed. 3 frames.
 - **M12, reduced motion (AM-15 item 12).** `M12-flyover-reduced-motion-…` at 1280, the four variants (4): each taken right after pressing the rail's three-line button, with no wait; the panel is already fully in place (its left edge measured 0, no running animation).
 - **M13, the phone with the new button symbol (AM-15 item 13).** At 390: `M13-phone-rest-…` (the three-line symbol and "Filters", nothing filter-related open), `M13-phone-filtering-…` (the symbol and a filled "2", the word hidden, one row: search, button, "11 of 52" / "11 van 52", Clear), `M13-phone-zero-…` ("0 of 52", highlighted Clear; the search holds "zzzzqqqq", so the filled count reads "1"); `M13-phone-filtering-brown-day-320-…` (the status wraps to a second row, the designed fallback); `M13-phone-filtering-brown-day-768-…` (a tablet: the word "Filters" shows next to the filled "2"); `M13-phone-sheet-open-…` (the sheet up, "Show 11 games" / "Toon 11 spellen"). All in English and Dutch on Brown by day (12), plus `M13-phone-filtering-{brown-lit,birch-day,birch-lit}-390-en` (3). 15 frames.
 - **M14, the owner address (AM-15 item 14).** `M14-owner-rail-filtering-…` at 1440 on the local synthetic set, the four variants (4): the rail at the edge, the owner strip ("14 games are not placed yet") in the page column beside it, filtering ("30 / of 53" on this set).
-- **M15, the filling message (AM-15 item 15).** `M15-filling-…` at 1440 on a host that has never synced, the four variants (4): no rail and no column; the page starts 24 px from the edge.
+- **M15, the filling message (AM-15 item 15).** `M15-filling-…` at 1440 on a host that has never synced, the four variants (4): no rail and no column; the page starts 24 px from the edge. Re-shot after D2: the two lines of the note now stand centred over the empty cabinet.
 
 Counts: M1 8, M2 23, M3 12, M4 8, M5 25, M6 6, M7 6, M8 4, M9 10, M10 24, M11 3, M12 4, M13 15, M14 4, M15 4: 156 frames.
 
 ### What I noticed while shooting (my own look, before the Critic's)
 
-- **The rail's Clear is not highlighted at zero matches.** AM-4 (FIXED) says the rail's icon Clear is "highlighted (inverted fill) at zero matches", like the panel's text Clear and the phone's icon Clear. In `M2-rail-zero-brown-day-1440-en.png` and `M2-rail-zero-birch-lit-1440-en.png` it stays outlined and transparent. The page does set the marker (`data-highlighted`), but the dock block's own rule for the rail buttons (`html[data-filter-dock] .filter-rail-clear { background: transparent; color: … }`) is more specific than the shared highlight rule (`.filter-rail-clear[data-highlighted]`), so the highlight never paints. The panel's Clear (M3 is not at zero, but a probe at zero confirmed its inverted fill) and the phone's (`M13-phone-zero-…`) are fine. The browser test checks only the marker, not the colour. Not fixed in this step (the frames are of the reviewed commit); for the Critic.
+- **The rail's Clear is not highlighted at zero matches.** AM-4 (FIXED) says the rail's icon Clear is "highlighted (inverted fill) at zero matches", like the panel's text Clear and the phone's icon Clear. In `M2-rail-zero-brown-day-1440-en.png` and `M2-rail-zero-birch-lit-1440-en.png` it stays outlined and transparent. The page does set the marker (`data-highlighted`), but the dock block's own rule for the rail buttons (`html[data-filter-dock] .filter-rail-clear { background: transparent; color: … }`) is more specific than the shared highlight rule (`.filter-rail-clear[data-highlighted]`), so the highlight never paints. The panel's Clear (M3 is not at zero, but a probe at zero confirmed its inverted fill) and the phone's (`M13-phone-zero-…`) are fine. The browser test checks only the marker, not the colour. Fixed after the Critic pass: D1.
 - **Lit on Birch barely differs from day in stills.** On the light Birch back the lamp's pool is faint; `M13-phone-filtering-birch-lit-390-en.png` and `M15-filling-birch-lit-1440-en.png` look almost the same as their day frames. This is the shipped lamp, not something this rework changed.
-- **The filling message and the empty cabinet do not share a centre line** (`M15-filling-brown-day-1440-en.png`): the two lines of text are centred in a narrower block at the left, the empty cabinet is centred further right. With no dock the page is as before the rework; whether it was always so I did not check.
+- **The filling message and the empty cabinet do not share a centre line** (`M15-filling-brown-day-1440-en.png`): the two lines of text are centred in a narrower block at the left, the empty cabinet is centred further right. Fixed after the Critic pass: D2 (it was already like this in the released version).
 - The 400 sample's rail second line reads "van 342", not "van 400", because the count is of list entries; it wraps at its space as the contract allows (M2).
 - The fly-over panel does not scroll in a 1280 by 720 window (its content is 576 px); the extra 520 px frame shows it does scroll when it has to (M6).
 - In the M8 frames the panel's count reads "61 games" in By location against "52 games" all together, the count difference you already chose to keep in round 1 (K5).
@@ -138,3 +154,55 @@ Marked "decided as described" when it is how the build works and nothing is aske
 - **N8, the remembered panel.** On a screen 1440 px or wider the open or folded panel is remembered on this device; a first visit starts folded; below 1440 px the page always loads with the rail and nothing is remembered from there. Decided as described (M9).
 - **N9, Show on shelf with the rail folded.** With the rail folded the cabinet is wider and the page shorter, so the page can end before the last location's heading reaches the top of the window; the found box still lands inside the window. Decided as described.
 - **N10, the 400 sample counts 342.** The rail's "van 342" on the 400 sample is the number of list entries, the same number the count line and the screen-reader list use. Decided as described.
+
+## Critic findings
+
+A separate senior-frontend Critic pass (the orchestrator's own, not the build's) looked at all 156 frames against the cue list: one light above and slightly left, a box in shadow stays solid with its lit rim, the lamp never lifts the shadow, the filter controls are wall chrome, headings are signs on the wall, and your rule that no filter option shows by default. Your rule holds everywhere (`M1-…`, `M13-phone-rest-…`). It found three defects, now fixed, and four taste calls for you.
+
+### Defects, fixed
+
+- **D1, the rail's Clear was not highlighted at zero matches.** The contract says the Clear is drawn in the inverted wall fill when nothing matches, as the panel's Clear and the phone's Clear already were. On the rail the fill never painted, because the rail's own rule cleared it. Fixed: the highlight is now stated as strongly as that rule, and the rail test now reads the painted colour at zero matches, not only the marker (it failed before the fix and passes after). Commit `31fabd6`. Re-shot: `M2-rail-zero-brown-day-1440-en.png`, `M2-rail-zero-birch-lit-1440-en.png`.
+- **D2, the "cabinet is being filled" note sat off-centre.** Its two lines were centred in a 40rem block at the left of the page, about 376 px left of the empty cabinet's centre at 1440 px. **Not a regression:** the released version 0.9.0 showed it in exactly the same place (checked by running that version on a host that had never synced: note centre 344 px, cabinet centre 720 px). Fixed anyway, because it is the first thing a new owner sees: the note now centres itself in the page column, over the cabinet. A browser test now checks that the note's centre is within 3 px of the cabinet's at 1440 and 390 px (it failed at 1440 before the fix). Commit `f517e55`. Re-shot: the four `M15-filling-…` frames.
+- **D3, the focused view segment lost its ring on one side.** With "By location" focused, the left edge of its ring lay over the dark fill of the chosen "All together" segment, dark on dark on Birch, so the ring showed on three sides only. Fixed: a band of the wall colour under the ring and 2 px beyond it now separates the ring from the filled neighbour; the ring itself is unchanged. Commit `d869435`. Re-shot: `M10-focus-view-segment-brown-day-1440-en-crop.png`, `M10-focus-view-segment-birch-day-1440-en-crop.png`.
+
+All three fixes only touch values the contract leaves open (fills, a separation band, a margin); no fixed rule changed, and the contrast, ring and access tests passed again.
+
+### Taste calls, for you
+
+- **K1, label size at 1440 px with the panel open (the same question as L1).** With the panel pushed, the two sections are 32.25rem. In the label crops (`M5-label-smallest-spine-push-s400-brown-day-1440-en-crop.png`, `M5-label-smallest-cover-push-s400-brown-day-1440-en-crop.png`) the smallest spine and cover still read; titles are cut a few letters sooner than when folded. A: keep the push from 1440 px (built). B: push only from 1600 px (sections 37.25rem) and let the panel fly over below that. Critic: A, because the loss is a few letters on the narrowest boxes and pushing keeps the panel and the cabinet side by side on the most common desktop width.
+- **K2, the rail's resting icons on the dark walls.** The unfilled rail icons (search, players, time, location) are quiet on purpose; on Brown and Mahogany by day they read as decoration more than as buttons (`M1-rail-rest-brown-day-1440-en.png`). A: keep them quiet; the filled state carries the meaning (built). B: give each resting icon button a thin outline in the wall's line colour, like the three-line button. Critic: A.
+- **K3, the fly-over's edge on the dark walls.** On Brown the fly-over's shadow is subtle and its edge reads mostly by the hairline (`M4-flyover-shadow-edge-brown-day-1280-en-crop.png`), as you chose in the design round. A: keep (built). B: a stronger shadow. Critic: A.
+- **K4, the counts differ between the views** (61 games By location against 52 all together, `M7-…`, `M8-…`). You already decided to keep this in round 1 (K5 there). Mentioned only; no question.
+
+The Critic's smaller notes match "What I noticed" above: the phone's slim bar at 320 px wraps the count and Clear onto a second row while filtering (the designed fallback, N1 is the same one width up), a returning visit keeps the title still (M9), and lit on Birch differs little from day in stills.
+
+## Look at these first
+
+Fourteen frames that tell most of the story, in this order (the three marked "re-shot" show the fixes):
+
+1. `M1-rail-rest-brown-day-1440-en.png`: the page on a first visit, the folded rail, no option visible.
+2. `M1-rail-rest-birch-day-1440-en.png`: the same on the light wall.
+3. `M2-rail-filtering-brown-day-1440-en-crop.png`: the rail while filtering: filled buttons, "11 / of 52", the Clear.
+4. `M2-rail-zero-brown-day-1440-en.png` (re-shot, D1): nothing matches, the Clear in the inverted fill.
+5. `M3-push-rest-brown-day-1440-en.png`: the panel open beside the cabinet.
+6. `M3-push-filtering-birch-day-1440-en.png`: the panel while filtering, on Birch.
+7. `M4-flyover-filtering-brown-day-1280-en.png`: below 1440 px the panel lies over the cabinet.
+8. `M4-flyover-shadow-edge-brown-day-1280-en-crop.png`: its edge on Brown (K3).
+9. `M5-push-s400-brown-day-1440-en.png`: the 400 sample with the panel pushed at 1440 px (L1 and K1).
+10. `M5-label-smallest-spine-push-s400-brown-day-1440-en-crop.png`: the thinnest spine at true size (L1 and K1).
+11. `M5-label-smallest-cover-push-s400-brown-day-1440-en-crop.png`: the smallest cover at true size (L1 and K1).
+12. `M10-focus-view-segment-birch-day-1440-en-crop.png` (re-shot, D3): the keyboard ring whole beside the chosen segment.
+13. `M13-phone-filtering-brown-day-390-en.png`: the phone while filtering, the new button with its filled count.
+14. `M15-filling-brown-day-1440-en.png` (re-shot, D2): before the first sync, the note centred over the empty cabinet.
+
+## Your questions
+
+Each has a recommended answer; "all recommended" is a valid reply.
+
+- **L1 / K1, label size with the panel open at 1440 px.** Keep the push from 1440 px with two 32.25rem sections, or push only from 1600 px and let the panel fly over below that? **Recommended: keep the push from 1440 px.** Look at frames 9 to 11.
+- **K2, the rail's resting icons on the dark walls.** Keep them quiet, or give each a thin outline? **Recommended: keep them quiet.** Look at frame 1.
+- **K3, the fly-over's edge on the dark walls.** Keep the subtle shadow and hairline, or make the shadow stronger? **Recommended: keep.** Look at frame 8.
+- **R1 to R7, the values you may tune by sight** (rail padding and gaps, the edge hairline, the hover wash, the fly-over shadow, the head button's position, the panel's gaps, the phone's 30rem rule). **Recommended: keep all as built.** Name any you want changed.
+- **N1, the Dutch slim bar at 360 px while filtering** wraps onto a second row under the wide test font. **Recommended: leave it and check it on a real phone in the device round.**
+- **N5, the browser tests that still sometimes fail on CI.** **Recommended: harden them as a separate change, not in this round.**
+- **T1, the new Dutch texts** (the table above). **Recommended: approve as written.**
