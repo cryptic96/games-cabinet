@@ -7,7 +7,8 @@
  * width, so the last section is as wide as the others. The row stops growing at three full columns, so a very wide
  * screen gets margins instead of a fourth column. Sections stand on the bottom of their row, so when balancing leaves one
  * section a shelf row shorter than its neighbour, the feet of every piece in the row share one line and the floor reads
- * as one floor with gaps.
+ * as one floor with gaps. The cabinet takes no part in the browser's own scroll anchoring: when the filter panel opens or folds
+ * beside it and resizes it, the page keeps the reader's place itself, so the browser must not correct the scroll a second time.
  */
 .cabinet {
   --column-gap: 24px;
@@ -21,6 +22,7 @@
   width: 100%;
   max-width: 123rem;
   margin-inline: auto;
+  overflow-anchor: none;
 }
 
 .cabinet > .cabinet-message {
