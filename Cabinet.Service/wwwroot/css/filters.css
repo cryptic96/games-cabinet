@@ -395,10 +395,15 @@
   font-weight: 600;
 }
 
+/**
+ * The focused segment's ring stands 2px outside it, and a band of the wall colour lies under the ring and 2px beyond it, so the ring
+ * stays whole where it crosses the filled neighbour.
+ */
 .filter-view-segment:has(input:focus-visible) {
   z-index: 2;
   outline: 2px solid var(--room-ring, var(--wood-light));
   outline-offset: 2px;
+  box-shadow: 0 0 0 6px var(--room, var(--wood-dark));
 }
 
 @media (forced-colors: active) {
