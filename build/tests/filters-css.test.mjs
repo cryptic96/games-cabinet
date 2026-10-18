@@ -695,3 +695,174 @@ test('a selector is matched to its subject, and a media block below the dock wid
   assert.equal(onlyBelowDock('@media (prefers-reduced-motion: reduce)'), false);
   assert.equal(onlyBelowDock('@media (width < 64rem), print'), false);
 });
+
+/** The hairline at the inline end of the rail and the panel: the line colour at 40% over nothing, a token blend and never a literal. */
+const HAIRLINE = 'color-mix(in srgb, var(--room-line) 40%, transparent)';
+
+/**
+ * The rules of the filter sheet that only apply while the page has a desktop dock, in normal colours: under forced colours the
+ * system draws the colours and the contrast pairs do not apply.
+ */
+const dockRules = scopedRules(filters).filter(
+  (rule) => /html\[data-filter-dock/.test(rule.selector) && !rule.conditions.some((condition) => /forced-colors/.test(condition)),
+);
+
+/**
+ * Splits a shadow value into its layers: a comma outside brackets separates them.
+ * @param {string} value The value of a box-shadow declaration.
+ * @returns {string[]}
+ */
+function shadowLayers(value) {
+  return selectorsOf(value);
+}
+
+/**
+ * Lists what is wrong with the hairlines a shadow value draws: every layer drawn as a one pixel line inside the inline end has to be
+ * the line token blended at 40% over nothing, with no colour of its own.
+ * @param {string} value The value of a box-shadow declaration.
+ * @returns {{ hairlines: number, problems: string[] }}
+ */
+function hairlineCheck(value) {
+  const problems = [];
+  let hairlines = 0;
+
+  for (const layer of shadowLayers(value)) {
+    const inset = /^inset\s+-1px\s+0\s+0\s+(.+)$/s.exec(layer.trim());
+
+    if (inset === null) {
+      continue;
+    }
+
+    hairlines += 1;
+
+    if (withoutFallbacks(inset[1]).trim() !== HAIRLINE) {
+      problems.push(layer.trim());
+    }
+  }
+
+  return { hairlines, problems };
+}
+
+/**
+ * Lists the shadow layers of a value that are not the hairline and whose colour is anything but the wall's shade colour at an alpha.
+ * @param {string} value The value of a box-shadow declaration.
+ * @returns {string[]}
+ */
+function foreignShadows(value) {
+  return shadowLayers(value)
+    .filter((layer) => !/^inset\s+-1px\s+0\s+0\s/.test(layer.trim()))
+    .filter((layer) => {
+      const plain = withoutFallbacks(layer);
+      const tokens = [...plain.matchAll(/var\((--[\w-]+)\)/g)].map((match) => match[1]);
+      const colour = /rgb\(var\(--room-shade-rgb\)\s*\/\s*[\d.]+\)\s*$/.test(plain.trim());
+
+      return !colour || tokens.some((token) => token !== '--room-shade-rgb') || colourLiterals(layer).length > 0;
+    })
+    .map((layer) => layer.trim());
+}
+
+/**
+ * Finds the dock rule whose selector list holds exactly the given selector.
+ * @param {string} selector One selector.
+ * @returns {{ selector: string, declarations: { name: string, value: string }[] }[]}
+ */
+function dockRulesFor(selector) {
+  return dockRules.filter((rule) => selectorsOf(rule.selector).includes(selector));
+}
+
+/**
+ * Reads the value a group of dock rules gives a property, with every fallback removed, from the last rule that sets it.
+ * @param {string} selector One selector.
+ * @param {string[]} names The property names to look for.
+ * @returns {string | null}
+ */
+function dockValue(selector, names) {
+  const value = dockRulesFor(selector)
+    .map((rule) => valueOf(rule, names))
+    .filter((found) => found !== null)
+    .at(-1);
+
+  return value === undefined ? null : withoutFallbacks(value);
+}
+
+test('the dock rules are in the sheet, so every sheet-wide check above covers the rail and the panel', () => {
+  assert.ok(dockRules.length > 30, 'the sheet has the dock rules');
+  assert.ok(dockRules.some((rule) => /\.filter-rail(?![\w-])/.test(rule.selector)), 'the rail has rules');
+  assert.ok(dockRules.some((rule) => /\.filter-panel(?![\w-])/.test(rule.selector)), 'the panel has rules');
+});
+
+test('the rail and the panel draw their edge as the token hairline and the fly-over shadow only in the wall shade colour', () => {
+  const edges = [
+    'html[data-filter-dock] .filter-rail',
+    'html[data-filter-dock="push"] .filter-panel',
+    'html[data-filter-dock="over"] .filter-panel',
+  ];
+
+  for (const selector of edges) {
+    const shadow = dockRulesFor(selector)
+      .map((rule) => valueOf(rule, ['box-shadow']))
+      .filter((value) => value !== null)
+      .at(-1);
+
+    assert.ok(shadow, `${selector} draws its edge as a shadow`);
+
+    const check = hairlineCheck(shadow);
+
+    assert.equal(check.hairlines, 1, `${selector} has one hairline`);
+    assert.deepEqual(check.problems, [], `${selector}'s hairline is ${HAIRLINE}`);
+  }
+
+  for (const { selector, name, value } of filterDeclarations.filter((entry) => entry.name === 'box-shadow' && /data-filter-dock/.test(entry.selector))) {
+    assert.deepEqual(hairlineCheck(value).problems, [], `${selector} { ${name}: ${value} }`);
+    assert.deepEqual(foreignShadows(value), [], `${selector} { ${name}: ${value} } casts a shadow in a colour other than the wall shade`);
+  }
+
+  const flyOver = dockValue('html[data-filter-dock="over"] .filter-panel', ['box-shadow']);
+
+  assert.equal(shadowLayers(flyOver).length, 2, 'the fly-over has the hairline and one soft shadow');
+});
+
+test('the hairline and shade checks recognise a literal, a wrong share and a foreign token', () => {
+  assert.deepEqual(hairlineCheck('inset -1px 0 0 color-mix(in srgb, var(--room-line, var(--chrome-line)) 40%, transparent)'), { hairlines: 1, problems: [] });
+  assert.equal(hairlineCheck('inset -1px 0 0 #444').problems.length, 1);
+  assert.equal(hairlineCheck('inset -1px 0 0 color-mix(in srgb, var(--room-line) 60%, transparent)').problems.length, 1);
+  assert.equal(hairlineCheck('inset -1px 0 0 color-mix(in srgb, var(--room-text) 40%, transparent)').problems.length, 1);
+  assert.equal(hairlineCheck('0 0 4px rgb(var(--room-shade-rgb) / 0.5)').hairlines, 0);
+  assert.deepEqual(foreignShadows('12px 0 32px -12px rgb(var(--room-shade-rgb, 20 10 4) / 0.7)'), []);
+  assert.equal(foreignShadows('12px 0 32px -12px rgb(0 0 0 / 0.7)').length, 1);
+  assert.equal(foreignShadows('12px 0 32px -12px rgb(var(--wood-shade-rgb) / 0.7)').length, 1);
+  assert.equal(foreignShadows('12px 0 32px -12px black').length, 1);
+});
+
+test('the dock draws its colours from the wall pairs the contrast test measures', () => {
+  const filled = 'html[data-filter-dock] .filter-rail-button[data-filled]:not([data-unavailable])';
+  const off = 'html[data-filter-dock] .filter-rail-button[data-unavailable]';
+
+  assert.equal(dockValue(filled, ['background', 'background-color']), 'var(--room-text)', 'a filled rail button is filled with the text colour');
+  assert.equal(dockValue(filled, ['color']), 'var(--room)', 'its symbol is the wall colour');
+  assert.equal(dockValue(off, ['border']), '1px dashed var(--room-line)', 'a button that is off has the dashed line border');
+  assert.equal(dockValue(off, ['color']), 'var(--room-muted)', 'and the muted symbol');
+  assert.equal(dockValue('html[data-filter-dock] .filter-rail-count-number', ['color']), 'var(--room-text)');
+  assert.equal(dockValue('html[data-filter-dock] .filter-rail-count-of', ['color']), 'var(--room-muted)');
+  assert.equal(dockValue('html[data-filter-dock] .filter-rail-clear', ['border']), '1px solid var(--room-line)');
+  assert.equal(dockValue('html[data-filter-dock] .filter-menu', ['border']), '1px solid var(--room-line)');
+  assert.equal(dockValue('html[data-filter-dock] .filter-panel-title', ['color']), 'var(--room-text)');
+  assert.equal(dockValue('html[data-filter-dock="over"] .filter-panel', ['background', 'background-color']), 'var(--room)', 'the fly-over stands on the flat wall colour');
+  assert.equal(dockValue('html[data-filter-dock="push"] .filter-panel', ['background', 'background-color']), 'transparent', 'the pushed panel is the plain wall');
+  assert.equal(dockValue('html[data-filter-dock] .filter-rail', ['background', 'background-color']), 'transparent', 'the rail is the plain wall');
+});
+
+test('no dock rule puts muted text on the rail hover wash or on a filled rail button', () => {
+  const muted = (rule) => /--room-muted\b/.test(valueOf(rule, ['color']) ?? '');
+  const washed = (rule) => /--room-(wash|text)\b/.test(withoutFallbacks(valueOf(rule, ['background', 'background-color']) ?? ''));
+
+  for (const rule of dockRules.filter(washed)) {
+    assert.equal(muted(rule), false, `${rule.selector} sets muted text on its own wash or fill`);
+
+    for (const selector of selectorsOf(rule.selector).filter((entry) => /\.filter-rail-button/.test(entry))) {
+      assert.match(selector, /:not\([^)]*\[data-unavailable\]/, `${selector} can wash or fill a button that is off, whose symbol is muted`);
+    }
+  }
+
+  assert.ok(dockRules.filter(washed).length >= 2, 'the dock has its hover wash and its filled button');
+});
