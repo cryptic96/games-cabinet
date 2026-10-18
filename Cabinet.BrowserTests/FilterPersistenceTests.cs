@@ -9,7 +9,9 @@ namespace Cabinet.BrowserTests;
 /// <summary>
 /// Proves in a real browser that the filters last for the tab and that the cabinet never shows an unfiltered frame first: a reload
 /// keeps the chosen chip and draws every box already in shadow, a new tab starts clean, the filters live only in the tab's session
-/// storage and never in the address or a cookie, and storage that refuses to answer breaks nothing.
+/// storage and never in the address or a cookie, and storage that refuses to answer breaks nothing. On a desktop the controls live
+/// in the filter panel, so each test opens it before choosing; when the card details fail, the panel shows the note directly under
+/// its count line and disables the card-based controls.
 /// </summary>
 [Trait("Category", "Browser")]
 public sealed class FilterPersistenceTests : CabinetPageTest
@@ -72,6 +74,7 @@ public sealed class FilterPersistenceTests : CabinetPageTest
         var first = await ReadRecorderAsync();
         AssertBarShownWithTheFirstDraw(first);
         first.Toggles.Should().BeEmpty("nothing was stored, so nothing was dimmed");
+        await OpenFilterPanelAsync();
 
         await Page.Locator("fieldset[data-filter=\"players\"] input[value=\"4\"]").ClickAsync();
         await Expect(Page.Locator(Dimmed).First).ToBeAttachedAsync();
@@ -107,6 +110,7 @@ public sealed class FilterPersistenceTests : CabinetPageTest
     public async Task A_new_tab_starts_clean()
     {
         var address = await OpenAsync("/?sample=65", 1440, 900);
+        await OpenFilterPanelAsync();
         await Page.Locator("fieldset[data-filter=\"players\"] input[value=\"4\"]").ClickAsync();
         await Expect(Page.Locator(Dimmed).First).ToBeAttachedAsync();
         await Page.WaitForFunctionAsync($"() => sessionStorage.getItem('{StorageKey}') !== null");
@@ -145,6 +149,7 @@ public sealed class FilterPersistenceTests : CabinetPageTest
         var dimmed = await BoxIdsAsync(Dimmed);
         dimmed.Should().NotBeEmpty();
         recording.Inserted.Where(box => box.Dim).Select(box => box.Id).Should().BeEquivalentTo(dimmed);
+        await OpenFilterPanelAsync();
         (await Page.Locator(".filter-group input").EvaluateAllAsync<bool[]>("(inputs) => inputs.map((input) => input.disabled)")).Should().OnlyContain(disabled => disabled);
         (await Page.Locator("#filter-loc").IsDisabledAsync()).Should().BeTrue();
         await Expect(Page.Locator(".filter-note")).ToBeVisibleAsync();
@@ -168,27 +173,29 @@ public sealed class FilterPersistenceTests : CabinetPageTest
     }
 
     [Theory]
-    [InlineData(1024)]
-    [InlineData(1440)]
-    public async Task Failed_card_data_keeps_the_pinned_bar_at_112_px(int width)
+    [InlineData(DockWidths.NarrowestDesktop)]
+    [InlineData(DockWidths.Push)]
+    public async Task Failed_card_data_puts_the_note_under_the_panel_count_line(int width)
     {
         await StartAsync(PrototypeOn);
         await FailCardDataRequestsAsync();
         await Page.SetViewportSizeAsync(width, 900);
 
         await GotoCabinetAsync("/?sample=65");
-        await Expect(Page.Locator(".filter-note")).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 20000 });
+        await Expect(Page.Locator(".filter-note")).ToHaveTextAsync("Couldn't load the details. Reload the page to try again.", new LocatorAssertionsToHaveTextOptions { Timeout = 20000 });
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await OpenFilterPanelAsync();
 
-        (await Page.EvaluateAsync<double>("() => window.scrollY")).Should().Be(0);
-        await AssertNoteUnderBarAsync();
-
-        await Page.EvaluateAsync("() => window.scrollTo(0, document.querySelector('.filter-sentinel').getBoundingClientRect().top + window.scrollY + 2)");
-        await Expect(Page.Locator(".filter-bar")).ToHaveAttributeAsync("data-stuck", string.Empty);
-        await AssertNoteUnderBarAsync();
+        await Expect(Page.Locator("#filter-panel .filter-note")).ToBeVisibleAsync();
+        await AssertNoteUnderCountLineAsync();
+        (await Page.Locator("fieldset[data-filter=\"players\"] input").EvaluateAllAsync<bool[]>("(inputs) => inputs.map((input) => input.disabled)")).Should().NotBeEmpty().And.OnlyContain(disabled => disabled);
+        (await Page.Locator("fieldset[data-filter=\"time\"] input").EvaluateAllAsync<bool[]>("(inputs) => inputs.map((input) => input.disabled)")).Should().NotBeEmpty().And.OnlyContain(disabled => disabled);
+        (await Page.Locator(Select).IsDisabledAsync()).Should().BeTrue();
 
         await Page.EvaluateAsync("() => window.scrollTo(0, 700)");
-        (await Page.Locator(".filter-bar").BoundingBoxAsync())!.Height.Should().Be(112);
+        await Page.WaitForFunctionAsync("() => window.scrollY > 0");
+        await AssertNoteUnderCountLineAsync();
+        ConsoleErrors.Should().OnlyContain(error => error.Contains("Failed to load resource", StringComparison.Ordinal), "only the requests made to fail are logged");
     }
 
     [Fact]
@@ -210,6 +217,7 @@ public sealed class FilterPersistenceTests : CabinetPageTest
     {
         await OpenAsync("/?sample=65", 1440, 900);
         var fragment = await TitleFragmentAsync();
+        await OpenFilterPanelAsync();
         await Page.Locator("#filter-q").FillAsync(fragment);
         await Page.Locator("fieldset[data-filter=\"time\"] input[value=\"60\"]").ClickAsync();
         await Expect(Page.Locator(Dimmed).First).ToBeAttachedAsync();
@@ -235,7 +243,7 @@ public sealed class FilterPersistenceTests : CabinetPageTest
     [Fact]
     public async Task An_owner_move_redraws_with_the_filter_and_the_scroll_kept()
     {
-        await Page.SetViewportSizeAsync(1440, 900);
+        await Page.SetViewportSizeAsync(DockWidths.Push, 600);
         var host = await OwnerHost.SyncAsync(factory => StartAsync(factory), SyntheticBggCollection.Create(120));
         var places = await host.SeedAsync("Cabinet A", "Shelf B");
         var games = host.Cards.DistinctBy(card => card.GameId).Take(3).ToList();
@@ -247,6 +255,7 @@ public sealed class FilterPersistenceTests : CabinetPageTest
         await GotoCabinetAsync("/");
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
+        await OpenFilterPanelAsync();
 
         await Page.Locator(Select).SelectOptionAsync(places[1]);
         await Expect(Page.Locator(Dimmed).First).ToBeAttachedAsync();
@@ -289,6 +298,7 @@ public sealed class FilterPersistenceTests : CabinetPageTest
         await GotoCabinetAsync("/");
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
+        await OpenFilterPanelAsync();
         await Page.Locator(Select).SelectOptionAsync(places[1]);
         await Expect(Page.Locator(Dimmed).First).ToBeAttachedAsync();
 
@@ -314,6 +324,7 @@ public sealed class FilterPersistenceTests : CabinetPageTest
         await PrepareAsync();
         await GotoCabinetAsync("/");
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await OpenFilterPanelAsync();
         await Expect(Page.Locator(Select)).ToBeVisibleAsync();
 
         await host.DeleteLocationAsync(places[0]);
@@ -330,17 +341,26 @@ public sealed class FilterPersistenceTests : CabinetPageTest
             "async (id) => (await (await fetch('/cabinet/cards?profile=desktop')).json()).cards.filter((card) => card.gameId === id).map((card) => String(card.entryId))",
             gameId);
 
-    private async Task AssertNoteUnderBarAsync()
+    private async Task AssertNoteUnderCountLineAsync()
     {
-        var bar = Page.Locator(".filter-bar");
-        var note = Page.Locator(".filter-note");
-        (await note.EvaluateAsync<bool>("(note) => note.previousElementSibling === document.querySelector('.filter-bar')")).Should().BeTrue("the note is the bar's next sibling");
-        (await note.EvaluateAsync<bool>("(note) => document.querySelector('.filter-bar').contains(note)")).Should().BeFalse();
-        var barBox = (await bar.BoundingBoxAsync())!;
-        var noteBox = (await note.BoundingBoxAsync())!;
-        noteBox.Y.Should().BeGreaterThanOrEqualTo(barBox.Y + barBox.Height);
-        noteBox.Y.Should().BeLessThanOrEqualTo(barBox.Y + barBox.Height + 17);
-        barBox.Height.Should().Be(112);
+        var layout = await Page.EvaluateAsync<JsonElement>("""
+            () => {
+              const count = document.querySelector('#filter-panel .filter-count');
+              const note = document.querySelector('#filter-panel .filter-note');
+              const countSlot = count.parentElement;
+              const countBox = count.getBoundingClientRect();
+              const noteBox = note.getBoundingClientRect();
+              const panel = document.querySelector('#filter-panel').getBoundingClientRect();
+              return {
+                next: countSlot.nextElementSibling !== null && countSlot.nextElementSibling.contains(note),
+                gap: noteBox.top - countBox.bottom,
+                inside: noteBox.left >= panel.left && noteBox.right <= panel.right,
+              };
+            }
+            """);
+        layout.GetProperty("next").GetBoolean().Should().BeTrue("the note follows the count line in the panel, before the groups");
+        layout.GetProperty("gap").GetDouble().Should().BeApproximately(8, 1, "the note sits directly under the count line");
+        layout.GetProperty("inside").GetBoolean().Should().BeTrue("the note stays inside the panel");
     }
 
     private async Task<string> TitleFragmentAsync()
