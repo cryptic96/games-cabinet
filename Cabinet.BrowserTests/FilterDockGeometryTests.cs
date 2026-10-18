@@ -9,7 +9,10 @@ namespace Cabinet.BrowserTests;
 /// Proves in a real browser how the filters sit on a desktop: the page loads with a folded rail at the left edge and no filter option
 /// in sight, the rail's three-line button opens a panel beside the cabinet that holds the one control set, a typed title dims
 /// everything outside its family, and the panel folds back to the rail. Nothing filter-related sits above the cabinet, the rail is
-/// pinned against the left, top and bottom edges while the page scrolls, and the dock's states are drawn by the style sheet.
+/// pinned against the left, top and bottom edges while the page scrolls, and the dock's states are drawn by the style sheet. At every
+/// desktop width the rail and the panel keep their sizes, a pushed panel never overlaps the cabinet and a panel over the cabinet never
+/// moves it, a short screen scrolls the dock inside itself, and below the desktop width there is no dock at all. While the panel
+/// pushes, the cabinet's columns follow the room it has; folded or lying over the cabinet, they follow the screen width.
 /// </summary>
 [Trait("Category", "Browser")]
 public sealed class FilterDockGeometryTests : CabinetPageTest
@@ -22,6 +25,8 @@ public sealed class FilterDockGeometryTests : CabinetPageTest
     private const double Rem = 16;
     private const double FullSection = 40 * Rem;
     private const int ColumnGap = 24;
+    private const int MinimumTarget = 44;
+    private const int ShortScreen = 560;
     private const string Groups = "#cabinet .location-group";
 
     /// <summary>A push width between the narrowest push and a wide desktop, where two sections almost reach their full width.</summary>
@@ -149,6 +154,125 @@ public sealed class FilterDockGeometryTests : CabinetPageTest
             await ExpectRailAgainstTheEdgesAsync($"{label} after scrolling");
         }
 
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task The_rail_and_the_panel_sit_right_at_every_desktop_width()
+    {
+        await OpenAsync("/?sample=400", DockWidths.NarrowestDesktop, 900);
+
+        foreach (var width in new[] { DockWidths.NarrowestDesktop, DockWidths.Over, DockWidths.Push - 1, DockWidths.Push, DockWidths.Wide })
+        {
+            var label = $"at {width} px";
+            var pushes = width >= DockWidths.Push;
+
+            await Page.SetViewportSizeAsync(width, 900);
+            await Page.EvaluateAsync("() => window.scrollTo(0, 0)");
+            await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-filter-dock", "rail");
+
+            await ExpectRailAgainstTheEdgesAsync(label);
+            await Page.EvaluateAsync("() => window.scrollTo(0, 1200)");
+            await Page.WaitForFunctionAsync("() => window.scrollY >= 1199");
+            await ExpectRailAgainstTheEdgesAsync($"{label} after scrolling");
+            await Page.EvaluateAsync("() => window.scrollTo(0, 0)");
+            await Page.WaitForFunctionAsync("() => window.scrollY === 0");
+
+            await ExpectControlsAtLeast44Async(".filter-rail", $"{label}, the rail");
+            (await TitleLeftAsync()).Should().BeApproximately(RailWidth + PageGap, 1, $"{label}: the title starts 24px from the rail");
+
+            var before = (await Page.Locator("#cabinet").BoundingBoxAsync())!;
+
+            await OpenFilterPanelAsync();
+            await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-filter-dock", pushes ? "push" : "over");
+            await Page.WaitForFunctionAsync("() => { const translate = getComputedStyle(document.getElementById('filter-panel')).translate; return translate === 'none' || translate === '0px' || translate === '0px 0px'; }");
+
+            var panel = (await Page.Locator("#filter-panel").BoundingBoxAsync())!;
+            ((double)panel.Width).Should().BeApproximately(PanelWidth, 0.5, label);
+            ((double)panel.X).Should().BeApproximately(0, 0.5, label);
+            await ExpectControlsAtLeast44Async("#filter-panel", $"{label}, the panel");
+
+            var after = (await Page.Locator("#cabinet").BoundingBoxAsync())!;
+            var overlapping = await Page.EvaluateAsync<int>(ReadPanelOverlap);
+
+            if (pushes)
+            {
+                ((double)after.X).Should().BeGreaterThanOrEqualTo(panel.X + panel.Width + PageGap - 0.5, $"{label}: the pushed cabinet keeps 24px from the panel");
+                overlapping.Should().Be(0, $"{label}: nothing of the pushed panel overlaps the cabinet");
+                (await TitleLeftAsync()).Should().BeApproximately(PanelWidth + PageGap, 1, $"{label}: the title starts 24px from the pushed panel");
+            }
+            else
+            {
+                ((double)after.X).Should().BeApproximately(before.X, 1, $"{label}: the panel over the cabinet leaves it in place");
+                ((double)after.Y).Should().BeApproximately(before.Y, 1, label);
+                ((double)after.Width).Should().BeApproximately(before.Width, 1, label);
+                ((double)after.Height).Should().BeApproximately(before.Height, 1, label);
+                overlapping.Should().BeGreaterThan(0, $"{label}: the panel lies over the cabinet");
+                (await TitleLeftAsync()).Should().BeApproximately(RailWidth + PageGap, 1, $"{label}: nothing moves under the panel");
+            }
+
+            await Page.Keyboard.PressAsync("Escape");
+
+            if (pushes)
+            {
+                await FoldFilterPanelAsync();
+            }
+
+            await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-filter-dock", "rail");
+        }
+
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Below_1024_there_is_no_dock()
+    {
+        await OpenAsync("/?sample=65", DockWidths.Tablet, 900);
+
+        foreach (var width in new[] { DockWidths.Tablet, DockWidths.Phone })
+        {
+            await Page.SetViewportSizeAsync(width, 900);
+            await Expect(Page.Locator(".filter-slim")).ToBeVisibleAsync();
+
+            (await Page.EvaluateAsync<bool>("() => document.querySelector('.filter-rail').getClientRects().length === 0"))
+                .Should().BeTrue($"at {width} px there is no rail");
+            (await Page.EvaluateAsync<bool>("() => document.getElementById('filter-panel').getClientRects().length === 0"))
+                .Should().BeTrue($"at {width} px there is no panel");
+            await Expect(Page.Locator(".filter-slim #filter-q")).ToBeVisibleAsync();
+            await Expect(Page.Locator(".filter-slim .filter-open")).ToBeVisibleAsync();
+            (await Page.Locator(".filter-slim .filter-open").BoundingBoxAsync())!.Height.Should().BeGreaterThanOrEqualTo(MinimumTarget - 0.5f, $"at {width} px the slim bar is drawn");
+        }
+
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_short_screen_scrolls_the_panel_and_the_rail_inside_themselves()
+    {
+        await OpenAsync("/?sample=65", DockWidths.Over, ShortScreen);
+
+        var rail = await Page.EvaluateAsync<JsonElement>(ReadScroller, ".filter-bar");
+        rail.GetProperty("overflowY").GetString().Should().BeOneOf("auto", "scroll");
+        rail.GetProperty("overscroll").GetString().Should().Be("contain");
+        rail.GetProperty("height").GetDouble().Should().BeApproximately(ShortScreen, 0.5, "the rail's column is exactly as tall as the screen");
+
+        await OpenFilterPanelAsync();
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-filter-dock", "over");
+
+        var panel = await Page.EvaluateAsync<JsonElement>(ReadScroller, "#filter-panel");
+        panel.GetProperty("overflowY").GetString().Should().BeOneOf("auto", "scroll");
+        panel.GetProperty("overscroll").GetString().Should().Be("contain");
+        panel.GetProperty("height").GetDouble().Should().BeApproximately(ShortScreen, 0.5);
+        panel.GetProperty("scrollHeight").GetDouble().Should().BeGreaterThan(panel.GetProperty("clientHeight").GetDouble(), "the panel's content is taller than a short screen");
+
+        var pageScroll = await Page.EvaluateAsync<double>("() => window.scrollY");
+        await Page.EvaluateAsync("() => { const panel = document.getElementById('filter-panel'); panel.scrollTop = panel.scrollHeight; }");
+        (await Page.EvaluateAsync<double>("() => document.getElementById('filter-panel').scrollTop")).Should().BeGreaterThan(0, "the panel scrolls inside itself");
+        (await Page.EvaluateAsync<double>("() => window.scrollY")).Should().Be(pageScroll, "scrolling the panel does not scroll the page");
+        (await Page.EvaluateAsync<bool>(ReadLastPanelControlInView)).Should().BeTrue("the panel's last control can be scrolled into view");
+
+        (await Page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth <= document.documentElement.clientWidth"))
+            .Should().BeTrue("the page column does not scroll sideways");
         ConsoleErrors.Should().BeEmpty();
     }
 
@@ -356,6 +480,52 @@ public sealed class FilterDockGeometryTests : CabinetPageTest
 
     private async Task<SectionReading> ReadSectionsAsync(string parent) =>
         JsonSerializer.Deserialize<SectionReading>((await Page.EvaluateAsync<JsonElement>(ReadSections, parent)).GetRawText(), WebOptions)!;
+
+    private const string ReadControlSizes = """
+        (scope) => [...document.querySelectorAll(`${scope} :is(button, select, input:not([type="radio"]), .filter-chip, .filter-view-segment)`)]
+          .filter((element) => element.getClientRects().length > 0)
+          .map((element) => ({ name: element.getAttribute('aria-label') || element.textContent.trim() || element.className || element.id, width: element.getBoundingClientRect().width, height: element.getBoundingClientRect().height }))
+        """;
+
+    private const string ReadScroller = """
+        (selector) => {
+          const element = document.querySelector(selector);
+          const style = getComputedStyle(element);
+          return {
+            overflowY: style.overflowY,
+            overscroll: style.overscrollBehaviorY,
+            height: element.getBoundingClientRect().height,
+            scrollHeight: element.scrollHeight,
+            clientHeight: element.clientHeight,
+          };
+        }
+        """;
+
+    private const string ReadLastPanelControlInView = """
+        () => {
+          const controls = [...document.querySelectorAll('#filter-panel :is(button, select, input:not([type="radio"]), .filter-chip, .filter-view-segment)')]
+            .filter((element) => element.getClientRects().length > 0);
+          const last = controls[controls.length - 1].getBoundingClientRect();
+          return last.top >= 0 && last.bottom <= window.innerHeight + 0.5;
+        }
+        """;
+
+    private async Task ExpectControlsAtLeast44Async(string scope, string label)
+    {
+        var controls = await Page.EvaluateAsync<JsonElement>(ReadControlSizes, scope);
+
+        controls.GetArrayLength().Should().BeGreaterThan(0, label);
+
+        foreach (var control in controls.EnumerateArray())
+        {
+            var name = control.GetProperty("name").GetString();
+            control.GetProperty("width").GetDouble().Should().BeGreaterThanOrEqualTo(MinimumTarget - 0.5, $"{label}: {name} is at least 44px wide");
+            control.GetProperty("height").GetDouble().Should().BeGreaterThanOrEqualTo(MinimumTarget - 0.5, $"{label}: {name} is at least 44px high");
+        }
+    }
+
+    private Task<double> TitleLeftAsync() =>
+        Page.EvaluateAsync<double>("() => { const range = document.createRange(); range.selectNodeContents(document.querySelector('body > header h1')); return range.getBoundingClientRect().left; }");
 
     private async Task ExpectRailAgainstTheEdgesAsync(string label)
     {
