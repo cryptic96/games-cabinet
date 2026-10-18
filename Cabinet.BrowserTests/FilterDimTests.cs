@@ -75,7 +75,7 @@ public sealed class FilterDimTests : CabinetPageTest
         OwnerDataSeed.Write(_storage.FullPath, OwnerData.Empty with { Revision = 1, Look = look });
         await StartAsync(new Dictionary<string, string?>(PrototypeOn) { ["Storage:Directory"] = _storage.FullPath });
         await Page.Clock.InstallAsync(new ClockInstallOptions { TimeString = EveningMoment });
-        await Page.SetViewportSizeAsync(1440, 900);
+        await Page.SetViewportSizeAsync(DockWidths.Push, 900);
         await GotoCabinetAsync("/?sample=65");
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
@@ -87,7 +87,8 @@ public sealed class FilterDimTests : CabinetPageTest
                 new PageWaitForFunctionOptions { Timeout = FadeWaitMilliseconds });
         }
 
-        await Page.Locator("fieldset[data-filter=\"players\"] input[value=\"5\"]").ClickAsync();
+        await OpenFilterPanelAsync();
+        await Page.Locator("#filter-panel fieldset[data-filter=\"players\"] input[value=\"5\"]").ClickAsync();
         await Expect(Page.Locator(Dimmed).First).ToBeAttachedAsync();
         await Page.Locator(Dimmed).First.ScrollIntoViewIfNeededAsync();
         await Page.WaitForFunctionAsync(

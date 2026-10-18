@@ -21,6 +21,7 @@ public sealed partial class FilterAlternateTitleTests : CabinetPageTest
 {
     private const string Boxes = "#cabinet .placement";
     private const string NamesRoute = "/cabinet/search-names";
+    private const string PanelCount = "#filter-panel .filter-count";
     private const string CardsAddress = "/cabinet/cards?profile=desktop&sample=65";
     private const string NamesAddress = "/cabinet/search-names?sample=65";
     private const string DrawnEntryIds = "() => [...document.querySelectorAll('#cabinet .placement:not([data-kind=\"moreMarker\"])')].map((box) => box.dataset.entryId)";
@@ -98,7 +99,7 @@ public sealed partial class FilterAlternateTitleTests : CabinetPageTest
 
         var box = Page.Locator($"{Boxes}[data-entry-id=\"{baseGame.EntryId}\"]:not([data-kind=\"moreMarker\"])").First;
         await Expect(box).Not.ToHaveAttributeAsync("data-dim", string.Empty);
-        await Expect(Page.Locator(".filter-count")).ToHaveTextAsync(CountPattern());
+        await Expect(Page.Locator(PanelCount)).ToHaveTextAsync(CountPattern());
         gate.SetResult();
     }
 
@@ -110,6 +111,7 @@ public sealed partial class FilterAlternateTitleTests : CabinetPageTest
         await GotoCabinetAsync("/?sample=65");
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
+        await OpenFilterPanelAsync();
         var cards = await LoadCardsAsync();
         var baseGame = cards.First(card => !card.IsExpansion);
 
@@ -118,9 +120,9 @@ public sealed partial class FilterAlternateTitleTests : CabinetPageTest
 
         var box = Page.Locator($"{Boxes}[data-entry-id=\"{baseGame.EntryId}\"]:not([data-kind=\"moreMarker\"])").First;
         await Expect(box).Not.ToHaveAttributeAsync("data-dim", string.Empty);
-        await Expect(Page.Locator(".filter-count")).ToHaveTextAsync(CountPattern());
+        await Expect(Page.Locator(PanelCount)).ToHaveTextAsync(CountPattern());
         await Page.Keyboard.TypeAsync(" zzz");
-        await Expect(Page.Locator(".filter-count")).ToHaveTextAsync("No games match");
+        await Expect(Page.Locator(PanelCount)).ToHaveTextAsync("No games match");
         await Task.Delay(500, TestContext.Current.CancellationToken);
 
         (await Page.Locator(".cabinet-message").CountAsync()).Should().Be(0);
@@ -162,10 +164,11 @@ public sealed partial class FilterAlternateTitleTests : CabinetPageTest
         Page.Request += (_, request) => Record(request.Url, names, layouts);
         using var client = factory.CreatePublicClient();
         await SyncRounds.PressAndWait(client, clock, advance: false);
-        await Page.SetViewportSizeAsync(1440, 900);
+        await Page.SetViewportSizeAsync(DockWidths.Push, 900);
         await GotoCabinetAsync("/");
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
+        await OpenFilterPanelAsync();
         await Page.Locator("#filter-q").FocusAsync();
         await WaitForCountAsync(names, 1);
         await Page.Locator("#filter-q").BlurAsync();
@@ -225,17 +228,22 @@ public sealed partial class FilterAlternateTitleTests : CabinetPageTest
     [GeneratedRegex(@"^\d+ of \d+ games?$")]
     private static partial Regex CountPattern();
 
+    /// <summary>
+    /// Opens the cabinet at the width where the filter panel stands beside it, and opens the panel with its three-line button, which
+    /// leaves focus on the panel's head and so does not count as a use of the search field.
+    /// </summary>
     private async Task OpenAsync(string path, ConcurrentQueue<string> names)
     {
         await StartAndRouteAsync(names, abortNames: false);
         await GotoCabinetAsync(path);
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
+        await OpenFilterPanelAsync();
     }
 
     private async Task StartAndRouteAsync(ConcurrentQueue<string> names, bool abortNames)
     {
-        await Page.SetViewportSizeAsync(1440, 900);
+        await Page.SetViewportSizeAsync(DockWidths.Push, 900);
         await StartAsync(PrototypeOn);
         Page.Request += (_, request) => Record(request.Url, names, new ConcurrentQueue<string>());
 
