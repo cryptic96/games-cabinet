@@ -682,9 +682,9 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
     bar.toggleAttribute('hidden', !visible);
 
     if (visible) {
-      dock?.attach();
+      dock?.show();
     } else {
-      dock?.detach();
+      dock?.hide();
     }
 
     if (note !== null) {

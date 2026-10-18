@@ -177,7 +177,7 @@ function sameStop(one, other) {
  * @param {HTMLElement | null} [parts.cabinet] The element the cabinet is drawn in, whose boxes keep their place while the pushed
  * panel resizes it.
  * @param {Storage | null} [parts.storage] The device's local storage, where the open or folded panel is remembered.
- * @returns {{ open: (how?: { focus?: string | null }) => void, fold: (how?: { restoreFocus?: boolean, instant?: boolean }) => void, isOpen: () => boolean, state: () => string | null, attach: () => void, detach: () => void }}
+ * @returns {{ open: (how?: { focus?: string | null }) => void, fold: (how?: { restoreFocus?: boolean, instant?: boolean }) => void, isOpen: () => boolean, state: () => string | null, show: () => void, hide: () => void }}
  * The controls: open the panel (moving focus to the head button, the search field or one group's control), fold it back to the
  * rail, whether it is open, the current state, and reserving or giving up the dock's column when the page has a cabinet or not.
  */
@@ -584,18 +584,20 @@ export function initFilterDock({ rail, panel, root = document.documentElement, f
   }
 
   /**
-   * Reserves the dock's column: the page has a cabinet, so the dock stands at the left edge in the state the width asks for.
+   * Reserves the dock's column: the page has a cabinet, so the dock stands at the left edge in the state the width and the remembered
+   * choice ask for. A state already set is kept, so a live redraw never folds an open panel.
    */
-  function attach() {
+  function show() {
     if (state() === null) {
       root.dataset.filterDock = dockStateFor({ wide: docked.matches, push: pushed.matches, remembered }) ?? RAIL;
     }
   }
 
   /**
-   * Gives up the dock's column: the page shows a message instead of a cabinet, so the column collapses.
+   * Gives up the dock's column: the page shows a message instead of a cabinet (before the first sync, an empty collection, a failed
+   * load), so the column collapses in the same task that draws the message. An open fly-over stops being modal first.
    */
-  function detach() {
+  function hide() {
     endModal();
     cancelFold();
     delete root.dataset.filterDock;
@@ -670,5 +672,5 @@ export function initFilterDock({ rail, panel, root = document.documentElement, f
   docked.addEventListener('change', followWidth);
   pushed.addEventListener('change', followWidth);
 
-  return { open, fold, isOpen, state, attach, detach };
+  return { open, fold, isOpen, state, show, hide };
 }

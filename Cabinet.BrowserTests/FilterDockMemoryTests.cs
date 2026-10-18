@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Cabinet.BrowserTests.Infrastructure;
+using Cabinet.FakeBgg;
 using FluentAssertions;
 using Microsoft.Playwright;
 
@@ -12,6 +13,8 @@ namespace Cabinet.BrowserTests;
 /// script in the head, so the page carries no inline script and the strict content security policy is never broken. The stored value
 /// only ever says what the visitor chose at such a width: a width change, a fly-over and the page itself never write it, the page never
 /// loads with a fly-over, storage that throws keeps the choice in memory, and the value is apart from the tab's filters and the view.
+/// With nothing stored no filter option is visible at any width, the cabinet never shifts sideways while it loads, and a page that
+/// has no cabinet to filter (before the first sync, a failed load, an empty collection) gives up the dock's column.
 /// </summary>
 [Trait("Category", "Browser")]
 public sealed class FilterDockMemoryTests : CabinetPageTest
@@ -54,6 +57,7 @@ public sealed class FilterDockMemoryTests : CabinetPageTest
               roomLeft: room === null ? null : room.getBoundingClientRect().left,
               boxes: document.querySelectorAll('#cabinet .placement').length,
               dimmed: document.querySelectorAll('#cabinet .placement[data-dim]').length,
+              sectionLeft: document.querySelector('#cabinet .section')?.getBoundingClientRect().left ?? null,
             });
             if (rec.frames.length < 240) {
               requestAnimationFrame(record);
@@ -244,6 +248,117 @@ public sealed class FilterDockMemoryTests : CabinetPageTest
         ConsoleErrors.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Nothing_is_open_by_default_at_any_width()
+    {
+        foreach (var width in new[] { DockWidths.NarrowestDesktop, DockWidths.Over, DockWidths.Push, DockWidths.Wide })
+        {
+            await OpenAsync(width);
+
+            (await DockStateAsync()).Should().Be("rail", $"the page loads folded at {width}px");
+            await Expect(Page.Locator(RailMenu)).ToHaveAttributeAsync("aria-expanded", "false");
+            (await RenderedAsync(".filter-chip", "input[name=\"filter-view\"]", "#filter-q", "#filter-loc"))
+                .Should().BeEmpty($"no filter option is visible by default at {width}px");
+        }
+
+        await OpenAsync(DockWidths.Phone);
+        await Expect(Page.Locator("dialog.filter-dialog[open]")).ToHaveCountAsync(0);
+        (await RenderedAsync(".filter-chip", "input[name=\"filter-view\"]", "#filter-loc"))
+            .Should().BeEmpty("on a phone the options wait in the closed Filters sheet");
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(DockWidths.Over, null)]
+    [InlineData(DockWidths.Push, "open")]
+    public async Task The_column_is_reserved_from_the_first_paint(int width, string? stored)
+    {
+        if (stored is not null)
+        {
+            await Page.AddInitScriptAsync($"if (localStorage.getItem('{PanelKey}') === null) {{ localStorage.setItem('{PanelKey}', '{stored}'); }}");
+        }
+
+        await OpenAsync(width);
+        var expected = stored is null ? "rail" : "push";
+        (await DockStateAsync()).Should().Be(expected);
+        await AssertFirstFrameAsync(expected);
+
+        await Page.WaitForTimeoutAsync(300);
+        var settledSection = await Page.Locator("#cabinet .section").First.EvaluateAsync<double>("(section) => section.getBoundingClientRect().left");
+        var drawn = (await ReadFramesAsync()).Where(frame => frame.SectionLeft is not null).ToList();
+        drawn.Should().NotBeEmpty("the cabinet was drawn within the recorded frames");
+        drawn.Should().OnlyContain(frame => Math.Abs(frame.SectionLeft!.Value - settledSection) <= Tolerance, "the drawn cabinet never shifts sideways");
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("never synced")]
+    [InlineData("failed layout")]
+    [InlineData("empty collection")]
+    public async Task A_page_without_a_cabinet_has_no_dock(string page)
+    {
+        await Page.SetViewportSizeAsync(DockWidths.Push, 900);
+        await Page.AddInitScriptAsync(InstallFrameRecorder);
+        _started = true;
+        var failing = true;
+
+        switch (page)
+        {
+            case "never synced":
+                await StartAsync(new Dictionary<string, string?>());
+                break;
+            case "failed layout":
+                await StartAsync(PrototypeOn);
+                await Page.RouteAsync("**/cabinet/layout**", async route =>
+                {
+                    if (Volatile.Read(ref failing))
+                    {
+                        await route.AbortAsync();
+                    }
+                    else
+                    {
+                        await route.ContinueAsync();
+                    }
+                });
+                break;
+            default:
+                await OwnerHost.SyncAsync(factory => StartAsync(factory), SyntheticBggCollection.Create(0));
+                break;
+        }
+
+        await Page.GotoAsync($"http://127.0.0.1:{PublicPort}{(page == "failed layout" ? "/?sample=65" : "/")}");
+        await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await Page.WaitForFunctionAsync("() => document.documentElement.dataset.filterDock === undefined");
+        (await ReadFramesAsync()).First().Dock.Should().Be("rail", "the column was reserved at the first paint, before the page knew it had no cabinet");
+
+        var shown = page == "empty collection"
+            ? Page.Locator(".cabinet-room")
+            : Page.Locator("main .cabinet-message:not(.cabinet-loading)").First;
+        await Expect(shown).ToBeVisibleAsync();
+        (await Page.Locator(Boxes).CountAsync()).Should().Be(0);
+        (await RenderedAsync(".filter-rail", "#filter-panel", ".filter-bar")).Should().BeEmpty("a page with nothing to filter has no dock");
+        var pagePad = await Page.EvaluateAsync<double>("() => parseFloat(getComputedStyle(document.body).paddingLeft)");
+        var shownLeft = await shown.EvaluateAsync<double>("(element) => element.getBoundingClientRect().left");
+        shownLeft.Should().BeApproximately(pagePad, Tolerance, "the column collapsed, so the page starts at its padding from the screen edge");
+        ConsoleErrors.Where(error => !error.Contains("net::ERR_FAILED", StringComparison.Ordinal))
+            .Should().BeEmpty("only the layout request the test broke on purpose is reported");
+
+        if (page == "failed layout")
+        {
+            Volatile.Write(ref failing, false);
+            await Page.Locator(".cabinet-retry").ClickAsync();
+            await Page.WaitForSelectorAsync(Boxes, new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached });
+            await WaitForDockAsync("rail");
+            await Expect(Page.Locator(".filter-rail")).ToBeVisibleAsync();
+            await Expect(Page.Locator(RailMenu)).ToHaveAttributeAsync("aria-expanded", "false");
+        }
+    }
+
+    private async Task<string[]> RenderedAsync(params string[] selectors) =>
+        await Page.EvaluateAsync<string[]>(
+            "(selectors) => selectors.flatMap((selector) => [...document.querySelectorAll(selector)].filter((element) => element.getClientRects().length > 0 && element.getBoundingClientRect().width > 0).map(() => selector))",
+            selectors);
+
     private async Task AssertFirstDrawDimmedAsync()
     {
         await Page.WaitForFunctionAsync("() => window.__memory.frames.some((frame) => frame.boxes > 0)");
@@ -312,7 +427,7 @@ public sealed class FilterDockMemoryTests : CabinetPageTest
         await Expect(Page.Locator(Bar)).ToBeVisibleAsync();
     }
 
-    private sealed record Frame(string? Dock, double? RoomLeft, int Boxes, int Dimmed);
+    private sealed record Frame(string? Dock, double? RoomLeft, int Boxes, int Dimmed, double? SectionLeft);
 
     private sealed record HeadScript(string Src, string Type, bool Async, bool Defer);
 }
