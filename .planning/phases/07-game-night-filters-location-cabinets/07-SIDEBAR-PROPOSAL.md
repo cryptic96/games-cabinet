@@ -222,3 +222,11 @@ Answer by label; "all recommended" is fine.
 - **Q9. Taste calls T1 to T6:** recommended: **T1 keep, T2 icons only, T3 yes (show "52 games" at rest), T4 plain wall, T5 three lines in place, T6 accept**.
 
 Once you have answered, the design contract (`07-UI-SPEC.md`) gets an amendment for the rules listed under each direction's conflicts before anything is built.
+
+## Owner's answer
+
+Verbatim: "a different version on the phone is fine! if that looks/feels better no problem. As long as the filter options are not visible by default when viewing the cabinets"
+
+Read as the recommended answers to Q1 to Q9, with one firm requirement:
+- Q1 S-B (rail and panel on desktop); Q2 search inside the panel on desktop, in the slim bar on phones; Q3 X2b, folded to the rail on a first visit and remembered per device; Q4 X3b, keep today's bottom sheet on phones and tablets (the Filters button gains the three-line symbol); Q5 X4a with a strip, X4b on the rail; Q6 X5c, push from 1440 px and fly over below; Q7 X6a, three lines with the word where there is room; Q8 X7a, keep the location select; Q9 T1 keep, T2 icons only, T3 yes, T4 plain wall, T5 three lines in place, T6 accept.
+- **Requirement:** the filter options are not visible by default when viewing the cabinets. On desktop the panel starts folded to the rail (the rail shows symbols and the active state, not the options); on phones the options stay inside the bottom sheet behind the Filters button. The slim bar keeps the search field on phones (to be confirmed by the owner if search should also hide behind the button).
