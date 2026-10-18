@@ -10,7 +10,7 @@ namespace Cabinet.BrowserTests;
 /// Proves in a real browser that the visitor's view is remembered on the device and read before anything is fetched, so the wrong
 /// cabinet never flashes; that switching is a calm cross-fade of the cabinet area that closes an open card first, scrolls up but never
 /// down, and is instant under reduced motion; and that a payload that cannot be had keeps the all-together cabinet on screen, says so,
-/// and leaves what the device remembers alone.
+/// and leaves what the device remembers alone. On a desktop the switch lives in the filter panel, so each case opens the panel first.
 /// </summary>
 [Trait("Category", "Browser")]
 public sealed class FilterViewSwitchTests : CabinetPageTest
@@ -101,7 +101,8 @@ public sealed class FilterViewSwitchTests : CabinetPageTest
     [Fact]
     public async Task A_remembered_location_view_opens_first_with_no_flash()
     {
-        var address = await OpenSampleAsync(1440, 900, remembered: null);
+        var address = await OpenSampleAsync(DockWidths.Push, 900, remembered: null);
+        await OpenFilterPanelAsync();
         await Expect(Page.Locator(Switch)).ToBeVisibleAsync();
         await Expect(Page.Locator(AllRadio)).ToBeCheckedAsync();
         (await Page.Locator(Groups).CountAsync()).Should().Be(0, "a first visit opens All together");
@@ -148,7 +149,7 @@ public sealed class FilterViewSwitchTests : CabinetPageTest
     [Fact]
     public async Task A_remembered_view_and_a_stored_filter_draw_dimmed_groups_first()
     {
-        await OpenSampleAsync(1440, 900, remembered: "location", storedFilters: "{\"q\":\"\",\"players\":4,\"time\":null,\"location\":null}");
+        await OpenSampleAsync(DockWidths.Push, 900, remembered: "location", storedFilters: "{\"q\":\"\",\"players\":4,\"time\":null,\"location\":null}");
         await Expect(Page.Locator(Groups).First).ToBeAttachedAsync();
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
@@ -175,7 +176,7 @@ public sealed class FilterViewSwitchTests : CabinetPageTest
     [Fact]
     public async Task A_remembered_view_without_locations_falls_back_quietly()
     {
-        await Page.SetViewportSizeAsync(1440, 900);
+        await Page.SetViewportSizeAsync(DockWidths.Push, 900);
         var host = await OwnerHost.SyncAsync(factory => StartAsync(factory), SyntheticBggCollection.Create(5));
         host.Cards.Should().NotBeEmpty();
         await PrepareAsync(remembered: "location");
@@ -186,6 +187,7 @@ public sealed class FilterViewSwitchTests : CabinetPageTest
         await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
         (await Page.Locator(Groups).CountAsync()).Should().Be(0);
         (await Page.Locator(Sections).CountAsync()).Should().BeGreaterThan(0, "All together is drawn");
+        await OpenFilterPanelAsync();
         await Expect(Page.Locator(Switch)).ToBeHiddenAsync();
         (await Page.EvaluateAsync<string?>($"() => localStorage.getItem('{ViewKey}')")).Should().Be("location");
         (await Page.Locator("#filter-live").InnerTextAsync()).Should().NotBe(FailureCopy, "this is not a failure, so nothing is announced");
@@ -201,7 +203,7 @@ public sealed class FilterViewSwitchTests : CabinetPageTest
     [InlineData(500, "", true)]
     public async Task A_remembered_location_view_that_fails_to_load_shows_all_together(int status, string body, bool withFilter)
     {
-        await Page.SetViewportSizeAsync(1440, 900);
+        await Page.SetViewportSizeAsync(DockWidths.Push, 900);
         await StartAsync(PrototypeOn);
         await PrepareAsync(
             remembered: "location",
@@ -219,6 +221,7 @@ public sealed class FilterViewSwitchTests : CabinetPageTest
         await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
         (await Page.Locator(Groups).CountAsync()).Should().Be(0);
         (await Page.Locator(Sections).CountAsync()).Should().BeGreaterThan(0, "the all-together cabinet is drawn");
+        await OpenFilterPanelAsync();
         await Expect(Page.Locator(Switch)).ToBeVisibleAsync();
         await Expect(Page.Locator(AllRadio)).ToBeCheckedAsync();
         await Expect(Page.Locator("#filter-live")).ToHaveTextAsync(FailureCopy);
@@ -240,7 +243,7 @@ public sealed class FilterViewSwitchTests : CabinetPageTest
     [Fact]
     public async Task Deleting_every_location_returns_to_All_together_and_keeps_the_choice()
     {
-        await Page.SetViewportSizeAsync(1440, 900);
+        await Page.SetViewportSizeAsync(DockWidths.Push, 900);
         var host = await OwnerHost.SyncAsync(factory => StartAsync(factory), SyntheticBggCollection.Create(60));
         var places = await host.SeedAsync("Cabinet A", "Shelf B");
         var games = host.Cards.DistinctBy(card => card.GameId).Take(2).ToList();
@@ -249,6 +252,7 @@ public sealed class FilterViewSwitchTests : CabinetPageTest
         await PrepareAsync(remembered: null);
         await GotoCabinetAsync("/");
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await OpenFilterPanelAsync();
         await Expect(Page.Locator(Switch)).ToBeVisibleAsync();
 
         await Page.Locator(".filter-view-segment").Nth(1).ClickAsync();
@@ -271,11 +275,12 @@ public sealed class FilterViewSwitchTests : CabinetPageTest
     [Fact]
     public async Task The_switch_cross_fades_and_reduced_motion_swaps_at_once()
     {
-        await OpenSampleAsync(1440, 900, remembered: null);
+        await OpenSampleAsync(DockWidths.Push, 900, remembered: null);
         await Page.AddInitScriptAsync(InstallTransitionSpy);
         await Page.ReloadAsync();
         await Page.WaitForSelectorAsync(Boxes, new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached });
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await OpenFilterPanelAsync();
         await Expect(Page.Locator(Switch)).ToBeVisibleAsync();
         await Page.EvaluateAsync("() => { window.__spy.before = window.__measure(); }");
 
@@ -305,7 +310,7 @@ public sealed class FilterViewSwitchTests : CabinetPageTest
     [Fact]
     public async Task The_current_view_stays_until_the_payload_arrives()
     {
-        await Page.SetViewportSizeAsync(1440, 900);
+        await Page.SetViewportSizeAsync(DockWidths.Push, 900);
         await StartAsync(PrototypeOn);
         await PrepareAsync(remembered: null);
         var release = new TaskCompletionSource();
@@ -316,6 +321,7 @@ public sealed class FilterViewSwitchTests : CabinetPageTest
         });
         await GotoCabinetAsync("/?sample=65");
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await OpenFilterPanelAsync();
         await Expect(Page.Locator(Switch)).ToBeVisibleAsync();
 
         await Page.Locator(".filter-view-segment").Nth(1).ClickAsync();
@@ -335,7 +341,7 @@ public sealed class FilterViewSwitchTests : CabinetPageTest
     [Fact]
     public async Task An_open_card_closes_before_the_switch()
     {
-        await OpenSampleAsync(1440, 900, remembered: null);
+        await OpenSampleAsync(DockWidths.Push, 900, remembered: null);
         await Page.Locator(Boxes + "[data-kind=\"cover\"]").First.ClickAsync();
         await Expect(Page.Locator("dialog.card-dialog[open]")).ToBeVisibleAsync();
 
@@ -352,7 +358,8 @@ public sealed class FilterViewSwitchTests : CabinetPageTest
     [Fact]
     public async Task The_switch_scrolls_up_but_never_down()
     {
-        await OpenSampleAsync(1440, 420, remembered: null);
+        await OpenSampleAsync(DockWidths.Push, 420, remembered: null);
+        await OpenFilterPanelAsync();
         await Expect(Page.Locator(Switch)).ToBeVisibleAsync();
 
         await Page.EvaluateAsync("() => window.scrollTo(0, document.documentElement.scrollHeight)");
@@ -363,10 +370,10 @@ public sealed class FilterViewSwitchTests : CabinetPageTest
 
         await Expect(Page.Locator(Groups).First).ToBeAttachedAsync();
         await Page.WaitForFunctionAsync("() => !document.documentElement.hasAttribute('data-switching-view')");
-        var gap = await Page.EvaluateAsync<double>("() => document.getElementById('cabinet').getBoundingClientRect().top - document.querySelector('.filter-bar').getBoundingClientRect().bottom");
+        var gap = await Page.EvaluateAsync<double>("() => document.getElementById('cabinet').getBoundingClientRect().top");
         var after = await Page.EvaluateAsync<double>("() => window.scrollY");
         after.Should().BeLessThanOrEqualTo(before + 0.5, "the page never scrolls down");
-        gap.Should().BeApproximately(16, 1, "the cabinet's top sits 16 px under the bar");
+        gap.Should().BeApproximately(16, 1, "on a desktop no bar covers the top of the page, so the cabinet's top sits 16 px under the viewport top");
 
         await Page.EvaluateAsync("() => window.scrollTo(0, 0)");
         await Page.WaitForFunctionAsync("() => window.scrollY === 0");
@@ -382,7 +389,7 @@ public sealed class FilterViewSwitchTests : CabinetPageTest
     [Fact]
     public async Task A_failed_payload_keeps_All_together_and_says_so()
     {
-        await Page.SetViewportSizeAsync(1440, 900);
+        await Page.SetViewportSizeAsync(DockWidths.Push, 900);
         await StartAsync(PrototypeOn);
         await PrepareAsync(remembered: null);
         var requests = 0;
@@ -402,6 +409,7 @@ public sealed class FilterViewSwitchTests : CabinetPageTest
         });
         await GotoCabinetAsync("/?sample=65");
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await OpenFilterPanelAsync();
         await Expect(Page.Locator(Switch)).ToBeVisibleAsync();
         var sectionsBefore = await Page.Locator(Sections).CountAsync();
 
