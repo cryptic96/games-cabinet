@@ -102,5 +102,15 @@
   { "key": "gamesTotal", "language": "en", "args": [52], "text": "52 games", "stack": "js" },
   { "key": "gamesTotal", "language": "nl", "args": [52], "text": "52 spellen", "stack": "js" },
   { "key": "gamesTotal", "language": "en", "args": [1], "text": "1 game", "stack": "js" },
-  { "key": "gamesTotal", "language": "nl", "args": [1], "text": "1 spel", "stack": "js" }
+  { "key": "gamesTotal", "language": "nl", "args": [1], "text": "1 spel", "stack": "js" },
+  { "key": "railName", "language": "en", "args": ["Players","8+"], "text": "Players: 8+", "stack": "js" },
+  { "key": "railName", "language": "nl", "args": ["Spelers","8+"], "text": "Spelers: 8+", "stack": "js" },
+  { "key": "railName", "language": "en", "args": ["Max. minutes","60"], "text": "Max. minutes: 60", "stack": "js" },
+  { "key": "railName", "language": "nl", "args": ["Max. minuten","60"], "text": "Max. minuten: 60", "stack": "js" },
+  { "key": "railName", "language": "en", "args": ["Location","Cabinet A"], "text": "Location: Cabinet A", "stack": "js" },
+  { "key": "railName", "language": "nl", "args": ["Locatie","Cabinet A"], "text": "Locatie: Cabinet A", "stack": "js" },
+  { "key": "railName", "language": "en", "args": ["Location","Unknown location"], "text": "Location: Unknown location", "stack": "js" },
+  { "key": "railName", "language": "nl", "args": ["Locatie","Onbekende locatie"], "text": "Locatie: Onbekende locatie", "stack": "js" },
+  { "key": "railName", "language": "en", "args": ["Search games","cata"], "text": "Search games: cata", "stack": "js" },
+  { "key": "railName", "language": "nl", "args": ["Zoek een spel","cata"], "text": "Zoek een spel: cata", "stack": "js" }
 ]

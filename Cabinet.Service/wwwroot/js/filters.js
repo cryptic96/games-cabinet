@@ -372,15 +372,33 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
   }
 
   /**
-   * Writes the count and the state of the bar for the current result.
+   * Gives the text of the count for the current result. The slim bar of a phone shows the short count while filtering and nothing at
+   * rest; the desktop panel's count line names the collection at rest, the matches out of all games while filtering, and the
+   * none-found sentence when nothing matches.
+   * @param {boolean} none Whether a filter is in use and nothing matches.
+   * @returns {string}
+   */
+  function countText(none) {
+    if (!window.matchMedia(FULL_BAR).matches) {
+      return result.active ? copy.filterCountShort(tally.lit, tally.total) : '';
+    }
+
+    if (!result.active) {
+      return copy.gamesTotal(tally.total);
+    }
+
+    return none ? copy.noMatch : copy.filterCount(tally.lit, tally.total);
+  }
+
+  /**
+   * Writes the count and the state of the bar for the current result. The panel's text Clear is only there while a filter is in use.
    */
   function showTally() {
     const none = result.active && tally.lit === 0;
 
-    const slim = !window.matchMedia(FULL_BAR).matches;
-
-    count.textContent = !result.active ? '' : slim ? copy.filterCountShort(tally.lit, tally.total) : none ? copy.noMatch : copy.filterCount(tally.lit, tally.total);
+    count.textContent = countText(none);
     bar.toggleAttribute('data-active', result.active);
+    clear.hidden = !result.active;
     clear.toggleAttribute('data-highlighted', none);
     clearIcon?.toggleAttribute('data-highlighted', none);
     showRail(none);
@@ -716,6 +734,8 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
     if (note !== null) {
       note.hidden = true;
     }
+
+    showTally();
   }
 
   field.addEventListener('input', search);
