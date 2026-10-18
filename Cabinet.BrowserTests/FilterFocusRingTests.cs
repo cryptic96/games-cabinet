@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Cabinet.BrowserTests.Infrastructure;
 using Cabinet.Domain.Layout;
@@ -10,10 +11,11 @@ using Microsoft.Playwright;
 namespace Cabinet.BrowserTests;
 
 /// <summary>
-/// Proves in a real browser that every control of the filter bar and of its sheet shows the wall's focus ring when it is reached by
+/// Proves in a real browser that every control of the filter dock, the slim bar and the sheet shows the wall's focus ring when it is reached by
 /// the keyboard: a solid ring two pixels wide that stands two pixels outside the control, in exactly the ring colour of the wall, so
-/// the ring always lies on the surface its contrast was measured on. A focused choice inside a group of choices is lifted above its
-/// neighbours so none of them covers its ring.
+/// the ring always lies on the surface its contrast was measured on. That covers the desktop dock folded to its rail, open beside the
+/// cabinet and open over it. No ring is cut by the edge of the rail, the panel, the sheet or the screen, and a control whose
+/// neighbour reaches under its ring is lifted above that neighbour.
 /// </summary>
 [Trait("Category", "Browser")]
 public sealed partial class FilterFocusRingTests : CabinetPageTest, IDisposable
@@ -23,7 +25,10 @@ public sealed partial class FilterFocusRingTests : CabinetPageTest, IDisposable
     private const string ChipHost = ".filter-chip";
     private const string ViewHost = ".filter-view-segment";
     private const string OpenSheet = "dialog.filter-dialog[open]";
+    private const string RailClear = ".filter-rail .filter-rail-clear";
+    private const string PhoneFilters = ".filter-bar .filter-open";
     private const int ViewportHeightOfAPhone = 844;
+    private const int DesktopHeight = 900;
     private const string RingWidth = "2px";
     private const string RingOffset = "2px";
     private const string SolidStyle = "solid";
@@ -32,32 +37,98 @@ public sealed partial class FilterFocusRingTests : CabinetPageTest, IDisposable
         (args) => {
           const target = document.querySelector(args.target);
           if (target === null) {
-            return ['missing'];
+            return { missing: true };
           }
           target.focus();
           const host = args.host === '' ? target : target.closest(args.host);
           const style = getComputedStyle(host);
-          return [
-            host.matches(':focus-visible') || target.matches(':focus-visible') ? 'yes' : 'no',
-            style.outlineColor,
-            style.outlineStyle,
-            style.outlineWidth,
-            style.outlineOffset,
-          ];
+          const box = host.getBoundingClientRect();
+          const reach = Number.parseFloat(style.outlineWidth) + Number.parseFloat(style.outlineOffset);
+          const ring = { left: box.left - reach, top: box.top - reach, right: box.right + reach, bottom: box.bottom + reach };
+          const name = (element) => element.id !== '' ? '#' + element.id : element.tagName.toLowerCase() + (element.className ? '.' + String(element.className).trim().split(/\s+/).join('.') : '');
+          const inside = (outer) => ring.left >= outer.left - 0.5 && ring.top >= outer.top - 0.5 && ring.right <= outer.right + 0.5 && ring.bottom <= outer.bottom + 0.5;
+          const clippedBy = [];
+          if (!inside({ left: 0, top: 0, right: document.documentElement.clientWidth, bottom: document.documentElement.clientHeight })) {
+            clippedBy.push('the viewport');
+          }
+          let fixed = getComputedStyle(host).position === 'fixed';
+          for (let parent = host.parentElement; parent !== null && parent !== document.body && !fixed; parent = parent.parentElement) {
+            const own = getComputedStyle(parent);
+            if (own.overflowX !== 'visible' || own.overflowY !== 'visible') {
+              const outer = parent.getBoundingClientRect();
+              const left = outer.left + parent.clientLeft;
+              const top = outer.top + parent.clientTop;
+              if (!inside({ left, top, right: left + parent.clientWidth, bottom: top + parent.clientHeight })) {
+                clippedBy.push(name(parent));
+              }
+            }
+            fixed = own.position === 'fixed';
+          }
+          const level = (element) => {
+            const own = getComputedStyle(element);
+            return own.position === 'static' || own.zIndex === 'auto' ? 0 : Number.parseInt(own.zIndex, 10);
+          };
+          const covered = [];
+          const middle = Number.parseFloat(style.outlineOffset) + Number.parseFloat(style.outlineWidth) / 2;
+          const points = [];
+          for (const share of [0.25, 0.5, 0.75]) {
+            const x = box.left + box.width * share;
+            const y = box.top + box.height * share;
+            points.push([x, box.top - middle], [x, box.bottom + middle], [box.left - middle, y], [box.right + middle, y]);
+          }
+          for (const [x, y] of points) {
+            const hit = document.elementFromPoint(x, y);
+            if (hit === null || hit.contains(host) || host.contains(hit)) {
+              continue;
+            }
+            let theirs = hit;
+            while (theirs.parentElement !== null && !theirs.parentElement.contains(host)) {
+              theirs = theirs.parentElement;
+            }
+            let mine = host;
+            while (mine.parentElement !== null && mine.parentElement !== theirs.parentElement) {
+              mine = mine.parentElement;
+            }
+            if (level(mine) <= level(theirs)) {
+              covered.push(name(theirs));
+            }
+          }
+          return {
+            missing: false,
+            visible: host.matches(':focus-visible') || target.matches(':focus-visible'),
+            colour: style.outlineColor,
+            style: style.outlineStyle,
+            width: style.outlineWidth,
+            offset: style.outlineOffset,
+            clippedBy,
+            coveredBy: [...new Set(covered)],
+          };
         }
         """;
 
-    private const string FocusAndReadLift = """
-        (args) => {
-          const target = document.querySelector(args.target);
-          target.focus();
-          const host = target.closest('.filter-chip');
-          const read = (element) => { const style = getComputedStyle(element); return [style.zIndex, style.position]; };
-          return [read(host), ...[...host.parentElement.querySelectorAll('.filter-chip')].filter((chip) => chip !== host).map(read)];
+    private const string PanelInPlace = """
+        () => {
+          const panel = document.querySelector('#filter-panel');
+          return panel.getAnimations().length === 0 && Math.abs(panel.getBoundingClientRect().left) < 0.5;
+        }
+        """;
+
+    private const string ReadSymbol = """
+        (selector) => {
+          const button = document.querySelector(selector);
+          const symbol = button.querySelector('svg use[href$="#i-menu"]')?.closest('svg') ?? null;
+          if (symbol === null) {
+            return false;
+          }
+          const outer = button.getBoundingClientRect();
+          const inner = symbol.getBoundingClientRect();
+          return inner.width > 0 && inner.left >= outer.left && inner.right <= outer.right && inner.top >= outer.top && inner.bottom <= outer.bottom;
         }
         """;
 
     private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
+
+    private static readonly JsonSerializerOptions WebOptions = new(JsonSerializerDefaults.Web);
 
     private readonly TemporaryDirectory _storage = new();
 
@@ -65,8 +136,12 @@ public sealed partial class FilterFocusRingTests : CabinetPageTest, IDisposable
     public static TheoryData<string> Walls { get; } = ["brown", "birch"];
 
     /// <summary>
-    /// Each control of the full bar at a desktop width, of the slim bar at a phone width and of the open sheet draws the wall's ring,
-    /// two pixels wide, two pixels outside itself, when the keyboard focuses it.
+    /// Each control of the desktop dock, of the slim bar at a phone width and of the open sheet draws the wall's ring, two pixels wide,
+    /// two pixels outside itself, when the keyboard focuses it: the folded rail's three-line button, its four group buttons and its
+    /// Clear; the pushed panel's head button, Clear, search field, chips, view segment and select; the head button, the search field
+    /// and a chip of the panel that lies over the cabinet; and the phone's Filters button with its symbol, the icon Clear and the
+    /// sheet's buttons. No ring is cut by the padding or the edge of the rail, the panel, the sheet or the screen, and no neighbour
+    /// stands over it.
     /// </summary>
     /// <param name="wood">The wood whose wall is drawn.</param>
     [Theory]
@@ -76,24 +151,49 @@ public sealed partial class FilterFocusRingTests : CabinetPageTest, IDisposable
         await StartWithLookAsync(wood);
         var problems = new List<string>();
 
-        await OpenAsync(1440, 900);
+        await OpenAsync(DockWidths.Push, DesktopHeight);
         var ring = await RootColourAsync("--room-ring");
         await ChooseSomethingToClearAsync();
-        problems.AddRange(await CheckAsync(wood, ring, "the search field", "#filter-q", string.Empty));
-        problems.AddRange(await CheckAsync(wood, ring, "the location select", "#filter-loc", string.Empty));
-        problems.AddRange(await CheckAsync(wood, ring, "a players chip", $"{PlayersGroup} input[value=\"4\"]", ChipHost));
-        problems.AddRange(await CheckAsync(wood, ring, "a time chip", $"{TimeGroup} input:not([value=\"\"])", ChipHost));
-        problems.AddRange(await CheckAsync(wood, ring, "a view toggle segment", "input[name=\"filter-view\"][value=\"location\"]", ViewHost));
-        problems.AddRange(await CheckAsync(wood, ring, "the text Clear", ".filter-bar .filter-clear", string.Empty));
-        await SaveScreenshotAsync($"filter-ring-full-bar-{wood}");
+        await Expect(Page.Locator(RailClear)).ToBeVisibleAsync();
+        problems.AddRange(await CheckAsync(wood, ring, "the rail's three-line button", ".filter-rail .filter-menu", string.Empty));
 
-        await OpenAsync(390, ViewportHeightOfAPhone);
+        foreach (var group in new[] { "search", "players", "time", "location" })
+        {
+            problems.AddRange(await CheckAsync(wood, ring, $"the rail's {group} button", $".filter-rail-button[data-group=\"{group}\"]", string.Empty));
+        }
+
+        problems.AddRange(await CheckAsync(wood, ring, "the rail's Clear", RailClear, string.Empty));
+        await SaveScreenshotAsync($"filter-ring-rail-{wood}");
+
+        await OpenFilterPanelAsync();
+        (await DockStateAsync()).Should().Be("push");
+        problems.AddRange(await CheckAsync(wood, ring, "the panel head's three-line button", "#filter-panel .filter-menu", string.Empty));
+        problems.AddRange(await CheckAsync(wood, ring, "the panel's Clear", "#filter-panel .filter-panel-head .filter-clear", string.Empty));
+        problems.AddRange(await CheckAsync(wood, ring, "the pushed search field", "#filter-q", string.Empty));
+        problems.AddRange(await CheckAsync(wood, ring, "a pushed players chip", $"{PlayersGroup} input[value=\"4\"]", ChipHost));
+        problems.AddRange(await CheckAsync(wood, ring, "a pushed time chip", $"{TimeGroup} input:not([value=\"\"])", ChipHost));
+        problems.AddRange(await CheckAsync(wood, ring, "a pushed view segment", "input[name=\"filter-view\"][value=\"location\"]", ViewHost));
+        problems.AddRange(await CheckAsync(wood, ring, "the pushed location select", "#filter-loc", string.Empty));
+        await SaveScreenshotAsync($"filter-ring-push-{wood}");
+        await FoldFilterPanelAsync();
+
+        await OpenAsync(DockWidths.Over, DesktopHeight);
+        await OpenFilterPanelAsync();
+        (await DockStateAsync()).Should().Be("over");
+        await Page.WaitForFunctionAsync(PanelInPlace);
+        problems.AddRange(await CheckAsync(wood, ring, "the fly-over head's three-line button", "#filter-panel .filter-menu", string.Empty));
+        problems.AddRange(await CheckAsync(wood, ring, "the fly-over search field", "#filter-q", string.Empty));
+        problems.AddRange(await CheckAsync(wood, ring, "a fly-over players chip", $"{PlayersGroup} input[value=\"4\"]", ChipHost));
+        await SaveScreenshotAsync($"filter-ring-over-{wood}");
+
+        await OpenAsync(DockWidths.Phone, ViewportHeightOfAPhone);
         await ChooseSomethingToClearAsync();
-        problems.AddRange(await CheckAsync(wood, ring, "the Filters button", ".filter-bar .filter-open", string.Empty));
+        (await Page.EvaluateAsync<bool>(ReadSymbol, PhoneFilters)).Should().BeTrue($"{wood}: the Filters button holds its three-line symbol inside its edge, so the ring goes round both");
+        problems.AddRange(await CheckAsync(wood, ring, "the Filters button", PhoneFilters, string.Empty));
         problems.AddRange(await CheckAsync(wood, ring, "the icon Clear", ".filter-bar .filter-clear-icon", string.Empty));
         await SaveScreenshotAsync($"filter-ring-slim-bar-{wood}");
 
-        await Page.Locator(".filter-bar .filter-open").ClickAsync();
+        await Page.Locator(PhoneFilters).ClickAsync();
         await Expect(Page.Locator(OpenSheet)).ToBeVisibleAsync();
         problems.AddRange(await CheckAsync(wood, ring, "the sheet's Clear", ".filter-sheet-actions .filter-sheet-clear", string.Empty));
         problems.AddRange(await CheckAsync(wood, ring, "the sheet's primary button", ".filter-done", string.Empty));
@@ -103,36 +203,12 @@ public sealed partial class FilterFocusRingTests : CabinetPageTest, IDisposable
         ConsoleErrors.Should().BeEmpty();
     }
 
-    /// <summary>
-    /// A focused choice in the bar's group of choices stands above every neighbour, so a neighbour never covers its ring.
-    /// </summary>
-    [Fact]
-    public async Task A_focused_chip_in_a_segmented_group_is_lifted()
-    {
-        await StartWithLookAsync("brown");
-        await OpenAsync(1440, 900);
-        await Page.Keyboard.PressAsync("Shift");
-
-        var read = await Page.EvaluateAsync<string[][]>(FocusAndReadLift, new { target = $"{PlayersGroup} input[value=\"4\"]" });
-        var focused = read[0];
-        var neighbours = read.Skip(1).ToList();
-
-        neighbours.Should().NotBeEmpty("the group holds more than the focused chip");
-        focused[1].Should().NotBe("static", "a lifted chip is positioned so its stacking level counts");
-        var lift = ZIndex(focused[0]);
-        lift.Should().BeGreaterThanOrEqualTo(1, "a focused chip is lifted");
-        neighbours.Should().OnlyContain(neighbour => ZIndex(neighbour[0]) < lift, "no neighbour stands at or above the focused chip, so none covers its ring");
-        ConsoleErrors.Should().BeEmpty();
-    }
-
     /// <inheritdoc />
     public void Dispose()
     {
         _storage.Dispose();
         GC.SuppressFinalize(this);
     }
-
-    private static int ZIndex(string computed) => computed == "auto" ? 0 : int.Parse(computed, CultureInfo.InvariantCulture);
 
     private static RgbColour ParseColour(string computed)
     {
@@ -172,8 +248,20 @@ public sealed partial class FilterFocusRingTests : CabinetPageTest, IDisposable
 
     private async Task ChooseSomethingToClearAsync()
     {
+        var docked = await IsDockWidthAsync();
+
+        if (docked)
+        {
+            await OpenFilterPanelAsync();
+        }
+
         await Page.Locator("#filter-q").FillAsync("a");
         await Page.WaitForSelectorAsync(".filter-bar[data-active]", new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached });
+
+        if (docked)
+        {
+            await FoldFilterPanelAsync();
+        }
     }
 
     private async Task<RgbColour> RootColourAsync(string property)
@@ -200,40 +288,70 @@ public sealed partial class FilterFocusRingTests : CabinetPageTest, IDisposable
         var problems = new List<string>();
 
         await Page.Keyboard.PressAsync("Shift");
-        var read = await Page.EvaluateAsync<string[]>(FocusAndRead, new { target, host });
+        var element = await Page.EvaluateAsync<JsonElement>(FocusAndRead, new { target, host });
+        var read = JsonSerializer.Deserialize<FocusReading>(element.GetRawText(), WebOptions)!;
 
-        if (read[0] == "missing")
+        if (read.Missing)
         {
             problems.Add($"{where}: the control is not on the page");
 
             return problems;
         }
 
-        if (read[0] != "yes")
+        if (!read.Visible)
         {
             problems.Add($"{where}: a keyboard focus does not show its ring");
         }
 
-        if (ParseColour(read[1]) != ring)
+        if (ParseColour(read.Colour) != ring)
         {
-            problems.Add($"{where}: the ring is {read[1]}, not the wall's ring colour");
+            problems.Add($"{where}: the ring is {read.Colour}, not the wall's ring colour");
         }
 
-        if (read[2] != SolidStyle)
+        if (read.Style != SolidStyle)
         {
-            problems.Add($"{where}: the ring is {read[2]}, not solid");
+            problems.Add($"{where}: the ring is {read.Style}, not solid");
         }
 
-        if (read[3] != RingWidth)
+        if (read.Width != RingWidth)
         {
-            problems.Add($"{where}: the ring is {read[3]} wide, not {RingWidth}");
+            problems.Add($"{where}: the ring is {read.Width} wide, not {RingWidth}");
         }
 
-        if (read[4] != RingOffset)
+        if (read.Offset != RingOffset)
         {
-            problems.Add($"{where}: the ring stands {read[4]} from the control, not {RingOffset} outside it");
+            problems.Add($"{where}: the ring stands {read.Offset} from the control, not {RingOffset} outside it");
+        }
+
+        if (read.ClippedBy.Count > 0)
+        {
+            problems.Add($"{where}: the ring is cut by {string.Join(", ", read.ClippedBy)}");
+        }
+
+        if (read.CoveredBy.Count > 0)
+        {
+            problems.Add($"{where}: the ring lies under {string.Join(", ", read.CoveredBy)}, which is not below the focused control");
         }
 
         return problems;
     }
+
+    /// <summary>What a focused control shows: its ring, and what would cut it or stand over it.</summary>
+    /// <param name="Missing">True when the control is not on the page.</param>
+    /// <param name="Visible">True when the browser treats the focus as a keyboard focus.</param>
+    /// <param name="Colour">The computed ring colour.</param>
+    /// <param name="Style">The computed ring style.</param>
+    /// <param name="Width">The computed ring width.</param>
+    /// <param name="Offset">The computed ring offset.</param>
+    /// <param name="ClippedBy">The scrolling or clipping boxes, and the screen, whose visible area does not hold the whole ring.</param>
+    /// <param name="CoveredBy">The neighbours that reach under the ring and are not stacked below the focused control.</param>
+    private sealed record FocusReading(
+        bool Missing,
+        bool Visible,
+        string Colour,
+        string Style,
+        string Width,
+        string Offset,
+        IReadOnlyList<string> ClippedBy,
+        IReadOnlyList<string> CoveredBy);
 }
