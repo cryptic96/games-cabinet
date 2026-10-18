@@ -206,3 +206,27 @@ Each has a recommended answer; "all recommended" is a valid reply.
 - **N1, the Dutch slim bar at 360 px while filtering** wraps onto a second row under the wide test font. **Recommended: leave it and check it on a real phone in the device round.**
 - **N5, the browser tests that still sometimes fail on CI.** **Recommended: harden them as a separate change, not in this round.**
 - **T1, the new Dutch texts** (the table above). **Recommended: approve as written.**
+
+## Owner's answer
+
+The owner's answer, verbatim, given in chat after reading this document and its frames: "images are looking good. I suppose all with recommendations"
+
+That is "all recommended": every question in "Your questions" above takes its recommended answer. Nothing in the product changes for the answer itself.
+
+| Label | Answer | What it meant | State |
+|---|---|---|---|
+| L1 / K1 | keep the push from 1440 px | the panel stands beside the cabinet from 90rem (1440 px) with two 32.25rem sections; AM-7's ROUND row is settled at 90rem and the 100rem (1600 px) fallback is not applied | nothing changed; noted on AM-7's legibility row in `07-UI-SPEC.md` |
+| K2 | keep them quiet | the rail's resting icons stay without an outline; the filled state carries the meaning | nothing changed |
+| K3 | keep | the fly-over keeps its subtle shadow and hairline | nothing changed |
+| R1 | keep as built | rail padding 16 px top, 10 px sides; 16 px under the three-line button, 8 px between the group buttons; while filtering 16 px, separator, 16 px, count, 8 px, Clear | nothing changed; final value as listed |
+| R2 | keep as built | edge hairline 1 px, the line colour at 40 percent, drawn as a shadow | nothing changed; final value as listed |
+| R3 | keep as built | hover wash: the wall text colour at 8 percent | nothing changed; final value as listed |
+| R4 | keep as built | fly-over shadow `12px 0 32px -12px` in the wall's shade colour at 0.7 | nothing changed; final value as listed |
+| R5 | keep as built | the head button 16 px from the top and the left edge (the three-line symbol moves 6 px sideways on open and fold) | nothing changed; final value as listed |
+| R6 | keep as built | panel gaps 16 px between blocks, 8 px between a legend and its control | nothing changed; final value as listed |
+| R7 | keep as built | the phone's 30rem rule: while filtering, "Filters" steps aside on a slim bar narrower than 480 px | nothing changed; final value as listed |
+| N1 | leave it | the Dutch slim bar at 360 px under the wide test font may wrap while filtering; check it on a real phone in the device round | nothing changed; carried to the device round |
+| N5 | separate change | the browser tests that still sometimes fail on CI are hardened as a separate change, not in this round | nothing changed; stays on its todo |
+| T1 | approve as written | the new English and Dutch texts in the T1 table are approved as drafted | approved; nothing changed |
+
+The Critic's three defects (D1 to D3) were already fixed before the question was asked (commits `31fabd6`, `f517e55`, `d869435`); the answer accepts them as built. No frame was re-shot for the answer, because nothing changed.

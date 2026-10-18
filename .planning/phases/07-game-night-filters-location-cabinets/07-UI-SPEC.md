@@ -944,6 +944,8 @@ Frames: `SB-open-brown-1440-en.png`, `SB-open-birch-1440-en.png`, `SB-open-brown
 | Layout profile | Unchanged: the phone or desktop layout is still chosen at 40rem by viewport. The dock never changes the profile and never fetches a layout | FIXED |
 | Guide | `docs/cabinet-layout.md` (the paragraph "one column up to 80rem … between 37rem and 40rem wide") is rewritten in plain language: beside the filter rail, desktop sections are a little narrower (from about 35.75rem to 40rem). While the filter panel is open beside the cabinet, the column count follows the space the cabinet has: two columns when each section can be at least 30rem wide, three when each can be at least 37rem. No planning references | FIXED |
 
+> Settled 2026-10-19 (legibility row): the owner kept the push from 90rem (1440px) with two 32.25rem sections after build round 2 ("all recommended", `07-REVIEW-ROUND-2.md`, "Owner's answer", L1 and K1). The 100rem fallback is not applied; the row above stays as written for the record.
+
 ### AM-8 The remembered open or folded state
 
 | Part | Value | Tag |
