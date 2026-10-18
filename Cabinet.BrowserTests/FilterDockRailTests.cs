@@ -219,6 +219,7 @@ public sealed partial class FilterDockRailTests : CabinetPageTest
         await Expect(Page.Locator(RailCount + " .filter-rail-count-number")).ToHaveTextAsync("0");
         await Expect(Page.Locator(RailCount + " .filter-rail-count-of")).ToHaveTextAsync($"of {total.ToString(CultureInfo.InvariantCulture)}");
         await Expect(Page.Locator(RailClear)).ToHaveAttributeAsync("data-highlighted", string.Empty);
+        await ExpectPaintedFillAsync(Page.Locator(RailClear), "at zero matches the rail's Clear is drawn in the inverted wall fill");
         await SaveScreenshotAsync("filter-rail-zero");
 
         await Page.Locator(RailClear).ClickAsync();
@@ -383,6 +384,15 @@ public sealed partial class FilterDockRailTests : CabinetPageTest
         await Expect(button).ToBeVisibleAsync();
         var fill = await button.EvaluateAsync<JsonElement>(ReadFill);
         fill.GetProperty("background").GetString().Should().Be(fill.GetProperty("wanted").GetString(), because);
+    }
+
+    private async Task ExpectPaintedFillAsync(ILocator button, string because)
+    {
+        await Expect(button).ToBeVisibleAsync();
+        var fill = await button.EvaluateAsync<JsonElement>(ReadFill);
+        var wanted = fill.GetProperty("wanted").GetString();
+        wanted.Should().NotBe("rgba(0, 0, 0, 0)", because);
+        await Expect(button).ToHaveCSSAsync("background-color", wanted!);
     }
 
     private async Task ExpectColourAsync(string selector, string token, string weight, string because)

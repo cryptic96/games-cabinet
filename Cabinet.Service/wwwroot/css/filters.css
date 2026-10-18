@@ -1205,6 +1205,16 @@
     color: var(--room, var(--wood-dark));
   }
 
+  /**
+   * When nothing matches, the rail's Clear takes the same inverted fill as the panel's Clear. The dock rule above clears every rail
+   * button's background, so the highlight is restated here at the dock rule's strength.
+   */
+  html[data-filter-dock] .filter-rail-clear[data-highlighted] {
+    border-color: var(--room-text, var(--wall-text));
+    background: var(--room-text, var(--wall-text));
+    color: var(--room, var(--wood-dark));
+  }
+
   html[data-filter-dock] .filter-rail-button[data-unavailable] {
     border: 1px dashed var(--room-line, var(--chrome-line));
     color: var(--room-muted, var(--chrome-muted));
