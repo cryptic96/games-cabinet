@@ -429,14 +429,8 @@ const ENGLISH = Object.freeze({
     return `Show ${englishGames(count)}`;
   },
 
-  /**
-   * The visible text of the Filters button: the number of filters in use after a dot, nothing while none is.
-   * @param {number} active How many filters are in use.
-   * @returns {string}
-   */
-  filtersButton(active) {
-    return active === 0 ? 'Filters' : `Filters · ${active}`;
-  },
+  /** The visible word of the Filters button; the number of filters in use stands beside it in its own filled count. */
+  filtersButton: 'Filters',
 
   /**
    * The accessible name of the Filters button, which spells out what the number means.
@@ -445,6 +439,34 @@ const ENGLISH = Object.freeze({
    */
   filtersButtonName(active) {
     return active === 0 ? 'Filters' : `Filters · ${active} active`;
+  },
+
+  /**
+   * The accessible name and tooltip of a rail button whose filter is in use: the group's label, a colon and the chosen value.
+   * @param {string} label The group's label, such as the players legend.
+   * @param {string} value The chosen value as the control shows it: a chip's text, a location's name or the typed search.
+   * @returns {string}
+   */
+  railName(label, value) {
+    return `${label}: ${value}`;
+  },
+
+  /**
+   * The second line of the rail's count, under the number of games in the light: out of how many.
+   * @param {number} total How many games there are.
+   * @returns {string}
+   */
+  railCountOf(total) {
+    return `of ${total}`;
+  },
+
+  /**
+   * The panel's count line while no filter is in use: how many games there are.
+   * @param {number} total How many games there are.
+   * @returns {string}
+   */
+  gamesTotal(total) {
+    return englishGames(total);
   },
 
   anyLocation: 'Any location',
@@ -826,14 +848,8 @@ const DUTCH = Object.freeze({
     return `Toon ${dutchGames(count)}`;
   },
 
-  /**
-   * The visible text of the Filters button: the number of filters in use after a dot, nothing while none is.
-   * @param {number} active How many filters are in use.
-   * @returns {string}
-   */
-  filtersButton(active) {
-    return active === 0 ? 'Filters' : `Filters · ${active}`;
-  },
+  /** The visible word of the Filters button; the number of filters in use stands beside it in its own filled count. */
+  filtersButton: 'Filters',
 
   /**
    * The accessible name of the Filters button, which spells out what the number means.
@@ -842,6 +858,34 @@ const DUTCH = Object.freeze({
    */
   filtersButtonName(active) {
     return active === 0 ? 'Filters' : `Filters · ${active} actief`;
+  },
+
+  /**
+   * The accessible name and tooltip of a rail button whose filter is in use: the group's label, a colon and the chosen value.
+   * @param {string} label The group's label, such as the players legend.
+   * @param {string} value The chosen value as the control shows it: a chip's text, a location's name or the typed search.
+   * @returns {string}
+   */
+  railName(label, value) {
+    return `${label}: ${value}`;
+  },
+
+  /**
+   * The second line of the rail's count, under the number of games in the light: out of how many.
+   * @param {number} total How many games there are.
+   * @returns {string}
+   */
+  railCountOf(total) {
+    return `van ${total}`;
+  },
+
+  /**
+   * The panel's count line while no filter is in use: how many games there are.
+   * @param {number} total How many games there are.
+   * @returns {string}
+   */
+  gamesTotal(total) {
+    return dutchGames(total);
   },
 
   anyLocation: 'Alle locaties',
