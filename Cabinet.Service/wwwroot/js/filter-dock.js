@@ -4,14 +4,20 @@
  * choices. From 90rem the open panel stands beside the cabinet and pushes it aside, as a plain neighbour that keeps the reader's
  * place; below that it lies over the cabinet as a modal fly-over that every close route puts away in one step. The state is one
  * attribute on the root element, which the style sheet reads; this module sets that attribute, the fly-over's dialog semantics and
- * focus. Below 64rem the style sheet ignores the attribute and the slim bar and its sheet are in use.
+ * focus. A small head script sets the attribute before the first paint from the choice the device remembers, so the dock's column is
+ * there in the first frame; this module keeps that state and remembers the visitor's own open or fold at widths where the panel
+ * stands beside the cabinet. Below 64rem the style sheet ignores the attribute and the slim bar and its sheet are in use.
  */
 import { createHistoryStep } from './card-flow.js';
+import { PANEL_FOLDED, PANEL_OPEN, readPanel, writePanel } from './filter-state.js';
 
 /** The media query from which the dock is in use; below it the page has the slim bar and the Filters sheet. */
 const DOCK_QUERY = '(min-width: 64rem)';
 
-/** The media query from which the open panel stands beside the cabinet; below it the open panel lies over the cabinet. */
+/**
+ * The media query from which the open panel stands beside the cabinet; below it the open panel lies over the cabinet. The head
+ * script holds the same query, and a test keeps the two equal.
+ */
 export const PUSH_QUERY = '(min-width: 90rem)';
 
 /** The media query that says the visitor prefers less motion. */
@@ -27,10 +33,10 @@ const PUSH = 'push';
 const OVER = 'over';
 
 /** The remembered choice of a visitor who left the panel open at a push width. */
-export const REMEMBER_OPEN = 'open';
+export const REMEMBER_OPEN = PANEL_OPEN;
 
 /** The remembered choice of a visitor who folded the panel, and the choice of a first visit. */
-export const REMEMBER_FOLDED = 'folded';
+export const REMEMBER_FOLDED = PANEL_FOLDED;
 
 /**
  * How long, in milliseconds, a press outside the fly-over keeps waiting for the click of its own gesture before it gives up, so a
@@ -43,6 +49,19 @@ const OUTSIDE_PARTS = 'body > .skip-link, body > header, body > main, body > foo
 
 /** The elements inside the panel that can take focus from the keyboard. */
 const FOCUSABLE = 'a[href], button, input, select, textarea, [tabindex]';
+
+/**
+ * Gives the device's local storage, where the open or folded panel is remembered, or null when the browser does not let the page
+ * have it.
+ * @returns {Storage | null}
+ */
+function deviceStorage() {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Tells which state the dock lands in for a width: none below 64rem, the rail at fly-over widths whatever is remembered, and from
@@ -157,11 +176,12 @@ function sameStop(one, other) {
  * @param {HTMLElement | null} [parts.fallbackFocus] Where focus goes when the panel had it and the dock goes away with the width.
  * @param {HTMLElement | null} [parts.cabinet] The element the cabinet is drawn in, whose boxes keep their place while the pushed
  * panel resizes it.
+ * @param {Storage | null} [parts.storage] The device's local storage, where the open or folded panel is remembered.
  * @returns {{ open: (how?: { focus?: string | null }) => void, fold: (how?: { restoreFocus?: boolean, instant?: boolean }) => void, isOpen: () => boolean, state: () => string | null, attach: () => void, detach: () => void }}
  * The controls: open the panel (moving focus to the head button, the search field or one group's control), fold it back to the
  * rail, whether it is open, the current state, and reserving or giving up the dock's column when the page has a cabinet or not.
  */
-export function initFilterDock({ rail, panel, root = document.documentElement, field = null, fallbackFocus = null, cabinet = document.getElementById('cabinet') }) {
+export function initFilterDock({ rail, panel, root = document.documentElement, field = null, fallbackFocus = null, cabinet = document.getElementById('cabinet'), storage = deviceStorage() }) {
   const railMenu = rail.querySelector('.filter-menu');
   const headMenu = panel.querySelector('.filter-menu');
   const docked = window.matchMedia(DOCK_QUERY);
@@ -174,7 +194,7 @@ export function initFilterDock({ rail, panel, root = document.documentElement, f
   });
 
   let foldTimer = 0;
-  let remembered = REMEMBER_FOLDED;
+  let remembered = readPanel(storage);
   let modal = false;
   let madeInert = [];
   let disarmSwallow = () => {};
@@ -197,6 +217,16 @@ export function initFilterDock({ rail, panel, root = document.documentElement, f
     const current = state();
 
     return current === PUSH || current === OVER;
+  }
+
+  /**
+   * Remembers the visitor's own open or fold at a push width: in memory, and on the device when its storage lets the page write. A
+   * write the storage refuses still changes the choice in memory, so the panel keeps working for the rest of the visit.
+   * @param {'open' | 'folded'} choice The choice.
+   */
+  function remember(choice) {
+    remembered = choice;
+    writePanel(storage, choice);
   }
 
   /**
@@ -453,8 +483,8 @@ export function initFilterDock({ rail, panel, root = document.documentElement, f
    * Opens the panel: beside the cabinet from 90rem, keeping the reader's place, or over it below that as a modal fly-over. Focus
    * moves to the control the reason names; for a search the field's text is selected so typing replaces it. When that control
    * cannot take focus (switched off because the card details failed) focus goes into the panel all the same: to the search field
-   * over the cabinet, to the head button beside it. An open at a push width is remembered. Nothing happens below 64rem or while
-   * the page has no dock.
+   * over the cabinet, to the head button beside it. An open at a push width is remembered on the device; an open over the cabinet is
+   * not. Nothing happens below 64rem or while the page has no dock.
    * @param {{ focus?: string | null }} [how] Why the panel opens.
    */
   function open({ focus = null } = {}) {
@@ -467,7 +497,7 @@ export function initFilterDock({ rail, panel, root = document.documentElement, f
     const next = pushed.matches ? PUSH : OVER;
 
     if (next === PUSH) {
-      remembered = REMEMBER_OPEN;
+      remember(REMEMBER_OPEN);
     }
 
     if (state() !== next) {
@@ -512,9 +542,9 @@ export function initFilterDock({ rail, panel, root = document.documentElement, f
   }
 
   /**
-   * Folds the panel back to the rail. A pushed panel folds at once, keeping the reader's place, and the fold is remembered. A
-   * fly-over first stops being modal, then slides out over the closing time, unless the visitor prefers less motion or the fold is
-   * asked to be instant. Focus goes to the rail's three-line button.
+   * Folds the panel back to the rail. A pushed panel folds at once, keeping the reader's place, and the fold is remembered on the
+   * device. A fly-over first stops being modal, then slides out over the closing time, unless the visitor prefers less motion or the
+   * fold is asked to be instant. Focus goes to the rail's three-line button.
    * @param {{ restoreFocus?: boolean, instant?: boolean }} [how] Whether focus moves to the rail's three-line button, and whether
    * the fold skips the slide.
    */
@@ -525,7 +555,7 @@ export function initFilterDock({ rail, panel, root = document.documentElement, f
 
     if (state() === PUSH) {
       if (pushed.matches) {
-        remembered = REMEMBER_FOLDED;
+        remember(REMEMBER_FOLDED);
       }
 
       keepingPlace(finishFold);
@@ -610,7 +640,19 @@ export function initFilterDock({ rail, panel, root = document.documentElement, f
     }
   }
 
-  attach();
+  /**
+   * Lands the dock at start. The head script has already set the state before the first paint; it is kept when it is the state the
+   * width and the remembered choice ask for, and put right otherwise, such as when the head script did not run.
+   */
+  function land() {
+    const next = dockStateFor({ wide: docked.matches, push: pushed.matches, remembered }) ?? RAIL;
+
+    if (state() !== next) {
+      root.dataset.filterDock = next;
+    }
+  }
+
+  land();
 
   railMenu.addEventListener('click', () => open({ focus: 'menu' }));
   headMenu.addEventListener('click', () => fold());
