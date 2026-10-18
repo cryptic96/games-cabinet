@@ -1,9 +1,10 @@
 /**
  * What the page remembers of the visitor's choices. The filters are kept for the tab only, in its session storage, so a reload, the
- * language switch and a live redraw keep the question while a new tab or a later visit starts clean; the chosen view is kept for the
- * device in its local storage. Nothing goes in a cookie or in the page address and nothing is sent to the server. The module takes
- * the storage and the timers as parameters and imports nothing, so it runs the same in the browser and under the plain Node test
- * runner. Every storage call is guarded, so storage that is missing, full or blocked leaves the state in memory and breaks nothing.
+ * language switch and a live redraw keep the question while a new tab or a later visit starts clean; the chosen view, and whether
+ * the visitor left the filter panel open, are kept for the device in its local storage. Nothing goes in a cookie or in the page
+ * address and nothing is sent to the server. The module takes the storage and the timers as parameters and imports nothing, so it
+ * runs the same in the browser and under the plain Node test runner. Every storage call is guarded, so storage that is missing,
+ * full or blocked leaves the state in memory and breaks nothing.
  */
 
 /** The key under which the tab's filters are kept in its session storage. */
@@ -161,6 +162,50 @@ export function writeView(storage, view) {
 
   try {
     storage.setItem(VIEW_KEY, view);
+  } catch {
+    return;
+  }
+}
+
+/** The key under which the device remembers whether the visitor left the filter panel open, in its local storage. */
+export const PANEL_KEY = 'cabinet-filter-panel';
+
+/** The remembered choice of a visitor who left the filter panel open. */
+export const PANEL_OPEN = 'open';
+
+/** The remembered choice of a visitor who folded the filter panel, and the choice of a first visit. */
+export const PANEL_FOLDED = 'folded';
+
+/** The values the panel key may hold. */
+const PANEL_VALUES = Object.freeze([PANEL_OPEN, PANEL_FOLDED]);
+
+/**
+ * Reads whether the visitor left the filter panel open on this device.
+ * @param {{ getItem: (key: string) => string | null } | null | undefined} storage The device's local storage.
+ * @returns {'open' | 'folded'} Open only when open is stored; folded when nothing is stored, when the value is not a known one and
+ * when the storage throws.
+ */
+export function readPanel(storage) {
+  try {
+    return storage?.getItem(PANEL_KEY) === PANEL_OPEN ? PANEL_OPEN : PANEL_FOLDED;
+  } catch {
+    return PANEL_FOLDED;
+  }
+}
+
+/**
+ * Remembers whether the visitor left the filter panel open. A value other than open or folded is not written, and storage that
+ * throws is ignored.
+ * @param {{ setItem: (key: string, value: string) => void } | null | undefined} storage The device's local storage.
+ * @param {string} value Open or folded.
+ */
+export function writePanel(storage, value) {
+  if (!PANEL_VALUES.includes(value)) {
+    return;
+  }
+
+  try {
+    storage.setItem(PANEL_KEY, value);
   } catch {
     return;
   }

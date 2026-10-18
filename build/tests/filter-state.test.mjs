@@ -1,6 +1,6 @@
 /**
  * Checks what the page remembers of the visitor's choices with the plain Node test runner: the stored filters read back field by
- * field, the one coalesced write, the remembered view, and storage that throws. The module is read from disk and imported through a
+ * field, the one coalesced write, the remembered view, the remembered open or folded filter panel, and storage that throws. The module is read from disk and imported through a
  * data URL, and the storage and timers are stand-ins.
  */
 import test from 'node:test';
@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const source = readFileSync(new URL('../../Cabinet.Service/wwwroot/js/filter-state.js', import.meta.url), 'utf8');
-const { FILTERS_KEY, VIEW_KEY, readFilters, createFilterWriter, readView, writeView } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+const { FILTERS_KEY, VIEW_KEY, PANEL_KEY, readFilters, createFilterWriter, readView, writeView, readPanel, writePanel } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 
 const EMPTY = { q: '', players: null, time: null, location: null };
 
@@ -268,6 +268,47 @@ test('the view is written under its own key and an unknown view is not written',
 test('writing the view swallows a throwing storage', () => {
   assert.doesNotThrow(() => writeView(createThrowingStorage(), 'location'));
   assert.doesNotThrow(() => writeView(null, 'location'));
+});
+
+test('the panel reads back open only for open, and folded for anything else', () => {
+  assert.equal(readPanel(createStorage({ [PANEL_KEY]: 'open' })), 'open');
+  assert.equal(readPanel(createStorage({ [PANEL_KEY]: 'folded' })), 'folded');
+  assert.equal(readPanel(createStorage()), 'folded', 'a first visit starts folded');
+  assert.equal(readPanel(createStorage({ [PANEL_KEY]: 'pushed' })), 'folded', 'an unknown value means folded');
+  assert.equal(readPanel(createStorage({ [PANEL_KEY]: 'OPEN' })), 'folded');
+  assert.equal(readPanel(createStorage({ [PANEL_KEY]: '' })), 'folded');
+  assert.equal(readPanel(null), 'folded');
+  assert.equal(readPanel(createThrowingStorage()), 'folded');
+});
+
+test('the panel is written under its own fixed key, and only open or folded', () => {
+  const storage = createStorage();
+
+  assert.equal(PANEL_KEY, 'cabinet-filter-panel');
+
+  writePanel(storage, 'open');
+  assert.equal(storage.items.get(PANEL_KEY), 'open');
+
+  writePanel(storage, 'folded');
+  assert.equal(storage.items.get(PANEL_KEY), 'folded');
+
+  for (const value of ['push', 'rail', 'over', '', null, undefined, 1]) {
+    writePanel(storage, value);
+  }
+
+  assert.equal(storage.items.get(PANEL_KEY), 'folded');
+  assert.equal(storage.sets, 2);
+  assert.deepEqual([...storage.items.keys()], [PANEL_KEY], 'nothing else is written');
+});
+
+test('the panel key is apart from the filters and the view', () => {
+  assert.notEqual(PANEL_KEY, FILTERS_KEY);
+  assert.notEqual(PANEL_KEY, VIEW_KEY);
+});
+
+test('writing the panel swallows a throwing storage', () => {
+  assert.doesNotThrow(() => writePanel(createThrowingStorage(), 'open'));
+  assert.doesNotThrow(() => writePanel(null, 'folded'));
 });
 
 test('the module never touches a cookie', () => {
