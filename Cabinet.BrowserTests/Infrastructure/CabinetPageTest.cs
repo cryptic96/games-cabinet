@@ -101,8 +101,8 @@ public abstract class CabinetPageTest : PageTest
     }
 
     /// <summary>
-    /// Waits until the view switch is offered: shown in the bar at a full-bar width, or, below it, present in the Filters sheet while
-    /// the owner has locations. The switch is hidden by the page while the owner has no location, whichever bar is shown.
+    /// Waits until the view switch is offered: present in the filter panel on a desktop, or, below the desktop width, in the Filters
+    /// sheet, while the owner has locations. The switch is hidden by the page while the owner has no location, wherever it lives.
     /// </summary>
     protected async Task ExpectViewSwitchAvailableAsync()
     {
@@ -110,12 +110,32 @@ public abstract class CabinetPageTest : PageTest
     }
 
     /// <summary>
-    /// Picks a segment of the view switch, 0 for all together and 1 for by location. Below the full bar the switch lives in the
+    /// Picks a segment of the view switch, 0 for all together and 1 for by location. On a desktop the switch lives in the filter
+    /// panel, so a folded panel is opened for the tap and folded again afterwards. Below the desktop width the switch lives in the
     /// Filters sheet, so the sheet is opened for the tap and closed again with its primary button.
     /// </summary>
     /// <param name="segment">The segment to tap.</param>
     protected async Task ChooseViewAsync(int segment)
     {
+        if (await IsDockWidthAsync())
+        {
+            var folded = await DockStateAsync() == "rail";
+
+            if (folded)
+            {
+                await OpenFilterPanelAsync();
+            }
+
+            await Page.Locator(".filter-view-segment").Nth(segment).ClickAsync();
+
+            if (folded)
+            {
+                await FoldFilterPanelAsync();
+            }
+
+            return;
+        }
+
         var opener = Page.Locator(".filter-bar .filter-open");
         var inSheet = await opener.IsVisibleAsync();
 
@@ -133,6 +153,44 @@ public abstract class CabinetPageTest : PageTest
             await Assertions.Expect(Page.Locator("dialog.filter-dialog[open]")).ToHaveCountAsync(0);
         }
     }
+
+    /// <summary>
+    /// Opens the desktop filter panel with the rail's three-line button when the dock is folded, and waits until the panel is open
+    /// beside or over the cabinet and visible. An open panel is left as it is.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The viewport is narrower than the desktop width, where there is no dock.</exception>
+    protected async Task OpenFilterPanelAsync()
+    {
+        if (!await IsDockWidthAsync())
+        {
+            throw new InvalidOperationException("The filter panel only exists from the desktop width.");
+        }
+
+        if (await DockStateAsync() == "rail")
+        {
+            await Page.Locator(".filter-rail .filter-menu").ClickAsync();
+        }
+
+        await Page.WaitForFunctionAsync("() => ['push', 'over'].includes(document.documentElement.dataset.filterDock)");
+        await Assertions.Expect(Page.Locator("#filter-panel")).ToBeVisibleAsync();
+    }
+
+    /// <summary>
+    /// Folds the desktop filter panel with its head's three-line button and waits until the dock is the rail again.
+    /// </summary>
+    protected async Task FoldFilterPanelAsync()
+    {
+        await Page.Locator("#filter-panel .filter-menu").ClickAsync();
+        await Page.WaitForFunctionAsync("() => document.documentElement.dataset.filterDock === 'rail'");
+    }
+
+    /// <summary>Tells whether the viewport is at the desktop width, where the filters stand in the dock at the left edge.</summary>
+    /// <returns>True from 64rem.</returns>
+    protected Task<bool> IsDockWidthAsync() => Page.EvaluateAsync<bool>("() => window.matchMedia('(min-width: 64rem)').matches");
+
+    /// <summary>Reads the state of the desktop filter dock from the root element.</summary>
+    /// <returns>The rail, push or over state, or null while the page has no dock.</returns>
+    protected Task<string?> DockStateAsync() => Page.EvaluateAsync<string?>("() => document.documentElement.dataset.filterDock ?? null");
 
     /// <summary>
     /// Makes the page's requests for the card data fail with a network error, the given number of times, and lets every later one

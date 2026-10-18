@@ -96,66 +96,87 @@
 </header>
 <div class="filter-sentinel" aria-hidden="true"></div>
 <div class="filter-bar" role="search" aria-label="@Model.Language.Text.FilterBarLabel" hidden>
-    <div class="filter-row">
-        <fieldset class="filter-view" hidden>
-            <legend class="visually-hidden">@Model.Language.Text.ViewLegend</legend>
-            <label class="filter-view-segment">
-                <input type="radio" name="filter-view" value="all" checked />
-                <span class="filter-view-text">@Model.Language.Text.ViewAll</span>
-            </label>
-            <label class="filter-view-segment">
-                <input type="radio" name="filter-view" value="location" />
-                <span class="filter-view-text">@Model.Language.Text.ViewByLocation</span>
-            </label>
-        </fieldset>
-        <label class="visually-hidden" for="filter-q">@Model.Language.Text.SearchLabel</label>
-        <span class="filter-search">
-            <input id="filter-q" type="search" name="q" placeholder="@Model.Language.Text.SearchLabel" enterkeyhint="search" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" dir="auto" aria-keyshortcuts="/" />
-            <svg class="filter-glass" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="@iconsUrl#i-search"></use></svg>
-            <kbd class="filter-hint" aria-hidden="true">/</kbd>
-        </span>
-        <button type="button" class="filter-open" aria-haspopup="dialog"><span class="filter-open-text">@Model.Language.Text.FiltersButton</span><span class="visually-hidden filter-open-suffix"></span></button>
-        <fieldset class="filter-group" data-filter="players">
-            <legend>@Model.Language.Text.PlayersLegend</legend>
-            <label class="filter-chip">
-                <input type="radio" name="filter-players" value="" checked />
-                <span class="filter-chip-text">@Model.Language.Text.AnyChoice</span>
-            </label>
-            @for (var players = 1; players <= 8; players++)
-            {
-                <label class="filter-chip">
-                    <input type="radio" name="filter-players" value="@players" />
-                    <span class="filter-chip-text" aria-hidden="true">@(players == 8 ? "8+" : players.ToString(System.Globalization.CultureInfo.InvariantCulture))</span>
-                    <span class="visually-hidden">@Model.Language.Text.PlayersSuffix(players)</span>
-                </label>
-            }
-        </fieldset>
+    <div class="filter-rail">
+        <button type="button" class="filter-menu" aria-expanded="false" aria-controls="filter-panel" title="@Model.Language.Text.FiltersButton"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="@iconsUrl#i-menu"></use></svg><span class="visually-hidden filter-menu-text">@Model.Language.Text.FiltersButton</span><span class="visually-hidden filter-menu-suffix"></span></button>
+        <button type="button" class="filter-rail-button" data-group="search" aria-controls="filter-panel" aria-label="@Model.Language.Text.SearchLabel" title="@Model.Language.Text.SearchLabel" data-label="@Model.Language.Text.SearchLabel"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="@iconsUrl#i-search"></use></svg></button>
+        <button type="button" class="filter-rail-button" data-group="players" aria-controls="filter-panel" aria-label="@Model.Language.Text.PlayersLegend" title="@Model.Language.Text.PlayersLegend" data-label="@Model.Language.Text.PlayersLegend"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="@iconsUrl#i-players"></use></svg></button>
+        <button type="button" class="filter-rail-button" data-group="time" aria-controls="filter-panel" aria-label="@Model.Language.Text.TimeLegend" title="@Model.Language.Text.TimeLegend" data-label="@Model.Language.Text.TimeLegend"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="@iconsUrl#i-time"></use></svg></button>
+        <button type="button" class="filter-rail-button" data-group="location" aria-controls="filter-panel" aria-label="@Model.Language.Text.LocationLabel" title="@Model.Language.Text.LocationLabel" data-label="@Model.Language.Text.LocationLabel" hidden><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="@iconsUrl#i-pin"></use></svg></button>
+        <span class="filter-rail-sep" aria-hidden="true"></span>
+        <span class="filter-rail-count" aria-hidden="true" hidden><span class="filter-rail-count-number"></span><span class="filter-rail-count-of"></span></span>
+        <button type="button" class="filter-rail-clear" aria-label="@Model.Language.Text.ClearName" title="@Model.Language.Text.ClearName" hidden><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="@iconsUrl#i-close"></use></svg></button>
     </div>
-    <div class="filter-row">
-        <fieldset class="filter-group" data-filter="time">
-            <legend>@Model.Language.Text.TimeLegend</legend>
-            <label class="filter-chip">
-                <input type="radio" name="filter-time" value="" checked />
-                <span class="filter-chip-text">@Model.Language.Text.AnyChoice</span>
-            </label>
-            @foreach (var minutes in new[] { 30, 45, 60, 90, 120 })
-            {
-                <label class="filter-chip">
-                    <input type="radio" name="filter-time" value="@minutes" />
-                    <span class="filter-chip-text" aria-hidden="true">@minutes.ToString(System.Globalization.CultureInfo.InvariantCulture)</span>
-                    <span class="visually-hidden">@Model.Language.Text.TimeSuffix(minutes)</span>
-                </label>
-            }
-        </fieldset>
-        <div class="filter-location" hidden>
-            <label class="visually-hidden" for="filter-loc" hidden>@Model.Language.Text.LocationLabel</label>
-            <select id="filter-loc" name="location" hidden>
-                <option value="">@Model.Language.Text.AnyLocation</option>
-            </select>
+    <div id="filter-panel" class="filter-panel">
+        <div class="filter-panel-head">
+            <button type="button" class="filter-menu" aria-expanded="true" aria-controls="filter-panel" title="@Model.Language.Text.FiltersButton"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="@iconsUrl#i-menu"></use></svg><span class="visually-hidden filter-menu-text">@Model.Language.Text.FiltersButton</span><span class="visually-hidden filter-menu-suffix"></span></button>
+            <h2 id="filter-panel-title" class="filter-panel-title">@Model.Language.Text.SheetTitle</h2>
+            <button type="button" class="filter-clear" aria-label="@Model.Language.Text.ClearName">@Model.Language.Text.ClearVisible</button>
         </div>
+        <div class="filter-panel-find"></div>
+        <div class="filter-panel-tally"></div>
+        <div class="filter-panel-note"></div>
+        <div class="filter-panel-groups">
+            <fieldset class="filter-view" hidden>
+                <legend class="visually-hidden">@Model.Language.Text.ViewLegend</legend>
+                <label class="filter-view-segment">
+                    <input type="radio" name="filter-view" value="all" checked />
+                    <span class="filter-view-text">@Model.Language.Text.ViewAll</span>
+                </label>
+                <label class="filter-view-segment">
+                    <input type="radio" name="filter-view" value="location" />
+                    <span class="filter-view-text">@Model.Language.Text.ViewByLocation</span>
+                </label>
+            </fieldset>
+            <fieldset class="filter-group" data-filter="players">
+                <legend>@Model.Language.Text.PlayersLegend</legend>
+                <label class="filter-chip">
+                    <input type="radio" name="filter-players" value="" checked />
+                    <span class="filter-chip-text">@Model.Language.Text.AnyChoice</span>
+                </label>
+                @for (var players = 1; players <= 8; players++)
+                {
+                    <label class="filter-chip">
+                        <input type="radio" name="filter-players" value="@players" />
+                        <span class="filter-chip-text" aria-hidden="true">@(players == 8 ? "8+" : players.ToString(System.Globalization.CultureInfo.InvariantCulture))</span>
+                        <span class="visually-hidden">@Model.Language.Text.PlayersSuffix(players)</span>
+                    </label>
+                }
+            </fieldset>
+            <fieldset class="filter-group" data-filter="time">
+                <legend>@Model.Language.Text.TimeLegend</legend>
+                <label class="filter-chip">
+                    <input type="radio" name="filter-time" value="" checked />
+                    <span class="filter-chip-text">@Model.Language.Text.AnyChoice</span>
+                </label>
+                @foreach (var minutes in new[] { 30, 45, 60, 90, 120 })
+                {
+                    <label class="filter-chip">
+                        <input type="radio" name="filter-time" value="@minutes" />
+                        <span class="filter-chip-text" aria-hidden="true">@minutes.ToString(System.Globalization.CultureInfo.InvariantCulture)</span>
+                        <span class="visually-hidden">@Model.Language.Text.TimeSuffix(minutes)</span>
+                    </label>
+                }
+            </fieldset>
+            <div class="filter-location" hidden>
+                <label class="visually-hidden" for="filter-loc" hidden>@Model.Language.Text.LocationLabel</label>
+                <select id="filter-loc" name="location" hidden>
+                    <option value="">@Model.Language.Text.AnyLocation</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    <div class="filter-slim">
+        <div class="filter-find">
+            <label class="visually-hidden" for="filter-q">@Model.Language.Text.SearchLabel</label>
+            <span class="filter-search">
+                <input id="filter-q" type="search" name="q" placeholder="@Model.Language.Text.SearchLabel" enterkeyhint="search" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" dir="auto" aria-keyshortcuts="/" />
+                <svg class="filter-glass" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="@iconsUrl#i-search"></use></svg>
+                <kbd class="filter-hint" aria-hidden="true">/</kbd>
+            </span>
+        </div>
+        <button type="button" class="filter-open" aria-haspopup="dialog"><span class="filter-open-text">@Model.Language.Text.FiltersButton</span><span class="visually-hidden filter-open-suffix"></span></button>
         <div class="filter-status">
             <span class="filter-count" aria-hidden="true"></span>
-            <button type="button" class="filter-clear" aria-label="@Model.Language.Text.ClearName">@Model.Language.Text.ClearVisible</button>
             <button type="button" class="filter-clear-icon" aria-label="@Model.Language.Text.ClearName"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="@iconsUrl#i-close"></use></svg></button>
         </div>
     </div>
@@ -187,11 +208,15 @@
     }
     @if (Model.ShowingSample)
     {
-        <div id="cabinet" class="cabinet" role="group" aria-label="@Model.Language.Text.CabinetLabel" aria-describedby="cabinet-hint" data-sample="@Model.SampleName"></div>
+        <div class="cabinet-room">
+            <div id="cabinet" class="cabinet" role="group" aria-label="@Model.Language.Text.CabinetLabel" aria-describedby="cabinet-hint" data-sample="@Model.SampleName"></div>
+        </div>
     }
     else
     {
-        <div id="cabinet" class="cabinet" role="group" aria-label="@Model.Language.Text.CabinetLabel" aria-describedby="cabinet-hint"></div>
+        <div class="cabinet-room">
+            <div id="cabinet" class="cabinet" role="group" aria-label="@Model.Language.Text.CabinetLabel" aria-describedby="cabinet-hint"></div>
+        </div>
     }
     <p id="cabinet-hint" class="visually-hidden">@Model.Language.Text.CabinetHint</p>
     @if (onOwnerPort)

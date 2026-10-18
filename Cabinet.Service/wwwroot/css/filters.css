@@ -80,6 +80,20 @@
   display: none;
 }
 
+/**
+ * The slim row and the search unit inside it give their children to the bar's own row, so the slim bar lays out the search field,
+ * the Filters button and the status group as one flex row. The desktop rail and panel are only drawn by the dock block below.
+ */
+.filter-slim,
+.filter-find {
+  display: contents;
+}
+
+.filter-rail,
+.filter-panel {
+  display: none;
+}
+
 .filter-search {
   position: relative;
   display: block;
@@ -834,10 +848,11 @@
 }
 
 /**
- * The group host is a size container, so the chip grids read the width the groups really have, which is the sheet's width less its
- * padding. Its groups carry no padding, border or margin of their own.
+ * The group host, in the sheet and in the desktop filter panel alike, is a size container, so the chip grids read the width the groups
+ * really have, which is the host's width less its padding. Its groups carry no padding, border or margin of their own.
  */
-.filter-sheet-groups {
+.filter-sheet-groups,
+.filter-panel-groups {
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -845,24 +860,30 @@
 }
 
 .filter-sheet .filter-group,
-.filter-sheet .filter-view {
+.filter-sheet .filter-view,
+.filter-panel .filter-group,
+.filter-panel .filter-view {
   min-inline-size: 0;
   margin: 0;
   padding: 0;
   border: 0;
 }
 
-.filter-sheet .filter-note {
+.filter-sheet .filter-note,
+.filter-panel .filter-note {
   margin: 0;
 }
 
 /**
- * In the sheet every group is named: the legends of the view switch and the players and time groups, and the label of the location
- * select, are shown in the legend style, undoing what hides them in the bar.
+ * In the sheet and in the panel every group is named: the legends of the view switch and the players and time groups, and the label of
+ * the location select, are shown in the legend style, undoing what hides them elsewhere.
  */
 .filter-sheet .filter-view > legend,
 .filter-sheet .filter-group > legend,
-.filter-sheet label[for="filter-loc"] {
+.filter-sheet label[for="filter-loc"],
+.filter-panel .filter-view > legend,
+.filter-panel .filter-group > legend,
+.filter-panel label[for="filter-loc"] {
   position: static;
   display: block;
   float: none;
@@ -879,26 +900,31 @@
   line-height: 1.5;
 }
 
-.filter-sheet label[for="filter-loc"][hidden] {
+.filter-sheet label[for="filter-loc"][hidden],
+.filter-panel label[for="filter-loc"][hidden] {
   display: none;
 }
 
 /**
- * The chips of the sheet stand apart on equal-width grids that every thumb can hit: five columns for players and three for time,
- * and one row of nine or one row of six once the group is wide enough.
+ * The chips of the sheet and the panel stand apart on equal-width grids that every thumb can hit: five columns for players and three
+ * for time, and one row of nine or one row of six once the group is wide enough. The panel is always wide enough for one row of six
+ * times and never for nine players in a row.
  */
-.filter-sheet .filter-group {
+.filter-sheet .filter-group,
+.filter-panel .filter-group {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
   align-items: stretch;
 }
 
-.filter-sheet .filter-group[data-filter="time"] {
+.filter-sheet .filter-group[data-filter="time"],
+.filter-panel .filter-group[data-filter="time"] {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.filter-sheet .filter-chip {
+.filter-sheet .filter-chip,
+.filter-panel .filter-chip {
   min-inline-size: 44px;
   min-block-size: 44px;
   margin: 0;
@@ -907,7 +933,8 @@
 }
 
 @container (inline-size >= 19rem) {
-  .filter-sheet .filter-group[data-filter="time"] {
+  .filter-sheet .filter-group[data-filter="time"],
+  .filter-panel .filter-group[data-filter="time"] {
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }
@@ -919,40 +946,48 @@
 }
 
 /**
- * The view switch in the sheet: its two segments share the width, each with its own outline so the legend above is not enclosed.
+ * The view switch in the sheet and the panel: its two segments share the width, each with its own outline so the legend above is not
+ * enclosed.
  */
-.filter-sheet .filter-view {
+.filter-sheet .filter-view,
+.filter-panel .filter-view {
   display: flex;
   flex-wrap: wrap;
   outline: none;
   overflow: visible;
 }
 
-.filter-sheet .filter-view[hidden] {
+.filter-sheet .filter-view[hidden],
+.filter-panel .filter-view[hidden] {
   display: none;
 }
 
-.filter-sheet .filter-view > legend {
+.filter-sheet .filter-view > legend,
+.filter-panel .filter-view > legend {
   flex: 0 0 100%;
 }
 
-.filter-sheet .filter-view-segment {
+.filter-sheet .filter-view-segment,
+.filter-panel .filter-view-segment {
   flex: 1 1 0;
   border: 1px solid var(--room-line, var(--chrome-line));
   border-radius: 4px 0 0 4px;
 }
 
-.filter-sheet .filter-view-segment + .filter-view-segment {
+.filter-sheet .filter-view-segment + .filter-view-segment,
+.filter-panel .filter-view-segment + .filter-view-segment {
   margin-inline-start: -1px;
   border-radius: 0 4px 4px 0;
 }
 
-.filter-sheet .filter-view-segment:has(input:checked) {
+.filter-sheet .filter-view-segment:has(input:checked),
+.filter-panel .filter-view-segment:has(input:checked) {
   position: relative;
   z-index: 1;
 }
 
-.filter-sheet #filter-loc {
+.filter-sheet #filter-loc,
+.filter-panel #filter-loc {
   inline-size: 100%;
   min-width: 0;
   max-width: none;
@@ -1019,5 +1054,213 @@
 @media (forced-colors: active) {
   .filter-sheet {
     border: 1px solid CanvasText;
+  }
+}
+
+/**
+ * The filter dock of a desktop. From 64rem, and only while the page script has put the dock's state on the root element, the filters
+ * leave the top of the page and stand in a column at the left edge: folded to a 4rem rail of symbols, or open as a 21rem panel that
+ * holds the search field, the count and the choices. The body becomes two columns, the dock and the page column, and the dock is
+ * pinned to the top, the left and the bottom of the viewport while the page scrolls. With the panel open beside the cabinet the dock
+ * column widens to the panel; with the panel open over the cabinet the column stays the rail's width and the panel lies over it.
+ * Nothing here gives the dock or any of its ancestors a transform, a filter, containment or a container type, because each of them
+ * would trap the panel that lies over the cabinet inside that element instead of the viewport. Without the root attribute (no script,
+ * or no cabinet on the page) none of this applies and the page keeps its plain flow.
+ */
+@media (min-width: 64rem) {
+  html[data-filter-dock] body {
+    display: grid;
+    grid-template-columns: 4rem minmax(0, 1fr);
+    grid-template-rows: auto 1fr auto;
+    column-gap: var(--page-pad, 24px);
+    padding: 0 var(--page-pad, 24px) 0 0;
+  }
+
+  html[data-filter-dock="push"] body {
+    grid-template-columns: 21rem minmax(0, 1fr);
+  }
+
+  html[data-filter-dock] body > header {
+    grid-column: 2;
+    grid-row: 1;
+    margin-block-start: var(--page-pad, 24px);
+  }
+
+  html[data-filter-dock] body > main {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  html[data-filter-dock] body > footer {
+    grid-column: 2;
+    grid-row: 3;
+  }
+
+  html[data-filter-dock] .filter-sentinel {
+    display: none;
+  }
+
+  html[data-filter-dock] .filter-bar {
+    grid-column: 1;
+    grid-row: 1 / 4;
+    align-self: start;
+    display: block;
+    position: sticky;
+    top: 0;
+    block-size: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  @supports (block-size: 1dvh) {
+    html[data-filter-dock] .filter-bar {
+      block-size: 100dvh;
+    }
+  }
+
+  html[data-filter-dock] .filter-bar[hidden] {
+    display: none;
+  }
+
+  html[data-filter-dock] .filter-bar::after {
+    display: none;
+  }
+
+  html[data-filter-dock] .filter-slim {
+    display: none;
+  }
+
+  html[data-filter-dock] .filter-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    inline-size: 4rem;
+    min-block-size: 100%;
+    padding: 16px 10px;
+    box-shadow: inset -1px 0 0 color-mix(in srgb, var(--room-line, var(--chrome-line)) 40%, transparent);
+  }
+
+  html[data-filter-dock="push"] .filter-rail {
+    display: none;
+  }
+
+  html[data-filter-dock] .filter-rail > .filter-menu {
+    margin-block-end: 8px;
+  }
+
+  html[data-filter-dock] .filter-menu,
+  html[data-filter-dock] .filter-rail-button,
+  html[data-filter-dock] .filter-rail-clear {
+    position: relative;
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: 44px;
+    block-size: 44px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--room-text, var(--wall-text));
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  html[data-filter-dock] .filter-menu,
+  html[data-filter-dock] .filter-rail-clear {
+    border: 1px solid var(--room-line, var(--chrome-line));
+  }
+
+  html[data-filter-dock] .filter-menu svg,
+  html[data-filter-dock] .filter-rail-button svg,
+  html[data-filter-dock] .filter-rail-clear svg {
+    inline-size: 20px;
+    block-size: 20px;
+    pointer-events: none;
+  }
+
+  html[data-filter-dock] .filter-menu:focus-visible,
+  html[data-filter-dock] .filter-rail-button:focus-visible,
+  html[data-filter-dock] .filter-rail-clear:focus-visible {
+    z-index: 1;
+    outline: 2px solid var(--room-ring, var(--wood-light));
+    outline-offset: 2px;
+  }
+
+  html[data-filter-dock] .filter-rail-button[hidden],
+  html[data-filter-dock] .filter-rail-clear[hidden] {
+    display: none;
+  }
+
+  html[data-filter-dock] .filter-rail-sep {
+    display: none;
+  }
+
+  html[data-filter-dock] .filter-rail-count {
+    display: none;
+  }
+
+  html[data-filter-dock="push"] .filter-panel,
+  html[data-filter-dock="over"] .filter-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    inline-size: 21rem;
+    min-block-size: 100%;
+    padding: 16px;
+    box-shadow: inset -1px 0 0 color-mix(in srgb, var(--room-line, var(--chrome-line)) 40%, transparent);
+  }
+
+  html[data-filter-dock="over"] .filter-panel {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    z-index: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: var(--room, var(--wood-dark));
+  }
+
+  html[data-filter-dock] .filter-panel-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  html[data-filter-dock] .filter-panel-title {
+    margin: 0;
+    color: var(--room-text, var(--wall-text));
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+
+  html[data-filter-dock] .filter-panel-head .filter-clear {
+    margin-inline-start: auto;
+  }
+
+  html[data-filter-dock] .filter-bar:not([data-active]) .filter-panel-head .filter-clear {
+    display: none;
+  }
+
+  html[data-filter-dock] .filter-panel-tally,
+  html[data-filter-dock] .filter-panel-note {
+    margin-block-start: -8px;
+  }
+
+  html[data-filter-dock] .filter-panel-note:not(:has(.filter-note:not([hidden]))) {
+    display: none;
+  }
+
+  html[data-filter-dock] .filter-panel .filter-count {
+    white-space: normal;
+  }
+
+  html[data-filter-dock] .filter-panel .filter-search {
+    flex: none;
   }
 }
