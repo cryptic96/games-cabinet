@@ -3,13 +3,15 @@ using System.Text.Json;
 using Cabinet.BrowserTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.Playwright;
+using SkiaSharp;
 
 namespace Cabinet.BrowserTests;
 
 /// <summary>
 /// Proves in a real browser that the flows that cross the desktop filter dock land where they should: Show on shelf lands the found
 /// box in the page column beside a pushed panel or the folded rail, inside the viewport and ringed, with nothing above it but the
-/// viewport's top.
+/// viewport's top; and the view switch fades only the cabinet, under an open panel that is drawn exactly as it is at rest, and
+/// scrolls up to the cabinet's top when the visitor had scrolled past it.
 /// </summary>
 [Trait("Category", "Browser")]
 public sealed class FilterDockFlowTests : CabinetPageTest
@@ -36,6 +38,54 @@ public sealed class FilterDockFlowTests : CabinetPageTest
             })),
           };
         })
+        """;
+
+    /// <summary>How fast the page's animations run while the middle of the view fade is captured: twenty times slower than normal.</summary>
+    private const double SlowPlayback = 0.05;
+
+    /// <summary>How long after the fade starts the slowed fade is captured, in real milliseconds: early in the old view's fade-out.</summary>
+    private const int MidFadeDelayMs = 1000;
+
+    /// <summary>The distance between two sampled pixels inside the panel, in CSS pixels.</summary>
+    private const int SampleStep = 12;
+
+    /// <summary>The largest difference of one colour channel between two samples that still counts as the same pixel.</summary>
+    private const int ChannelTolerance = 8;
+
+    /// <summary>
+    /// Records the view transition of a view switch: the transition names of the panel and the dock while the switch runs, and when
+    /// the fade is ready and finished.
+    /// </summary>
+    private const string InstallSwitchSpy = """
+        (() => {
+          const spy = { readyAt: null, finishedAt: null, panelName: null, dockName: null };
+          window.__switch = spy;
+          const original = document.startViewTransition?.bind(document);
+          if (original === undefined) {
+            return;
+          }
+          document.startViewTransition = (callback) => {
+            const transition = original(callback);
+            if (document.documentElement.hasAttribute('data-switching-view')) {
+              spy.panelName = getComputedStyle(document.getElementById('filter-panel')).viewTransitionName;
+              spy.dockName = getComputedStyle(document.querySelector('.filter-bar')).viewTransitionName;
+              transition.ready.then(() => { spy.readyAt = performance.now(); }, () => {});
+              transition.finished.then(() => { spy.finishedAt = performance.now(); }, () => {});
+            }
+            return transition;
+          };
+        })();
+        """;
+
+    /// <summary>Measures the panel and the view switch inside it, which changes its own look when it is pressed.</summary>
+    private const string MeasurePanelScript = """
+        () => {
+          const box = (element) => {
+            const rect = element.getBoundingClientRect();
+            return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
+          };
+          return { panel: box(document.getElementById('filter-panel')), view: box(document.querySelector('#filter-panel .filter-view')) };
+        }
         """;
 
     private const string DockRightScript = """
@@ -90,6 +140,115 @@ public sealed class FilterDockFlowTests : CabinetPageTest
         ConsoleErrors.Should().BeEmpty();
     }
 
+    [Theory]
+    [InlineData(DockWidths.Over, "over")]
+    [InlineData(DockWidths.Push, "push")]
+    public async Task The_view_fade_never_paints_over_an_open_panel(int width, string state)
+    {
+        await OpenSampleAsync(width, 900, InstallSwitchSpy);
+        await ExpectViewSwitchAvailableAsync();
+        await OpenFilterPanelAsync();
+        (await DockStateAsync()).Should().Be(state);
+        var segment = Page.Locator("#filter-panel .filter-view-segment").Nth(1);
+        await segment.HoverAsync();
+        await Page.Locator(LocationRadio).FocusAsync();
+        await Page.WaitForFunctionAsync("() => document.getElementById('filter-panel').getAnimations({ subtree: true }).length === 0");
+        var measured = await Page.EvaluateAsync<JsonElement>(MeasurePanelScript);
+        var before = await Page.ScreenshotAsync();
+        var session = await Page.Context.NewCDPSessionAsync(Page);
+        await session.SendAsync("Animation.enable");
+        await session.SendAsync("Animation.setPlaybackRate", new Dictionary<string, object> { ["playbackRate"] = SlowPlayback });
+
+        await segment.ClickAsync();
+
+        await Page.WaitForFunctionAsync("() => window.__switch.readyAt !== null");
+        await Task.Delay(MidFadeDelayMs, TestContext.Current.CancellationToken);
+        var during = await Page.ScreenshotAsync();
+        var running = await Page.EvaluateAsync<bool>("() => window.__switch.finishedAt === null && document.documentElement.hasAttribute('data-switching-view')");
+        var names = await Page.EvaluateAsync<string[]>("() => [window.__switch.panelName, window.__switch.dockName]");
+        await session.SendAsync("Animation.setPlaybackRate", new Dictionary<string, object> { ["playbackRate"] = 1 });
+        await Page.WaitForFunctionAsync("() => !document.documentElement.hasAttribute('data-switching-view')");
+
+        running.Should().BeTrue("the second picture was taken while the fade was still running");
+        var differing = DifferingSamples(before, during, measured);
+        differing.Sampled.Should().BeGreaterThan(200, "the panel is sampled all over");
+        differing.Points.Should().BeEmpty("the panel looks exactly as it did at rest: nothing painted over it, not brighter, not doubled");
+        names.Should().Equal(["filter-panel", "none"], "the panel, never the dock, is named while the view switches");
+        await Expect(Page.Locator(Groups).First).ToBeAttachedAsync();
+        (await DockStateAsync()).Should().Be(state, "the panel is still open after the switch");
+        (await Page.EvaluateAsync<bool>($"() => document.activeElement === document.querySelector('{LocationRadio}')")).Should().BeTrue("focus stays where it was");
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task The_switch_scrolls_up_to_the_cabinet_top_on_a_desktop()
+    {
+        await OpenSampleAsync(DockWidths.Push, 420);
+        await ExpectViewSwitchAvailableAsync();
+        await OpenFilterPanelAsync();
+        await Page.EvaluateAsync("() => window.scrollTo(0, document.documentElement.scrollHeight)");
+        await Page.WaitForFunctionAsync("() => window.scrollY > 300 && document.getElementById('cabinet').getBoundingClientRect().top < 0");
+        var before = await Page.EvaluateAsync<double>("() => window.scrollY");
+
+        await Page.Locator("#filter-panel .filter-view-segment").Nth(1).ClickAsync();
+
+        await Expect(Page.Locator(Groups).First).ToBeAttachedAsync();
+        await Page.WaitForFunctionAsync("() => !document.documentElement.hasAttribute('data-switching-view')");
+        (await Page.EvaluateAsync<double>("() => window.scrollY")).Should().BeLessThanOrEqualTo(before + 0.5, "the page never scrolls down");
+        (await Page.EvaluateAsync<double>("() => document.getElementById('cabinet').getBoundingClientRect().top")).Should().BeApproximately(HeadingGap, 1, "the cabinet's top sits 16 px under the viewport top");
+        (await DockStateAsync()).Should().Be("push");
+
+        await Page.EvaluateAsync("() => window.scrollTo(0, 0)");
+        await Page.WaitForFunctionAsync("() => window.scrollY === 0");
+
+        await Page.Locator("#filter-panel .filter-view-segment").Nth(0).ClickAsync();
+
+        await Expect(Page.Locator(Groups)).ToHaveCountAsync(0);
+        await Page.WaitForFunctionAsync("() => !document.documentElement.hasAttribute('data-switching-view')");
+        (await Page.EvaluateAsync<double>("() => window.scrollY")).Should().Be(0, "with the cabinet's top in view a switch does not scroll");
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    /// <summary>
+    /// Compares two screenshots at points spread over the panel, leaving out the view switch itself (which is pressed) with a margin
+    /// for its focus ring.
+    /// </summary>
+    /// <param name="first">The screenshot at rest.</param>
+    /// <param name="second">The screenshot in the middle of the fade.</param>
+    /// <param name="measured">The panel's and the view switch's boxes.</param>
+    /// <returns>How many points were sampled and where the two differ.</returns>
+    private static (int Sampled, List<string> Points) DifferingSamples(byte[] first, byte[] second, JsonElement measured)
+    {
+        using var rest = SKBitmap.Decode(first);
+        using var fading = SKBitmap.Decode(second);
+        var panel = Edges.Of(measured.GetProperty("panel"));
+        var view = Edges.Of(measured.GetProperty("view"));
+        var points = new List<string>();
+        var sampled = 0;
+
+        for (var y = panel.Top + 2; y < Math.Min(panel.Bottom, rest.Height) - 2; y += SampleStep)
+        {
+            for (var x = panel.Left + 2; x < Math.Min(panel.Right, rest.Width) - 2; x += SampleStep)
+            {
+                if (x > view.Left - 10 && x < view.Right + 10 && y > view.Top - 10 && y < view.Bottom + 10)
+                {
+                    continue;
+                }
+
+                sampled += 1;
+                var a = rest.GetPixel((int)x, (int)y);
+                var b = fading.GetPixel((int)x, (int)y);
+
+                if (Math.Abs(a.Red - b.Red) > ChannelTolerance || Math.Abs(a.Green - b.Green) > ChannelTolerance || Math.Abs(a.Blue - b.Blue) > ChannelTolerance)
+                {
+                    points.Add($"({(int)x}, {(int)y}): {a} became {b}");
+                }
+            }
+        }
+
+        return (sampled, points);
+    }
+
     /// <summary>
     /// Checks a desktop landing: measured on a still layout, nothing above it but the viewport's top, inside the viewport, the heading
     /// 16 px under the top when heading and box both fit and the box centred otherwise, and the found ring in the default wood's light
@@ -130,7 +289,7 @@ public sealed class FilterDockFlowTests : CabinetPageTest
         return $"rgb({channel(1)}, {channel(3)}, {channel(5)})";
     }
 
-    private async Task OpenSampleAsync(int width, int height)
+    private async Task OpenSampleAsync(int width, int height, string? extraScript = null)
     {
         await Page.SetViewportSizeAsync(width, height);
         await StartAsync(PrototypeOn);
@@ -141,6 +300,12 @@ public sealed class FilterDockFlowTests : CabinetPageTest
             Body = "{\"names\":{}}",
         }));
         await Page.AddInitScriptAsync(FilterShowOnShelfTests.InstallRecorder);
+
+        if (extraScript is not null)
+        {
+            await Page.AddInitScriptAsync(extraScript);
+        }
+
         await GotoCabinetAsync("/?sample=65");
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
@@ -186,6 +351,23 @@ public sealed class FilterDockFlowTests : CabinetPageTest
         await box.ScrollIntoViewIfNeededAsync();
         await box.ClickAsync();
         await Expect(Page.Locator(OpenCard)).ToBeVisibleAsync();
+    }
+
+    /// <summary>The edges of a box in the viewport, in CSS pixels.</summary>
+    /// <param name="Left">The left edge.</param>
+    /// <param name="Top">The top edge.</param>
+    /// <param name="Right">The right edge.</param>
+    /// <param name="Bottom">The bottom edge.</param>
+    private sealed record Edges(double Left, double Top, double Right, double Bottom)
+    {
+        /// <summary>Reads the edges the page measured.</summary>
+        /// <param name="box">The measured box.</param>
+        /// <returns>The edges.</returns>
+        public static Edges Of(JsonElement box) => new(
+            box.GetProperty("left").GetDouble(),
+            box.GetProperty("top").GetDouble(),
+            box.GetProperty("right").GetDouble(),
+            box.GetProperty("bottom").GetDouble());
     }
 
     private sealed record MeasuredBox(string Id, double Span);

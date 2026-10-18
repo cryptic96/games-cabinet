@@ -733,6 +733,27 @@ html[data-switching-view]::view-transition-new(cabinet-area) {
   animation-duration: calc(var(--look-fade) / 2);
 }
 
+/**
+ * While the view switches, the open filter panel is a picture of its own that does not animate, so the fading cabinet never covers
+ * it, whether the panel stands beside the cabinet or lies over it. Its old picture is hidden, so the one picture left is drawn as it
+ * is and never blended with an identical copy, which would brighten it. The name goes on the panel and never on the dock: the dock
+ * is an ancestor of the panel that lies over the cabinet, and a name there would make the dock the box that panel is laid out in
+ * instead of the viewport, while the panel itself holds nothing laid out against the viewport. The rail never overlaps the cabinet
+ * and needs no name.
+ */
+html[data-switching-view] #filter-panel {
+  view-transition-name: filter-panel;
+}
+
+html[data-switching-view]::view-transition-group(filter-panel),
+html[data-switching-view]::view-transition-new(filter-panel) {
+  animation: none;
+}
+
+html[data-switching-view]::view-transition-old(filter-panel) {
+  display: none;
+}
+
 ::view-transition-group(pull) {
   animation-timing-function: var(--pull-ease-out);
 }
