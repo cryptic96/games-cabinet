@@ -21,6 +21,14 @@ public sealed class FilterDockGeometryTests : CabinetPageTest
     private const string Cabinet = "#cabinet";
     private const double Rem = 16;
     private const double FullSection = 40 * Rem;
+    private const int ColumnGap = 24;
+    private const string Groups = "#cabinet .location-group";
+
+    /// <summary>A push width between the narrowest push and a wide desktop, where two sections almost reach their full width.</summary>
+    private const int PushedMiddle = 1680;
+
+    /// <summary>A push width wide enough for three sections beside the open panel.</summary>
+    private const int PushedThreeColumns = 2304;
     private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
     private static readonly JsonSerializerOptions WebOptions = new(JsonSerializerDefaults.Web);
 
@@ -194,6 +202,51 @@ public sealed class FilterDockGeometryTests : CabinetPageTest
         ConsoleErrors.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task The_columns_follow_the_room_at_every_width()
+    {
+        await OpenAsync("/?sample=400", PushedMiddle, 900);
+
+        await OpenFilterPanelAsync();
+        await ExpectSectionsAsync(Cabinet, 2, 39.75 * Rem, $"pushed at {PushedMiddle} px");
+
+        await Page.SetViewportSizeAsync(DockWidths.Wide, 900);
+        await OpenFilterPanelAsync();
+        await ExpectSectionsAsync(Cabinet, 2, FullSection, $"pushed at {DockWidths.Wide} px");
+
+        await Page.SetViewportSizeAsync(PushedThreeColumns, 900);
+        await OpenFilterPanelAsync();
+        await ExpectSectionsAsync(Cabinet, 3, 39 * Rem, $"pushed at {PushedThreeColumns} px");
+
+        await FoldFilterPanelAsync();
+        await Page.SetViewportSizeAsync(DockWidths.Wide, 900);
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-filter-dock", "rail");
+        await ExpectSectionsAsync(Cabinet, 3, (DockWidths.Wide - RailWidth - 2 * PageGap - 2 * ColumnGap) / 3.0, $"folded at {DockWidths.Wide} px");
+
+        await Page.SetViewportSizeAsync(DockWidths.Over, 900);
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-filter-dock", "rail");
+        var folded = await ExpectSectionsAsync(Cabinet, 2, (DockWidths.Over - RailWidth - 2 * PageGap - ColumnGap) / 2.0, $"folded at {DockWidths.Over} px");
+        folded.Widths.Should().OnlyContain(width => width >= 35.5 * Rem, "beside the rail a section is never under 35.5rem");
+
+        await OpenFilterPanelAsync();
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-filter-dock", "over");
+        var over = await ReadSectionsAsync(Cabinet);
+        over.Widths.Should().Equal(folded.Widths, (actual, expected) => Math.Abs(actual - expected) <= 1, "the panel that lies over the cabinet leaves its sections as they were");
+        over.FirstRow.Should().Be(folded.FirstRow);
+        await Page.Keyboard.PressAsync("Escape");
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-filter-dock", "rail");
+
+        await Page.SetViewportSizeAsync(DockWidths.Push, 900);
+        await ExpectViewSwitchAvailableAsync();
+        await OpenFilterPanelAsync();
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-filter-dock", "push");
+        await ChooseViewAsync(1);
+        await Page.WaitForFunctionAsync("() => document.querySelectorAll('#cabinet .location-group').length > 1");
+        await ExpectSectionsAsync(Groups, null, 32.25 * Rem, $"by location, pushed at {DockWidths.Push} px");
+
+        ConsoleErrors.Should().BeEmpty();
+    }
+
     private const string ReadPageFrame = """
         () => {
           const cabinet = document.getElementById('cabinet').getBoundingClientRect();
@@ -276,7 +329,7 @@ public sealed class FilterDockGeometryTests : CabinetPageTest
     /// Waits a moment for every section under the given parents to be drawn at the expected width, then checks the width and the
     /// number of sections in the first row, so a width that never arrives fails with the widths that were measured.
     /// </summary>
-    private async Task<SectionReading> ExpectSectionsAsync(string parent, int columns, double width, string label)
+    private async Task<SectionReading> ExpectSectionsAsync(string parent, int? columns, double width, string label)
     {
         try
         {
@@ -285,18 +338,24 @@ public sealed class FilterDockGeometryTests : CabinetPageTest
                 new object[] { parent, width },
                 new PageWaitForFunctionOptions { Timeout = 5000 });
         }
-        catch (TimeoutException)
+        catch (PlaywrightException)
         {
         }
 
-        var reading = JsonSerializer.Deserialize<SectionReading>((await Page.EvaluateAsync<JsonElement>(ReadSections, parent)).GetRawText(), WebOptions)!;
+        var reading = await ReadSectionsAsync(parent);
 
         reading.Widths.Should().NotBeEmpty(label);
         reading.Widths.Should().OnlyContain(actual => Math.Abs(actual - width) <= 1, $"{label}: every section is {width / Rem}rem wide, measured {string.Join(", ", reading.Widths.Distinct())}");
-        reading.FirstRow.Should().Be(columns, $"{label}: the first row holds {columns} sections");
+        if (columns is not null)
+        {
+            reading.FirstRow.Should().Be(columns, $"{label}: the first row holds {columns} sections");
+        }
 
         return reading;
     }
+
+    private async Task<SectionReading> ReadSectionsAsync(string parent) =>
+        JsonSerializer.Deserialize<SectionReading>((await Page.EvaluateAsync<JsonElement>(ReadSections, parent)).GetRawText(), WebOptions)!;
 
     private async Task ExpectRailAgainstTheEdgesAsync(string label)
     {
