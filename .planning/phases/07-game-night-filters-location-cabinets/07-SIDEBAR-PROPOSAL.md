@@ -199,6 +199,14 @@ I reviewed my own frames with the senior-frontend checklist before writing this 
 - **T5.** The drawer's head repeats the three-line button in the same spot as the strip's button (pressing it again puts the drawer away) instead of an × close button. Chosen so the drawer seems to fold out of the button, and so it is not confused with the × of Clear.
 - **T6.** S-B's folded rail costs the cabinet 64 px of width: at 1280 px today's 38rem sections become 35rem (at 1440 px nothing changes). I would accept it.
 
+## Orchestrator's review of this proposal
+
+A second senior-frontend look at the frames before they reach you (the key frames at full size and the rest in contact sheets):
+
+- **I agree with S-B on desktop.** Folded, the rail gives the cabinet the whole wall and still shows which filters are on (filled icons, "11 of 52" and Clear on the rail); open, the panel reads as part of the wall on dark and light walls. Choosing push or fly-over by width (X5c) is the right answer to the 1280 px problem the frames show.
+- **Phones (Q4) are a real choice, not a detail.** You asked for a sidebar on the left. On a 390 px phone a left drawer leaves about 50 px of the cabinet visible, so you no longer see the shadow change as you tap a chip (`SB-open-brown-390-en.png`); today's bottom sheet keeps the top of the cabinet in view (`S0-current-sheet-brown-390-en.png`). I agree with keeping the sheet, but if you want the same left panel on every device, answer Q4 with X3a: it costs one more plan and the live view on phones.
+- **If you pick S-A instead:** the open drawer covers the strip's search field on desktop (`SA-open-brown-1440-en.png`), so search would have to move into the drawer as well.
+
 ## Your questions
 
 Answer by label; "all recommended" is fine.
