@@ -148,6 +148,11 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
   const rail = bar.querySelector('.filter-rail');
   const panel = bar.querySelector('#filter-panel');
   const placeButton = bar.querySelector('.filter-rail-button[data-group="location"]');
+  const railButtons = [...bar.querySelectorAll('.filter-rail-button')];
+  const railSearch = bar.querySelector('.filter-rail-button[data-group="search"]');
+  const railCount = bar.querySelector('.filter-rail-count');
+  const railClear = bar.querySelector('.filter-rail-clear');
+  const menus = [...bar.querySelectorAll('.filter-menu')];
 
   const note = document.querySelector('.filter-note');
   const writer = createFilterWriter({
@@ -282,6 +287,91 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
   }
 
   /**
+   * Gives the visible text of the chip a group stands on, such as "4", "8+" or "60".
+   * @param {string} name The group, players or time.
+   * @param {number} value The value the group stands on.
+   * @returns {string | null} The chip's text, or null when the page has no such chip.
+   */
+  function chipText(name, value) {
+    const group = groups.find((candidate) => candidate.name === name);
+    const chip = group?.element.querySelector(`input[value="${value}"]`)?.closest('.filter-chip');
+
+    return chip?.querySelector('.filter-chip-text')?.textContent.trim() ?? null;
+  }
+
+  /**
+   * Gives the value a rail button shows for its group while that filter is in use: the typed search, the chosen chip's text or the
+   * chosen location's name as the select shows it. A group on Any, or a card-based group while the card details are off, has none.
+   * @param {string} group The rail button's group: search, players, time or location.
+   * @returns {string | null}
+   */
+  function railValue(group) {
+    if (group === 'search') {
+      return fold(state.q) === '' ? null : state.q.trim();
+    }
+
+    if (cardFiltersOff) {
+      return null;
+    }
+
+    if (group === 'players' || group === 'time') {
+      return state[group] === null ? null : chipText(group, state[group]);
+    }
+
+    if (group === 'location' && state.location !== null && place !== null) {
+      return [...place.options].find((option) => option.value === state.location)?.textContent ?? null;
+    }
+
+    return null;
+  }
+
+  /**
+   * Writes the folded rail for the current result, so it tells what is filtered without opening anything. A group whose filter is in
+   * use is filled and carries its value in its name and tooltip; a card-based group is marked unavailable while the card details are
+   * off. Only while filtering the two-line count and the rail's Clear show, Clear highlighted when nothing matches. Both three-line
+   * buttons say how many filters are in use. Names are written as attributes and text only.
+   * @param {boolean} none Whether a filter is in use and nothing matches.
+   */
+  function showRail(none) {
+    for (const button of railButtons) {
+      const group = button.dataset.group ?? '';
+      const label = button.dataset.label ?? '';
+      const value = railValue(group);
+      const name = value === null ? label : copy.railName(label, value);
+
+      button.toggleAttribute('data-filled', value !== null);
+      button.toggleAttribute('data-unavailable', cardFiltersOff && group !== 'search');
+      button.setAttribute('aria-label', name);
+      button.setAttribute('title', name);
+    }
+
+    if (railCount !== null) {
+      railCount.hidden = !result.active;
+      railCount.querySelector('.filter-rail-count-number').textContent = String(tally.lit);
+      railCount.querySelector('.filter-rail-count-of').textContent = copy.railCountOf(tally.total);
+    }
+
+    if (railClear !== null) {
+      railClear.hidden = !result.active;
+      railClear.toggleAttribute('data-highlighted', none);
+    }
+
+    const active = activeFilters();
+
+    for (const menu of menus) {
+      const visible = menu.querySelector('.filter-menu-text')?.textContent ?? '';
+      const name = copy.filtersButtonName(active);
+      const suffix = menu.querySelector('.filter-menu-suffix');
+
+      if (suffix !== null) {
+        suffix.textContent = name.startsWith(visible) ? name.slice(visible.length) : '';
+      }
+
+      menu.setAttribute('title', name);
+    }
+  }
+
+  /**
    * Writes the count and the state of the bar for the current result.
    */
   function showTally() {
@@ -293,6 +383,7 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
     bar.toggleAttribute('data-active', result.active);
     clear.toggleAttribute('data-highlighted', none);
     clearIcon?.toggleAttribute('data-highlighted', none);
+    showRail(none);
     showFiltersButton();
     showHeadings();
   }
@@ -664,6 +755,10 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
 
   clear.addEventListener('click', () => clearAll());
   clearIcon?.addEventListener('click', () => clearAll());
+
+  if (railClear !== null && railSearch !== null) {
+    railClear.addEventListener('click', () => clearAll(railSearch));
+  }
   window.matchMedia(FULL_BAR).addEventListener('change', showTally);
 
   let showSlimBar = () => {};

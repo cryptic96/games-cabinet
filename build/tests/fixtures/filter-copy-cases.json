@@ -92,5 +92,15 @@
   { "key": "unknownLocationHeading", "language": "en", "args": [0,2,true], "text": "Unknown location · 0 of 2 games", "stack": "js" },
   { "key": "unknownLocationHeading", "language": "nl", "args": [0,2,true], "text": "Onbekende locatie · 0 van 2 spellen", "stack": "js" },
   { "key": "showOnShelfName", "language": "en", "args": ["Shelf B"], "text": "Show on shelf: Shelf B", "stack": "js" },
-  { "key": "showOnShelfName", "language": "nl", "args": ["Shelf B"], "text": "Toon in de kast: Shelf B", "stack": "js" }
+  { "key": "showOnShelfName", "language": "nl", "args": ["Shelf B"], "text": "Toon in de kast: Shelf B", "stack": "js" },
+  { "key": "railName", "language": "en", "args": ["Players","4"], "text": "Players: 4", "stack": "js" },
+  { "key": "railName", "language": "nl", "args": ["Spelers","4"], "text": "Spelers: 4", "stack": "js" },
+  { "key": "railCountOf", "language": "en", "args": [52], "text": "of 52", "stack": "js" },
+  { "key": "railCountOf", "language": "nl", "args": [52], "text": "van 52", "stack": "js" },
+  { "key": "railCountOf", "language": "en", "args": [400], "text": "of 400", "stack": "js" },
+  { "key": "railCountOf", "language": "nl", "args": [400], "text": "van 400", "stack": "js" },
+  { "key": "gamesTotal", "language": "en", "args": [52], "text": "52 games", "stack": "js" },
+  { "key": "gamesTotal", "language": "nl", "args": [52], "text": "52 spellen", "stack": "js" },
+  { "key": "gamesTotal", "language": "en", "args": [1], "text": "1 game", "stack": "js" },
+  { "key": "gamesTotal", "language": "nl", "args": [1], "text": "1 spel", "stack": "js" }
 ]
