@@ -2,12 +2,12 @@
  * The Filters sheet of a phone or tablet: below 64rem the bar is a slim bar with the search field and a Filters button, and the
  * choices (the view switch, players, time and location) live in a bottom sheet over a clear backdrop, so the dimmed cabinet stays
  * visible above them while the visitor chooses. There is one set of controls; this module moves each one between its slot in the
- * full bar and its slot in the sheet when the width crosses 64rem. The sheet closes the way the detail card's sheet does: its
- * primary button, Escape, a tap on the cabinet, a drag down from its grip strip, and Back.
+ * desktop filter panel and its slot in the sheet or the slim bar when the width crosses 64rem. The sheet closes the way the detail
+ * card's sheet does: its primary button, Escape, a tap on the cabinet, a drag down from its grip strip, and Back.
  */
 import { createHistoryStep, dragOutcome, recentSamples, releaseSpeed, resist } from './card-flow.js';
 
-/** The media query that says the full bar is in use; below it the controls live in the sheet. */
+/** The media query that says the desktop filter panel is in use; below it the controls live in the sheet and the slim bar. */
 const FULL_BAR = '(min-width: 64rem)';
 
 /** The media query that says the visitor prefers less motion. */
@@ -71,8 +71,9 @@ export function slideDecision({ lastY, y, away, blocked, barHeight }) {
  * @param {object} parts What the sheet needs from the page.
  * @param {HTMLElement} parts.bar The filter bar.
  * @param {HTMLDialogElement} parts.dialog The sheet's dialog.
- * @param {{ view: HTMLElement | null, players: HTMLElement | null, time: HTMLElement | null, location: HTMLElement | null, note: HTMLElement | null }} parts.units
- * The movable units of the control set.
+ * @param {{ find: HTMLElement | null, count: HTMLElement | null, view: HTMLElement | null, players: HTMLElement | null, time: HTMLElement | null, location: HTMLElement | null, note: HTMLElement | null }} parts.units
+ * The movable units of the control set: the search field with its label, the count, the view switch, the two chip groups, the
+ * location group and the note about the card details.
  * @param {HTMLElement} parts.openButton The Filters button of the slim bar.
  * @param {HTMLElement | null} parts.cabinet The element the cabinet is drawn in, whose lit boxes the page scrolls to.
  * @param {object} parts.copy The visitor-facing strings of the page language.
@@ -87,8 +88,14 @@ export function initFilterSheet({ bar, dialog, units, openButton, cabinet, copy,
   const slot = dialog.querySelector('.filter-sheet-groups');
   const done = dialog.querySelector('.filter-done');
   const sheetClear = dialog.querySelector('.filter-sheet-clear');
-  const rows = [...bar.querySelectorAll('.filter-row')];
+  const slim = bar.querySelector('.filter-slim');
   const status = bar.querySelector('.filter-status');
+  const panelSlots = {
+    find: bar.querySelector('.filter-panel-find'),
+    tally: bar.querySelector('.filter-panel-tally'),
+    note: bar.querySelector('.filter-panel-note'),
+    groups: bar.querySelector('.filter-panel-groups'),
+  };
   const full = window.matchMedia(FULL_BAR);
   const steps = createHistoryStep({
     history: window.history,
@@ -130,40 +137,45 @@ export function initFilterSheet({ bar, dialog, units, openButton, cabinet, copy,
   }
 
   /**
-   * Puts every unit where the current width wants it: each one on its own into the sheet's slot in the order view, players, time,
-   * location, note, or back into its place in the bar against an anchor that never moves, so the bar's order holds after any
-   * number of moves.
+   * Appends the units that exist to a slot, in the order given; a missing slot or unit is skipped.
+   * @param {HTMLElement | null} target The slot.
+   * @param {Array<HTMLElement | null>} found The units, in the order they stand in the slot.
+   */
+  function putInto(target, found) {
+    const present = found.filter((unit) => unit !== null);
+
+    if (target !== null && present.length > 0) {
+      target.append(...present);
+    }
+  }
+
+  /**
+   * Puts every unit where the current width wants it. From 64rem each one goes to its slot in the panel, in the panel's order: the
+   * search field, the count, the note, then view, players, time and location. Below 64rem the search field goes back to the start of
+   * the slim bar, the count back into the status group before its Clear, and the groups and the note into the sheet's slot in the
+   * order view, players, time, location, note. The slots never move, so the order holds after any number of moves.
    */
   function place() {
-    const { view, players, time, location, note } = units;
+    const { find, count, view, players, time, location, note } = units;
 
-    if (!full.matches) {
-      slot.append(...[view, players, time, location, note].filter((unit) => unit !== null));
+    if (full.matches) {
+      putInto(panelSlots.find, [find]);
+      putInto(panelSlots.tally, [count]);
+      putInto(panelSlots.note, [note]);
+      putInto(panelSlots.groups, [view, players, time, location]);
 
       return;
     }
 
-    const [first, second] = rows;
-
-    if (view !== null) {
-      first.prepend(view);
+    if (find !== null && slim !== null) {
+      slim.prepend(find);
     }
 
-    if (players !== null) {
-      first.append(players);
+    if (count !== null && status !== null) {
+      status.prepend(count);
     }
 
-    if (time !== null) {
-      second.prepend(time);
-    }
-
-    if (location !== null) {
-      second.insertBefore(location, status);
-    }
-
-    if (note !== null) {
-      bar.after(note);
-    }
+    putInto(slot, [view, players, time, location, note]);
   }
 
   /**
@@ -199,8 +211,8 @@ export function initFilterSheet({ bar, dialog, units, openButton, cabinet, copy,
 
   /**
    * Opens the sheet over the cabinet, takes the one history step and moves focus to the first control. Focus is released first, so
-   * the browser has nothing to scroll back to when the dialog closes; the sheet returns focus itself. Nothing happens in the full
-   * bar, where there is no sheet, or while the sheet is already open.
+   * the browser has nothing to scroll back to when the dialog closes; the sheet returns focus itself. Nothing happens on a desktop,
+   * where the controls live in the filter panel and there is no sheet, or while the sheet is already open.
    * @returns {Promise<void>}
    */
   async function open() {
@@ -444,8 +456,8 @@ export function initFilterSheet({ bar, dialog, units, openButton, cabinet, copy,
   }
 
   /**
-   * Listens for scrolling while the slim bar is in use, with the one passive listener, and lets go of it in the full bar, which stays
-   * pinned and never slides.
+   * Listens for scrolling while the slim bar is in use, with the one passive listener, and lets go of it on a desktop, where the filter
+   * dock stays pinned at the left edge and never slides.
    */
   function watchScroll() {
     if (full.matches) {

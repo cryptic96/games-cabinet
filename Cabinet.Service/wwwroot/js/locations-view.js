@@ -20,6 +20,12 @@ const SWITCH_MARKER = 'data-switching-view';
 /** The query that tells the visitor wants less motion. */
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
+/**
+ * The query from which the filters stand in the dock at the left edge of the screen. The dock is pinned too, but it covers nothing
+ * above the cabinet, so from this width there is no bar edge to keep the cabinet below.
+ */
+const DOCK_QUERY = '(min-width: 64rem)';
+
 /** The gap, in pixels, between the bottom of the bar and the top of the cabinet after the page scrolled up. */
 const BAR_GAP_PX = 16;
 
@@ -280,6 +286,14 @@ export function initLocationsView({
   }
 
   /**
+   * Tells whether the filters stand in the dock at the left edge, which covers nothing above the cabinet.
+   * @returns {boolean}
+   */
+  function inDock() {
+    return window.matchMedia?.(DOCK_QUERY)?.matches === true;
+  }
+
+  /**
    * Scrolls the page up when the swap left the cabinet's top above the bar, and never down.
    */
   function keepCabinetInReach() {
@@ -287,7 +301,8 @@ export function initLocationsView({
       return;
     }
 
-    const target = scrollAfterSwitch(cabinet.getBoundingClientRect().top, bar.getBoundingClientRect().bottom, window.scrollY);
+    const barBottom = inDock() ? 0 : bar.getBoundingClientRect().bottom;
+    const target = scrollAfterSwitch(cabinet.getBoundingClientRect().top, barBottom, window.scrollY);
 
     if (target !== null) {
       window.scrollTo({ top: target, behavior: 'instant' });
@@ -299,7 +314,7 @@ export function initLocationsView({
    * @returns {number}
    */
   function pinnedBarBottom() {
-    if (bar === null || window.getComputedStyle(bar).position !== 'sticky') {
+    if (bar === null || inDock() || window.getComputedStyle(bar).position !== 'sticky') {
       return 0;
     }
 

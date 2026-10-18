@@ -1,5 +1,6 @@
 /**
- * The filter bar above the cabinet: the search field, the chip groups and the count of games that stand in the light. Typing or
+ * The filters of the cabinet: the search field, the chip groups and the count of games that stand in the light, in the desktop dock at
+ * the left edge from 64rem and in the slim bar with its sheet below that. Typing or
  * choosing puts every box that is not part of a matching family into shadow where it stands, in the same task as the keystroke or tap;
  * nothing moves and nothing is removed. The rules live in the pure filter-rules module; this module only reads the controls, toggles
  * an attribute on the boxes and writes text.
@@ -22,6 +23,7 @@ import {
 } from './filter-rules.js';
 import { createFilterWriter } from './filter-state.js';
 import { initFilterSheet } from './filter-sheet.js';
+import { initFilterDock } from './filter-dock.js';
 
 /** How long the count must stay unchanged before it is announced to a screen reader, in milliseconds. */
 export const FILTER_ANNOUNCE_MS = 600;
@@ -32,7 +34,7 @@ export const FILTER_ANNOUNCE_MS = 600;
  */
 export const BULK_VEIL_COUNT = 120;
 
-/** The media query that says the full bar is in use; below it the bar is the slim bar, whose count is the short one. */
+/** The media query that says the desktop dock is in use; below it the bar is the slim bar, whose count is the short one. */
 const FULL_BAR = '(min-width: 64rem)';
 
 /** The address of the other titles of the owned games, which the search reads once on first use. */
@@ -76,10 +78,11 @@ export const NO_FILTERS = Object.freeze({
 });
 
 /**
- * Keeps the page in step with the pinned bar without a scroll handler. One observer on the zero-height marker that sits right before
- * the bar sets the stuck attribute while the marker is above the top of the viewport, which is when the bar is pinned, and a second
- * observer writes the bar's height on the root while the bar is pinned, and zero while it is not, so the page can keep focused and
- * scrolled-to boxes clear of it.
+ * Keeps the page in step with the pinned slim bar without a scroll handler. One observer on the zero-height marker that sits right
+ * before the bar sets the stuck attribute while the marker is above the top of the viewport, which is when the bar is pinned, and a
+ * second observer writes the bar's height on the root while the slim bar is pinned, and zero while it is not, so the page can keep
+ * focused and scrolled-to boxes clear of it. From 64rem the filters stand in the dock at the left edge, which covers nothing above
+ * the cabinet, so the height written is always zero there.
  * @param {HTMLElement} bar The filter bar element.
  */
 function watchPinning(bar) {
@@ -98,7 +101,7 @@ function watchPinning(bar) {
 
   if ('ResizeObserver' in window) {
     const publish = () => {
-      const pinned = window.getComputedStyle(bar).position === 'sticky';
+      const pinned = !window.matchMedia(FULL_BAR).matches && window.getComputedStyle(bar).position === 'sticky';
 
       document.documentElement.style.setProperty('--filter-bar-h', `${pinned ? bar.offsetHeight : 0}px`);
     };
@@ -142,6 +145,9 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
   const groups = CHIP_GROUPS.map((group) => ({ ...group, element: document.querySelector(`.filter-group[data-filter="${group.name}"]`) })).filter((group) => group.element !== null);
   const openButton = bar.querySelector('.filter-open');
   const sheetDialog = document.querySelector('.filter-dialog');
+  const rail = bar.querySelector('.filter-rail');
+  const panel = bar.querySelector('#filter-panel');
+  const placeButton = bar.querySelector('.filter-rail-button[data-group="location"]');
 
   const note = document.querySelector('.filter-note');
   const writer = createFilterWriter({
@@ -167,6 +173,8 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
   let bulkFrame = 0;
 
   watchPinning(bar);
+
+  const dock = rail !== null && panel !== null ? initFilterDock({ rail, panel, field, fallbackFocus: openButton }) : null;
 
   /**
    * Lists the entries the count works on for the view on screen: one list for the whole collection, or one per location cabinet.
@@ -240,6 +248,10 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
 
     if (placeLabel !== null) {
       placeLabel.hidden = !shown;
+    }
+
+    if (placeButton !== null) {
+      placeButton.hidden = !shown;
     }
 
     place.value = effectiveLocation(state.location, model) ?? '';
@@ -547,11 +559,18 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
   }
 
   /**
-   * Shows or hides the bar, and the note about the card details with it: the note only shows while the bar does.
+   * Shows or hides the bar, and the note about the card details with it: the note only shows while the bar does. The desktop dock
+   * keeps its column only while the bar is shown, so a page that shows a message instead of a cabinet has no empty column.
    * @param {boolean} visible Whether the bar is shown.
    */
   function showBar(visible) {
     bar.toggleAttribute('hidden', !visible);
+
+    if (visible) {
+      dock?.attach();
+    } else {
+      dock?.detach();
+    }
 
     if (note !== null) {
       note.hidden = !visible || !cardFiltersOff;
@@ -658,6 +677,8 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
       copy,
       getCount: () => ({ lit: tally.lit, total: tally.total, active: result.active }),
       units: {
+        find: bar.querySelector('.filter-find'),
+        count,
         view: document.querySelector('.filter-view'),
         players: groups.find((group) => group.name === 'players')?.element ?? null,
         time: groups.find((group) => group.name === 'time')?.element ?? null,
@@ -679,6 +700,13 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
     }
 
     event.preventDefault();
+
+    if (dock !== null && window.matchMedia(FULL_BAR).matches) {
+      dock.open({ focus: 'search' });
+
+      return;
+    }
+
     showSlimBar();
     field.focus();
     field.select();
