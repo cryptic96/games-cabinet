@@ -8,7 +8,8 @@ namespace Cabinet.BrowserTests;
 /// <summary>
 /// Proves in a real browser how the filters sit on a desktop: the page loads with a folded rail at the left edge and no filter option
 /// in sight, the rail's three-line button opens a panel beside the cabinet that holds the one control set, a typed title dims
-/// everything outside its family, and the panel folds back to the rail.
+/// everything outside its family, and the panel folds back to the rail. Nothing filter-related sits above the cabinet, the rail is
+/// pinned against the left, top and bottom edges while the page scrolls, and the dock's states are drawn by the style sheet.
 /// </summary>
 [Trait("Category", "Browser")]
 public sealed class FilterDockGeometryTests : CabinetPageTest
@@ -111,6 +112,137 @@ public sealed class FilterDockGeometryTests : CabinetPageTest
             .Should().BeTrue("the slash selects the text already in the field");
         await SaveScreenshotAsync("filter-dock-push-filtering");
         ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task No_filter_element_sits_above_the_cabinet_on_a_desktop()
+    {
+        await OpenAsync("/?sample=400", DockWidths.NarrowestDesktop, 900);
+
+        foreach (var width in new[] { DockWidths.NarrowestDesktop, DockWidths.Push, DockWidths.Wide })
+        {
+            await Page.SetViewportSizeAsync(width, 900);
+            await Page.EvaluateAsync("() => window.scrollTo(0, 0)");
+            await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-filter-dock", "rail");
+            await Page.WaitForFunctionAsync("() => getComputedStyle(document.documentElement).getPropertyValue('--filter-bar-h').trim() === '0px'");
+
+            var frame = await Page.EvaluateAsync<JsonElement>(ReadPageFrame);
+            var label = $"at {width} px";
+            frame.GetProperty("above").GetArrayLength().Should().Be(0, $"{label} nothing filter-related sits above the cabinet: {frame.GetProperty("above").GetRawText()}");
+            frame.GetProperty("sentinelRendered").GetBoolean().Should().BeFalse(label);
+            frame.GetProperty("cabinetTop").GetDouble().Should().BeApproximately(frame.GetProperty("headerBottom").GetDouble() + 32, 1, label);
+
+            await ExpectRailAgainstTheEdgesAsync(label);
+            await Page.EvaluateAsync("() => window.scrollTo(0, 1200)");
+            await Page.WaitForFunctionAsync("() => window.scrollY >= 1199");
+            await ExpectRailAgainstTheEdgesAsync($"{label} after scrolling");
+        }
+
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task The_dock_wears_its_states_from_the_stylesheet()
+    {
+        await OpenAsync("/?sample=65", DockWidths.Over, 720);
+
+        await Page.EvaluateAsync("() => { document.documentElement.dataset.filterDock = 'over'; }");
+        await Page.WaitForFunctionAsync("() => getComputedStyle(document.getElementById('filter-panel')).translate === 'none' || getComputedStyle(document.getElementById('filter-panel')).translate === '0px'");
+
+        var over = await Page.EvaluateAsync<JsonElement>(ReadOverPanel);
+        over.GetProperty("position").GetString().Should().Be("fixed");
+        over.GetProperty("left").GetDouble().Should().BeApproximately(0, 0.5);
+        over.GetProperty("top").GetDouble().Should().BeApproximately(0, 0.5);
+        over.GetProperty("width").GetDouble().Should().BeApproximately(PanelWidth, 0.5);
+        over.GetProperty("height").GetDouble().Should().BeApproximately(over.GetProperty("viewportHeight").GetDouble(), 0.5);
+        over.GetProperty("background").GetString().Should().Be(over.GetProperty("wall").GetString(), "the panel over the cabinet stands on the wall colour");
+        over.GetProperty("shadow").GetString().Should().Contain(over.GetProperty("shade").GetString(), "the shadow is tinted with the wall's shade");
+
+        await Page.EvaluateAsync("() => { document.documentElement.dataset.filterDock = 'rail'; document.querySelector('.filter-rail-button[data-group=\"players\"]').setAttribute('data-filled', ''); document.querySelector('.filter-rail-button[data-group=\"time\"]').setAttribute('data-unavailable', ''); }");
+
+        var states = await Page.EvaluateAsync<JsonElement>(ReadRailStates);
+        states.GetProperty("filled").GetString().Should().Be(states.GetProperty("text").GetString(), "a filled rail button takes the wall text as its fill");
+        states.GetProperty("unavailableBorder").GetString().Should().Be("dashed");
+        states.GetProperty("unavailableFill").GetString().Should().NotBe(states.GetProperty("text").GetString());
+
+        await Page.EmulateMediaAsync(new PageEmulateMediaOptions { ReducedMotion = ReducedMotion.Reduce });
+        await Page.EvaluateAsync("() => { document.documentElement.dataset.filterDock = 'over'; }");
+        (await Page.EvaluateAsync<string>("() => getComputedStyle(document.getElementById('filter-panel')).transitionDuration"))
+            .Split(',').Select(part => part.Trim()).Should().OnlyContain(part => part == "0s");
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    private const string ReadPageFrame = """
+        () => {
+          const cabinet = document.getElementById('cabinet').getBoundingClientRect();
+          const header = document.querySelector('body > header').getBoundingClientRect();
+          const above = [...document.querySelectorAll('.filter-bar *')]
+            .filter((element) => element.getClientRects().length > 0)
+            .map((element) => ({ element, rect: element.getBoundingClientRect() }))
+            .filter(({ rect }) => rect.width > 0 && rect.height > 0 && rect.right > header.left + 0.5 && rect.top < cabinet.top - 0.5)
+            .map(({ element }) => element.className || element.id || element.tagName);
+          return {
+            above,
+            sentinelRendered: document.querySelector('.filter-sentinel').getClientRects().length > 0,
+            cabinetTop: cabinet.top,
+            headerBottom: header.bottom,
+          };
+        }
+        """;
+
+    private const string ReadRail = """
+        () => {
+          const rect = document.querySelector('.filter-rail').getBoundingClientRect();
+          return { left: rect.left, top: rect.top, bottom: rect.bottom, width: rect.width, viewportHeight: window.innerHeight };
+        }
+        """;
+
+    private const string ReadOverPanel = """
+        () => {
+          const panel = document.getElementById('filter-panel');
+          const rect = panel.getBoundingClientRect();
+          const style = getComputedStyle(panel);
+          const probe = document.createElement('span');
+          probe.style.setProperty('background-color', 'var(--room)');
+          document.body.append(probe);
+          const wall = getComputedStyle(probe).backgroundColor;
+          probe.remove();
+          const shade = getComputedStyle(document.documentElement).getPropertyValue('--room-shade-rgb').trim().split(/\s+/).join(', ');
+          return {
+            position: style.position,
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height,
+            viewportHeight: window.innerHeight,
+            background: style.backgroundColor,
+            wall,
+            shadow: style.boxShadow,
+            shade: `rgba(${shade}, 0.7)`,
+          };
+        }
+        """;
+
+    private const string ReadRailStates = """
+        () => {
+          const probe = document.createElement('span');
+          probe.style.setProperty('background-color', 'var(--room-text)');
+          document.body.append(probe);
+          const text = getComputedStyle(probe).backgroundColor;
+          probe.remove();
+          const filled = getComputedStyle(document.querySelector('.filter-rail-button[data-group="players"]'));
+          const unavailable = getComputedStyle(document.querySelector('.filter-rail-button[data-group="time"]'));
+          return { text, filled: filled.backgroundColor, unavailableBorder: unavailable.borderTopStyle, unavailableFill: unavailable.backgroundColor };
+        }
+        """;
+
+    private async Task ExpectRailAgainstTheEdgesAsync(string label)
+    {
+        var rail = await Page.EvaluateAsync<JsonElement>(ReadRail);
+        rail.GetProperty("width").GetDouble().Should().BeApproximately(RailWidth, 0.5, label);
+        rail.GetProperty("left").GetDouble().Should().BeApproximately(0, 0.5, $"{label}: the rail touches the left edge");
+        rail.GetProperty("top").GetDouble().Should().BeApproximately(0, 0.5, $"{label}: the rail touches the top edge");
+        rail.GetProperty("bottom").GetDouble().Should().BeApproximately(rail.GetProperty("viewportHeight").GetDouble(), 0.5, $"{label}: the rail touches the bottom edge");
     }
 
     private async Task OpenAsync(string path, int width, int height)

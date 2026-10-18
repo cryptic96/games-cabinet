@@ -1,8 +1,8 @@
 /**
- * The filter bar on the wall above the cabinet: a search field, the player and time choices, the count of games that stand in the
- * light and a button that clears the choices. It is page chrome in wall colours, like the rest of the page controls, and holds no cabinet rule: the shadow a search
- * puts on a box is drawn by the modifiers layer. The bar is transparent so the wall shows through, and the group at its end is
- * hidden by visibility while nothing is filtered, so its space stays and the bar never changes height when a search starts.
+ * The filters of the cabinet: a search field, the player and time choices, the count of games that stand in the light and a button
+ * that clears the choices. On a phone or tablet they sit in a slim bar above the cabinet with the choices in a bottom sheet; on a
+ * desktop they stand in a dock at the left edge of the screen, folded to a rail or open as a panel. It is page chrome in wall colours,
+ * like the rest of the page controls, and holds no cabinet rule: the shadow a search puts on a box is drawn by the modifiers layer.
  */
 .filter-sentinel {
   block-size: 0;
@@ -21,9 +21,9 @@
 }
 
 /**
- * The bar stays pinned at the top while the cabinet scrolls. It runs edge to edge across the page padding so its fill, once stuck,
- * covers the full width. In the page flow it has no fill; the fill and the shadow live on one layer under the controls that fades in
- * when the sentinel above the bar has scrolled out of view. The padding of the page is 24px from 64rem and 8px below it.
+ * The slim bar stays pinned at the top while the cabinet scrolls. It runs edge to edge across the page padding so its fill, once
+ * stuck, covers the full width. In the page flow it has no fill; the fill and the shadow live on one layer under the controls that
+ * fades in when the sentinel above the bar has scrolled out of view. On a desktop the dock block at the end of this sheet takes over.
  */
 .filter-bar {
   --bar-pad: var(--page-pad, 8px);
@@ -53,27 +53,10 @@
   opacity: 1;
 }
 
-@media (min-width: 64rem) {
-  .filter-bar {
-    --bar-pad: var(--page-pad, 24px);
-  }
-
-  html {
-    scroll-padding-top: var(--filter-bar-h, 0px);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .filter-bar::after {
     transition: none;
   }
-}
-
-.filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 16px;
 }
 
 .filter-bar[hidden] {
@@ -145,11 +128,6 @@
   gap: 8px;
 }
 
-.filter-bar:not([data-active]) .filter-status {
-  visibility: hidden;
-}
-
-
 .filter-count {
   font-size: 16px;
   font-weight: 600;
@@ -207,7 +185,8 @@
  * When nothing matches, Clear is the action to take, so it is drawn as the inverted wall fill, the way a chosen value is.
  */
 .filter-clear[data-highlighted],
-.filter-clear-icon[data-highlighted] {
+.filter-clear-icon[data-highlighted],
+.filter-rail-clear[data-highlighted] {
   background: var(--room-text, var(--wall-text));
   color: var(--room, var(--wood-dark));
   font-weight: 600;
@@ -240,11 +219,13 @@
 }
 
 /**
- * A group of choices: its legend stands inline before the chips, which form one segmented control with shared borders. The legend
- * is floated so that it is an ordinary item of the row and the group can lay out as a flex row; it still names the group.
+ * A group of choices: its legend names the group above its chips, which stand apart as separate chips. The sheet and the panel lay
+ * the chips out on their grids.
  */
 .filter-group {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   align-items: center;
   min-width: 0;
   margin: 0;
@@ -253,8 +234,6 @@
 }
 
 .filter-group > legend {
-  float: inline-start;
-  margin-inline-end: 8px;
   padding: 0;
   font-size: 14px;
   font-weight: 600;
@@ -263,7 +242,7 @@
 
 /**
  * One chip: the label is the visible control and the radio inside it is an invisible hit target that covers the whole chip, so the
- * native group keeps its role, its one tab stop and its arrow keys. Neighbouring chips share their border.
+ * native group keeps its role, its one tab stop and its arrow keys.
  */
 .filter-chip {
   position: relative;
@@ -272,9 +251,10 @@
   justify-content: center;
   min-width: 44px;
   min-height: 44px;
-  margin-inline-start: -1px;
+  margin: 0;
   padding-inline: 12px;
   border: 1px solid var(--room-line, var(--chrome-line));
+  border-radius: 4px;
   background: transparent;
   color: var(--room-text, var(--wall-text));
   font-size: 16px;
@@ -283,17 +263,6 @@
   font-variant-numeric: tabular-nums;
   cursor: pointer;
   touch-action: manipulation;
-}
-
-.filter-group > legend + .filter-chip {
-  margin-inline-start: 0;
-  border-start-start-radius: 4px;
-  border-end-start-radius: 4px;
-}
-
-.filter-group > .filter-chip:last-child {
-  border-start-end-radius: 4px;
-  border-end-end-radius: 4px;
 }
 
 .filter-chip input {
@@ -565,40 +534,6 @@
 }
 
 /**
- * From 64rem the bar is two designed rows of one line each: nothing wraps inside a row or inside a group, and the status group at the
- * end of the second row keeps its space while it is hidden, so the bar is the same height whether or not a filter is set.
- */
-@media (min-width: 64rem) {
-  .filter-row,
-  .filter-group {
-    flex-wrap: nowrap;
-  }
-}
-
-/**
- * On a screen too narrow for nine segments in a line, the chips of a group wrap and stand apart as separate chips, each still 44 px
- * high and wide, so the page never scrolls sideways.
- */
-@media not all and (min-width: 64rem) {
-  .filter-group {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .filter-group > legend {
-    float: none;
-    margin-inline-end: 0;
-  }
-
-  .filter-chip,
-  .filter-group > legend + .filter-chip,
-  .filter-group > .filter-chip:last-child {
-    margin-inline-start: 0;
-    border-radius: 4px;
-  }
-}
-
-/**
  * The Filters button of the slim bar, shown below 64rem only. It is as tall as every other control, never narrower than 88px, and
  * its text carries the number of filters in use.
  */
@@ -633,8 +568,7 @@
 
 /**
  * Below 64rem the bar is one slim row: the search field takes the spare width, then the Filters button, then the count and Clear
- * while a filter is in use. The two rows dissolve so their remaining items join the one row, and the controls that are not in the
- * bar live in the sheet.
+ * while a filter is in use. The controls that are not in the bar live in the sheet.
  */
 @media not all and (min-width: 64rem) {
   .filter-bar {
@@ -654,10 +588,6 @@
     transition:
       transform var(--fallback-close) var(--pull-ease-out),
       visibility 0s linear var(--fallback-close);
-  }
-
-  .filter-row {
-    display: contents;
   }
 
   .filter-search {
@@ -1063,9 +993,11 @@
  * holds the search field, the count and the choices. The body becomes two columns, the dock and the page column, and the dock is
  * pinned to the top, the left and the bottom of the viewport while the page scrolls. With the panel open beside the cabinet the dock
  * column widens to the panel; with the panel open over the cabinet the column stays the rail's width and the panel lies over it.
+ * The dock is the plain wall: rail and pushed panel are transparent with one hairline at their inline end, drawn as a shadow so the
+ * widths stay exact; only the panel that lies over the cabinet takes the wall colour and a soft shadow that falls away from the lamp.
  * Nothing here gives the dock or any of its ancestors a transform, a filter, containment or a container type, because each of them
- * would trap the panel that lies over the cabinet inside that element instead of the viewport. Without the root attribute (no script,
- * or no cabinet on the page) none of this applies and the page keeps its plain flow.
+ * would trap the panel that lies over the cabinet inside that element instead of the viewport; the panel's own slide is its own
+ * translate. Without the root attribute (no script, or no cabinet on the page) none of this applies and the page keeps its plain flow.
  */
 @media (min-width: 64rem) {
   html[data-filter-dock] body {
@@ -1132,6 +1064,10 @@
     display: none;
   }
 
+  /**
+   * The rail: the three-line button, then the four group buttons, then, only while filtering, a short rule, the two-line count and
+   * the Clear button. Each button is a 44px target centred in the 64px column.
+   */
   html[data-filter-dock] .filter-rail {
     display: flex;
     flex-direction: column;
@@ -1140,6 +1076,7 @@
     inline-size: 4rem;
     min-block-size: 100%;
     padding: 16px 10px;
+    background: transparent;
     box-shadow: inset -1px 0 0 color-mix(in srgb, var(--room-line, var(--chrome-line)) 40%, transparent);
   }
 
@@ -1196,11 +1133,74 @@
     display: none;
   }
 
+  /**
+   * A group button whose filter is in use is filled with the wall colours inverted, the chosen-chip pair, so what is bright on the
+   * rail is what is active. A button whose control is off because the card details failed is dashed and muted instead and is never
+   * filled; it stays operable and opens the panel, where the note says why.
+   */
+  html[data-filter-dock] .filter-rail-button[data-filled]:not([data-unavailable]) {
+    background: var(--room-text, var(--wall-text));
+    color: var(--room, var(--wood-dark));
+  }
+
+  html[data-filter-dock] .filter-rail-button[data-unavailable] {
+    border: 1px dashed var(--room-line, var(--chrome-line));
+    color: var(--room-muted, var(--chrome-muted));
+  }
+
   html[data-filter-dock] .filter-rail-sep {
+    display: none;
+    flex: none;
+    inline-size: 24px;
+    block-size: 1px;
+    margin-block: 8px;
+    background: var(--room-line, var(--chrome-line));
+  }
+
+  html[data-filter-dock] .filter-rail-sep:has(~ .filter-rail-clear:not([hidden])) {
+    display: block;
+  }
+
+  /**
+   * The rail's count: the number on one line and "of 52" under it in the muted wall colour, centred over the rail's full width. The
+   * second line may wrap at its space and is never clipped.
+   */
+  html[data-filter-dock] .filter-rail-count {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    align-self: stretch;
+    margin-inline: -10px;
+    padding-inline: 4px;
+    text-align: center;
+  }
+
+  html[data-filter-dock] .filter-rail-count[hidden] {
     display: none;
   }
 
-  html[data-filter-dock] .filter-rail-count {
+  html[data-filter-dock] .filter-rail-count-number {
+    color: var(--room-text, var(--wall-text));
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+  }
+
+  html[data-filter-dock] .filter-rail-count-of {
+    color: var(--room-muted, var(--chrome-muted));
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /**
+   * The panel: the head row, the search field, the count line, the note when the card details failed, and the groups, with 16px
+   * between them and 8px under the search field. Beside the cabinet it is the plain wall; over the cabinet it takes the wall colour
+   * and the soft shadow, and slides in from the left edge.
+   */
+  html[data-filter-dock] .filter-panel {
     display: none;
   }
 
@@ -1212,6 +1212,7 @@
     inline-size: 21rem;
     min-block-size: 100%;
     padding: 16px;
+    background: transparent;
     box-shadow: inset -1px 0 0 color-mix(in srgb, var(--room-line, var(--chrome-line)) 40%, transparent);
   }
 
@@ -1223,6 +1224,23 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     background: var(--room, var(--wood-dark));
+    box-shadow:
+      inset -1px 0 0 color-mix(in srgb, var(--room-line, var(--chrome-line)) 40%, transparent),
+      12px 0 32px -12px rgb(var(--room-shade-rgb, 20 10 4) / 0.7);
+    translate: 0 0;
+    transition: translate var(--fallback-open) var(--pull-ease-out);
+  }
+
+  @starting-style {
+    html[data-filter-dock="over"] .filter-panel {
+      translate: -100% 0;
+    }
+  }
+
+  html[data-filter-dock="over"] .filter-panel[data-folding] {
+    translate: -100% 0;
+    transition-duration: var(--fallback-close);
+    pointer-events: none;
   }
 
   html[data-filter-dock] .filter-panel-head {
@@ -1256,11 +1274,66 @@
     display: none;
   }
 
+  html[data-filter-dock] .filter-panel .filter-search {
+    flex: none;
+  }
+
+  /**
+   * The panel's count line: the muted wall colour in regular weight at rest, strong wall text while filtering. It may wrap, so a long
+   * sentence never widens the panel.
+   */
   html[data-filter-dock] .filter-panel .filter-count {
+    display: block;
+    color: var(--room-text, var(--wall-text));
+    font-weight: 600;
     white-space: normal;
   }
 
-  html[data-filter-dock] .filter-panel .filter-search {
-    flex: none;
+  html[data-filter-dock] .filter-bar:not([data-active]) .filter-panel .filter-count {
+    color: var(--room-muted, var(--chrome-muted));
+    font-weight: 400;
+  }
+}
+
+/**
+ * A pointer that hovers puts the wall's wash behind a dock button that is neither filled nor off, so the target is clear before the
+ * press.
+ */
+@media (min-width: 64rem) and (hover: hover) and (pointer: fine) {
+  html[data-filter-dock] .filter-menu:hover,
+  html[data-filter-dock] .filter-rail-button:not([data-filled], [data-unavailable]):hover,
+  html[data-filter-dock] .filter-rail-clear:not([data-highlighted]):hover {
+    background: var(--room-wash, color-mix(in srgb, var(--room-text, var(--wall-text)) 8%, transparent));
+  }
+}
+
+/**
+ * For a visitor who prefers less motion the panel over the cabinet appears and goes at once.
+ */
+@media (min-width: 64rem) and (prefers-reduced-motion: reduce) {
+  html[data-filter-dock="over"] .filter-panel,
+  html[data-filter-dock="over"] .filter-panel[data-folding] {
+    transition: none;
+  }
+}
+
+/**
+ * Forced colours drop shadows and fills, so the dock's edge becomes a system border, the panel over the cabinet stands on the system
+ * background, and a filled rail button carries the chips' system outline inside its edge.
+ */
+@media (min-width: 64rem) and (forced-colors: active) {
+  html[data-filter-dock] .filter-rail,
+  html[data-filter-dock="push"] .filter-panel,
+  html[data-filter-dock="over"] .filter-panel {
+    border-inline-end: 1px solid CanvasText;
+  }
+
+  html[data-filter-dock="over"] .filter-panel {
+    background: Canvas;
+  }
+
+  html[data-filter-dock] .filter-rail-button[data-filled]:not([data-unavailable]) {
+    outline: 2px solid Highlight;
+    outline-offset: -4px;
   }
 }
