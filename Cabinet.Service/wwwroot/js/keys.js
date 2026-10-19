@@ -165,13 +165,24 @@ export function nearestBox(rects, from) {
 }
 
 /**
- * Lists the indices of the rectangles in on-screen reading order: by top edge, then by left edge, where tops within the tolerance of
- * the first top of a row count as the same row. The order does not depend on the order of the input.
- * @param {{ left: number, top: number }[]} rects The rectangles to order.
+ * Gives the top edge a rectangle is read by: the top of the shelf the box stands on when it is known, otherwise its own. Boxes stand on
+ * the shelf's floor, so boxes of one shelf have different tops of their own whenever their heights differ.
+ * @param {{ top: number, shelfTop?: number }} rect A rectangle.
+ * @returns {number}
+ */
+function rowTopOf(rect) {
+  return typeof rect.shelfTop === 'number' ? rect.shelfTop : rect.top;
+}
+
+/**
+ * Lists the indices of the rectangles in on-screen reading order: by the top of the shelf each box stands on, then by left edge,
+ * where shelf tops within the tolerance of the first one of a row count as the same row, so a short box left of a tall one on the
+ * same shelf comes first. A pile on one spot is read from the top down. The order does not depend on the order of the input.
+ * @param {{ left: number, top: number, shelfTop?: number }[]} rects The rectangles to order.
  * @returns {number[]} The indices of the rectangles, first in reading order first.
  */
 export function readingOrder(rects) {
-  const byTop = rects.map((rect, index) => index).sort((a, b) => rects[a].top - rects[b].top || rects[a].left - rects[b].left || a - b);
+  const byTop = rects.map((rect, index) => index).sort((a, b) => rowTopOf(rects[a]) - rowTopOf(rects[b]) || rects[a].left - rects[b].left || a - b);
   const ordered = [];
   let row = [];
   let rowTop = 0;
@@ -183,12 +194,12 @@ export function readingOrder(rects) {
   };
 
   for (const index of byTop) {
-    if (row.length > 0 && rects[index].top > rowTop + TOLERANCE) {
+    if (row.length > 0 && rowTopOf(rects[index]) > rowTop + TOLERANCE) {
       closeRow();
     }
 
     if (row.length === 0) {
-      rowTop = rects[index].top;
+      rowTop = rowTopOf(rects[index]);
     }
 
     row.push(index);
@@ -261,15 +272,24 @@ function keyOf(element) {
 }
 
 /**
- * Reads the rectangles of boxes as they sit on screen right now.
+ * Reads the rectangles of boxes as they sit on screen right now, each with the top of the cubby it stands in.
  * @param {HTMLElement[]} boxes The boxes to measure.
- * @returns {{ left: number, top: number, right: number, bottom: number, shelf: string }[]}
+ * @returns {{ left: number, top: number, right: number, bottom: number, shelf: string, shelfTop: number }[]}
  */
 function rectsOf(boxes) {
+  const cubbyTops = new Map();
+
   return boxes.map((candidate) => {
     const rect = candidate.getBoundingClientRect();
+    const cubby = candidate.closest('.cubby');
 
-    return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, shelf: candidate.dataset.shelf };
+    if (cubby !== null && !cubbyTops.has(cubby)) {
+      cubbyTops.set(cubby, cubby.getBoundingClientRect().top);
+    }
+
+    const shelfTop = cubby === null ? rect.top : cubbyTops.get(cubby);
+
+    return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, shelf: candidate.dataset.shelf, shelfTop };
   });
 }
 
