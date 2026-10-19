@@ -1,4 +1,4 @@
-# Device round on the deployed release (v0.9.0)
+# Device round on the deployed release (v0.10.0)
 
 Checks that only a real phone and a real screen reader can judge. Run them on the cabinet's address (the live site). Nothing here needs a computer.
 
@@ -18,7 +18,7 @@ Back means the system Back, by button and by swipe from the screen edge. Each Ba
 
 Pass: the card closes and you are still on the cabinet.
 
-Result A1: pending
+Result A1: pass
 
 ### A2. Back closes a card after tapping inside it
 
@@ -27,7 +27,7 @@ Result A1: pending
 
 Pass: the card closes and you are still on the cabinet. The tap inside did not add an extra step.
 
-Result A2: pending
+Result A2: pass
 
 ### A3. Back gesture closes an open card
 
@@ -36,7 +36,7 @@ Result A2: pending
 
 Pass: the card closes and you are still on the cabinet.
 
-Result A3: pending
+Result A3: pass
 
 ### A4. Back gesture after tapping inside the card
 
@@ -44,7 +44,7 @@ Result A3: pending
 
 Pass: the card closes and you are still on the cabinet.
 
-Result A4: pending
+Result A4: pass
 
 ### A5. With nothing open, Back leaves the page as before
 
@@ -53,7 +53,7 @@ Result A4: pending
 
 Pass: the browser returns to the page you opened in A1 step 1 (the cabinet is left in one step, not stuck).
 
-Result A5: pending
+Result A5: pass
 
 ### A6. Back closes the Filters sheet and nothing else (button)
 
@@ -62,7 +62,7 @@ Result A5: pending
 
 Pass: only the sheet closes. You stay on the cabinet, no card opens or closes, nothing else changes.
 
-Result A6: pending
+Result A6: pass
 
 ### A7. Back with a filter active keeps the filter (button)
 
@@ -71,7 +71,7 @@ Result A6: pending
 
 Pass: the sheet closes, the filter is still on (the bar shows the count such as "12 of 48" and the Filters button shows "Filters - 1"), and you are still on the cabinet.
 
-Result A7: pending
+Result A7: pass
 
 ### A8. The same by gesture
 
@@ -80,7 +80,7 @@ Result A7: pending
 
 Pass: the same as A6 and A7: only the sheet closes, the filter stays, you stay on the cabinet. Then, with nothing open, one more Back leaves the page.
 
-Result A8: pending
+Result A8: pass
 
 ## Part S. Screen reader (TalkBack on Android, or VoiceOver on iPhone)
 
@@ -93,7 +93,7 @@ Turn the screen reader on, then use the live cabinet. Swipe right for the next i
 
 Pass: it is announced as a skip link, and after activating it the next item you reach is the games list (its first game).
 
-Result S1: pending
+Result S1: not run - screen readers are out of scope for now; the owner cannot test with one
 
 ### S2. An entry reads its title, facts and location
 
@@ -101,7 +101,7 @@ Result S1: pending
 
 Pass: each entry reads the game's title and its game-night facts (players, play time, weight), and the place where it is stored when it has one.
 
-Result S2: pending
+Result S2: not run - screen readers are out of scope for now; the owner cannot test with one
 
 ### S3. Filtering gives one count announcement
 
@@ -110,7 +110,7 @@ Result S2: pending
 
 Pass: you hear the count once, in the full form such as "12 of 48 games", not once per letter and not the short form "12 of 48".
 
-Result S3: pending
+Result S3: not run - screen readers are out of scope for now; the owner cannot test with one
 
 ### S4. The filtered list holds only the matches
 
@@ -118,7 +118,7 @@ Result S3: pending
 
 Pass: only the matching games are read. Games that do not match are skipped.
 
-Result S4: pending
+Result S4: not run - screen readers are out of scope for now; the owner cannot test with one
 
 ### S5. By location reads one heading per location with its count
 
@@ -127,7 +127,7 @@ Result S4: pending
 
 Pass: you hear one heading per storage location with the number of games in it, and the entries come after the heading of the location they belong to. The new view is announced when you switch.
 
-Result S5: pending
+Result S5: not run - screen readers are out of scope for now; the owner cannot test with one
 
 ### S6. Clear restores the full list
 
@@ -135,7 +135,7 @@ Result S5: pending
 
 Pass: you hear that filters are cleared and the full game count (for example "Filters cleared, 48 games"), the list holds every game again, and the view you were in did not change.
 
-Result S6: pending
+Result S6: not run - screen readers are out of scope for now; the owner cannot test with one
 
 ## Part P. The slim bar on a small phone
 
@@ -147,7 +147,7 @@ Result S6: pending
 
 Pass: in both languages the bar stays one row of the same height, with the search field, the Filters button, the count (short form such as "12 of 48" / Dutch equivalent) and the clear button all visible and not wrapped or cut off. A screenshot is welcome if it shows no personal data.
 
-Result P1: pending
+Result P1: pass
 
 ## Optional extras
 
@@ -162,7 +162,7 @@ Only if you have a minute. These come from points the build review left for a re
 
 Pass: scrolling down slides the bar away; a small scroll up brings it back; with a filter on, or with the search field focused, the bar never slides away. In the edge case an away bar slides up out of its place without looking broken (say if it looks odd).
 
-Result P2: pending
+Result P2: pass
 
 ### P3. (optional) Switching views with the Filters sheet open
 
@@ -171,8 +171,19 @@ Result P2: pending
 
 Pass: the view changes. The cross-fade may paint over the sheet for about a quarter of a second. Say whether that looks wrong (a flash over the sheet) or is fine.
 
-Result P3: pending
+Result P3: pass
 
 ## How to answer
 
 List results by label, for example "A1-A8 pass, S1-S6 pass, P1 pass", or describe issues in your own words ("A7 fail: the filter was cleared"). Say "not run: no Android phone" (or similar) for anything you could not do. Add P2 and P3 notes if you tried them.
+
+## Owner's answer (2026-10-19)
+
+The round ran on v0.10.0, deployed on 2026-10-19. The owner's answer, verbatim:
+
+> screen reader out of scope for now. Can't test it. write as a todo.
+> all others seem to work fine!
+>
+> all pass for device round
+
+How it is recorded above: A1 to A8 pass; P1 pass; the optional P2 and P3 pass (the owner said all the other checks work fine); S1 to S6 not run, because screen readers are out of scope for now. The optional desktop items from the round's plan were not in this checklist: P4 is not recorded, and P5 (a desktop screen-reader check of the fly-over Filters panel) falls under the same screen-reader scope. S1 to S6 and the P5 check stay open in `.planning/todos/pending/2026-10-12-screen-reader-check-of-games-list.md`.

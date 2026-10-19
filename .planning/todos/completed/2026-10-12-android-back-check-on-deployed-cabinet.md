@@ -24,3 +24,7 @@ When an Android phone is available (borrowed is fine), in Chrome on the deployed
 5. With no card open, press Back once more: the browser returns to the page from step 1.
 
 Record the result in `05-UAT.md` test 1, or note any issue for a fix.
+
+## Resolution
+
+Done (2026-10-19, phase 7 device round on v0.10.0): on an Android phone in Chrome, Back by button and by gesture closes an open card and nothing else, also after tapping inside the card, and with nothing open one Back leaves the page (A1 to A5). The same holds for the phone's Filters sheet: Back closes only the sheet and keeps an active filter (A6 to A8). Recorded in `07-DEVICE-ROUND.md` and in `05-UAT.md` test 1, which now reads pass.
