@@ -27,6 +27,25 @@ public sealed class OwnerRestoreTests
     }
 
     [Fact]
+    public void The_placed_figure_counts_every_copy_kept_in_a_location_so_moving_one_copy_out_changes_it()
+    {
+        var current = OwnerData.Empty with
+        {
+            Locations = [new OwnerLocation(FileLocationA, CabinetA), new OwnerLocation(FileLocationB, ShelfB)],
+            Games =
+            [
+                new OwnerGame(100, FileLocationA, null, null, 7001),
+                new OwnerGame(100, FileLocationB, null, null, 7002),
+                new OwnerGame(101, FileLocationA, null, null),
+            ],
+        };
+        var secondCopyNotPlaced = current with { Games = [current.Games[0], current.Games[2]] };
+
+        OwnerDataFigures.From(current).PlacedGames.Should().Be(3);
+        OwnerDataFigures.From(secondCopyNotPlaced).PlacedGames.Should().Be(2);
+    }
+
+    [Fact]
     public void The_line_about_pictures_being_fetched_again_reads_in_the_singular_for_one()
     {
         OwnerStrings.FetchingPictures(1).Should().Be("Fetching 1 picture in the background.");

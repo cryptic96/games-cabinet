@@ -62,7 +62,10 @@ public sealed record OwnerGame(int GameId, string? LocationId, DateTimeOffset? A
 
 /// <summary>The three counts that say what a copy of the owner data holds, which the owner compares before a copy replaces another.</summary>
 /// <param name="Locations">How many locations there are.</param>
-/// <param name="PlacedGames">How many games are kept in a location.</param>
+/// <param name="PlacedGames">
+/// How many copies are kept in a location, counted the way the rest of the owner tools count games: one for each copy with a
+/// location of its own, and one for a location that holds for every copy of a game. Moving one copy of a game changes it.
+/// </param>
 /// <param name="PictureChoices">How many games have a picture other than the automatic one.</param>
 public readonly record struct OwnerDataFigures(int Locations, int PlacedGames, int PictureChoices)
 {
@@ -74,7 +77,7 @@ public readonly record struct OwnerDataFigures(int Locations, int PlacedGames, i
 
         return new OwnerDataFigures(
             data.Locations.Count,
-            data.Games.Where(game => game.LocationId is not null).Select(game => game.GameId).Distinct().Count(),
+            data.Games.Count(game => game.LocationId is not null),
             data.Games.Count(game => game.Picture is { } picture && picture.Choice != PictureChoice.Automatic));
     }
 }
