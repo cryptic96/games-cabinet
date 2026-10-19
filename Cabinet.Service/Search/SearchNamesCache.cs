@@ -31,7 +31,8 @@ public sealed record CachedNames(string Json, string ETag)
 /// <summary>
 /// Keeps the other titles of every invented collection that has been asked for, built once per process. Callers only pass
 /// names from the fixed sample allowlist, so the number of entries is bounded and a visitor cannot grow the cache. The real
-/// collection's names live with the collection itself.
+/// collection's names live with the collection itself. A sample's names that fail to build are remembered as failed until the
+/// process restarts: a sample never changes, so building again would fail the same way.
 /// </summary>
 /// <param name="catalog">The sample allowlist that supplies each sample's items.</param>
 public sealed class SearchNamesCache(SampleCatalog catalog)

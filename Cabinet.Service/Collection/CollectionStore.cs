@@ -14,7 +14,9 @@ namespace Cabinet.Service.Collection;
 /// <summary>
 /// One immutable view of the owned collection: the items to draw, which collection version they came from, and when they
 /// were captured. A new view replaces the old one as a whole, so a reader that holds one never sees a half-updated
-/// collection. The layouts and card records built from it are kept with it and disappear with it.
+/// collection. The layouts and card records built from it are kept with it and disappear with it. A build that fails is
+/// remembered as failed for the life of the view: every build is a pure function of the view, so building again would fail
+/// the same way and only repeat the work on every request.
 /// </summary>
 public sealed class CollectionState
 {
