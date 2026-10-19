@@ -31,17 +31,19 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 - ✓ Series stand together and a base game with two or more owned expansions faces out, its expansions continuing into the next cubby when needed — Phase 4 (owner request during the server review)
 - ✓ Tapping a game pulls the box out of the shelf (view-transition animation, plain fade where unsupported) and opens a detail card: cover, title, year, players, play time, weight, minimum age, owned expansions (tap to swap), BGG rating, designers, mechanics and a link to BGG; the storage-location row is built and shows as soon as locations exist (owner tools) — Phase 5 (v0.6.0, owner-checked on iPhone Safari, desktop and Firefox)
 - ✓ Reduced motion gets the card with a fade and the box outlined in place, no pull-out — Phase 5
-- ✓ Keyboard: the cabinet is one tab stop with arrow, Home and End navigation and Enter to open; screen readers get a skip link and an A to Z list of every game whose entries open the card — Phase 5 (real screen-reader listen and Android Back are open todos)
+- ✓ Keyboard: the cabinet is one tab stop with arrow, Home and End navigation and Enter to open; screen readers get a skip link and an A to Z list of every game whose entries open the card — Phase 5 (Android Back checked on a real phone in Phase 7; the real screen-reader listen is deferred by the owner and kept as a todo)
 - ✓ Site labels in English and Dutch: the page follows the browser language from the first byte, an EN · NL toggle switches in place and is remembered in one cookie, and game titles stay exactly as BGG provides them — Phase 5
 - ✓ Owner tools on their own port and hostname, reachable only from the home network or VPN (proxy allow-list, container firewall, a listener wall and a client-range wall that fails closed unless the request came through the configured proxy); the public site answers 404 for every owner path and asset — Phase 6 (v0.7.0, owner-verified from home and from outside)
 - ✓ The owner chooses each game's picture (owned edition, main picture or a pasted BGG gallery link, previewed on a mini shelf) from a "Worth a look" worklist, and every visitor's cabinet and card follow — Phase 6
 - ✓ The owner keeps an ordered list of storage locations and places games (row picker, bulk move, expansions follow their base); every visitor's card shows the location — Phase 6
 - ✓ Owner data lives in its own file beside the synced collection and survives syncs, restarts and releases (ten earlier versions kept, change log with Undo); backed up by the owner's own download and restorable after a strict check and a side-by-side preview — Phase 6 (live backup and restore round trip done by the owner)
+- ✓ Game-night filters: search by name (also across a game's other BGG titles), player count, play time and storage location combine; non-matching games dim in place, an expansion follows its base game, a match count shows and one tap clears everything — Phase 7 (v0.10.0, owner-checked on the deployed site and a real Android phone)
+- ✓ Visitors toggle between one big cabinet and one cabinet per storage location, in the owner's order, with unplaced games in an "Unknown location" cabinet — Phase 7
+- ✓ Filters stay out of sight until asked for: a folded rail of symbols at the left on desktop opens a filter panel (beside the cabinet on wide screens, over it below that), and phones keep a slim bar with a Filters sheet; the choices last for the tab and the view for the device — Phase 7 (owner-requested rework after v0.9.0)
+- ✓ Storage locations are kept per copy, so two copies of one game can stand in different places; the owner tools place each copy, and the location list's game counts and delete warnings count copies — Phase 7
 
 ### Active
 
-- [ ] Visitors can toggle between one big cabinet and one cabinet per storage location
-- [ ] Game-night filters: player count, play time, storage location, search by name (non-matching games dim on the shelf)
 - [ ] Before the site goes public: revoke or downgrade the development admin account (passwordless sudo) on the server, and drop the LAN/VPN allow-list from the route
 - [ ] Site is public and read-only with no accounts, reachable from the internet through the existing Traefik reverse proxy (the owner tools already stay home/VPN-only)
 - [ ] Before the site goes public: also downgrade or revoke the maintenance key on the reverse-proxy container, added in Phase 6 to switch the owner host on
@@ -111,7 +113,7 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 | Sync about hourly, plus a manual sync button with a global cooldown | Fresh enough after adding a game; can't be abused to hit BGG rate limits | — Pending |
 | Mix of face-out boxes and generated spines, packed to look good | Mirrors the inspiration photo; looks like a real cabinet | ✓ Good — approved after two screenshot review rounds and on the deployed v0.2.0 (Phase 2); flat piles and big boxes lying flat added at the owner's request |
 | Expansions as sideways spines beside their base game | Owner's idea; keeps families together visually | ✓ Revised — thick big-box expansions stand upright beside the base, thin ones stack thickest at the bottom (Phase 2, owner request after seeing the first families) |
-| Toggle between one cabinet and one cabinet per location | Supports both browsing and "where is it?" | — Pending |
+| Toggle between one cabinet and one cabinet per location | Supports both browsing and "where is it?" | ✓ Good — one cabinet per location in the owner's order, Unknown location last (Phase 7, v0.10.0) |
 | On mobile, reflow to a narrow, tall cabinet | Keeps the cabinet look on phones instead of falling back to a list | ✓ Good — separate phone section design with derived readability minimums; owner walked it on a real phone (Phase 2) |
 | Tap shows a pull-out animation and a detail card | Delight plus the info friends need to pick a game | — Pending |
 | Owned games only | Wishlist, preordered and for-trade statuses are not wanted | — Pending |
@@ -136,6 +138,10 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 | Backup by the owner's own download (reminder banner), not a scheduled job | Smallest moving part on a low-power host; the owner keeps the file off the server | ✓ Good — owner made a real backup and restored it in UAT (Phase 6) |
 | Owner tools on a separate port and hostname behind the proxy allow-list, not a login | No accounts on a public site; nothing writable reachable from the internet | ✓ Good — walls proven by self-check, route check and an outside-network test (Phase 6) |
 | Owner picture links only from BGG's own picture host | One fixed host keeps the server-side fetch safe and stays within BGG's gallery and terms | ✓ Confirmed by the owner (Phase 6): no other sources |
+| Filters dim in place instead of hiding or moving games | The cabinet stays the same cabinet while narrowing; friends still see where everything stands | ✓ Good — owner-approved over two build review rounds (Phase 7) |
+| Filter options folded away by default: a left rail and panel on desktop, a slim bar and sheet on phones | Owner disliked the filter bar above the cabinet after v0.9.0; the cabinet comes first | ✓ Good — reworked within Phase 7 and released as v0.10.0 |
+| Storage locations per copy, not per game | Owners can keep two copies of one game in different places | ✓ Good — owner's choice during Phase 7 (copy key shown beside the game) |
+| Real screen-reader listen deferred | The owner cannot test with a screen reader at the moment; automated tests cover the structure, roles, live regions and focus | ⚠ Deferred by the owner (Phase 7 device round); kept as a todo |
 
 ## Evolution
 
@@ -155,4 +161,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-13 after Phase 6 (owner tools and persistence; released as v0.7.0, review and security fixes on the milestone branch for v0.7.1)*
+*Last updated: 2026-10-19 after Phase 7 (game-night filters and location cabinets; released as v0.9.0 and, with the filter rail and panel, v0.10.0)*
