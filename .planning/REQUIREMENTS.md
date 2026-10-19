@@ -37,7 +37,7 @@ Requirements for the initial release. Each maps to a roadmap phase.
 - [x] **EXP-01**: Each owned expansion appears with its name right beside its owned base game: thick (big-box) expansions stand upright as spines next to the base, thin ones lie as thin sideways spines in a stack beside it.
 - [x] **EXP-02**: An owned expansion whose base game is not owned still appears, as its own spine, labelled with the game it expands.
 - [x] **EXP-03**: A base game with many expansions collapses the extras into a "+N more" stack, so a family never overflows its shelf.
-- [ ] **EXP-04**: An expansion dims or lights up together with its base game when filters are applied.
+- [x] **EXP-04**: An expansion dims or lights up together with its base game when filters are applied.
 
 ### Game Detail
 
@@ -52,21 +52,21 @@ Requirements for the initial release. Each maps to a roadmap phase.
 
 ### Filters
 
-- [ ] **FILT-01**: A visitor can search games by name.
-- [ ] **FILT-02**: A visitor can filter by player count; this shows games whose player range includes the chosen number.
-- [ ] **FILT-03**: A visitor can filter by play time; this shows games that take at most the chosen number of minutes.
-- [ ] **FILT-04**: A visitor can filter by storage location.
-- [ ] **FILT-05**: Non-matching games dim instead of disappearing. Filters combine, a match count is shown, and one tap clears all filters.
+- [x] **FILT-01**: A visitor can search games by name.
+- [x] **FILT-02**: A visitor can filter by player count; this shows games whose player range includes the chosen number.
+- [x] **FILT-03**: A visitor can filter by play time; this shows games that take at most the chosen number of minutes.
+- [x] **FILT-04**: A visitor can filter by storage location.
+- [x] **FILT-05**: Non-matching games dim instead of disappearing. Filters combine, a match count is shown, and one tap clears all filters.
 
 ### Storage Location
 
-- [ ] **LOC-01**: Each game's storage location is visible to every visitor.
+- [x] **LOC-01**: Each game's storage location is visible to every visitor.
 - [x] **LOC-02**: An early spike with the real BGG token determines whether BGG exposes the private "inventory location" field to the app. The outcome is recorded.
   - **If it does:** the owner sets locations on BGG and the app reads them.
   - **If it does not:** LOC-03 and LOC-04 are built as owner tools.
 - [ ] **LOC-03**: The owner can define their own list of storage locations, for example rooms, cabinets, or "Lent out".
 - [ ] **LOC-04**: The owner can assign one of those locations to each game.
-- [ ] **LOC-05**: Visitors can toggle between one big cabinet and one cabinet per storage location. Games without a location go in an "Unknown location" cabinet.
+- [x] **LOC-05**: Visitors can toggle between one big cabinet and one cabinet per storage location. Games without a location go in an "Unknown location" cabinet.
 
 ### Box Images & Shape
 
@@ -190,20 +190,20 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EXP-01 | Phase 2 | Complete |
 | EXP-02 | Phase 2 | Complete |
 | EXP-03 | Phase 2 | Complete |
-| EXP-04 | Phase 7 | Pending |
+| EXP-04 | Phase 7 | Complete |
 | DET-01 | Phase 5 | Complete |
 | DET-02 | Phase 5 | Complete |
 | DET-03 | Phase 5 | Complete |
-| FILT-01 | Phase 7 | Pending |
-| FILT-02 | Phase 7 | Pending |
-| FILT-03 | Phase 7 | Pending |
-| FILT-04 | Phase 7 | Pending |
-| FILT-05 | Phase 7 | Pending |
-| LOC-01 | Phase 7 | Pending |
+| FILT-01 | Phase 7 | Complete |
+| FILT-02 | Phase 7 | Complete |
+| FILT-03 | Phase 7 | Complete |
+| FILT-04 | Phase 7 | Complete |
+| FILT-05 | Phase 7 | Complete |
+| LOC-01 | Phase 7 | Complete |
 | LOC-02 | Phase 3 | Complete |
 | LOC-03 | Phase 6 | Pending (conditional on LOC-02 outcome) |
 | LOC-04 | Phase 6 | Pending (conditional on LOC-02 outcome) |
-| LOC-05 | Phase 7 | Pending |
+| LOC-05 | Phase 7 | Complete |
 | IMG-01 | Phase 4 | Complete |
 | IMG-02 | Phase 6 | Complete |
 | IMG-03 | Phase 4 | Complete |

@@ -22,7 +22,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: Game Detail, Accessibility & Language** - Pull-out animation, detail card, keyboard and screen-reader access, English and Dutch labels (completed 2026-10-12)
 - [x] **Phase 6: Owner Tools & Persistence** - Home/VPN-only image overrides (and location editing if needed), persisted and backed up (completed 2026-10-13)
 - [x] **Phase 6.1: Selectable Cabinet Finishes & Lighting** (INSERTED) - Seven owner-chosen finishes with their walls, lit cubbies with an optional day-and-night mode, and cubby depth (completed 2026-10-15)
-- [ ] **Phase 7: Game-Night Filters & Location Cabinets** - Dim-to-filter search and a per-location cabinet toggle
+- [x] **Phase 7: Game-Night Filters & Location Cabinets** - Dim-to-filter search and a per-location cabinet toggle (completed 2026-10-19)
 - [ ] **Phase 8: Public Hardening & Go-Public** - HTTPS exposure through Traefik with rate limits, headers, resource caps and a go-public checklist
 
 ## Phase Details
@@ -545,7 +545,7 @@ Plans:
   4. Every game's storage location is visible to every visitor, whether it was read from BGG or entered by the owner.
   5. A visitor can toggle between one big cabinet and one cabinet per storage location, with games that have no location placed in an "Unknown location" cabinet.
 
-**Plans:** 47/47 plans executed
+**Plans:** 47/47 plans complete
 
 Plans:
 **Wave 1**
@@ -703,5 +703,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. Game Detail, Accessibility & Language | 16/16 | Complete    | 2026-10-12 |
 | 6. Owner Tools & Persistence | 30/30 | Complete    | 2026-10-13 |
 | 6.1. Selectable Cabinet Finishes & Lighting (INSERTED) | 21/21 | Complete    | 2026-10-15 |
-| 7. Game-Night Filters & Location Cabinets | 47/47 | In Progress|  |
+| 7. Game-Night Filters & Location Cabinets | 47/47 | Complete    | 2026-10-19 |
 | 8. Public Hardening & Go-Public | 0/0 | Not started | - |
