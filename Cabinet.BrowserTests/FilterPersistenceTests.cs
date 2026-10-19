@@ -142,8 +142,9 @@ public sealed class FilterPersistenceTests : CabinetPageTest
         var recording = await ReadRecorderAsync();
         AssertBarShownWithTheFirstDraw(recording);
         var firstDraw = recording.Batches.First(batch => batch.Inserted > 0);
-        firstDraw.CardRequests.Should().Be(3, "the first try and one retry per delay had failed before the cabinet drew");
-        requestCount().Should().Be(3);
+        firstDraw.CardRequests.Should().Be(1, "the cabinet drew after the first failed try, and the retries went on behind it");
+        await WaitForCardDataRequestsAsync(requestCount, 3);
+        recording = await ReadRecorderAsync();
         recording.Toggles.Should().BeEmpty("every box that is dimmed was inserted dimmed");
 
         var dimmed = await BoxIdsAsync(Dimmed);
@@ -170,6 +171,64 @@ public sealed class FilterPersistenceTests : CabinetPageTest
         await Page.Locator(".lang-toggle a[lang=nl]").ClickAsync();
         await Expect(Page.Locator("html")).ToHaveAttributeAsync("lang", "nl");
         await Expect(Page.Locator(".filter-note")).ToHaveTextAsync("De details konden niet worden geladen. Laad de pagina opnieuw om het nog eens te proberen.", new LocatorAssertionsToHaveTextOptions { Timeout = 20000 });
+    }
+
+    [Fact]
+    public async Task One_failed_card_request_draws_at_once_and_the_retry_brings_the_card_filters_back()
+    {
+        await StartAsync(PrototypeOn);
+        var requestCount = await FailCardDataRequestsAsync(1);
+        await Page.SetViewportSizeAsync(1440, 900);
+        await PrepareAsync(StoredFilters(string.Empty, players: 4));
+
+        await GotoCabinetAsync("/?sample=65");
+        await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
+
+        var recording = await ReadRecorderAsync();
+        AssertBarShownWithTheFirstDraw(recording);
+        recording.Batches.First(batch => batch.Inserted > 0).CardRequests.Should().Be(1, "the cabinet drew after the first failed try instead of waiting for the retries");
+        await WaitForCardDataRequestsAsync(requestCount, 2);
+        await Expect(Page.Locator(".filter-note")).ToBeHiddenAsync();
+        await OpenFilterPanelAsync();
+        await Expect(Page.Locator("fieldset[data-filter=\"players\"] input[value=\"4\"]")).ToBeCheckedAsync();
+        (await Page.Locator(".filter-group input").EvaluateAllAsync<bool[]>("(inputs) => inputs.map((input) => input.disabled)")).Should().NotBeEmpty().And.OnlyContain(disabled => !disabled);
+        await Expect(Page.Locator(Dimmed).First).ToBeAttachedAsync();
+        (await StoredAsync()).GetProperty("players").GetInt32().Should().Be(4);
+        ConsoleErrors.Should().OnlyContain(error => error.Contains("Failed to load resource", StringComparison.Ordinal), "only the request made to fail is logged");
+    }
+
+    [Fact]
+    public async Task A_card_failure_keeps_the_stored_card_filters_and_a_later_load_brings_them_back()
+    {
+        await Page.SetViewportSizeAsync(DockWidths.Push, 900);
+        var host = await OwnerHost.SyncAsync(factory => StartAsync(factory), SyntheticBggCollection.Create(40));
+        var places = await host.SeedAsync("Cabinet A", "Shelf B");
+        var games = host.Cards.DistinctBy(card => card.GameId).Take(2).ToList();
+        await host.PlaceAsync(games[0], places[0]);
+        await host.PlaceAsync(games[1], places[1]);
+        var requestCount = await FailCardDataRequestsAsync(3);
+        await PrepareAsync(StoredFilters(string.Empty, players: 4, location: places[0]));
+
+        await GotoCabinetAsync("/");
+        await Expect(Page.Locator(".filter-note")).ToHaveTextAsync("Couldn't load the details. Reload the page to try again.", new LocatorAssertionsToHaveTextOptions { Timeout = 20000 });
+        await WaitForCardDataRequestsAsync(requestCount, 3);
+
+        var kept = await StoredAsync();
+        kept.ValueKind.Should().Be(JsonValueKind.Object, "a failed load of the details must not forget the question");
+        kept.GetProperty("players").GetInt32().Should().Be(4);
+        kept.GetProperty("location").GetString().Should().Be(places[0]);
+
+        await host.PlaceAsync(games[1], places[0]);
+        host.TellOpenPages();
+
+        await Expect(Page.Locator(".filter-note")).ToBeHiddenAsync(new LocatorAssertionsToBeHiddenOptions { Timeout = 20000 });
+        await OpenFilterPanelAsync();
+        await Expect(Page.Locator("fieldset[data-filter=\"players\"] input[value=\"4\"]")).ToBeCheckedAsync();
+        await Expect(Page.Locator(Select)).ToHaveValueAsync(places[0]);
+        await Expect(Page.Locator(Select)).ToBeEnabledAsync();
+        var restored = await StoredAsync();
+        restored.GetProperty("players").GetInt32().Should().Be(4);
+        restored.GetProperty("location").GetString().Should().Be(places[0]);
     }
 
     [Theory]
@@ -374,8 +433,19 @@ public sealed class FilterPersistenceTests : CabinetPageTest
         return title[..5].ToLowerInvariant();
     }
 
-    private static string StoredFilters(string query, int? players = null, int? time = null) =>
-        JsonSerializer.Serialize(new { q = query, players, time, location = (string?)null });
+    private static string StoredFilters(string query, int? players = null, int? time = null, string? location = null) =>
+        JsonSerializer.Serialize(new { q = query, players, time, location });
+
+    /// <summary>
+    /// Reads the filters the tab keeps, after asking the page to write any change it is still holding back, so the reading shows what
+    /// the page has decided to keep.
+    /// </summary>
+    private async Task<JsonElement> StoredAsync()
+    {
+        await Page.EvaluateAsync("() => window.dispatchEvent(new Event('pagehide'))");
+
+        return await Page.EvaluateAsync<JsonElement>($"() => JSON.parse(sessionStorage.getItem('{StorageKey}') ?? 'null')");
+    }
 
     private async Task PrepareAsync(string? stored = null)
     {

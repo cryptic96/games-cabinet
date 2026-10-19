@@ -663,6 +663,35 @@ public sealed partial class FilterSheetTests : CabinetPageTest
         ConsoleErrors.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Widening_past_the_sheet_while_it_is_open_hands_focus_to_the_rails_menu_button()
+    {
+        await OpenAsync(390, 844);
+        await OpenTheSheetAsync();
+
+        await Page.SetViewportSizeAsync(DockWidths.Over, 900);
+
+        await Expect(Page.Locator(OpenSheet)).ToHaveCountAsync(0);
+        await Expect(Page.Locator($"{Bar} .filter-rail .filter-menu")).ToBeFocusedAsync();
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Widening_past_the_sheet_while_it_slides_out_closes_it_at_once()
+    {
+        await OpenAsync(390, 844);
+        await OpenTheSheetAsync();
+        await Page.EvaluateAsync("() => document.documentElement.style.setProperty('--fallback-close', '10s')");
+        await Page.Locator(Done).ClickAsync();
+        await Expect(Page.Locator("dialog.filter-dialog[open][data-closing]")).ToHaveCountAsync(1);
+
+        await Page.SetViewportSizeAsync(DockWidths.Over, 900);
+
+        await Expect(Page.Locator(OpenSheet)).ToHaveCountAsync(0, new LocatorAssertionsToHaveCountOptions { Timeout = 2000 });
+        await Expect(Page.Locator($"{Bar} .filter-rail .filter-menu")).ToBeFocusedAsync();
+        ConsoleErrors.Should().BeEmpty();
+    }
+
     private static string Games(int count) => count == 1 ? "1 game" : $"{count.ToString(CultureInfo.InvariantCulture)} games";
 
     private static int Columns(IReadOnlyList<double[]> boxes) => boxes.Select(box => Math.Round(box[0])).Distinct().Count();

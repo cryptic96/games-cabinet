@@ -194,6 +194,16 @@ test('reading order gives the same boxes in the same order however the input is 
   }
 });
 
+test('reading order keeps a shelf in one row by its top, so a short box left of a tall one still comes first', () => {
+  const tall = { ...box(100, 100, 40, 100, '0:0'), shelfTop: 90 };
+  const below = { ...box(0, 300, 40, 100, '0:1'), shelfTop: 260 };
+  const short = { ...box(0, 150, 40, 50, '0:0'), shelfTop: 90 };
+  const pile = { ...box(160, 170, 60, 30, '0:0'), shelfTop: 90 };
+  const pileTop = { ...box(160, 140, 60, 30, '0:0'), shelfTop: 90 };
+
+  assert.deepEqual(readingOrder([tall, below, short, pile, pileTop]), [2, 0, 4, 3, 1]);
+});
+
 test('reading order of nothing is nothing', () => {
   assert.deepEqual(readingOrder([]), []);
 });

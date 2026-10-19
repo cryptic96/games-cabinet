@@ -199,7 +199,23 @@ public sealed class LocationEditsTests
 
         LocationEdits.CountLeftNotPlaced(data, snapshot, ShelfB).Should().Be(LocationEdits.Delete(data, snapshot, ShelfB).GamesNotPlaced);
         LocationEdits.CountLeftNotPlaced(data, snapshot, CrateC).Should().Be(0);
-        LocationEdits.CountLeftNotPlaced(data, null, ShelfB).Should().Be(0);
+    }
+
+    [Fact]
+    public void Without_a_collection_every_decision_kept_in_the_location_counts_so_a_delete_asks_first_and_reports_them()
+    {
+        var data = ThreeLocations() with
+        {
+            Games = [new OwnerGame(100, ShelfB, null, null), new OwnerGame(101, ShelfB, null, null, 7002), new OwnerGame(102, CabinetA, null, null)],
+        };
+
+        var deleted = LocationEdits.Delete(data, null, ShelfB);
+
+        LocationEdits.CountLeftNotPlaced(data, null, ShelfB).Should().Be(2);
+        LocationEdits.CountLeftNotPlaced(data, null, CrateC).Should().Be(0);
+        deleted.GamesNotPlaced.Should().Be(2);
+        deleted.LogText.Should().Be("Deleted location \"Shelf B\" (2 games now not placed)");
+        deleted.Data.Games.Should().Equal(new OwnerGame(102, CabinetA, null, null));
     }
 
     [Fact]

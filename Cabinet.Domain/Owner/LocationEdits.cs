@@ -426,7 +426,7 @@ public static class LocationEdits
     /// to following its base game; nothing is moved to another location. The change says how many games ended up not placed.
     /// </summary>
     /// <param name="data">The data to change.</param>
-    /// <param name="snapshot">The collection the games are in, or null when there is none yet, which counts no games.</param>
+    /// <param name="snapshot">The collection the games are in, or null when there is none yet, which counts every decision kept there.</param>
     /// <param name="id">The location to delete.</param>
     public static OwnerChange Delete(OwnerData data, CollectionSnapshot? snapshot, string id)
     {
@@ -449,7 +449,11 @@ public static class LocationEdits
         return new OwnerChange(Without(data, id), log, "location-deleted") { GamesNotPlaced = notPlaced };
     }
 
-    /// <summary>Counts the copies that would be not placed if a location were deleted: those shown there now that would be shown nowhere afterwards.</summary>
+    /// <summary>
+    /// Counts the copies that would be not placed if a location were deleted: those shown there now that would be shown nowhere
+    /// afterwards. Before there is a collection no copy can be told apart, so every decision that keeps a game or a copy there
+    /// counts, and a delete still asks first instead of dropping placements nobody was shown.
+    /// </summary>
     /// <param name="data">The data as it is now.</param>
     /// <param name="snapshot">The collection the games are in, or null when there is none yet.</param>
     /// <param name="id">The location that would be deleted.</param>
@@ -458,9 +462,14 @@ public static class LocationEdits
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(id);
 
-        if (snapshot is null || IndexOf(data, id) < 0)
+        if (IndexOf(data, id) < 0)
         {
             return 0;
+        }
+
+        if (snapshot is null)
+        {
+            return data.Games.Count(game => string.Equals(game.LocationId, id, StringComparison.Ordinal));
         }
 
         var before = OwnerOverlay.From(snapshot, data);

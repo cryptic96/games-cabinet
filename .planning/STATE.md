@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-10-13)
 Phase: 8 — Public Hardening & Go-Public
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-10-19 — Phase 07 complete, transitioned to Phase 8
+Last activity: 2026-10-19 - Completed quick task 261019-nyb: fix the phase 7 code review product warnings
 
 Progress: [██████████] 100%
 
@@ -115,6 +115,7 @@ Recent decisions affecting current work:
 | 261004-vqo | Make out-of-date provisioning visible on the server (poll warning + selfcheck per-file check) | 2026-10-04 | fa25c8f | [261004-vqo-make-out-of-date-provisioning-visible-on](./quick/261004-vqo-make-out-of-date-provisioning-visible-on/) |
 | 2 | Move CI and release workflows to ubuntu-26.04 (actionlint label config added) | 2026-10-06 | 7d802a1 | — |
 | 3 | Fix flaky port race in integration tests (retry host start on fresh ports) | 2026-10-06 | 3376015 | — |
+| 261019-nyb | Fix the phase 7 code review product warnings (WR-A01 to WR-A04, WR-B01 in part, WR-B02; WR-C01 rejected with a code note) | 2026-10-19 | e1d2b4c | [261019-nyb-fix-phase-7-review-product-warnings](./quick/261019-nyb-fix-phase-7-review-product-warnings/) |
 
 ### Roadmap Evolution
 
