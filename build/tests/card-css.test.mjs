@@ -148,6 +148,19 @@ test('the cabinet area takes its view-transition name only while a switch is und
   assert.deepEqual(names[0].selectors, ['html[data-switching-view] #cabinet']);
 });
 
+test('while the view switches the filter panel is its own still picture, drawn once, and the dock is never named', () => {
+  assert.ok(declares('html[data-switching-view] #filter-panel', 'view-transition-name: filter-panel'));
+  assert.ok(declares('html[data-switching-view]::view-transition-group(filter-panel)', 'animation: none'));
+  assert.ok(declares('html[data-switching-view]::view-transition-new(filter-panel)', 'animation: none'));
+  assert.ok(declares('html[data-switching-view]::view-transition-old(filter-panel)', 'display: none'));
+
+  const names = rules().filter((rule) => /view-transition-name:\s*filter-panel/.test(rule.body));
+
+  assert.equal(names.length, 1);
+  assert.deepEqual(names[0].selectors, ['html[data-switching-view] #filter-panel']);
+  assert.equal(rules().some((rule) => rule.selectors.some((selector) => /\.filter-bar(?![-\w])/.test(selector)) && /view-transition-name/.test(rule.body)), false);
+});
+
 test('the chip takes its colour from the row, and the text and paper never take an art colour', () => {
   assert.ok(declares('.exp-chip', 'background: var(--chip)'));
   assert.doesNotMatch(stripped, /\.card(-ruled|-head|-titles|-title|-year)?\s*\{[^{}]*var\(--(bg|fg|chip)\)/);

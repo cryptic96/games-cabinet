@@ -1,13 +1,15 @@
 @layer structure {
 
 /**
- * Sections sit in rows that wrap: one column, two from 80rem and three from 118rem, each section at most 40rem wide and
- * never under 37rem, the narrowest a desktop section is ever drawn. Every row is centred, so a lone section and a last
+ * Sections sit in rows that wrap: one column, two from 80rem and three from 118rem, each section at most 40rem wide. Beside the
+ * filter rail at the left of a desktop screen a section can be as narrow as about 35.75rem; while the filter panel is open beside
+ * the cabinet the column count follows the room the cabinet has instead (see the rule for the open panel below). Every row is centred, so a lone section and a last
  * row with fewer sections than columns sit in the middle, and the column count is the only thing that sets a section's
  * width, so the last section is as wide as the others. The row stops growing at three full columns, so a very wide
  * screen gets margins instead of a fourth column. Sections stand on the bottom of their row, so when balancing leaves one
  * section a shelf row shorter than its neighbour, the feet of every piece in the row share one line and the floor reads
- * as one floor with gaps.
+ * as one floor with gaps. The cabinet takes no part in the browser's own scroll anchoring: when the filter panel opens or folds
+ * beside it and resizes it, the page keeps the reader's place itself, so the browser must not correct the scroll a second time.
  */
 .cabinet {
   --column-gap: 24px;
@@ -21,6 +23,7 @@
   width: 100%;
   max-width: 123rem;
   margin-inline: auto;
+  overflow-anchor: none;
 }
 
 .cabinet > .cabinet-message {
@@ -59,6 +62,39 @@
 @media (min-width: 118rem) {
   .cabinet {
     --section-basis: min(40rem, calc((100% - 2 * var(--column-gap)) / 3));
+  }
+}
+
+/**
+ * The room the cabinet has: the wrapper around the cabinet is a size container, so the cabinet's columns can follow the space
+ * beside the filter panel rather than the width of the screen. It is the wrapper and never the page's main element, because the
+ * main element also holds the games list, whose open panel is fixed to the viewport and must not be held inside a container.
+ */
+.cabinet-room {
+  container: cabinet-room / inline-size;
+}
+
+/**
+ * While the filter panel is open beside the cabinet and pushes it aside, the column count follows the room the cabinet has and not
+ * the screen: one column while two sections of 30rem do not fit, two columns once they do (61.5rem of room), three once three
+ * sections of 37rem fit (114rem of room). Each section is still at most 40rem wide. These rules are more specific than the
+ * screen-width rules above, so the screen-width rule does not apply while the panel pushes. The panel only pushes from 90rem.
+ */
+@media (min-width: 90rem) {
+  html[data-filter-dock="push"] .cabinet {
+    --section-basis: min(40rem, 100%);
+  }
+
+  @container cabinet-room (min-width: 61.5rem) {
+    html[data-filter-dock="push"] .cabinet {
+      --section-basis: min(40rem, calc((100% - var(--column-gap)) / 2));
+    }
+  }
+
+  @container cabinet-room (min-width: 114rem) {
+    html[data-filter-dock="push"] .cabinet {
+      --section-basis: min(40rem, calc((100% - 2 * var(--column-gap)) / 3));
+    }
   }
 }
 

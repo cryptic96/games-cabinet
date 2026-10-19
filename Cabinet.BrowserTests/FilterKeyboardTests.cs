@@ -16,6 +16,7 @@ public sealed class FilterKeyboardTests : CabinetPageTest
     private const string Boxes = "#cabinet .placement";
     private const string BoxesOnAShelf = Boxes + "[data-shelf]";
     private const string Field = "#filter-q";
+    private const string PanelClear = "#filter-panel .filter-clear";
     private const string TabStops = Boxes + "[tabindex=\"0\"]";
     private const string OpenCard = "dialog.card-dialog[open]";
     private const string NoMatchQuery = "zzzzqxqx";
@@ -231,7 +232,7 @@ public sealed class FilterKeyboardTests : CabinetPageTest
         await Expect(Page.Locator(Boxes).First).ToBeFocusedAsync();
         var stopBeforeClear = (await Page.EvaluateAsync<string[]>(TabStopScript)).Single()[..^4];
 
-        await Page.Locator(".filter-clear").ClickAsync();
+        await Page.Locator(PanelClear).ClickAsync();
 
         await Expect(Page.Locator(Boxes + "[data-dim]")).ToHaveCountAsync(0);
         await Expect(Page.Locator(TabStops)).ToHaveCountAsync(1);
@@ -333,21 +334,38 @@ public sealed class FilterKeyboardTests : CabinetPageTest
     private async Task<string> KeyOfAsync(ILocator box) =>
         await box.GetAttributeAsync("data-entry-id") + "|" + await box.GetAttributeAsync("data-kind");
 
+    /// <summary>
+    /// Opens the cabinet at the width where the filter panel stands beside it without making the page modal, and opens the panel, so
+    /// the search field is in reach while the boxes still take the keyboard. The index of other titles is answered empty, so what a
+    /// query lights depends on the titles alone and an index arriving between two fills cannot change it.
+    /// </summary>
     private async Task OpenAsync()
     {
-        await Page.SetViewportSizeAsync(1440, 900);
+        await Page.SetViewportSizeAsync(DockWidths.Push, 900);
         await StartAsync(PrototypeOn);
+        await Page.RouteAsync("**/cabinet/search-names**", route => route.FulfillAsync(new RouteFulfillOptions
+        {
+            Status = 200,
+            ContentType = "application/json",
+            Body = "{\"names\":{}}",
+        }));
         await GotoCabinetAsync(SamplePath);
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
+        await OpenFilterPanelAsync();
     }
 
+    /// <summary>
+    /// Clears the filters and loads the page again, then makes sure the filter panel is open, whether or not the page brought it back
+    /// open by itself.
+    /// </summary>
     private async Task ReloadAsync()
     {
-        await Page.EvaluateAsync("() => document.querySelector('.filter-clear').click()");
+        await Page.EvaluateAsync("(selector) => document.querySelector(selector).click()", PanelClear);
         await GotoCabinetAsync(SamplePath);
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await Expect(Page.Locator(TabStops)).ToHaveCountAsync(1);
+        await OpenFilterPanelAsync();
     }
 
     private async Task<Probe> ProbeAsync(string query) =>

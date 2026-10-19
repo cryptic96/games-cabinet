@@ -228,8 +228,12 @@ main .cabinet-message {
   font-weight: 600;
 }
 
+/**
+ * The note that the cabinet is being filled stands centred over the empty cabinet below it, which is centred in the page column.
+ */
 .cabinet-filling {
   max-width: 40rem;
+  margin-inline: auto;
   text-align: center;
 }
 

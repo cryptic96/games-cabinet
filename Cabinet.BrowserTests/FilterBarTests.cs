@@ -23,9 +23,9 @@ public sealed class FilterBarTests : CabinetPageTest
     [Fact]
     public async Task Choosing_five_lights_the_families_five_can_play()
     {
-        await OpenAsync("/?sample=65", 1440, 900);
+        await OpenAsync("/?sample=65", DockWidths.Push, 900);
         var cards = await LoadCardsAsync();
-        var group = Page.Locator("fieldset.filter-group[data-filter=\"players\"]");
+        var group = Page.Locator("#filter-panel fieldset.filter-group[data-filter=\"players\"]");
 
         await Expect(group.Locator("legend")).ToHaveTextAsync("Players");
         (await group.Locator("input[type=radio][name=\"filter-players\"]").CountAsync()).Should().Be(9);
@@ -55,12 +55,12 @@ public sealed class FilterBarTests : CabinetPageTest
     [Fact]
     public async Task An_owned_expansion_widens_the_range_a_family_lights_for()
     {
-        await OpenAsync("/?sample=65", 1440, 900);
+        await OpenAsync("/?sample=65", DockWidths.Push, 900);
         var cards = await LoadCardsAsync();
         var widened = FindWidenedCount(cards);
         widened.Should().NotBeNull("the sample holds a family an owned expansion makes playable for one more count");
 
-        await Page.Locator($"fieldset[data-filter=\"players\"] input[value=\"{widened!.Players}\"]").ClickAsync();
+        await Page.Locator($"#filter-panel fieldset[data-filter=\"players\"] input[value=\"{widened!.Players}\"]").ClickAsync();
 
         var all = await BoxIdsAsync(Boxes);
         await Expect(Page.Locator(Dimmed)).ToHaveCountAsync(all.Count(id => !ExpectedLit(cards, widened.Players, null).Contains(id)));
@@ -72,8 +72,8 @@ public sealed class FilterBarTests : CabinetPageTest
     [Fact]
     public async Task Tapping_the_chosen_count_again_returns_to_Any()
     {
-        await OpenAsync("/?sample=65", 1440, 900);
-        var group = Page.Locator("fieldset[data-filter=\"players\"]");
+        await OpenAsync("/?sample=65", DockWidths.Push, 900);
+        var group = Page.Locator("#filter-panel fieldset[data-filter=\"players\"]");
         var five = group.Locator("input[value=\"5\"]");
         var any = group.Locator("input[value=\"\"]");
 
@@ -97,8 +97,8 @@ public sealed class FilterBarTests : CabinetPageTest
     [Fact]
     public async Task The_arrow_keys_move_the_count_and_the_group_is_one_tab_stop()
     {
-        await OpenAsync("/?sample=65", 1440, 900);
-        var group = Page.Locator("fieldset[data-filter=\"players\"]");
+        await OpenAsync("/?sample=65", DockWidths.Push, 900);
+        var group = Page.Locator("#filter-panel fieldset[data-filter=\"players\"]");
         var cards = await LoadCardsAsync();
         var any = group.Locator("input[value=\"\"]");
 
@@ -127,9 +127,9 @@ public sealed class FilterBarTests : CabinetPageTest
     [Fact]
     public async Task Time_and_players_combine_and_unknowns_stay_in_shadow()
     {
-        await OpenAsync("/?sample=65", 1440, 900);
+        await OpenAsync("/?sample=65", DockWidths.Push, 900);
         var cards = await LoadCardsAsync();
-        var time = Page.Locator("fieldset[data-filter=\"time\"]");
+        var time = Page.Locator("#filter-panel fieldset[data-filter=\"time\"]");
         var all = await BoxIdsAsync(Boxes);
 
         await Expect(time.Locator("legend")).ToHaveTextAsync("Max. minutes");
@@ -151,7 +151,7 @@ public sealed class FilterBarTests : CabinetPageTest
         dimmed.Should().Contain(unknownTime.Where(all.Contains));
         dimmed.Should().Contain(longerThanAnHour.Where(all.Contains));
 
-        await Page.Locator("fieldset[data-filter=\"players\"] input[value=\"4\"]").ClickAsync();
+        await Page.Locator("#filter-panel fieldset[data-filter=\"players\"] input[value=\"4\"]").ClickAsync();
 
         var both = ExpectedLit(cards, players: 4, minutes: 60);
         both.Count.Should().BeLessThan(byTime.Count);
@@ -169,12 +169,12 @@ public sealed class FilterBarTests : CabinetPageTest
     [Fact]
     public async Task Search_players_and_time_narrow_together_and_Clear_returns_every_chip_to_Any()
     {
-        await OpenAsync("/?sample=65", 1440, 900);
+        await OpenAsync("/?sample=65", DockWidths.Push, 900);
         var cards = await LoadCardsAsync();
         var all = await BoxIdsAsync(Boxes);
 
-        await Page.Locator("fieldset[data-filter=\"time\"] input[value=\"90\"]").ClickAsync();
-        await Page.Locator("fieldset[data-filter=\"players\"] input[value=\"3\"]").ClickAsync();
+        await Page.Locator("#filter-panel fieldset[data-filter=\"time\"] input[value=\"90\"]").ClickAsync();
+        await Page.Locator("#filter-panel fieldset[data-filter=\"players\"] input[value=\"3\"]").ClickAsync();
         var lit = ExpectedLit(cards, players: 3, minutes: 90);
         lit.Should().NotBeEmpty();
         var fragment = cards.First(card => lit.Contains(card.EntryId.ToString(CultureInfo.InvariantCulture)) && !card.IsExpansion).Title;
@@ -185,11 +185,11 @@ public sealed class FilterBarTests : CabinetPageTest
         shown.Should().OnlyContain(id => lit.Contains(id));
         shown.Count.Should().BeLessThan(all.Count(lit.Contains));
 
-        await Page.Locator(".filter-clear").ClickAsync();
+        await Page.Locator("#filter-panel .filter-clear").ClickAsync();
 
         await Expect(Page.Locator("#filter-q")).ToHaveValueAsync(string.Empty);
-        await Expect(Page.Locator("fieldset[data-filter=\"players\"] input[value=\"\"]")).ToBeCheckedAsync();
-        await Expect(Page.Locator("fieldset[data-filter=\"time\"] input[value=\"\"]")).ToBeCheckedAsync();
+        await Expect(Page.Locator("#filter-panel fieldset[data-filter=\"players\"] input[value=\"\"]")).ToBeCheckedAsync();
+        await Expect(Page.Locator("#filter-panel fieldset[data-filter=\"time\"] input[value=\"\"]")).ToBeCheckedAsync();
         await Expect(Page.Locator(Dimmed)).ToHaveCountAsync(0);
         ConsoleErrors.Should().BeEmpty();
     }
@@ -197,14 +197,14 @@ public sealed class FilterBarTests : CabinetPageTest
     [Fact]
     public async Task A_large_change_is_shown_at_once()
     {
-        await OpenAsync("/?sample=400", 1440, 900);
+        await OpenAsync("/?sample=400", DockWidths.Push, 900);
         var cards = await LoadCardsAsync("400");
         var all = await BoxIdsAsync(Boxes);
         var expected = ExpectedLit(cards, players: null, minutes: 30);
         all.Count(id => !expected.Contains(id)).Should().BeGreaterThan(120);
         await Page.EvaluateAsync(RecordBulkPass);
 
-        await Page.Locator("fieldset[data-filter=\"time\"] input[value=\"30\"]").ClickAsync();
+        await Page.Locator("#filter-panel fieldset[data-filter=\"time\"] input[value=\"30\"]").ClickAsync();
 
         await Expect(Page.Locator(Dimmed)).ToHaveCountAsync(all.Count(id => !expected.Contains(id)));
         await Expect(Page.Locator("#cabinet")).Not.ToHaveAttributeAsync("data-bulk", string.Empty);
@@ -219,10 +219,10 @@ public sealed class FilterBarTests : CabinetPageTest
     [Fact]
     public async Task A_small_change_keeps_its_fade()
     {
-        await OpenAsync("/?sample=65", 1440, 900);
+        await OpenAsync("/?sample=65", DockWidths.Push, 900);
         await Page.EvaluateAsync(RecordBulkPass);
 
-        await Page.Locator("fieldset[data-filter=\"players\"] input[value=\"5\"]").ClickAsync();
+        await Page.Locator("#filter-panel fieldset[data-filter=\"players\"] input[value=\"5\"]").ClickAsync();
 
         await Expect(Page.Locator(Dimmed).First).ToBeAttachedAsync();
         await Page.EvaluateAsync("() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
@@ -345,6 +345,10 @@ public sealed class FilterBarTests : CabinetPageTest
         return true;
     }
 
+    /// <summary>
+    /// Opens the cabinet at the given size and opens the filter panel, where the chips live on a desktop. At the push width the open
+    /// panel stands beside the cabinet, so the boxes stay in reach while a chip is chosen.
+    /// </summary>
     private async Task OpenAsync(string path, int width, int height)
     {
         await Page.SetViewportSizeAsync(width, height);
@@ -352,6 +356,7 @@ public sealed class FilterBarTests : CabinetPageTest
         await GotoCabinetAsync(path);
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
+        await OpenFilterPanelAsync();
     }
 
     private async Task<IReadOnlyList<CardData>> LoadCardsAsync(string sample = "65")

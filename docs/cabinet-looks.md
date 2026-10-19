@@ -115,11 +115,16 @@ Some things on the page follow every look without being part of it:
   cubby never brightens a game that is in shadow. Pointing at a dimmed box
   lifts the veil a little (a peek) so its title can be read. The veil has a
   fixed strength on every wood, chosen so the label still reads.
-- **The search bar and the phone sheet are wall chrome.** They take their text,
-  lines and focus ring from the wall of the chosen wood, by day and in the
-  evening, and stand on the wall rather than on the furniture; when the bar is
-  stuck to the top of the page it gets a solid fill and a soft shadow so boxes
-  do not show through it.
+- **The filter rail, the filter panel, the phone's slim bar and its sheet are
+  wall chrome.** They take their colour, text, lines and focus ring from the
+  wall of the chosen wood, by day and in the evening, and stand on the wall
+  rather than on the furniture, with no wood texture. A thin line in the wall's
+  line colour marks where the rail and the panel meet the page. When the panel
+  lies over the cabinet on a smaller desktop screen, it casts a soft shadow to
+  the right in the wall's own shade colour, never black; when it stands beside
+  the cabinet it casts none. When the phone's slim bar is stuck to the top of
+  the page it gets a solid fill and a soft shadow so boxes do not show through
+  it.
 - **A found or open box wears the furniture ring.** The box that Show on shelf
   scrolls to (and, with reduced motion, the box of the open card) is outlined in
   the same light colour as the keyboard focus ring, so it reads against the

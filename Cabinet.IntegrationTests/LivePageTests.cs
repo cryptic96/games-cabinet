@@ -39,7 +39,16 @@ public partial class LivePageTests
         classic[0].Groups["src"].Value.Should().StartWith("/lib/signalr/signalr.min").And.EndWith(".js");
         module.Success.Should().BeTrue();
         classic[0].Index.Should().BeLessThan(module.Index);
-        ScriptElements().Matches(html).Should().HaveCount(2, "the vendored client is the only script besides the page's own module");
+        var dockHead = DockHeadScript().Match(html);
+        dockHead.Success.Should().BeTrue("the filter dock's state is set by an external head script before the first paint");
+        dockHead.Index.Should().BeLessThan(module.Index);
+        ScriptElements().Matches(html).Should().HaveCount(3, "the vendored client and the filter dock's head script are the only scripts besides the page's own module");
+
+        using (var head = await client.GetAsync(dockHead.Groups["src"].Value, TestContext.Current.CancellationToken))
+        {
+            head.StatusCode.Should().Be(HttpStatusCode.OK);
+            head.ShouldHaveMediaType("text/javascript");
+        }
 
         using var response = await client.GetAsync(classic[0].Groups["src"].Value, TestContext.Current.CancellationToken);
 
@@ -59,6 +68,9 @@ public partial class LivePageTests
 
     [GeneratedRegex("<script src=\"(?<src>/lib/[^\"]+)\"[^>]*></script>")]
     private static partial Regex ClassicLibraryScripts();
+
+    [GeneratedRegex("<script src=\"(?<src>/js/filter-dock-head[^\"]*\\.js[^\"]*)\"[^>]*></script>")]
+    private static partial Regex DockHeadScript();
 
     [GeneratedRegex("<script\\b", RegexOptions.IgnoreCase)]
     private static partial Regex ScriptElements();

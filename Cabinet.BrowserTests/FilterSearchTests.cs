@@ -15,6 +15,9 @@ public sealed class FilterSearchTests : CabinetPageTest
 {
     private const string Boxes = "#cabinet .placement";
     private const string OpenCard = "dialog.card-dialog[open]";
+    private const string PanelCount = "#filter-panel .filter-count";
+    private const string PanelClear = "#filter-panel .filter-clear";
+    private const string PanelLayout = "() => ['#filter-panel', '#filter-panel .filter-panel-head', '#filter-q', '#filter-panel .filter-count'].map((selector) => { const r = document.querySelector(selector).getBoundingClientRect(); return [selector, r.left, r.top, r.width, r.height].join(':'); })";
     private const string BoxRectangles = "() => [...document.querySelectorAll('#cabinet .placement')].map((box) => { const r = box.getBoundingClientRect(); return [box.dataset.entryId, box.dataset.kind, r.left, r.top, r.width, r.height].join(':'); })";
     private const string InstallAnnouncementRecorder = "() => { window.__announced = []; const live = document.getElementById('filter-live'); new MutationObserver(() => { if (live.textContent !== '') { window.__announced.push({ text: live.textContent, at: performance.now() }); } }).observe(live, { childList: true, characterData: true, subtree: true }); }";
     private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
@@ -23,35 +26,34 @@ public sealed class FilterSearchTests : CabinetPageTest
     [Fact]
     public async Task A_typed_fragment_lights_its_family_and_shadows_the_rest_in_place()
     {
-        await OpenAsync("/?sample=65", 1440, 900);
+        await OpenAsync("/?sample=65", DockWidths.Push, 900);
+        await OpenFilterPanelAsync();
         var cards = await LoadCardsAsync();
         var fragment = FragmentOfABaseGameWithAnExpansion(cards);
         var expected = ExpectedResult(cards, fragment);
         expected.LitBoxCount.Should().BeGreaterThan(0);
         expected.LitEntries.Should().BeLessThan(expected.TotalEntries);
 
-        var status = Page.Locator(".filter-bar .filter-status");
-        (await status.GetAttributeAsync("hidden")).Should().BeNull();
-        (await VisibilityAsync(status)).Should().Be("hidden");
+        var noun = expected.TotalEntries == 1 ? "game" : "games";
+        await Expect(Page.Locator(PanelCount)).ToHaveTextAsync($"{expected.TotalEntries} {noun}");
+        await Expect(Page.Locator(PanelClear)).ToBeHiddenAsync();
         (await Page.Locator(".filter-bar").GetAttributeAsync("data-active")).Should().BeNull();
         (await Page.Locator(Boxes + "[data-dim]").CountAsync()).Should().Be(0);
-        var heightBefore = (await Page.Locator(".filter-bar").BoundingBoxAsync())!.Height;
+        var panelBefore = await PanelLayoutAsync();
         var rectanglesBefore = await Page.EvaluateAsync<string[]>(BoxRectangles);
 
         await Page.Locator("#filter-q").FillAsync(fragment);
 
-        var noun = expected.TotalEntries == 1 ? "game" : "games";
-        await Expect(Page.Locator(".filter-count")).ToHaveTextAsync($"{expected.LitEntries} of {expected.TotalEntries} {noun}");
+        await Expect(Page.Locator(PanelCount)).ToHaveTextAsync($"{expected.LitEntries} of {expected.TotalEntries} {noun}");
         var dimmed = await Page.Locator(Boxes + "[data-dim]").EvaluateAllAsync<string[]>("(boxes) => boxes.map((box) => box.dataset.entryId)");
         var all = await Page.Locator(Boxes).EvaluateAllAsync<string[]>("(boxes) => boxes.map((box) => box.dataset.entryId)");
         dimmed.Should().BeEquivalentTo(all.Where(id => !expected.LitEntryIds.Contains(id)));
         all.Where(id => expected.LitEntryIds.Contains(id)).Should().NotBeEmpty();
         (await Page.EvaluateAsync<string[]>(BoxRectangles)).Should().Equal(rectanglesBefore);
         await Expect(Page.Locator(".filter-bar")).ToHaveAttributeAsync("data-active", string.Empty);
-        (await VisibilityAsync(status)).Should().Be("visible");
-        (await status.GetAttributeAsync("hidden")).Should().BeNull();
-        (await Page.Locator(".filter-bar").BoundingBoxAsync())!.Height.Should().Be(heightBefore);
-        (await Page.Locator(".filter-count").GetAttributeAsync("aria-hidden")).Should().Be("true");
+        await Expect(Page.Locator(PanelClear)).ToBeVisibleAsync();
+        (await PanelLayoutAsync()).Should().Equal(panelBefore);
+        (await Page.Locator(PanelCount).GetAttributeAsync("aria-hidden")).Should().Be("true");
         await SaveScreenshotAsync("filter-search-typed");
         ConsoleErrors.Should().BeEmpty();
     }
@@ -59,7 +61,8 @@ public sealed class FilterSearchTests : CabinetPageTest
     [Fact]
     public async Task A_box_in_shadow_keeps_its_name_and_opens_its_card()
     {
-        await OpenAsync("/?sample=65", 1440, 900);
+        await OpenAsync("/?sample=65", DockWidths.Push, 900);
+        await OpenFilterPanelAsync();
         var cards = await LoadCardsAsync();
         await Page.Locator("#filter-q").FillAsync(FragmentOfABaseGameWithAnExpansion(cards));
         var shadowed = Page.Locator(Boxes + "[data-dim]:not([data-kind=\"moreMarker\"])").First;
@@ -82,7 +85,8 @@ public sealed class FilterSearchTests : CabinetPageTest
     [Fact]
     public async Task Quick_typing_is_announced_once_after_it_stops()
     {
-        await OpenAsync("/?sample=65", 1440, 900);
+        await OpenAsync("/?sample=65", DockWidths.Push, 900);
+        await OpenFilterPanelAsync();
         var cards = await LoadCardsAsync();
         var title = FragmentOfABaseGameWithAnExpansion(cards);
         await Page.EvaluateAsync(InstallAnnouncementRecorder);
@@ -95,7 +99,7 @@ public sealed class FilterSearchTests : CabinetPageTest
             var expected = ExpectedResult(cards, prefix);
             var noun = expected.TotalEntries == 1 ? "game" : "games";
             var shown = expected.LitEntries == 0 ? "No games match" : $"{expected.LitEntries} of {expected.TotalEntries} {noun}";
-            await Expect(Page.Locator(".filter-count")).ToHaveTextAsync(shown);
+            await Expect(Page.Locator(PanelCount)).ToHaveTextAsync(shown);
         }
 
         var lastKeyAt = await Page.EvaluateAsync<double>("() => performance.now()");
@@ -116,25 +120,26 @@ public sealed class FilterSearchTests : CabinetPageTest
     [Fact]
     public async Task Clear_restores_the_light_announces_and_keeps_focus_in_the_field()
     {
-        await OpenAsync("/?sample=65", 1440, 900);
+        await OpenAsync("/?sample=65", DockWidths.Push, 900);
+        await OpenFilterPanelAsync();
         var cards = await LoadCardsAsync();
         var fragment = FragmentOfABaseGameWithAnExpansion(cards);
         var total = ExpectedResult(cards, fragment).TotalEntries;
-        var heightBefore = (await Page.Locator(".filter-bar").BoundingBoxAsync())!.Height;
+        var panelBefore = await PanelLayoutAsync();
         await Page.Locator("#filter-q").FillAsync(fragment);
         await Expect(Page.Locator(".filter-bar")).ToHaveAttributeAsync("data-active", string.Empty);
         (await Page.Locator(Boxes + "[data-dim]").CountAsync()).Should().BeGreaterThan(0);
-        (await Page.Locator(".filter-clear").GetAttributeAsync("aria-label")).Should().Be("Clear filters");
-        await Expect(Page.Locator(".filter-clear")).ToHaveTextAsync("Clear");
+        (await Page.Locator(PanelClear).GetAttributeAsync("aria-label")).Should().Be("Clear filters");
+        await Expect(Page.Locator(PanelClear)).ToHaveTextAsync("Clear");
 
-        await Page.Locator(".filter-clear").ClickAsync();
+        await Page.Locator(PanelClear).ClickAsync();
 
         await Expect(Page.Locator("#filter-q")).ToHaveValueAsync(string.Empty);
         await Expect(Page.Locator(Boxes + "[data-dim]")).ToHaveCountAsync(0);
         await Expect(Page.Locator(".filter-bar")).Not.ToHaveAttributeAsync("data-active", string.Empty);
-        await Expect(Page.Locator(".filter-status")).ToHaveCSSAsync("visibility", "hidden");
-        (await Page.Locator(".filter-status").GetAttributeAsync("hidden")).Should().BeNull();
-        (await Page.Locator(".filter-bar").BoundingBoxAsync())!.Height.Should().Be(heightBefore);
+        await Expect(Page.Locator(PanelClear)).ToBeHiddenAsync();
+        await Expect(Page.Locator(PanelCount)).ToHaveTextAsync($"{total} games");
+        (await PanelLayoutAsync()).Should().Equal(panelBefore);
         await Expect(Page.Locator("#filter-live")).ToHaveTextAsync($"Filters cleared, {total} games");
         await Expect(Page.Locator("#filter-q")).ToBeFocusedAsync();
         ConsoleErrors.Should().BeEmpty();
@@ -143,7 +148,8 @@ public sealed class FilterSearchTests : CabinetPageTest
     [Fact]
     public async Task Escape_and_slash_behave_as_promised()
     {
-        await OpenAsync("/?sample=65", 1440, 900);
+        await OpenAsync("/?sample=65", DockWidths.Push, 900);
+        await OpenFilterPanelAsync();
         var field = Page.Locator("#filter-q");
         var hint = Page.Locator(".filter-hint");
 
@@ -197,22 +203,23 @@ public sealed class FilterSearchTests : CabinetPageTest
     [Fact]
     public async Task Nothing_matching_shadows_everything_and_highlights_Clear()
     {
-        await OpenAsync("/?sample=65", 1440, 900);
+        await OpenAsync("/?sample=65", DockWidths.Push, 900);
+        await OpenFilterPanelAsync();
 
         await Page.Locator("#filter-q").FillAsync("zzzzqxqx");
 
-        await Expect(Page.Locator(".filter-count")).ToHaveTextAsync("No games match");
-        await Expect(Page.Locator(".filter-clear")).ToHaveAttributeAsync("data-highlighted", string.Empty);
-        await Expect(Page.Locator(".filter-clear")).ToHaveCSSAsync("font-weight", "600");
+        await Expect(Page.Locator(PanelCount)).ToHaveTextAsync("No games match");
+        await Expect(Page.Locator(PanelClear)).ToHaveAttributeAsync("data-highlighted", string.Empty);
+        await Expect(Page.Locator(PanelClear)).ToHaveCSSAsync("font-weight", "600");
         (await Page.Locator(Boxes + ":not([data-dim])").CountAsync()).Should().Be(0);
         (await Page.Locator(Boxes).CountAsync()).Should().BeGreaterThan(10);
         await SaveScreenshotAsync("filter-search-no-match");
 
         await Page.Locator("#filter-q").FillAsync("zzzzqxq");
-        await Expect(Page.Locator(".filter-clear")).ToHaveAttributeAsync("data-highlighted", string.Empty);
+        await Expect(Page.Locator(PanelClear)).ToHaveAttributeAsync("data-highlighted", string.Empty);
 
         await Page.Locator("#filter-q").FillAsync(string.Empty);
-        await Expect(Page.Locator(".filter-clear")).Not.ToHaveAttributeAsync("data-highlighted", string.Empty);
+        await Expect(Page.Locator(PanelClear)).Not.ToHaveAttributeAsync("data-highlighted", string.Empty);
         await Expect(Page.Locator(Boxes + "[data-dim]")).ToHaveCountAsync(0);
         ConsoleErrors.Should().BeEmpty();
     }
@@ -220,7 +227,8 @@ public sealed class FilterSearchTests : CabinetPageTest
     [Fact]
     public async Task Enter_closes_the_keyboard_only_on_a_touch_screen()
     {
-        await OpenAsync("/?sample=65", 1440, 900);
+        await OpenAsync("/?sample=65", DockWidths.Push, 900);
+        await OpenFilterPanelAsync();
         await Page.Locator("#filter-q").FocusAsync();
         await Page.Keyboard.TypeAsync("lan");
         await Page.Keyboard.PressAsync("Enter");
@@ -249,8 +257,11 @@ public sealed class FilterSearchTests : CabinetPageTest
         await Expect(touchPage.Locator(".filter-hint")).ToHaveCSSAsync("display", "none");
     }
 
-    private static async Task<string> VisibilityAsync(ILocator locator) =>
-        await locator.EvaluateAsync<string>("(element) => getComputedStyle(element).visibility");
+    /// <summary>
+    /// Reads where the panel, its head row, the search field and the count line stand, so a test can prove that starting or clearing
+    /// a filter moves none of them.
+    /// </summary>
+    private async Task<string[]> PanelLayoutAsync() => await Page.EvaluateAsync<string[]>(PanelLayout);
 
     private static string FragmentOfABaseGameWithAnExpansion(IReadOnlyList<CardData> cards)
     {

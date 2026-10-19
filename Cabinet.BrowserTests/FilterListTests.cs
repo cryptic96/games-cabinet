@@ -11,8 +11,10 @@ namespace Cabinet.BrowserTests;
 
 /// <summary>
 /// Proves in a real browser that the list behind the cabinet says where each game is stored, holds only the matching entries while a
-/// filter is on with the same number the bar shows, and in the by-location view lists the games in one group under a heading for every
-/// location. The list never disagrees with the cabinet, even when the card data or the by-location payload cannot be had.
+/// filter is on with the same number the filters show, and in the by-location view lists the games in one group under a heading for every
+/// location. The list never disagrees with the cabinet, even when the card data or the by-location payload cannot be had. On a
+/// desktop the controls live in the filter panel, so a test that filters opens it first, at the width where it stands beside the
+/// cabinet.
 /// </summary>
 [Trait("Category", "Browser")]
 public sealed class FilterListTests : CabinetPageTest
@@ -41,6 +43,7 @@ public sealed class FilterListTests : CabinetPageTest
         before.Should().NotBeEmpty();
         before.Should().OnlyContain(text => Phrase.IsMatch(text), "the sample owner has locations");
         var total = await Page.Locator(TopEntries).CountAsync();
+        await OpenFilterPanelAsync();
 
         await Page.Locator("#filter-q").FillAsync(fragment);
 
@@ -93,7 +96,7 @@ public sealed class FilterListTests : CabinetPageTest
         await Page.SetViewportSizeAsync(1440, 900);
 
         await GotoCabinetAsync("/?sample=65");
-        await Expect(Page.Locator(".filter-note")).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 20000 });
+        await Expect(Page.Locator(".filter-note")).ToHaveTextAsync("Couldn't load the details. Reload the page to try again.", new LocatorAssertionsToHaveTextOptions { Timeout = 20000 });
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
         var drawn = await Page.Locator("#cabinet .placement:not([data-kind=\"moreMarker\"])").EvaluateAllAsync<string[][]>("(boxes) => boxes.map((box) => [box.dataset.entryId, box.getAttribute('aria-label')])");
@@ -104,6 +107,8 @@ public sealed class FilterListTests : CabinetPageTest
         entries.Should().OnlyContain(pair => labels[pair[0]] == pair[1], "each entry carries the words its box carries");
         entries.Should().OnlyContain(pair => !Phrase.IsMatch(pair[1]));
         var fragment = entries.Select(pair => pair[1]).First(text => !text.Contains(',', StringComparison.Ordinal));
+        await OpenFilterPanelAsync();
+        await Expect(Page.Locator("#filter-panel .filter-note")).ToBeVisibleAsync();
 
         await Page.Locator("#filter-q").FillAsync(fragment);
 
@@ -127,6 +132,7 @@ public sealed class FilterListTests : CabinetPageTest
         var apart = FindExpansionStoredApart(document);
         apart.Should().NotBeNull("the sample holds an expansion stored away from every base game it expands");
         groups.Should().HaveCountGreaterThan(1);
+        await OpenFilterPanelAsync();
 
         await ChooseViewAsync(1);
 
@@ -250,6 +256,7 @@ public sealed class FilterListTests : CabinetPageTest
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
         await Expect(Page.Locator(".filter-bar")).ToBeVisibleAsync();
         var total = await Page.Locator(TopEntries).CountAsync();
+        await OpenFilterPanelAsync();
 
         await ChooseViewAsync(1);
 

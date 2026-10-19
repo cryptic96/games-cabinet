@@ -55,6 +55,25 @@ test('Show on shelf puts the top of a box taller than the space below the bar un
   assert.equal(shelfScrollTarget({ headingTop: -50, boxTop: 40, boxBottom: 140, barBottom: 112, viewportHeight: 900, scrollY: 30 }), 0);
 });
 
+test('with no bar above the cabinet the heading lands 16 px under the viewport top when the heading and the box both fit', () => {
+  const target = shelfScrollTarget({ headingTop: 600, boxTop: 700, boxBottom: 800, barBottom: 0, viewportHeight: 900, scrollY: 1000 });
+
+  assert.equal(target, 1000 + 600 - 16);
+});
+
+test('with no bar above the cabinet a box that does not fit with its heading is centred in the whole viewport height', () => {
+  const target = shelfScrollTarget({ headingTop: -900, boxTop: 1200, boxBottom: 1300, barBottom: 0, viewportHeight: 900, scrollY: 2000 });
+
+  assert.equal(target, 2000 + 1250 - 450);
+});
+
+test('with no bar above the cabinet the switch scrolls the cabinet 16 px under the viewport top, and only when it went above it', () => {
+  assert.equal(scrollAfterSwitch(-500, 0, 2000), 2000 - 500 - 16);
+  assert.equal(scrollAfterSwitch(-0.5, 0, 300), 300 - 0.5 - 16);
+  assert.equal(scrollAfterSwitch(0, 0, 300), null);
+  assert.equal(scrollAfterSwitch(40, 0, 0), null);
+});
+
 test('the box that Show on shelf found stays outlined for two seconds', () => {
   assert.equal(FOUND_HOLD_MS, 2000);
 });
@@ -81,10 +100,11 @@ test('a document is usable only with a layout tag and a list of locations that h
  * @param {'all' | 'location'} [options.initialView] The view remembered at the start.
  * @param {boolean} [options.reducedMotion] Whether the visitor asked for less motion.
  * @param {boolean} [options.transitions] Whether the browser has view transitions.
+ * @param {boolean} [options.dock] Whether the viewport is at the desktop width, where the filters stand in the dock beside the cabinet.
  * @param {(url: string) => { ok: boolean, body: unknown } | Promise<{ ok: boolean, body: unknown }>} [options.answer] Answers a request.
  * @returns {object} The page, the switch and the records.
  */
-function startPage({ initialView = 'all', reducedMotion = false, transitions = false, answer = () => ({ ok: true, body: GOOD_DOCUMENT }) } = {}) {
+function startPage({ initialView = 'all', reducedMotion = false, transitions = false, dock = false, answer = () => ({ ok: true, body: GOOD_DOCUMENT }) } = {}) {
   const log = [];
   const listeners = new Map();
   const attributes = new Set();
@@ -122,7 +142,7 @@ function startPage({ initialView = 'all', reducedMotion = false, transitions = f
   }
 
   globalThis.window = {
-    matchMedia: () => ({ matches: reducedMotion }),
+    matchMedia: (query) => ({ matches: query.includes('64rem') ? dock : reducedMotion }),
     get scrollY() {
       return state.scrollY;
     },
@@ -325,4 +345,112 @@ test('after a switch the page scrolls up when the cabinet slipped above the bar,
   await click(resting, 'location');
 
   assert.deepEqual(resting.scrolls, []);
+});
+
+test('at the desktop width the switch scrolls the cabinet 16 px under the viewport top and never reads the dock as a bar above it', async () => {
+  const slipped = startPage({ dock: true });
+
+  slipped.state.top = -500;
+  slipped.state.bottom = 900;
+  slipped.state.scrollY = 2000;
+  await click(slipped, 'location');
+
+  assert.deepEqual(slipped.scrolls, [{ top: 2000 - 500 - 16, behavior: 'instant' }]);
+
+  const resting = startPage({ dock: true });
+
+  resting.state.top = 10;
+  resting.state.bottom = 900;
+  await click(resting, 'location');
+
+  assert.deepEqual(resting.scrolls, [], 'a cabinet below the viewport top stays where it is, although the full-height dock ends lower');
+});
+
+/**
+ * Builds a stand-in page that shows the location view with one box on a shelf far down the page, and lets Show on shelf land on it.
+ * The box and its location's heading are measured against the page's scroll position like real elements.
+ * @param {object} options What differs between the cases.
+ * @param {boolean} options.dock Whether the viewport is at the desktop width, where the filters stand in the dock beside the cabinet.
+ * @param {number} options.barBottom Where the bar's box ends, in pixels from the top of the viewport.
+ * @returns {Promise<{ scrolls: { top: number }[], marked: Set<string> }>} The scrolls the page made and the attributes the box got.
+ */
+async function landOnFarBox({ dock, barBottom }) {
+  const listeners = new Map();
+  const scrolls = [];
+  const marked = new Set();
+  const page = { scrollY: 0 };
+  const heading = { getBoundingClientRect: () => ({ top: 2000 - page.scrollY }) };
+  const group = { querySelector: () => heading };
+  const box = {
+    getBoundingClientRect: () => ({ top: 2100 - page.scrollY, bottom: 2200 - page.scrollY }),
+    closest: () => group,
+    setAttribute: (name) => marked.add(name),
+    removeAttribute: (name) => marked.delete(name),
+  };
+  const bar = {
+    getBoundingClientRect: () => ({ bottom: barBottom }),
+  };
+
+  globalThis.CSS = { escape: (text) => text };
+  globalThis.document = {
+    getElementById: () => null,
+    addEventListener: (name, handler) => listeners.set(name, handler),
+    removeEventListener: () => {},
+    documentElement: { setAttribute: () => {}, removeAttribute: () => {} },
+  };
+  globalThis.window = {
+    innerHeight: 900,
+    matchMedia: (query) => ({ matches: query.includes('64rem') ? dock : false }),
+    getComputedStyle: () => {
+      if (dock) {
+        throw new Error('the dock is not a bar above the cabinet, so its style is never read');
+      }
+
+      return { position: 'sticky' };
+    },
+    get scrollY() {
+      return page.scrollY;
+    },
+    scrollTo: ({ top }) => {
+      scrolls.push({ top });
+      page.scrollY = top;
+    },
+    setTimeout: () => 1,
+    clearTimeout: () => {},
+    requestAnimationFrame: () => 1,
+  };
+
+  initLocationsView({
+    toggle: { hidden: false, querySelectorAll: () => [] },
+    copy: COPY,
+    getProfile: () => 'desktop',
+    getSample: () => undefined,
+    getLayoutEtag: () => ETAG,
+    onSwitch: () => {},
+    initialView: 'location',
+    cabinet: { querySelector: () => box, getBoundingClientRect: () => ({ top: 0 }) },
+    bar,
+  });
+
+  listeners.get('cabinet:show-on-shelf')({ detail: { entryId: '7' } });
+
+  for (let turn = 0; turn < 4; turn += 1) {
+    await settle();
+  }
+
+  return { scrolls, marked };
+}
+
+test('at the desktop width Show on shelf puts the heading 16 px under the viewport top, whatever box the dock has', async () => {
+  const landed = await landOnFarBox({ dock: true, barBottom: 900 });
+
+  assert.deepEqual(landed.scrolls, [{ top: 2000 - 16 }]);
+  assert.equal(landed.marked.has('data-found'), true);
+});
+
+test('below the desktop width Show on shelf keeps the heading 16 px under the pinned slim bar', async () => {
+  const landed = await landOnFarBox({ dock: false, barBottom: 60 });
+
+  assert.deepEqual(landed.scrolls, [{ top: 2000 - 60 - 16 }]);
+  assert.equal(landed.marked.has('data-found'), true);
 });

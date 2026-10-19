@@ -10,7 +10,8 @@ namespace Cabinet.BrowserTests;
 
 /// <summary>
 /// Proves in a real browser that below 64rem the bar is a slim bar with a Filters button and a bottom sheet that applies every tap
-/// at once over a clear backdrop: the controls move between the bar and the sheet one by one, the chips form grids every thumb can
+/// at once over a clear backdrop: the controls move between the desktop filter panel and the sheet one by one (on a desktop the sheet
+/// never opens), the chips form grids every thumb can
 /// hit, the sheet scrolls inside with its grip kept at the top, and it closes by its primary button, Escape, a tap on the cabinet, a
 /// drag down and Back, each doing one thing. Only the primary button brings the first match into view.
 /// </summary>
@@ -112,8 +113,9 @@ public sealed partial class FilterSheetTests : CabinetPageTest
         await Expect(Page.Locator(OpenSheet)).ToHaveCountAsync(1);
         var shown = await LitCountOfTheBarAsync();
         await Expect(Page.Locator(Done)).ToHaveTextAsync($"Show {Games(shown)}");
-        await Expect(Page.Locator($"{Bar} .filter-open-text")).ToHaveTextAsync("Filters · 1");
-        await Expect(Page.Locator($"{Bar} .filter-open-suffix")).ToHaveTextAsync(" active");
+        await Expect(Page.Locator($"{Bar} .filter-open-text")).ToHaveTextAsync("Filters");
+        await Expect(Page.Locator($"{Bar} .filter-open-count")).ToHaveTextAsync("1");
+        await Expect(Page.Locator($"{Bar} .filter-open-suffix")).ToHaveTextAsync(" · 1 active");
         var dimmed = await Page.Locator(Dimmed).CountAsync();
 
         await Page.Locator(Done).ClickAsync();
@@ -126,12 +128,15 @@ public sealed partial class FilterSheetTests : CabinetPageTest
     }
 
     [Fact]
-    public async Task On_a_desktop_the_controls_stay_in_the_bar()
+    public async Task On_a_desktop_the_controls_are_in_the_panel_and_the_sheet_never_opens()
     {
-        await OpenAsync(1280, 900);
+        await OpenAsync(DockWidths.Over, 900);
 
-        await Expect(Page.Locator(".filter-open")).ToBeHiddenAsync();
-        await ExpectBarOrderAsync("at 1280 px");
+        (await Page.Locator(".filter-open").EvaluateAsync<int>("(button) => button.getClientRects().length")).Should().Be(0, "the Filters button has no box on a desktop");
+        await ExpectPanelOrderAsync("on a desktop");
+        await Page.Locator(".filter-open").DispatchEventAsync("click");
+        await Task.Delay(300, TestContext.Current.CancellationToken);
+        await Expect(Page.Locator(OpenSheet)).ToHaveCountAsync(0);
 
         await Page.SetViewportSizeAsync(390, 844);
         await Expect(Page.Locator(".filter-sheet-groups > fieldset.filter-view")).ToHaveCountAsync(1);
@@ -151,33 +156,34 @@ public sealed partial class FilterSheetTests : CabinetPageTest
             "fieldset.filter-group[time]",
             "div.filter-location");
 
-        await Page.SetViewportSizeAsync(1280, 900);
+        await Page.SetViewportSizeAsync(DockWidths.Over, 900);
         await Expect(Page.Locator(OpenSheet)).ToHaveCountAsync(0);
-        await ExpectBarOrderAsync("after 1280 to 390 to 1280 px");
+        await ExpectPanelOrderAsync("after a desktop, a phone and a desktop again");
         (await Page.Locator(PlayersGroup).CountAsync()).Should().Be(1);
+        await Page.Locator(".filter-open").DispatchEventAsync("click");
+        await Task.Delay(300, TestContext.Current.CancellationToken);
+        await Expect(Page.Locator(OpenSheet)).ToHaveCountAsync(0);
         ConsoleErrors.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task The_card_details_note_moves_between_the_wall_and_the_sheet()
+    public async Task The_card_details_note_moves_between_the_panel_and_the_sheet()
     {
         await StartAsync(PrototypeOn);
         await FailCardDataRequestsAsync();
         var note = Page.Locator("p.filter-note");
 
-        foreach (var width in new[] { 1024, 1440 })
+        foreach (var width in new[] { DockWidths.NarrowestDesktop, DockWidths.Push })
         {
             await Page.SetViewportSizeAsync(width, 900);
             await GotoCabinetAsync("/?sample=65");
-            await Expect(note).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30000 });
+            await Page.WaitForFunctionAsync("() => document.querySelector('.filter-note').textContent !== ''", null, new PageWaitForFunctionOptions { Timeout = 30000 });
+            await OpenFilterPanelAsync();
+            await Expect(note).ToBeVisibleAsync();
             await Expect(note).ToHaveTextAsync(FailedDetails);
 
-            await ExpectNoteUnderTheBarAsync(width);
-            (await BarHeightAsync()).Should().BeApproximately(112, 0.5, $"{width} px at the top of the page");
-
-            await Page.EvaluateAsync("() => window.scrollTo(0, 700)");
-            await Expect(Page.Locator($"{Bar}[data-stuck]")).ToHaveCountAsync(1);
-            (await BarHeightAsync()).Should().BeApproximately(112, 0.5, $"{width} px once stuck");
+            await ExpectNoteUnderTheCountLineAsync($"at {width} px");
+            await FoldFilterPanelAsync();
         }
 
         await Page.SetViewportSizeAsync(390, 844);
@@ -193,11 +199,11 @@ public sealed partial class FilterSheetTests : CabinetPageTest
         (await Page.Locator(".filter-sheet-groups").EvaluateAsync<string[]>(DescribeChildren)).Last().Should().Be("p.filter-note");
         (await Page.EvaluateAsync<bool>("() => (document.querySelector('.filter-location').compareDocumentPosition(document.querySelector('.filter-note')) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0")).Should().BeTrue();
 
-        await Page.SetViewportSizeAsync(1440, 900);
+        await Page.SetViewportSizeAsync(DockWidths.Push, 900);
         await Expect(Page.Locator(OpenSheet)).ToHaveCountAsync(0);
+        await OpenFilterPanelAsync();
         await Expect(note).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30000 });
-        await ExpectNoteUnderTheBarAsync(1440);
-        await Page.WaitForFunctionAsync($"() => document.querySelector('.filter-bar').offsetHeight === 112");
+        await ExpectNoteUnderTheCountLineAsync("after the phone width");
         ConsoleErrors.Should().NotContain(error => error.Contains("Content Security", StringComparison.OrdinalIgnoreCase));
     }
 
@@ -646,11 +652,14 @@ public sealed partial class FilterSheetTests : CabinetPageTest
         await Expect(Page.Locator(OpenSheet)).ToHaveCountAsync(1);
         await Expect(Page.Locator("#filter-loc")).ToHaveValueAsync(places[1]);
 
-        await Page.SetViewportSizeAsync(1280, 900);
+        await Page.SetViewportSizeAsync(DockWidths.Over, 900);
 
         await Expect(Page.Locator(OpenSheet)).ToHaveCountAsync(0);
-        await Expect(Page.Locator($"{Bar} {PlayersGroup}")).ToHaveCountAsync(1);
-        await Expect(Page.Locator($"{Bar} #filter-loc")).ToHaveCountAsync(1);
+        await Expect(Page.Locator($"#filter-panel {PlayersGroup}")).ToHaveCountAsync(1);
+        await Expect(Page.Locator("#filter-panel #filter-loc")).ToHaveCountAsync(1);
+        await Expect(Page.Locator(".filter-sheet-groups > *")).ToHaveCountAsync(0);
+        await ExpectPanelOrderAsync("after the rotation");
+        await Expect(Page.Locator("#filter-loc")).ToHaveValueAsync(places[1]);
         ConsoleErrors.Should().BeEmpty();
     }
 
@@ -716,35 +725,34 @@ public sealed partial class FilterSheetTests : CabinetPageTest
         await Page.WaitForFunctionAsync("() => getComputedStyle(document.querySelector('.filter-sheet')).translate === 'none' || getComputedStyle(document.querySelector('.filter-sheet')).translate === '0px'");
     }
 
-    private async Task ExpectBarOrderAsync(string moment)
+    private async Task ExpectPanelOrderAsync(string moment)
     {
-        var rows = Page.Locator($"{Bar} .filter-row");
-
-        (await rows.Nth(0).EvaluateAsync<string[]>(DescribeChildren)).Should().Equal(
-            ["fieldset.filter-view", "span.filter-search", "button.filter-open", "fieldset.filter-group[players]"],
-            $"row one {moment}");
-        (await rows.Nth(1).EvaluateAsync<string[]>(DescribeChildren)).Should().Equal(
-            ["fieldset.filter-group[time]", "div.filter-location", "div.filter-status"],
-            $"row two {moment}");
-        (await Page.Locator(Bar).EvaluateAsync<bool>("(bar) => bar.nextElementSibling.matches('p.filter-note')")).Should().BeTrue($"the note follows the bar {moment}");
+        (await Page.Locator("#filter-panel .filter-panel-groups").EvaluateAsync<string[]>(DescribeChildren)).Should().Equal(
+            ["fieldset.filter-view", "fieldset.filter-group[players]", "fieldset.filter-group[time]", "div.filter-location"],
+            $"the panel's groups {moment}");
+        (await Page.Locator("#filter-panel .filter-panel-find > .filter-find").CountAsync()).Should().Be(1, $"the search field is in the panel {moment}");
+        (await Page.Locator("#filter-panel .filter-panel-tally > .filter-count").CountAsync()).Should().Be(1, $"the count is in the panel {moment}");
+        (await Page.Locator("#filter-panel .filter-panel-note > p.filter-note").CountAsync()).Should().Be(1, $"the note is in the panel {moment}");
+        (await Page.Locator("input[name=\"filter-players\"]").CountAsync()).Should().Be(9, $"one players group {moment}");
+        (await Page.Locator("input[name=\"filter-time\"]").CountAsync()).Should().Be(6, $"one time group {moment}");
     }
 
-    private async Task ExpectNoteUnderTheBarAsync(int width)
+    private async Task ExpectNoteUnderTheCountLineAsync(string moment)
     {
         var reading = await Page.EvaluateAsync<JsonElement>("""
             () => {
-              const bar = document.querySelector('.filter-bar');
+              const count = document.querySelector('#filter-panel .filter-panel-tally .filter-count').getBoundingClientRect();
               const note = document.querySelector('p.filter-note');
-              return { inside: bar.contains(note), gap: note.getBoundingClientRect().top - bar.getBoundingClientRect().bottom, visible: note.offsetParent !== null };
+              const rect = note.getBoundingClientRect();
+              return { inside: document.getElementById('filter-panel').contains(note), gap: rect.top - count.bottom, leftGap: rect.left - count.left, visible: note.getClientRects().length > 0 };
             }
             """);
 
-        reading.GetProperty("visible").GetBoolean().Should().BeTrue($"{width} px");
-        reading.GetProperty("inside").GetBoolean().Should().BeFalse($"{width} px");
-        reading.GetProperty("gap").GetDouble().Should().BeInRange(-0.5, 17, $"{width} px");
+        reading.GetProperty("visible").GetBoolean().Should().BeTrue(moment);
+        reading.GetProperty("inside").GetBoolean().Should().BeTrue($"the note sits in the panel {moment}");
+        reading.GetProperty("gap").GetDouble().Should().BeApproximately(8, 1, $"the note sits 8px under the count line {moment}");
+        reading.GetProperty("leftGap").GetDouble().Should().BeApproximately(0, 1, $"the note lines up with the count line {moment}");
     }
-
-    private async Task<double> BarHeightAsync() => await Page.Locator(Bar).EvaluateAsync<double>("(bar) => bar.getBoundingClientRect().height");
 
     private async Task<List<double[]>> ChipBoxesAsync(string group) =>
         [.. await Page.EvaluateAsync<double[][]>(ReadChipBoxes, group)];
