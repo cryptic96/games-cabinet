@@ -167,6 +167,32 @@ public sealed class OwnerLocationListPostTests
     }
 
     [Fact]
+    public async Task Without_a_collection_a_delete_still_asks_first_when_games_are_kept_there()
+    {
+        const string shelfId = "e5f6a7b8";
+        using var storage = new TemporaryDirectory();
+        new OwnerDataStore(storage.FullPath, NullLogger<OwnerDataStore>.Instance).Save(OwnerData.Empty with
+        {
+            Locations = [new OwnerLocation(shelfId, "Shelf B")],
+            Games = [new OwnerGame(100, shelfId, null, null), new OwnerGame(101, shelfId, null, null, 7002)],
+        });
+        await using var factory = new CabinetWebApplicationFactory(new Dictionary<string, string?> { ["Storage:Directory"] = storage.FullPath });
+        using var session = new OwnerSession(factory);
+        var revision = factory.ServingServices.GetRequiredService<OwnerDataService>().Revision.ToString(CultureInfo.InvariantCulture);
+
+        var page = await session.GetAsync(LocationsPath);
+        var form = await session.PostFormAsync($"{LocationsPath}?handler=Delete", [Field("id", shelfId), Field("revision", revision)]);
+        var unconfirmed = await session.PostJsonAsync($"{LocationsPath}?handler=Delete", [Field("id", shelfId), Field("revision", revision)]);
+
+        page.Body.Should().Contain("data-not-placed=\"2\"");
+        form.Status.Should().Be(HttpStatusCode.Found);
+        form.Location.Should().Be($"{LocationsPath}?confirm={shelfId}#loc-{shelfId}");
+        unconfirmed.Status.Should().Be(HttpStatusCode.UnprocessableEntity);
+        unconfirmed.JsonText("status").Should().Be("confirm-needed");
+        Locations(factory).Should().Equal(new OwnerLocation(shelfId, "Shelf B"));
+    }
+
+    [Fact]
     public async Task Deleting_an_empty_location_without_script_deletes_at_once_and_lands_on_the_neighbour()
     {
         await using var factory = new CabinetWebApplicationFactory();

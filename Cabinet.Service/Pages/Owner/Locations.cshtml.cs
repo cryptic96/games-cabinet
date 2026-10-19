@@ -435,7 +435,7 @@ public class LocationsModel : OwnerPage
             .. data.Locations.Select((location, index) =>
             {
                 var games = counts.GetValueOrDefault(location.Id);
-                var notPlaced = games == 0 ? 0 : LocationEdits.CountLeftNotPlaced(data, snapshot, location.Id);
+                var notPlaced = games == 0 && snapshot is not null ? 0 : LocationEdits.CountLeftNotPlaced(data, snapshot, location.Id);
 
                 return new LocationItemModel(location, index + 1, data.Locations.Count, games, notPlaced, data.Revision);
             }),
