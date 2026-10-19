@@ -241,34 +241,46 @@ async function requestCards(epoch, etag, started = null, beforeDraw = false) {
  * Fetches the card data of the layout just drawn and keeps it in memory so a tap finds it ready. It tries again when the
  * data belongs to a different layout than the one on screen, and again after a short wait when the request failed. It never
  * shows anything: a card without its data still opens with what the drawn box knows, and says that the details could not be
- * loaded once every attempt has failed, which is also when the filters that need the details step aside. A newer load or redraw
- * supersedes it.
+ * loaded once every attempt has failed. A draw that waits for the data waits for one failed request only: the filters that need
+ * the details step aside at once so the cabinet can be drawn, and the remaining attempts follow the draw, which brings them back
+ * when one succeeds. A newer load or redraw supersedes it.
  * @param {number} epoch The load counter when the layout was drawn.
  * @param {string | null} etag The entity tag of the layout on screen, when the response carried one.
- * @param {Promise<Response | null> | null} [started] A request for the card data that is already under way; the first attempt uses it.
- * @returns {Promise<'loaded' | 'superseded' | 'failed'>} How it ended.
+ * @param {Promise<Response | null> | null} [started] A request for the card data that is already under way for a draw that waits for
+ * it; the first attempt uses it.
+ * @param {number} [failures] How many requests have failed already, so the next one waits its turn first.
+ * @returns {Promise<'loaded' | 'superseded' | 'retrying' | 'failed'>} How it ended; retrying when a draw that waits should go on
+ * while the remaining attempts follow it.
  */
-async function fetchCards(epoch, etag, started = null) {
+async function fetchCards(epoch, etag, started = null, failures = 0) {
   const beforeDraw = started !== null;
-  let failures = 0;
+  let failed = failures;
+  let waiting = failures > 0;
 
-  for (let attempt = 0; attempt < CARD_ATTEMPTS; attempt += 1) {
-    const outcome = await requestCards(epoch, etag, attempt === 0 ? started : null, beforeDraw);
-
-    if (outcome === 'superseded') {
-      return 'superseded';
-    }
-
-    if (outcome === 'loaded') {
-      return 'loaded';
-    }
-
-    if (outcome === 'failed' && attempt < CARD_ATTEMPTS - 1) {
-      await pause(CARD_RETRY_DELAYS_MS[failures]);
-      failures += 1;
+  for (let attempt = failures; attempt < CARD_ATTEMPTS; attempt += 1) {
+    if (waiting) {
+      await pause(CARD_RETRY_DELAYS_MS[failed - 1]);
+      waiting = false;
 
       if (epoch !== latestLoad) {
         return 'superseded';
+      }
+    }
+
+    const outcome = await requestCards(epoch, etag, attempt === failures ? started : null, beforeDraw);
+
+    if (outcome === 'superseded' || outcome === 'loaded') {
+      return outcome;
+    }
+
+    if (outcome === 'failed') {
+      failed += 1;
+      waiting = true;
+
+      if (beforeDraw && attempt < CARD_ATTEMPTS - 1) {
+        filters.disableCardFilters();
+
+        return 'retrying';
       }
     }
   }
@@ -303,7 +315,8 @@ function layoutOfLocations(doc) {
 /**
  * Tells whether a draw has to wait for the card data: any filter set, the search included, needs the details to be judged, so the
  * first frame is already in shadow instead of showing every box in the light first. The location view waits too, because only the card
- * data says whether the owner still has any location to show a cabinet for.
+ * data says whether the owner still has any location to show a cabinet for. The wait ends at the first failed request, so a card
+ * endpoint that is down never holds the cabinet back.
  * @returns {boolean}
  */
 function drawWaitsForCards() {
@@ -344,7 +357,8 @@ function paint(layout, etag, doc) {
  * Draws the cabinet and then does what follows a draw.
  * @param {object} layout The layout to draw.
  * @param {string | null} etag The entity tag of the layout response.
- * @param {'loaded' | 'failed' | null} settled How the wait for the card data ended, or null when the draw did not wait for it.
+ * @param {'loaded' | 'retrying' | 'failed' | null} settled How the wait for the card data ended, or null when the draw did not wait
+ * for it.
  * @param {object | null} [doc] The by-location document to draw instead of the combined layout.
  */
 function drawCabinet(layout, etag, settled, doc = null) {
@@ -417,10 +431,12 @@ async function documentForView(etag, quiet, started = null) {
 }
 
 /**
- * Remembers what the layout just drawn holds and, unless the draw already waited for the card data, starts fetching it.
+ * Remembers what the layout just drawn holds and, unless the draw already waited for the card data, starts fetching it; after a
+ * draw that went ahead on a failed request, the remaining attempts carry on from there.
  * @param {object} layout The layout drawn.
  * @param {string | null} etag The entity tag of the layout response.
- * @param {'loaded' | 'failed' | null} settled How the wait for the card data ended, or null when the draw did not wait for it.
+ * @param {'loaded' | 'retrying' | 'failed' | null} settled How the wait for the card data ended, or null when the draw did not wait
+ * for it.
  */
 function afterDraw(layout, etag, settled) {
   drawnPlacements = indexPlacements(layout);
@@ -433,6 +449,8 @@ function afterDraw(layout, etag, settled) {
 
   if (settled === null) {
     fetchCards(latestLoad, etag);
+  } else if (settled === 'retrying') {
+    fetchCards(latestLoad, etag, null, 1);
   }
 }
 
