@@ -797,6 +797,7 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
       cabinet: mount,
       copy,
       getCount: () => ({ lit: tally.lit, total: tally.total, active: result.active }),
+      fallbackFocus: [rail?.querySelector('.filter-menu') ?? null, panel?.querySelector('.filter-menu') ?? null, field],
       units: {
         find: bar.querySelector('.filter-find'),
         count,

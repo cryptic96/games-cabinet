@@ -79,11 +79,13 @@ export function slideDecision({ lastY, y, away, blocked, barHeight }) {
  * @param {object} parts.copy The visitor-facing strings of the page language.
  * @param {() => { lit: number, total: number, active: boolean }} parts.getCount Gives how many games stand in the light, how many
  * there are, and whether a filter is in use.
+ * @param {Array<HTMLElement | null>} [parts.fallbackFocus] Where focus goes when the sheet closes and the Filters button has left the
+ * layout, as it does when the window widens past the sheet: the first of them that is on screen.
  * @returns {{ open: () => Promise<void>, close: (how?: { instant?: boolean }) => void, isOpen: () => boolean, refresh: () => void, showBar: () => void }}
  * The controls: open the sheet, close it, whether it is open, write its button and Clear for the current result, and bring the slim
  * bar back into view if it slid away.
  */
-export function initFilterSheet({ bar, dialog, units, openButton, cabinet, copy, getCount }) {
+export function initFilterSheet({ bar, dialog, units, openButton, cabinet, copy, getCount, fallbackFocus = [] }) {
   const sheet = dialog.querySelector('.filter-sheet');
   const slot = dialog.querySelector('.filter-sheet-groups');
   const done = dialog.querySelector('.filter-done');
@@ -106,6 +108,7 @@ export function initFilterSheet({ bar, dialog, units, openButton, cabinet, copy,
 
   let shown = false;
   let closing = false;
+  let closeTimer = 0;
   let revealPending = false;
   let pressedOnFrame = false;
   let drag = null;
@@ -265,10 +268,19 @@ export function initFilterSheet({ bar, dialog, units, openButton, cabinet, copy,
   }
 
   /**
+   * Gives the control focus returns to when the sheet closes: the Filters button, or, when the width has taken it out of the layout,
+   * the first fallback that is on screen.
+   * @returns {HTMLElement}
+   */
+  function returnTarget() {
+    return [openButton, ...fallbackFocus].find((control) => control !== null && control.getClientRects().length > 0) ?? openButton;
+  }
+
+  /**
    * Ends a close: takes away every mark the close or a drag left on the sheet, removes the history step when the close did not come
-   * from Back, gives focus back to the Filters button and, after a close through the primary button, shows the matches. It does
-   * its work once per open, whichever way the dialog closed. The matches are shown on the next frame, after the browser has finished
-   * returning focus to where it was, which can move the page.
+   * from Back, gives focus back to the Filters button, or to a fallback when the button is no longer on screen, and, after a close
+   * through the primary button, shows the matches. It does its work once per open, whichever way the dialog closed. The matches are
+   * shown on the next frame, after the browser has finished returning focus to where it was, which can move the page.
    */
   function settle() {
     if (!shown) {
@@ -277,13 +289,14 @@ export function initFilterSheet({ bar, dialog, units, openButton, cabinet, copy,
 
     shown = false;
     closing = false;
+    window.clearTimeout(closeTimer);
     drag = null;
     delete dialog.dataset.closing;
     delete sheet.dataset.moving;
     delete sheet.dataset.springing;
     sheet.style.removeProperty('--sheet-dy');
     steps.closedHere();
-    openButton.focus({ preventScroll: true });
+    returnTarget().focus({ preventScroll: true });
 
     if (revealPending) {
       revealPending = false;
@@ -304,11 +317,12 @@ export function initFilterSheet({ bar, dialog, units, openButton, cabinet, copy,
 
   /**
    * Closes the sheet. By default it slides out over the card sheet's closing time and then closes; with `instant`, and for a visitor
-   * who prefers less motion, it closes at once. Asking again while it slides out changes nothing.
+   * who prefers less motion, it closes at once. Asking again while it slides out changes nothing, except that an instant close cuts
+   * the slide short, so a width change never leaves the sheet open after its controls have moved out of it.
    * @param {{ instant?: boolean, reveal?: boolean }} [how] Whether to close at once, and whether the page then shows the matches.
    */
   function close({ instant = false, reveal = false } = {}) {
-    if (!dialog.open || closing) {
+    if (!dialog.open || (closing && !instant)) {
       return;
     }
 
@@ -322,7 +336,7 @@ export function initFilterSheet({ bar, dialog, units, openButton, cabinet, copy,
 
     closing = true;
     dialog.dataset.closing = '';
-    window.setTimeout(finish, tokenMs('--fallback-close'));
+    closeTimer = window.setTimeout(finish, tokenMs('--fallback-close'));
   }
 
   /**
