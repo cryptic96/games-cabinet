@@ -22,3 +22,12 @@ The bumps touch no product code. They run on `main`, which still carries the two
 ## Solution
 
 After the milestone branch is merged into `main`, have Dependabot rebase each pull request so it runs on the new `main`. If a job is still red, read its log once and fix the real cause on a `feature/` branch. Check that the NuGet bumps keep the lock files consistent (`dotnet restore --locked-mode`) and that the new zizmor passes `build/lint.sh` locally. Merge each through its pull request with the owner's OK.
+
+## Resolution
+
+Done on 2026-10-19, after the milestone branch reached `main` (v0.10.0). No product code changed.
+
+- #28 (TimeProvider.Testing 10.11.0) and #26 (zizmor 1.31.1) merged once they ran on the new `main`; the red jobs were the two flaky browser tests that the milestone branch had hardened.
+- #27 stayed stuck on a lock-file conflict with #28 and ignored a rebase request. Dependabot recreated it as #30 (`Cabinet.BrowserTests`) and #31 (`Cabinet.IntegrationTests`), which both merged, and #27 was closed as superseded.
+- One red lint run on #30 was the network check of the attested-digest commit hitting the unauthenticated GitHub API rate limit. It passes locally with `CABINET_LINT_NETWORK=1` and passed when re-run.
+- `main` was merged back into the milestone branch; `dotnet restore --locked-mode` and the warnings-as-errors build pass.
