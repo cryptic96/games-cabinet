@@ -77,7 +77,7 @@ Not in this phase: new visitor features, search indexing, a styled refusal page,
   - The before-and-after numbers go into the phase record under `.planning/`, without hostnames or addresses.
 
 ### Go-public day
-- **D-10: Order: v1.0.0 first, then open.**
+- **D-10: v1.0.0 first, then open.**
   1. All hardening ships as `v1.0.0`, as planned in the repo-setup phase (0.x until go-public).
   2. Everything is checked on the still LAN-only route: headers, limits with a burst test, caps, the flood test, and the full browser suite under the CSP.
   3. After the owner's checklist sign-off, the allow-list comes off and the external probe runs.
@@ -121,7 +121,7 @@ Not in this phase: new visitor features, search indexing, a styled refusal page,
     - The accepted-risk register entries AR-08 and AR-06-05 are re-accepted with the new mitigation and a new expiry or review point, chosen at planning time with the owner.
     - The PROJECT.md active items that say "revoke or downgrade" are updated at the phase transition.
   - **Residual risk, accepted:** while the agent is unlocked, anything running on the desktop can use the keys.
-- **D-15: Outbound firewall: block the home network.**
+- **D-15: The outbound firewall blocks the home network.**
   - The cabinet container's nftables output chain refuses new connections to private, LAN and VPN ranges, except what the host needs: its DNS resolver, local time servers if any, and the loopback.
   - Replies to Traefik are established traffic and keep working.
   - The internet stays open on the ports the host needs (HTTPS, HTTP for package mirrors, DNS, NTP).
@@ -129,7 +129,7 @@ Not in this phase: new visitor features, search indexing, a styled refusal page,
   - **Verify on the container:** no connection to a LAN host succeeds, while sync, picture downloads, the deploy poll, Sigstore verification and package updates still work.
   - A full hostname allow-list was considered and rejected for now: CDN addresses change, and a missed one silently breaks sync or deploys.
   - **Reversibility:** reversible.
-- **D-16: An owner step on the checklist: restrict SSH on the reverse-proxy container.**
+- **D-16: An owner step on the checklist restricts SSH on the reverse-proxy container.**
   - It currently answers SSH from the whole LAN, guarded only by key pinning.
   - The step restricts it to admin addresses, like the cabinet container already does.
   - Claude supplies the rule at execution time. The repository carries only a generic checklist line, nothing about that container.
