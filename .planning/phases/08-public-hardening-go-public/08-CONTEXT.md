@@ -83,6 +83,7 @@ Not in this phase: new visitor features, search indexing, a styled refusal page,
   3. After the owner's checklist sign-off, the allow-list comes off and the external probe runs.
 
   The version that goes public is the version that was checked.
+  - **Measurement build (owner's agreement, 2026-10-20, during planning):** the load is measured on a 0.x release deployed to the still LAN-only site. The measured limits are then written into the repository, and `v1.0.0` is cut as a new build that is verified on its own before the route opens. This is within "0.x until go-public".
   - **Reversibility:** one-way. Releases are immutable, so `v1.0.0` cannot be re-cut. Once the route is open, the site can be fetched and cached by anyone. Re-adding the allow-list closes it again but does not undo what was fetched.
 - **D-11: The external probe is the owner's phone plus online scanners.**
   - On mobile data (Wi-Fi off), the owner opens the site and tries `/health` on the public hostname, the ops port and the owner hostname. All must fail: 404, refused or blocked.
