@@ -119,6 +119,7 @@ Not in this phase: new visitor features, search indexing, a styled refusal page,
   - **Consequences:**
     - This replaces "Claude revokes its own access as the very last step" in D-13. The last step becomes the owner setting the passphrases and locking the agent.
     - The accepted-risk register entries AR-08 and AR-06-05 are re-accepted with the new mitigation and a new expiry or review point, chosen at planning time with the owner.
+    - **Review point (owner's choice, 2026-10-20, during planning):** 90 days after the go-public date. The exact date is written into both registers when the site opens.
     - The PROJECT.md active items that say "revoke or downgrade" are updated at the phase transition.
   - **Residual risk, accepted:** while the agent is unlocked, anything running on the desktop can use the keys.
 - **D-15: The outbound firewall blocks the home network.**
