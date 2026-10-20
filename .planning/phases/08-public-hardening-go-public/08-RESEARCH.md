@@ -689,20 +689,27 @@ Model on `build/check-owner-routes.sh` (environment-driven hostnames, `PASS`/`FA
 | A9 | SSL Labs and securityheaders.com cannot be driven by Claude without the owner (SSL Labs API v4 needs a registered organisation e-mail; its page is script-driven) | Go-public checklist | If wrong, more can be automated. |
 | A10 | Packet loss from `reject` towards a LAN resolver is not an issue because DNS is allowed first | Pattern 6 | DNS outage after applying; mitigated by the selfcheck and `pct enter`. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Origin allow-list source (D-04 says "from the env file").**
    - What we know: `AllowedHosts` is already needed from the env file; "origin host equals Host" plus host filtering is equivalent to an allow-list of the site's own hostnames and needs no second value.
    - What is unclear: whether the owner wants a separate explicit key.
    - Recommendation: reuse `AllowedHosts`; if the owner wants a separate key, add it with the same startup validation.
+   - RESOLVED: the live channel admits a request only when its `Origin` names the same host and port as its `Host`, and host filtering restricts `Host` to the hostnames in the server env file's `AllowedHosts`; no second list (plans 08-05 and 08-07).
 2. **SSL Labs and securityheaders.com automation (D-11).**
    - What we know: the SSL Labs page is script-driven and its API v4 asks for registration with a name and organisation e-mail `[CITED: ssllabs-scan docs]`; the MDN Observatory v2 scan is a POST with a `host` query parameter `[CITED: MDN FAQ]`; securityheaders.com has a server-rendered result page.
    - Recommendation: Claude runs Observatory and securityheaders.com; the owner opens SSL Labs in a browser with the results hidden from the public board and reads the grade back. Ask before sending the hostname.
+   - RESOLVED: Claude runs all three after the owner's yes, SSL Labs through the built-in in-app browser (the web form with "Do not show the results on the boards" ticked); a CAPTCHA or automated-use block hands only that scan to the owner, never bypassed (plan 08-22).
 3. **How the .NET runtime sees memory inside the container.** Without `MemoryMax` it reads no limit. Confirm after applying `MemoryMax` by logging `GC.GetGCMemoryInfo().TotalAvailableMemoryBytes` once in a throwaway run, or with `dotnet-counters`.
+   - RESOLVED: the app logs the memory limit the runtime sees once at start (plan 08-07); the measurement build's deploy confirms it reads about 75 % of the unit's `MemoryMax` (plan 08-12, Task 3), and the public version confirms it again (plan 08-19).
 4. **Access log rotation on the proxy.** The access log is 104 MB with no `logrotate` entry; a flood grows it. Out of the repository; record it as an owner/maintenance item.
+   - RESOLVED: an owner maintenance item outside the repository, tracked in `.planning/todos/pending/2026-10-20-rotate-the-proxy-access-log.md`; the flood plans record the log size before and after (plans 08-15 and 08-20).
 5. **Re-acceptance dates for the two maintenance accesses (D-14).** Chosen with the owner at planning time; suggest the next release after go-public or a fixed 90-day review.
+   - RESOLVED: 90 days after the go-public date, chosen by the owner on 2026-10-20 (CONTEXT D-14); written into both registers when the site opens (plans 08-21 and 08-22).
 6. **Whether a generous per-address global limiter in the app is wanted.** Recommendation: no. Traefik covers general floods, the measured first visit is the sizing input, and the app's own caps are the two endpoints plus Kestrel and the unit limits; a direct flood at the app port then slows the app under the unit's CPU cap rather than being refused.
+   - RESOLVED: no app-wide limiter. The walls are the proxy's per-address rate limit and in-flight cap, the app's per-client limits on "sync now" and the live channel, the Kestrel limits and the unit and container caps; the direct-port flood (plans 08-15 and 08-20) verifies that the app slows under its CPU cap and recovers.
 7. **Real source address after go-public.** Verified indirectly (see Environment Availability), but confirm with the owner's phone on mobile data by reading the proxy access log's first field for that request before trusting per-address limits.
+   - RESOLVED: checked before the switch, by classifying the client addresses of the proxy's other public sites in its access log (plan 08-22, Task 1; the switch waits if none is public), and confirmed after it by the phone's request (plan 08-23; a non-public address there closes the site again at once).
 
 ## Environment Availability
 
