@@ -687,7 +687,32 @@ Plans:
   4. The container has CPU and memory caps sized from real image-processing and sync load, and a flood of requests slows the app without starving the other guests on the host.
   5. A go-public checklist (headers, rate limits, health not routed, BGG credit present, BGG terms re-read, no personal data in the repository) is completed, and only then does the router open the public route.
 
-**Plans**: TBD
+**Plans:** 23 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — Tracer: per-client "sync now" limit, refused in the shape the page already explains
+- [ ] 08-02-PLAN.md — Container walls in the repo: unit caps and GC mode, outbound block, selfcheck checks
+- [ ] 08-03-PLAN.md — Scripted public route check (LAN or outside, headers, routes, noindex, credit, burst)
+- [ ] 08-04-PLAN.md — Flaky browser tests, part one: live-channel waits and the sample-400 first draw
+- [ ] 08-05-PLAN.md — Live channel per-client caps (both transports), negotiate window, origin allow-list; AR-03-02/03 closed
+- [ ] 08-06-PLAN.md — Traefik example outer wall on the public router only, HSTS-only headers, AllowedHosts in the env example
+- [ ] 08-07-PLAN.md — Host filtering proven, validated Kestrel limits, runtime memory report
+- [ ] 08-08-PLAN.md — Full security-header set from the app, header matrix, clean console in Chromium and WebKit, credit in every state
+- [ ] 08-09-PLAN.md — Flaky browser tests, part two: card closes, back button, sheet; todo closed
+- [ ] 08-10-PLAN.md — docs/go-public.md checklist and the hardening in the setup, deploy and settings docs
+- [ ] 08-11-PLAN.md — Measurement release (0.x), part one: PR, owner's merge and tag, verified draft
+- [ ] 08-12-PLAN.md — Measurement release, part two: host list first, deploy, provisioning, outbound block proven
+- [ ] 08-13-PLAN.md — First visit counted, proxy outer wall applied on the real file, live connection cost
+- [ ] 08-14-PLAN.md — Sync and full picture rebuild peaks (owner's go), cap proposal
+- [ ] 08-15-PLAN.md — Owner sets container caps; controlled flood twice from the proxy (owner's go)
+- [ ] 08-16-PLAN.md — Sizing review and the owner's decision (host graph read)
+- [ ] 08-17-PLAN.md — Decided limits written into the repository; sizing todo closed
+- [ ] 08-18-PLAN.md — v1.0.0 part one: one-way decision, merge, tag, verified draft
+- [ ] 08-19-PLAN.md — v1.0.0 part two: deploy, provisioning, proxy at decided numbers, LAN-route proof
+- [ ] 08-20-PLAN.md — Verification flood on v1.0.0 (owner's go)
+- [ ] 08-21-PLAN.md — Checklist filled, BGG terms re-read, proxy SSH restricted, AR-08/AR-06-05 re-accepted
+- [ ] 08-22-PLAN.md — Go: owner signs off, public router opens (owner router untouched), scanners
+- [ ] 08-23-PLAN.md — Phone probe from mobile data, real client address, owner locks the maintenance keys
 
 ## Progress
 

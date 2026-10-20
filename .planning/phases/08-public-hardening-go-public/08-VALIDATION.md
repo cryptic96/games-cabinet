@@ -38,7 +38,41 @@ created: 2026-10-20
 
 ## Per-Task Verification Map
 
-Filled in from the plans once they exist. Requirement-level map from research:
+Filled in from the plans (2026-10-20). `IT` = `DOTNET_USE_POLLING_FILE_WATCHER=1 dotnet test --project Cabinet.IntegrationTests`, `UT` = `dotnet test --project Cabinet.UnitTests`, `BT` = `dotnet test --project Cabinet.BrowserTests --no-build` (solo).
+
+| Plan-Task | Req | Behavior | Test Type | Automated Command | Status |
+|-----------|-----|----------|-----------|-------------------|--------|
+| 08-01-1 | SEC-02 | Per-client sync refusal in the shared shape; boundary N/N+1 | integration | `IT --filter-class "Cabinet.IntegrationTests.SyncRateLimitTests"` | ⬜ pending |
+| 08-01-2 | SEC-02 | Separate budgets, forged header, IPv6 /64, window recovery, settings, page sentence | integration + unit + node | `IT --filter-class "...SyncRateLimitTests"`, `UT --filter-class "*ClientLimitSettingsTests"`, `node --test build/tests/page-scripts.test.mjs` | ⬜ pending |
+| 08-02-1 | SEC-06 | Unit limits and GC env; selfcheck limits vs container | script | `bash deploy/tests/sandboxing-test.sh` | ⬜ pending |
+| 08-02-2 | SEC-06 | Output chain rendered, validated, ordered | script | `bash deploy/tests/render-templates-test.sh && bash deploy/tests/provision-logic-test.sh` | ⬜ pending |
+| 08-02-3 | SEC-06 | Selfcheck egress refused at once; DNS | script | `bash deploy/tests/sandboxing-test.sh` | ⬜ pending |
+| 08-03-1 | SEC-03 | Header set exactly once, no hostname printed | script | `bash build/tests/check-public-routes-test.sh` | ⬜ pending |
+| 08-03-2 | SEC-01, SEC-04 | Routes closed, owner host by vantage, noindex, credit, burst | script | `bash build/tests/check-public-routes-test.sh` | ⬜ pending |
+| 08-04-1 | SEC-03 | Live look tests wait for a heard push | browser | `BT --filter-class "Cabinet.BrowserTests.LiveLookTests"` (10 solo runs, one-core quota) | ⬜ pending |
+| 08-04-2 | SEC-03 | Card redraw and sample-400 waits | browser | `BT --filter-class "...CardSyncTests"`, `"...DefaultLookIdentityTests"` | ⬜ pending |
+| 08-05-1 | SEC-02 | Per-address live cap both transports; negotiate window; SSE pings not counted; upgraded cap | integration | `IT --filter-class "Cabinet.IntegrationTests.LiveAddressCapTests"` | ⬜ pending |
+| 08-05-2 | SEC-02 | Origin guard on negotiate, WebSocket, SSE, both ports | integration + unit | `IT --filter-class "Cabinet.IntegrationTests.LiveOriginTests"` | ⬜ pending |
+| 08-05-3 | SEC-02 | Refused page stays usable and quiet | browser | `BT --filter-class "Cabinet.BrowserTests.LiveRefusalTests"` | ⬜ pending |
+| 08-06-1 | SEC-02, SEC-04 | Outer wall on the public router only, explicit source criteria | script | `bash deploy/tests/render-templates-test.sh` | ⬜ pending |
+| 08-06-2 | SEC-03, SEC-04 | HSTS-only headers; `AllowedHosts` with loopback | script | `bash deploy/tests/render-templates-test.sh` | ⬜ pending |
+| 08-07-1 | SEC-04 | Foreign host 400; listed host and loopback health 200 | integration | `IT --filter-class "Cabinet.IntegrationTests.HostFilteringTests"` | ⬜ pending |
+| 08-07-2 | SEC-06 | Kestrel limits, header timeout, connection ceiling, runtime report; owner uploads still work | integration + unit | `IT --filter-class "Cabinet.IntegrationTests.KestrelLimitsTests"`, `"...OwnerRestoreTests"` | ⬜ pending |
+| 08-08-1 | SEC-03 | Full header set once on public responses | integration | `IT --filter-class "Cabinet.IntegrationTests.SecurityHeadersTests"` | ⬜ pending |
+| 08-08-2 | SEC-03 | Art, refusals, owner and ops listeners, exclusions | integration | `IT --filter-class "Cabinet.IntegrationTests.SecurityHeadersTests"` | ⬜ pending |
+| 08-08-3 | SEC-03 | Clean console in Chromium and WebKit; credit in every state | browser | `BT --filter-class "...HeaderConsoleTests"`, `"...CreditVisibilityTests"`, WebKit with `CABINET_WEBKIT=1` | ⬜ pending |
+| 08-09-1..3 | SEC-03 | Card closes, URL retries, all slices green | browser | the five CI slices, solo, also under DejaVu | ⬜ pending |
+| 08-10-1..2 | SEC-01, SEC-06 | Generic checklist and docs, no planning refs or personal data | lint | `bash build/lint/checks/10-repo-rules.sh && bash build/lint/checks/40-secrets.sh` | ⬜ pending |
+| 08-11, 08-18 | all | Release PR checks, verified draft | CI + script | `gh release view <tag> --json assets` (3 assets), checksum, attestation | ⬜ pending |
+| 08-12, 08-19 | SEC-04, SEC-06 | Installed, selfcheck all pass, outbound proven, LAN route check | server + script | `ssh cabinet-lxc sudo -n cabinet-selfcheck`, `build/check-public-routes.sh --from-lan --burst` | ⬜ pending |
+| 08-13 | SEC-02, SEC-03 | First visit counted, proxy outer wall live, burst 429 | script + manual | `build/check-public-routes.sh --from-lan --burst` | ⬜ pending |
+| 08-14 | SEC-06 | Rebuild and sync peaks, owner data untouched | server | health `missingArt` 0, checksums unchanged | ⬜ pending |
+| 08-15, 08-20 | SEC-06, SEC-04 | Flood pass bar, recovery, tool removed | server + manual | `ssh traefik-lxc "! command -v hey"`, health, route check; owner reads host graph | ⬜ pending |
+| 08-16, 08-17 | SEC-02, SEC-06 | Decided values in the repository | unit + script | `UT`, `bash deploy/tests/sandboxing-test.sh` | ⬜ pending |
+| 08-21 | all | Checklist complete, BGG terms, proxy SSH, risks re-accepted | manual + lint | `build/scan-history.sh`, `build/lint.sh`, route check | ⬜ pending |
+| 08-22, 08-23 | SEC-01, SEC-04 | Switch on the public router only; phone probe; real client address | manual + script | `build/check-public-routes.sh --from-lan`; owner's phone on mobile data | ⬜ pending |
+
+Requirement-level map from research:
 
 | Requirement | Behavior | Test Type | Automated Command | File Exists | Status |
 |-------------|----------|-----------|-------------------|-------------|--------|
