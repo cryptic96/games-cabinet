@@ -5,6 +5,7 @@ using Cabinet.Service.Collection;
 using Cabinet.Service.Hosting;
 using Cabinet.Service.Language;
 using Cabinet.Service.Layout;
+using Cabinet.Service.Limits;
 using Cabinet.Service.Live;
 using Cabinet.Service.Owner;
 using Cabinet.Service.Review;
@@ -48,6 +49,7 @@ builder.Services.AddRazorPages();
 builder.Services.AddCabinetLayout(builder.Configuration, builder.Environment);
 builder.Services.AddCabinetSync(builder.Configuration, builder.Environment);
 builder.Services.AddCabinetLive(builder.Configuration);
+builder.Services.AddCabinetClientLimits(builder.Configuration);
 builder.Services.AddCabinetOwner(builder.Configuration, builder.Environment);
 builder.Services.AddSingleton<ArtFileAudit>();
 
@@ -93,6 +95,7 @@ app.UseCabinetArt();
 
 app.UseRouting();
 app.UseOwnerOnlyRoutes();
+app.UseCabinetClientLimits();
 
 app.MapStaticAssets().MarkOwnerAssets();
 app.MapRazorPages().WithStaticAssets();
