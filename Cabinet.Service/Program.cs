@@ -42,6 +42,7 @@ if (builder.Environment.IsProduction())
 }
 
 builder.Services.Configure<KestrelServerOptions>(options => options.AddServerHeader = false);
+builder.Services.AddCabinetHostLimits(builder.Configuration);
 
 builder.Services.AddHealthChecks();
 
