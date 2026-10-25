@@ -10,6 +10,10 @@
 # Nothing else is routed: the operations listener binds to loopback only and
 # is not reachable through the reverse proxy.
 #
+# The public router also carries an outer wall: a per-client-address rate
+# limit and a cap on requests in flight, so a flood is refused at the proxy
+# before it reaches the cabinet host. The owner router has neither.
+#
 # The owner router keeps the cabinet-lan-only allow-list permanently, even
 # when the public router later drops its allow-list to open the site to
 # everyone. The owner tools must never be reachable from outside the home
@@ -40,30 +44,79 @@ http:
           # Replace with the real VPN subnet.
           - "198.51.100.0/24"
 
-    # The application sends its own Content-Security-Policy with every
-    # response, so this middleware deliberately sets none: a second policy
-    # here would be combined with the application's and could block the page.
+    # Outer wall, part one: a limit on how fast one internet address may
+    # request. Traefik counts requests per client address and refuses a
+    # sustained flood cheaply, before it reaches the cabinet host. A request
+    # over the limit is delayed a little first and then refused with
+    # Traefik's plain 429 response; no styled error page is added.
+    #
+    # The numbers are starting values. Re-size them from a measured first
+    # visit, so that several friends on one Wi-Fi network opening the link at
+    # the same moment all get every picture.
+    #
+    # The source criterion is set explicitly on purpose. Without it the
+    # in-flight limit would count per request host, which puts every client
+    # in one shared bucket. A hop-count strategy would be just as wrong on
+    # this edge proxy: it reads an empty forwarded header, again one shared
+    # bucket. The IPv6 subnet setting groups the addresses of one household
+    # into one client.
+    cabinet-rate-limit:
+      rateLimit:
+        average: 50
+        period: 1s
+        burst: 1000
+        sourceCriterion:
+          ipStrategy:
+            ipv6Subnet: 64
+
+    # Outer wall, part two: a cap on requests being served at once per client
+    # address, with the same explicit source criterion and the same plain 429
+    # refusal. An open live connection is expected to count as in flight for
+    # its whole life (the controlled flood test verifies this with about 20
+    # held streams), so the amount must stay above the application's own
+    # per-address live-connection cap plus the parallel page loads of a group
+    # of friends on one address. These are starting values too.
+    cabinet-in-flight:
+      inFlightReq:
+        amount: 150
+        sourceCriterion:
+          ipStrategy:
+            ipv6Subnet: 64
+
+    # The application sends its own Content-Security-Policy and the rest of
+    # the security headers with every response, and they are tested together
+    # with the page. The proxy adds only HSTS, because it is the one that
+    # terminates TLS. A header set in both places would be sent twice, and a
+    # second policy would be combined with the application's and could block
+    # the page. Do not add the preload flag: preload needs the apex domain,
+    # this is a sub-domain host, and a preload entry is slow to undo.
     cabinet-security-headers:
       headers:
         stsSeconds: 31536000
-        stsIncludeSubdomains: true
-        stsPreload: true
-        contentTypeNosniff: true
-        frameDeny: true
-        referrerPolicy: "strict-origin-when-cross-origin"
 
   routers:
     cabinet:
       rule: "Host(`cabinet.example.com`)"
       entryPoints:
         - websecure
+      # Traefik runs a router's middlewares in list order. The security
+      # headers come first so the proxy's own refusals (429 from the limits,
+      # 403 from the allow-list) carry the HSTS header too. Opening the site
+      # to everyone removes only cabinet-lan-only from this list; putting it
+      # back closes the site again.
       middlewares:
-        - cabinet-lan-only
         - cabinet-security-headers
+        - cabinet-lan-only
+        - cabinet-rate-limit
+        - cabinet-in-flight
       service: cabinet
       tls:
         certResolver: letsencrypt
 
+    # No rate limit on this router, on purpose: the owner tools are reachable
+    # from the home network and VPN only, and the owner's pictures page loads
+    # many images at once. The application's own sync and live-connection
+    # limits still apply.
     cabinet-owner:
       rule: "Host(`owner.example.com`)"
       entryPoints:
