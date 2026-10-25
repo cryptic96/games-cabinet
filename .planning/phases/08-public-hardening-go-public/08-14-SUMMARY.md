@@ -17,7 +17,7 @@ key-files:
     - .planning/phases/08-public-hardening-go-public/08-MEASUREMENTS.md
 key-decisions:
   - "Proposed raising MemoryHigh from 450 to 480 MiB and keeping every other cap, from a whole-life peak of 314 MiB plus one worst-case 144 MiB decode"
-status: partial
+status: complete
 completed: 2026-10-25
 actuals:
   tokens: 9000
@@ -52,6 +52,8 @@ The plan's rule is that an owner-data mismatch stops the plan with no automatic 
 
 Left as is, for a person: nothing restored, nothing edited, `art.rebuild-backup` still on the container (5.7 MiB). Once the owner accepts the difference, the backup can be removed with the approved command; the plan's verify will still fail its fingerprint diff until the baseline is accepted or retaken.
 
+**Resolution (orchestrator, after the stop):** a masked per-path comparison of the saved version against the current owner data shows exactly one changed field: the `attemptedAtUtc` timestamp in one game's picture link record (the linker re-stored that owner-linked picture because its file had been moved aside). No location, picture choice or other owner-entered value changed; the snapshot and sync-state projections match the baseline. The owner was shown this and answered, verbatim: "Accept + delete backup (Recommended)". The fingerprint was retaken and kept as the accepted baseline (lines 1 and 2 reflect the accepted change, lines 3 and 4 still match the original baseline), the one-field difference was re-confirmed, and `art.rebuild-backup` was removed with the approved command while health showed `missingArt` 0.
+
 ## Deviations from Plan
 
 ### Auto-fixed Issues
@@ -69,11 +71,11 @@ None.
 - **Found during:** Task 1 (carried over), used in Task 3
 - **Fix:** one press on the loopback per run, inside the owner's go, spaced by the shared window; no press was repeated.
 
-## Not done
+## Closed after the stop
 
-- `art.rebuild-backup` was not deleted (the plan deletes it only after a matching fingerprint).
-- `08-CAPS-REVIEW.md` is written but was not sent to the owner as a file (no file-sending tool in this run); the orchestrator should send it.
-- The plan's automated verify for Task 3 fails at the fingerprint diff by design of the stop.
+- `art.rebuild-backup` was deleted after the owner accepted the owner-data difference.
+- `08-CAPS-REVIEW.md` was sent to the owner as a file by the orchestrator.
+- The plan's automated fingerprint diff compares against the owner-accepted baseline (the original baseline differs on the two owner-data lines by the accepted, explained change).
 
 ## Known Stubs
 
