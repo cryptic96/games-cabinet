@@ -28,6 +28,7 @@ public class LiveAddressCapTests
     private const string OtherClient = "203.0.113.8";
     private const string SharedClient = "203.0.113.7";
     private const int ShippedCap = 20;
+    private const int SeveralPings = 4;
 
     [Theory]
     [InlineData(HttpTransportType.WebSockets)]
@@ -133,11 +134,14 @@ public class LiveAddressCapTests
         await using var pages = new PageSet(host.Factory, HttpTransportType.ServerSentEvents);
         var page = await pages.StartHeldAsync(forwardedFor: null, expectedCount: 1, keepAlive: TimeSpan.FromMilliseconds(500));
 
-        await Task.Delay(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+        var refusalsBefore = host.Refusals.Refusals;
+
+        await SyncHarness.WaitUntil(() => Task.FromResult(host.Refusals.Messages >= SeveralPings));
         using var press = await client.PostAsync(SyncHarness.SyncRoute, content: null, TestContext.Current.CancellationToken);
         await SyncHarness.WaitUntil(() => Task.FromResult(page.ReceivedCount >= 2));
 
-        page.Connection.State.Should().Be(HubConnectionState.Connected, "its pings are messages, which no limit counts");
+        host.Refusals.Refusals.Should().Be(refusalsBefore, "the posted pings are messages, which no live limit counts");
+        page.Connection.State.Should().Be(HubConnectionState.Connected);
         host.Limiter.Count.Should().Be(1);
     }
 
