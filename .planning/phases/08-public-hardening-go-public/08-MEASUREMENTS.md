@@ -127,3 +127,57 @@ in-flight limit would otherwise count per request host (one shared bucket for ev
 
 Compared with the example's starting values (`average` 50, `burst` 1000, `amount` 150): `average` rises slightly, `burst`
 falls by a fifth (tighter wall, still 13 measured visits deep) and `amount` rises by a third.
+
+## Sync and picture rebuild
+
+Measured on the real container on 2026-10-25, running release 0.11.0 with the unit's shipped limits in force. Numbers and
+plain descriptions only. The sections below are filled in as the measurement runs happen.
+
+### Idle baseline (read-only, before anything is restarted)
+
+| Reading | Value |
+|---|---|
+| Unit memory limits in force | high 450 MiB, max 600 MiB, swap 0 |
+| Unit CPU limits in force | quota 80 % of one core, weight 50, at most 512 tasks |
+| Memory now (`MemoryCurrent`) | 83.8 MiB (87 830 528 bytes) |
+| Memory peak since the unit's last start (`MemoryPeak`) | 99.1 MiB (103 972 864 bytes) |
+| Restarts since the last start | 0 |
+| `memory.events` | low 0, high 0, max 0, oom 0, oom_kill 0 |
+| CPU used since the last start | 28.16 s (user 16.98 s, system 11.18 s) |
+| CPU throttling since the last start | 46 of 36 740 periods throttled, 0.81 s in total |
+| Container's view of its own memory | 1 GiB total, 512 MiB swap (almost all free), 1 core |
+| Memory pressure (`some`, 10 s average) | 0.00 |
+| CPU pressure (`some`, 10 s average) | 0.12 |
+| Health | healthy, version 0.11.0, 0 pictures missing |
+| Sync state | not running, last result `unchanged` |
+
+What the counters already contain: the peak and CPU totals above cover the whole time since the unit last started
+(19:48 UTC), including the start-up work and one sync run that happened at 21:06 UTC (result `unchanged`, 8 seconds from
+start to finish). They are context, not a measurement of a single run; the runs below are sampled once a second from a
+fresh start.
+
+Context on the runtime's memory detection (finding from the previous release plan): the runtime's own start-up line still
+reports about 15.6 GB of memory and one processor, not the unit's 600 MiB limit, so the garbage collector does not size
+itself against the limit; the kernel's high and max lines are what bound the unit. The peaks below are therefore what the
+app really uses when its collector is not working against the limit.
+
+### What the rebuild will touch
+
+| Item | Number |
+|---|---|
+| Games in the collection | 72 shelf items, 69 games with details |
+| Picture records stored | 107, all stored successfully |
+| Distinct picture addresses the collection offers (owned edition plus main picture, each once) | 107 |
+| Files in the picture folder | 212 (207 belong to the 107 records, the rest are not referenced by a record) |
+| Pictures one run may download | at most 80, one a second |
+| Runs needed to download every picture again | 2 (80, then 27) |
+
+The discussion's "about 65 pictures" was the number of games; the plan's "about 99" was an estimate. The real count of
+pictures to download is 107.
+
+### Baseline fingerprint
+
+Four lines were taken and kept in the session scratchpad only: owner data file (byte hash), owner data versions folder
+(hash of the sorted per-file hashes, 9 files), snapshot content projection and sync state projection (without start,
+finish and success times, last result and the shared window's end). A second reading right after the first was
+identical, so the projections are stable between syncs that change nothing.
