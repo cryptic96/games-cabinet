@@ -142,6 +142,58 @@ public class LiveOriginTests
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
+    [Theory]
+    [InlineData("wss", "https://cabinet.example.com", true)]
+    [InlineData("wss", "https://elsewhere.example.org", false)]
+    [InlineData("wss", "http://cabinet.example.com", false)]
+    [InlineData("ws", "http://cabinet.example.com", true)]
+    [InlineData("ws", "https://cabinet.example.com", false)]
+    [InlineData("https", "https://cabinet.example.com", true)]
+    public async Task A_negotiate_behind_the_proxy_compares_the_origin_with_the_forwarded_scheme(
+        string forwardedProto, string origin, bool admitted)
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreatePublicClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, NegotiatePath);
+        request.Headers.Host = "cabinet.example.com";
+        request.Headers.Add("Origin", origin);
+        request.Headers.Add("X-Forwarded-Proto", forwardedProto);
+        request.Headers.Add("X-Forwarded-For", "203.0.113.7");
+
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        (response.StatusCode != HttpStatusCode.Forbidden).Should().Be(admitted);
+    }
+
+    [Theory]
+    [InlineData("wss", "https://cabinet.example.com", true)]
+    [InlineData("wss", "https://elsewhere.example.org", false)]
+    [InlineData("wss", "http://cabinet.example.com", false)]
+    [InlineData("ws", "http://cabinet.example.com", true)]
+    [InlineData("https", "https://cabinet.example.com", true)]
+    public async Task A_web_socket_upgrade_behind_the_proxy_compares_the_origin_with_the_forwarded_scheme(
+        string forwardedProto, string origin, bool admitted)
+    {
+        await using var factory = CreateFactory();
+        using var socket = new ClientWebSocket();
+        socket.Options.SetRequestHeader("Host", "cabinet.example.com");
+        socket.Options.SetRequestHeader("Origin", origin);
+        socket.Options.SetRequestHeader("X-Forwarded-Proto", forwardedProto);
+        socket.Options.SetRequestHeader("X-Forwarded-For", "203.0.113.7");
+        socket.Options.CollectHttpResponseDetails = true;
+
+        var act = () => socket.ConnectAsync(new Uri($"ws://127.0.0.1:{factory.PublicPort}{ConnectPath}"), TestContext.Current.CancellationToken);
+        try
+        {
+            await act();
+        }
+        catch (WebSocketException)
+        {
+        }
+
+        (socket.HttpStatusCode != HttpStatusCode.Forbidden).Should().Be(admitted);
+    }
+
     private static CabinetWebApplicationFactory CreateFactory(IReadOnlyDictionary<string, string?>? settings = null)
     {
         var handler = ScriptedBggHandler.ForCollection(SyntheticBggCollection.Create(3));
