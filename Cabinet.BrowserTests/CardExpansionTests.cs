@@ -196,13 +196,6 @@ public sealed class CardExpansionTests : CabinetPageTest
         await Expect(Page.Locator("#card-title")).ToHaveTextAsync(record.Title);
     }
 
-    private async Task CloseCardAsync()
-    {
-        await Page.Keyboard.PressAsync("Escape");
-        await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(0);
-        await WaitUntilTheCardStepIsGoneAsync();
-    }
-
     private sealed record CardLink(long? EntryId, int GameId, string Title, string? Chip);
 
     private sealed record CardData(long EntryId, string Title, bool IsExpansion, List<CardLink> Expansions, List<CardLink> Bases);

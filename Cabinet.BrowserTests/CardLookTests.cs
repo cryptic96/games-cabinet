@@ -199,14 +199,6 @@ public abstract class CardLookScenarios(int width, int height, bool touch) : Cab
         }
     }
 
-    /// <summary>Closes the open card with the keyboard.</summary>
-    protected async Task CloseCardAsync()
-    {
-        await Page.Keyboard.PressAsync("Escape");
-        await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(0);
-        await WaitUntilTheCardStepIsGoneAsync();
-    }
-
     private async Task AssertSwapRowTextSitsOnTheRulingsAsync()
     {
         var cards = await LoadCardsAsync("/?sample=400", "many expansions");

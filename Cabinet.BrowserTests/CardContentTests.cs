@@ -235,13 +235,6 @@ public sealed class CardContentTests : CabinetPageTest
         }
     }
 
-    private async Task CloseCardAsync()
-    {
-        await Page.Keyboard.PressAsync("Escape");
-        await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(0);
-        await WaitUntilTheCardStepIsGoneAsync();
-    }
-
     private sealed record CardData(
         long EntryId,
         string Title,

@@ -14,10 +14,23 @@ public abstract class CabinetPageTest : PageTest
 
     private const string CabinetReadySelector = "#cabinet .placement, .cabinet-message:not(.cabinet-loading)";
 
+    private const string OpenCardSelector = "dialog.card-dialog[open]";
+
+    private const string PullOutRunningSelector = "html[data-pull-kind]";
+
+    /// <summary>
+    /// How long a retrying assertion waits for its end state, in milliseconds. A passing test never waits this long, so the value only
+    /// matters on a slow runner, where the default of five seconds is too short for a card to settle or a history step to be undone.
+    /// </summary>
+    private const float DefaultExpectTimeoutMs = 15000;
+
     private readonly object _recordLock = new();
     private readonly List<string> _consoleErrors = [];
     private readonly HashSet<string> _requestHosts = new(StringComparer.Ordinal);
     private CabinetWebApplicationFactory? _factory;
+
+    /// <summary>Sets the wait of every retrying assertion once, before the first test of the process creates its page.</summary>
+    static CabinetPageTest() => Assertions.SetDefaultExpectTimeout(DefaultExpectTimeoutMs);
 
     /// <summary>The console errors and uncaught page errors seen since the host was started.</summary>
     protected IReadOnlyList<string> ConsoleErrors
@@ -78,6 +91,27 @@ public abstract class CabinetPageTest : PageTest
         Page.Request += (_, request) => RecordRequest(request);
 
         return factory;
+    }
+
+    /// <summary>
+    /// Waits until the opening pull-out of the card has ended. While it runs the page marks its root element, and a key press sent
+    /// before the marker is gone can land on a card that is not yet ready to close, which leaves the dialog open on a slow runner.
+    /// </summary>
+    protected async Task WaitUntilTheCardHasSettledAsync()
+    {
+        await Assertions.Expect(Page.Locator(PullOutRunningSelector)).ToHaveCountAsync(0);
+    }
+
+    /// <summary>
+    /// Closes the open card with the keyboard: waits until the opening pull-out has settled, presses Escape, waits until no card is
+    /// open and then until the card's history step is gone, so a later navigation or Back step does not race the close.
+    /// </summary>
+    protected async Task CloseCardAsync()
+    {
+        await WaitUntilTheCardHasSettledAsync();
+        await Page.Keyboard.PressAsync("Escape");
+        await Assertions.Expect(Page.Locator(OpenCardSelector)).ToHaveCountAsync(0);
+        await WaitUntilTheCardStepIsGoneAsync();
     }
 
     /// <summary>
