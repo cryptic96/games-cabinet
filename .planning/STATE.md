@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 8
-current_phase_name: Public Hardening & Go-Public
+current_phase: 08
+current_phase_name: public-hardening-go-public
 status: executing
 stopped_at: Phase 8 context gathered
-last_updated: "2026-10-20T08:38:42.288Z"
-last_activity: 2026-10-19
-last_activity_desc: Phase 07 complete, transitioned to Phase 8
+last_updated: "2026-10-25T12:44:44.939Z"
+last_activity: 2026-10-25
+last_activity_desc: Phase 08 execution started
 progress:
   total_phases: 9
   completed_phases: 8
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-13)
 
 **Core value:** Anyone with the link sees an up-to-date, good-looking cabinet of exactly the games the owner owns on BGG, with no manual data entry in the app.
-**Current focus:** Phase 07 — Game-Night Filters & Location Cabinets
+**Current focus:** Phase 08 — public-hardening-go-public
 
 ## Current Position
 
-Phase: 8 — Public Hardening & Go-Public
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-10-19 - Completed quick task 261019-nyb: fix the phase 7 code review product warnings
+Phase: 08 (public-hardening-go-public) — EXECUTING
+Plan: 1 of 24
+Status: Executing Phase 08
+Last activity: 2026-10-25 — Phase 08 execution started
 
 Progress: [██████████] 100%
 
