@@ -150,6 +150,8 @@ public static class ClientLimits
         services.AddRateLimiter(limiter =>
         {
             limiter.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            limiter.OnRejected = (context, _) => LiveConnectPolicy.RejectAsync(context, options.LiveWindow);
+            limiter.GlobalLimiter = LiveConnectWindow.CreateLimiter(options);
             limiter.AddPolicy<string, SyncPressPolicy>(SyncPressPolicyName);
             limiter.AddPolicy<string, LiveConnectPolicy>(LiveConnectPolicyName);
         });

@@ -178,9 +178,8 @@ public partial class KestrelLimitsTests
 
         handlers.Select(handler => handler.Name).Should().Equal("OnPostCheckFileAsync");
         handlers.Should().OnlyContain(
-            handler => handler.IsDefined(typeof(RequestSizeLimitAttribute), inherit: true)
-                || handler.DeclaringType!.IsDefined(typeof(RequestSizeLimitAttribute), inherit: true),
-            "a handler that reads an upload must say how large it may be");
+            handler => handler.DeclaringType!.IsDefined(typeof(RequestSizeLimitAttribute), inherit: true),
+            "a handler that reads an upload must say how large it may be on its page model, because Razor Pages ignores the attribute on a handler method");
     }
 
     [GeneratedRegex(@"^The runtime sees \d+ MB of memory and \d+ processors; server GC: (True|False)$")]
