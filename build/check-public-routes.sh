@@ -282,16 +282,40 @@ resolve_burst_count() {
 }
 
 ###
+### Prints, one per answer in the header dump HEADERS_FILE, 1 when that answer
+### carries a Retry-After header and 0 when it does not. The dump holds the
+### headers of every answer of one curl call, each starting at its status line.
+###
+retry_after_per_answer() {
+  local line answers=-1 seen=0
+  local -a flags=()
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"
+    if [[ "$line" == HTTP/* ]]; then
+      answers=$((answers + 1))
+      flags[answers]=0
+    elif ((answers >= 0)) && [[ "${line,,}" == retry-after:* ]]; then
+      flags[answers]=1
+    fi
+  done < "$HEADERS_FILE"
+  for ((seen = 0; seen <= answers; seen++)); do
+    echo "${flags[seen]}"
+  done
+}
+
+###
 ### Sends BURST_COUNT presses through one curl call (one connection) and
 ### judges the answers: the app's own per-client refusal is a 429 with a
 ### Retry-After header and a JSON body without a status object, the shared
 ### window's refusal carries a status object, and a proxy refusal has no JSON
-### body at all.
+### body at all. The Retry-After header is judged on each of the app's own
+### refusals separately, so another refusal's header cannot stand in for one
+### that is missing.
 ###
 run_burst() {
-  local host="$1" url index status body retry_after
-  local cooldown=0 shared=0 proxy=0 refused=0
-  local -a args statuses=()
+  local host="$1" url index status body answered=0
+  local cooldown=0 cooldown_bare=0 shared=0 proxy=0 refused=0
+  local -a args statuses=() retry_flags=()
   url="https://${host}${PRESS_PATH}"
   args=(-s -X POST --max-time 60 -D "$HEADERS_FILE" -w '%{http_code}\n')
   for ((index = 1; index <= BURST_COUNT; index++)); do
@@ -300,9 +324,11 @@ run_burst() {
   done
   : > "$HEADERS_FILE"
   mapfile -t statuses < <(curl "${args[@]}" 2>/dev/null || true)
+  mapfile -t retry_flags < <(retry_after_per_answer)
 
   for ((index = 1; index <= ${#statuses[@]}; index++)); do
     status="${statuses[index - 1]}"
+    [[ "$status" == "000" || -z "$status" ]] || answered=$((answered + 1))
     [[ "$status" == "429" ]] || continue
     refused=$((refused + 1))
     body="$(cat "${WORK_DIR}/burst-${index}")"
@@ -312,16 +338,16 @@ run_burst() {
       shared=$((shared + 1))
     elif [[ "$body" == *'"outcome":"cooldown"'* ]]; then
       cooldown=$((cooldown + 1))
+      [[ "${retry_flags[answered - 1]:-0}" == "1" ]] || cooldown_bare=$((cooldown_bare + 1))
     fi
   done
 
-  retry_after="$(header_count "Retry-After")"
   local counts
   counts="$(printf '%s\n' "${statuses[@]}" | grep -v '^$' | sort | uniq -c | awk '{printf "%s%sx%s", sep, $2, $1; sep=" "}' || true)"
   counts="${counts:-none answered}"
 
   local base="the burst of ${BURST_COUNT} presses is refused by the app's own limit"
-  if ((cooldown > 0 && retry_after >= cooldown)); then
+  if ((cooldown > 0 && cooldown_bare == 0)); then
     pass "${base}, with a Retry-After header (answers ${counts})"
   elif ((cooldown > 0)); then
     fail "${base} (a 429 came without Retry-After; answers ${counts})"
