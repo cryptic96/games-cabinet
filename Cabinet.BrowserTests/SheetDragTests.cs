@@ -64,11 +64,11 @@ public sealed partial class SheetDragTests : CabinetPageTest
         await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(0);
         await Expect(Page.Locator(".placement:focus")).ToHaveCountAsync(1);
         await WaitUntilTheCardStepIsGoneAsync();
-        Page.Url.Should().Be(address);
+        await Expect(Page).ToHaveURLAsync(address);
 
         await Page.GoBackAsync();
 
-        Page.Url.Should().Be(BlankPage);
+        await Expect(Page).ToHaveURLAsync(BlankPage);
         ConsoleErrors.Should().BeEmpty();
     }
 
@@ -206,11 +206,11 @@ public sealed partial class SheetDragTests : CabinetPageTest
 
         (await TransitionCallsAsync()).Should().Be(1);
         await WaitUntilTheCardStepIsGoneAsync();
-        Page.Url.Should().Be(address);
+        await Expect(Page).ToHaveURLAsync(address);
 
         await Page.GoBackAsync();
 
-        Page.Url.Should().Be(BlankPage);
+        await Expect(Page).ToHaveURLAsync(BlankPage);
         ConsoleErrors.Should().BeEmpty();
     }
 
@@ -226,7 +226,7 @@ public sealed partial class SheetDragTests : CabinetPageTest
 
         await Page.Locator(CoverBox).First.ClickAsync();
         await Expect(Page.Locator(OpenCard)).ToBeVisibleAsync();
-        await Expect(Page.Locator("html[data-pull-kind]")).ToHaveCountAsync(0);
+        await WaitUntilTheCardHasSettledAsync();
 
         return address;
     }

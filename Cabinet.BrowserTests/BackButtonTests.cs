@@ -24,11 +24,11 @@ public sealed class BackButtonTests : CabinetPageTest
         await Page.GoBackAsync();
 
         await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(0);
-        Page.Url.Should().Be(address);
+        await Expect(Page).ToHaveURLAsync(address);
 
         await Page.GoBackAsync();
 
-        Page.Url.Should().Be(BlankPage);
+        await Expect(Page).ToHaveURLAsync(BlankPage);
         ConsoleErrors.Should().BeEmpty();
     }
 
@@ -40,11 +40,11 @@ public sealed class BackButtonTests : CabinetPageTest
         await Page.Keyboard.PressAsync("Escape");
         await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(0);
         await WaitUntilTheCardStepIsGoneAsync();
-        Page.Url.Should().Be(address);
+        await Expect(Page).ToHaveURLAsync(address);
 
         await Page.GoBackAsync();
 
-        Page.Url.Should().Be(BlankPage);
+        await Expect(Page).ToHaveURLAsync(BlankPage);
     }
 
     [Fact]
@@ -55,11 +55,11 @@ public sealed class BackButtonTests : CabinetPageTest
         await Page.Locator(".card-close").ClickAsync();
         await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(0);
         await WaitUntilTheCardStepIsGoneAsync();
-        Page.Url.Should().Be(address);
+        await Expect(Page).ToHaveURLAsync(address);
 
         await Page.GoBackAsync();
 
-        Page.Url.Should().Be(BlankPage);
+        await Expect(Page).ToHaveURLAsync(BlankPage);
     }
 
     [Fact]
@@ -70,11 +70,11 @@ public sealed class BackButtonTests : CabinetPageTest
         await Page.Mouse.ClickAsync(5, 5);
         await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(0);
         await WaitUntilTheCardStepIsGoneAsync();
-        Page.Url.Should().Be(address);
+        await Expect(Page).ToHaveURLAsync(address);
 
         await Page.GoBackAsync();
 
-        Page.Url.Should().Be(BlankPage);
+        await Expect(Page).ToHaveURLAsync(BlankPage);
     }
 
     [Fact]
@@ -100,18 +100,18 @@ public sealed class BackButtonTests : CabinetPageTest
         await Page.WaitForSelectorAsync("#cabinet .placement");
 
         await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(0);
-        Page.Url.Should().Be(address);
+        await Expect(Page).ToHaveURLAsync(address);
         (await Page.EvaluateAsync<bool>("window.history.state === null")).Should().BeTrue();
 
         await Page.GoBackAsync();
         await Page.WaitForSelectorAsync("#cabinet .placement");
 
-        Page.Url.Should().Be(address);
+        await Expect(Page).ToHaveURLAsync(address);
         await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(0);
 
         await Page.GoBackAsync();
 
-        Page.Url.Should().Be(BlankPage);
+        await Expect(Page).ToHaveURLAsync(BlankPage);
     }
 
     [Fact]
@@ -125,11 +125,11 @@ public sealed class BackButtonTests : CabinetPageTest
         await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(1);
         await Page.GoBackAsync();
         await Expect(Page.Locator(OpenCard)).ToHaveCountAsync(0);
-        Page.Url.Should().Be(address);
+        await Expect(Page).ToHaveURLAsync(address);
 
         await Page.GoBackAsync();
 
-        Page.Url.Should().Be(BlankPage);
+        await Expect(Page).ToHaveURLAsync(BlankPage);
     }
 
     private async Task<string> OpenCardAfterBlankPageAsync()
@@ -141,8 +141,8 @@ public sealed class BackButtonTests : CabinetPageTest
 
         await Page.Locator(CoverWithoutSecondLine).First.ClickAsync();
         await Expect(Page.Locator(OpenCard)).ToBeVisibleAsync();
-        await Expect(Page.Locator("html[data-pull-kind]")).ToHaveCountAsync(0);
-        Page.Url.Should().Be(address);
+        await WaitUntilTheCardHasSettledAsync();
+        await Expect(Page).ToHaveURLAsync(address);
 
         return address;
     }
