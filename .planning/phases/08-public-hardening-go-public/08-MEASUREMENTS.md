@@ -293,3 +293,54 @@ What the numbers say:
   therefore not evidence of a squeeze, but it means a flood that writes a large access log can push the proxy's cache out
  . The access log grows with every flood request and is not rotated; the flood adds to it.
 - The neighbour's baseline is tight (median 24.0 ms, 95th percentile 34.6 ms), so the stop rule trips at 48.0 ms.
+
+### Flood preparation and the pre-flood request (stopped before any flood step)
+
+Run on 2026-10-25, 22:16 to 22:19 UTC, after the owner's go. The container caps the owner set were read from inside
+(1 GiB memory, 512 MiB swap, 1 core, as proposed) and the unit showed its shipped limits before the run.
+
+| Step | Result |
+|---|---|
+| Unit limits applied at run time (`MemoryHigh` 480 MiB, `MemoryMax` 600 MiB, `CPUQuota` 80 %) | applied and read back (503 316 480 and 629 145 600 bytes, 800 ms per second) |
+| Load generator installed on the proxy from the Ubuntu archive | 0.1.4-2ubuntu0.24.04.3, no other package pulled in; `-h`, `-host`, `-H`, `-m`, `-d`, `-z`, `-c`, `-disable-keepalive` and `-h2` confirmed in its help |
+| Public name resolved on the proxy | resolution local: yes (pinned: no): the name returns one of the proxy's own addresses and the route to it is local delivery with no hop through the gateway |
+| Pre-flood request from the proxy to the public site, home page, status page and the live negotiate route (one request each) | 403 on all three |
+| Where the 403 came from | the access log shows the public router answering 403 with a 9-byte body in 0 ms; the proxy's own address lies inside neither of the two ranges of the router's home-network and VPN allow-list, so the allow-list refuses it before the rate limit, the in-flight cap or the app can run |
+| Requests from the workstation (inside the allowed ranges) to the public site in the same minutes | 200 |
+
+Decision taken under the plan's own rule: a 403 means a flood from the proxy would test only the allow-list, so no flood
+step was started. A flood sent from the proxy through the public router cannot reach the outer wall's rate limit, the
+in-flight cap or the app while the allow-list is on, which also rules out the held-streams check (C0, C20) and the
+two-address check, both of which go through the public router.
+
+Flood windows: none; no flood step ran, so there is nothing for the owner to read on the host CPU graph.
+
+### Clean-up after the stop
+
+| Item | Result |
+|---|---|
+| Load generator on the proxy | removed and purged (`dpkg -l` finds no such package; `command -v` finds nothing); an autoremove simulation listed 0 packages, so nothing else was touched |
+| Name pin in the proxy's hosts file | none was made; no line mentions the site |
+| Helper scripts left on the proxy | none were written there |
+| Run-time unit properties on the cabinet | reverted with `systemctl revert`; the unit shows `MemoryHigh` 450 MiB, `MemoryMax` 600 MiB, `CPUQuota` 800 ms per second again, no run-time drop-in left (the revert also removed an empty drop-in folder under the persistent unit directory; no file was inside) |
+| Cabinet unit restarts since last start | 0 (unchanged) |
+| Cabinet unit `memory.events` | low 0, high 0, max 0, oom 0, oom_kill 0 (unchanged) |
+| Out-of-memory lines in the unit's journal since its start | 0 |
+| Cabinet health | Healthy, version 0.11.0, 0 pictures missing |
+| Route check from the home network | 31 checks passed, 0 failed |
+| Proxy access log size | 112 257 140 bytes before, 112 290 591 bytes after (the three refused requests, the neighbour probes and normal traffic) |
+| Proxy container memory now / whole-life peak | 292.7 MiB / 510.0 MiB |
+
+### What has to be decided before the floods can run
+
+The pass bar needs the flood to reach the router's outer wall and the app. Three ways to get there; each needs the owner:
+
+1. Add the proxy's own address to the allow-list of the public router for the duration of the floods (one edit to the
+   proxy's dynamic file, watched by the proxy, reverted afterwards). The owner's go covered the tool, one hosts-file pin and
+   the run-time unit limits, not an edit of the proxy's routing files.
+2. Run the router flood after the public router drops its allow-list at go-public, and the direct flood now (the direct
+   flood does not go through the router and is not affected by the allow-list).
+3. Run the direct flood now and treat the router flood and the held-streams and two-address checks as part of the final
+   verification round.
+
+No verdict table is written: no flood ran, so no row can be PASS or FAIL.
