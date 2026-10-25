@@ -34,11 +34,19 @@ public static class LiveOriginGuard
             return false;
         }
 
-        var port = request.Host.Port ?? (request.IsHttps ? HttpsPort : HttpPort);
+        var secure = IsSecureScheme(request.Scheme);
+        var port = request.Host.Port ?? (secure ? HttpsPort : HttpPort);
 
         return string.Equals(origin.Host, request.Host.Host, StringComparison.OrdinalIgnoreCase)
+            && (origin.Scheme == Uri.UriSchemeHttps) == secure
             && origin.Port == port;
     }
+
+    /// <summary>Whether a request scheme is the secure one: <c>https</c> or <c>wss</c>. Any other scheme counts as plain.</summary>
+    /// <param name="scheme">The request scheme.</param>
+    private static bool IsSecureScheme(string scheme) =>
+        string.Equals(scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(scheme, Uri.UriSchemeWss, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Answers 403 with no body to a request on the live route whose Origin is not the site itself.</summary>
     /// <param name="app">The pipeline to add to.</param>

@@ -4,6 +4,11 @@ Out-of-scope discoveries logged during execution. Not fixed by the plan that fou
 
 ## Browser WebSockets are refused behind the proxy (found in plan 08-13)
 
+- **Status: fixed in commit 153a43f.** `LiveOriginGuard` now treats `wss` as `https` and `ws` as `http` for the default port
+  and requires the Origin scheme to be secure exactly when the request is. Covered by unit tests on the guard and by
+  integration tests that send negotiate and upgrade requests with `X-Forwarded-Proto: wss`/`ws`. Not yet re-measured on
+  the real route; that needs a release.
+
 - **Symptom:** through the real route every browser WebSocket handshake to the live channel answers 403, so the page falls
   back to Server-Sent Events. Negotiate and the stream requests work, so the site looks fine.
 - **Cause (reproduced straight against the app from the proxy container):** Traefik sends `X-Forwarded-Proto: wss` on a
