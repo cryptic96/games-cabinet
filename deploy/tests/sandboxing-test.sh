@@ -99,9 +99,20 @@ for directive in \
   ProtectKernelTunables=yes ProtectKernelModules=yes ProtectControlGroups=yes \
   RestrictNamespaces=yes LockPersonality=yes \
   RestrictAddressFamilies=AF_UNIX\ AF_INET\ AF_INET6 \
-  CapabilityBoundingSet= SystemCallArchitectures=native; do
+  CapabilityBoundingSet= SystemCallArchitectures=native \
+  MemoryHigh=450M MemoryMax=600M MemorySwapMax=0 CPUQuota=80% CPUWeight=50 \
+  TasksMax=512 LimitNOFILE=4096 \
+  Environment=DOTNET_gcServer=0 Environment=DOTNET_gcConcurrent=0; do
   check "app unit has ${directive}" "1" "$(file_has_line "$APP_UNIT" "$directive")"
 done
+
+APP_MEMORY_HIGH_MIB="$(sed -n 's/^MemoryHigh=\([0-9]*\)M$/\1/p' "$APP_UNIT")"
+APP_MEMORY_MAX_MIB="$(sed -n 's/^MemoryMax=\([0-9]*\)M$/\1/p' "$APP_UNIT")"
+APP_CPU_QUOTA_PERCENT="$(sed -n 's/^CPUQuota=\([0-9]*\)%$/\1/p' "$APP_UNIT")"
+check "app unit keeps MemoryHigh below MemoryMax" "below" \
+  "$([ "${APP_MEMORY_HIGH_MIB:-0}" -lt "${APP_MEMORY_MAX_MIB:-0}" ] && echo below || echo not-below)"
+check "app unit keeps the CPU quota below one whole core" "below" \
+  "$([ "${APP_CPU_QUOTA_PERCENT:-100}" -lt 100 ] && echo below || echo not-below)"
 
 check "app unit orders after nothing but the network" "1" "$(count_lines_matching "$APP_UNIT" '^After=')"
 check "app unit declares no dependency on any other unit" "0" \
@@ -420,6 +431,105 @@ STUB_SS_OUTPUT="$OWNER_OFF_SS"
 STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain input {\n\t\ttype filter hook input priority filter; policy drop;\n\t}\n}'
 run_selfcheck_function check_firewall
 check "firewall asks nothing about the owner port when the owner tools are off" "1 0" "${RUN_PASSED} ${RUN_FAILED}"
+
+###
+### Selfcheck: the unit's limits against the loaded unit file and the container
+###
+LIMITS_FIXTURE_UNIT="${WORK_DIR}/limits-cabinet.service"
+LIMITS_UNIT_WITHOUT_CPU="${WORK_DIR}/limits-no-cpu.service"
+cp "${DEPLOY_DIR}/systemd/cabinet.service" "$LIMITS_FIXTURE_UNIT"
+grep -v "^CPUQuota=" "${DEPLOY_DIR}/systemd/cabinet.service" > "$LIMITS_UNIT_WITHOUT_CPU"
+STUB_UNIT_PATH="$LIMITS_FIXTURE_UNIT"
+LIMITS_GOOD_SHOW=$'MemoryHigh=471859200\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=800ms\nCPUWeight=50\nTasksMax=512'
+STUB_SYSTEMCTL_SHOW_OUTPUT="$LIMITS_GOOD_SHOW"
+STUB_CONTAINER_MEMORY_KIB=1048576
+STUB_CONTAINER_SWAP_KIB=524288
+STUB_CONTAINER_CORES=1
+
+# shellcheck disable=SC2329 # invoked by the selfcheck function under test
+systemctl() {
+  printf 'systemctl %s\n' "$*" >> "$STUB_ARGS_LOG"
+  case "$*" in
+    *"--value"*) printf '%s\n' "$STUB_UNIT_PATH" ;;
+    *) printf '%s\n' "$STUB_SYSTEMCTL_SHOW_OUTPUT" ;;
+  esac
+}
+# shellcheck disable=SC2329
+container_memory_kib() { echo "$STUB_CONTAINER_MEMORY_KIB"; }
+# shellcheck disable=SC2329
+container_swap_kib() { echo "$STUB_CONTAINER_SWAP_KIB"; }
+# shellcheck disable=SC2329
+container_cores() { echo "$STUB_CONTAINER_CORES"; }
+
+run_selfcheck_function check_limits
+check "limits pass when the effective values match the unit and sit below the container" "9 0" \
+  "${RUN_PASSED} ${RUN_FAILED}"
+check "limits report the container's memory, swap and cores as numbers" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "the container shows 1024 MiB memory, 512 MiB swap and 1 cores")"
+check "limits read the effective values with one systemctl show" "1" \
+  "$(count_lines_matching "$STUB_ARGS_LOG" -F 'systemctl show cabinet.service --property=MemoryHigh,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,CPUWeight,TasksMax')"
+
+STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=471859200\nMemoryMax=infinity\nMemorySwapMax=0\nCPUQuotaPerSecUSec=800ms\nCPUWeight=50\nTasksMax=512'
+run_selfcheck_function check_limits
+check "limits fail when MemoryMax is infinity" "1" "$(file_has_text "${WORK_DIR}/run.out" "FAIL - MemoryMax")"
+check "limits count one failure for an infinite MemoryMax" "1" "$RUN_FAILED"
+
+STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=471859200\nMemoryMax=629145600\nMemorySwapMax=infinity\nCPUQuotaPerSecUSec=800ms\nCPUWeight=50\nTasksMax=512'
+run_selfcheck_function check_limits
+check "limits fail when swap is not capped at zero" "1" "$(file_has_text "${WORK_DIR}/run.out" "FAIL - MemorySwapMax")"
+
+STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=471859200\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=500ms\nCPUWeight=50\nTasksMax=512'
+run_selfcheck_function check_limits
+check "limits fail when the effective CPU quota differs from the unit file" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "FAIL - CPUQuota")"
+
+STUB_SYSTEMCTL_SHOW_OUTPUT="$LIMITS_GOOD_SHOW"
+STUB_UNIT_PATH="$LIMITS_UNIT_WITHOUT_CPU"
+run_selfcheck_function check_limits
+check "limits fail when the unit file has no CPUQuota" "1" "$(file_has_text "${WORK_DIR}/run.out" "FAIL - CPUQuota")"
+STUB_UNIT_PATH="$LIMITS_FIXTURE_UNIT"
+
+STUB_CONTAINER_MEMORY_KIB=524288
+run_selfcheck_function check_limits
+check "limits fail when the container has less memory than MemoryMax" "1" "$RUN_FAILED"
+check "limits name the margin when the container is too small" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "128 MiB margin")"
+
+STUB_CONTAINER_MEMORY_KIB=716800
+run_selfcheck_function check_limits
+check "limits fail when MemoryMax leaves less than 128 MiB for the rest of the container" "1" "$RUN_FAILED"
+check "limits name the margin when it is not left over" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "128 MiB margin")"
+STUB_CONTAINER_MEMORY_KIB=1048576
+
+STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=471859200\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=1s\nCPUWeight=50\nTasksMax=512'
+sed -i 's/^CPUQuota=80%$/CPUQuota=100%/' "$LIMITS_FIXTURE_UNIT"
+run_selfcheck_function check_limits
+check "limits fail with one core and a quota of a whole core" "1" "$RUN_FAILED"
+check "limits say the CPU quota reaches the container's cores" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "FAIL - the CPU quota")"
+
+STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=471859200\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=1.2s\nCPUWeight=50\nTasksMax=512'
+sed -i 's/^CPUQuota=100%$/CPUQuota=120%/' "$LIMITS_FIXTURE_UNIT"
+run_selfcheck_function check_limits
+check "limits fail with one core and a quota above a whole core" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "FAIL - the CPU quota")"
+
+STUB_CONTAINER_CORES=2
+STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=471859200\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=1s\nCPUWeight=50\nTasksMax=512'
+sed -i 's/^CPUQuota=120%$/CPUQuota=100%/' "$LIMITS_FIXTURE_UNIT"
+run_selfcheck_function check_limits
+check "limits pass with two cores and a quota of a whole core" "9 0" "${RUN_PASSED} ${RUN_FAILED}"
+check "limits report the core count" "1" "$(file_has_text "${WORK_DIR}/run.out" "and 2 cores")"
+
+STUB_CONTAINER_CORES=1
+STUB_SYSTEMCTL_SHOW_OUTPUT="$LIMITS_GOOD_SHOW"
+cp "${DEPLOY_DIR}/systemd/cabinet.service" "$LIMITS_FIXTURE_UNIT"
+run_selfcheck_function check_limits
+check "limits report names no address" "0" \
+  "$(count_lines_matching "${WORK_DIR}/run.out" -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+|[0-9a-f]*:[0-9a-f:]+/[0-9]+')"
+check "selfcheck runs the limits check after the units check" "1" "$(file_has_line "$SELFCHECK" "  check_limits")"
+unset -f systemctl container_memory_kib container_swap_kib container_cores
 
 STUB_SSHD_OUTPUT=$'port 22\npasswordauthentication no\nkbdinteractiveauthentication no'
 export STUB_SSHD_OUTPUT
