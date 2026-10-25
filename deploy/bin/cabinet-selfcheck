@@ -37,9 +37,12 @@ usage() {
   cat <<'EOF'
 Usage: cabinet-selfcheck [-h|--help]
 
-Checks, as root, that this host is correctly provisioned: units, file modes,
+Checks, as root, that this host is correctly provisioned: units, the app
+unit's resource limits against the container's own, file modes,
 listeners (the app, the loopback ops port and the optional owner port),
-the owner tools' address walls when the owner port is on, firewall, health at the installed version, that the installed
+the owner tools' address walls when the owner port is on, firewall, the
+outbound block that refuses new connections to the home network (and that DNS
+still works), health at the installed version, that the installed
 scripts, libraries and units match the active release, SSH key-only login, no
 GitHub credential or Actions runner, and the image smoke in a sandbox.
 Prints PASS or FAIL per check and exits 1 when any check fails.
@@ -66,6 +69,149 @@ check_units() {
       fi
     done
   done
+}
+
+###
+### Room, in MiB, that the app unit's MemoryMax must leave inside the
+### container for SSH, journald, nftables and the deploy timer.
+###
+readonly LIMIT_MEMORY_MARGIN_MIB=128
+
+### Prints the memory the container shows through lxcfs, in KiB.
+container_memory_kib() {
+  awk '/^MemTotal:/ { print $2 }' /proc/meminfo
+}
+
+### Prints the swap the container shows through lxcfs, in KiB.
+container_swap_kib() {
+  awk '/^SwapTotal:/ { print $2 }' /proc/meminfo
+}
+
+### Prints the number of cores the container shows.
+container_cores() {
+  nproc
+}
+
+### Prints the value of the last NAME= line in unit file $1; nothing when absent.
+unit_directive() {
+  local file="$1" name="$2" value
+  value="$(sed -n "s/^${name}=//p" "$file")"
+  printf '%s' "${value##*$'\n'}"
+}
+
+### Prints size $1 such as 450M, 2G, 512K or plain bytes as bytes; prints
+### nothing when it is not a size.
+size_to_bytes() {
+  local value="$1" number unit
+  [[ "$value" =~ ^([0-9]+)([KMGkmg]?)$ ]] || return 0
+  number="${BASH_REMATCH[1]}"
+  unit="${BASH_REMATCH[2]}"
+  case "$unit" in
+    K | k) echo $((number * 1024)) ;;
+    M | m) echo $((number * 1048576)) ;;
+    G | g) echo $((number * 1073741824)) ;;
+    *) echo "$number" ;;
+  esac
+}
+
+### Prints duration $1 such as 800ms, 1s or 1.2s in whole milliseconds; prints
+### nothing when it is not a duration in ms or s.
+duration_to_ms() {
+  local value="$1"
+  [[ "$value" =~ ^[0-9]+(\.[0-9]+)?(ms|s)$ ]] || return 0
+  LC_ALL=C awk -v v="$value" 'BEGIN { if (v ~ /ms$/) { sub(/ms$/, "", v); printf "%d", v + 0.5 } else { sub(/s$/, "", v); printf "%d", v * 1000 + 0.5 } }'
+}
+
+###
+### Compares the app unit's effective limits with the directives of the unit
+### file systemd loaded, then with what the container shows through lxcfs:
+### the unit's MemoryMax must leave the margin inside the container's memory
+### and its CPU quota must stay below the whole of the container's cores, so
+### SSH, the firewall and the deploy timer keep headroom while the app is
+### flooded. A missing directive or an infinite effective value fails. Prints
+### sizes and counts only, never an address.
+###
+check_limits() {
+  local fragment property directive effective wanted shown line
+  local shown_output max_bytes="" quota_ms="" mem_kib swap_kib cores
+  local -A effective_values=()
+
+  fragment="$(systemctl show "$APP_UNIT" --property=FragmentPath --value 2>&1)"
+  if [[ -z "$fragment" || ! -r "$fragment" ]]; then
+    fail "could not read the loaded unit file of ${APP_UNIT}"
+    return
+  fi
+  if ! shown_output="$(systemctl show "$APP_UNIT" --property=MemoryHigh,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,CPUWeight,TasksMax 2>&1)"; then
+    fail "could not read the effective limits of ${APP_UNIT}: ${shown_output}"
+    return
+  fi
+  while IFS= read -r line; do
+    [[ "$line" == *=* ]] && effective_values["${line%%=*}"]="${line#*=}"
+  done <<<"$shown_output"
+
+  for property in MemoryHigh MemoryMax MemorySwapMax CPUQuota CPUWeight TasksMax; do
+    directive="$(unit_directive "$fragment" "$property")"
+    if [[ -z "$directive" ]]; then
+      fail "${property} is not set in the unit file"
+      continue
+    fi
+    if [[ "$property" == "CPUQuota" ]]; then
+      effective="${effective_values[CPUQuotaPerSecUSec]:-}"
+    else
+      effective="${effective_values[$property]:-}"
+    fi
+    if [[ -z "$effective" || "$effective" == "infinity" ]]; then
+      fail "${property} is not in force: systemd reports '${effective:-nothing}'"
+      continue
+    fi
+
+    case "$property" in
+      MemoryHigh | MemoryMax | MemorySwapMax)
+        wanted="$(size_to_bytes "$directive")"
+        shown="$effective"
+        ;;
+      CPUQuota)
+        wanted=""
+        [[ "$directive" =~ ^([0-9]+)%$ ]] && wanted="$((BASH_REMATCH[1] * 10))"
+        shown="$(duration_to_ms "$effective")"
+        ;;
+      *)
+        wanted="$directive"
+        shown="$effective"
+        ;;
+    esac
+    if [[ -n "$wanted" && "$wanted" == "$shown" ]]; then
+      pass "${property} is in force as the unit file sets it"
+      [[ "$property" == "MemoryMax" ]] && max_bytes="$shown"
+      [[ "$property" == "CPUQuota" ]] && quota_ms="$shown"
+    else
+      fail "${property} in force (${effective}) does not match the unit file (${directive})"
+    fi
+  done
+
+  mem_kib="$(container_memory_kib)"
+  swap_kib="$(container_swap_kib)"
+  cores="$(container_cores)"
+  if [[ ! "$mem_kib" =~ ^[0-9]+$ || ! "$swap_kib" =~ ^[0-9]+$ || ! "$cores" =~ ^[0-9]+$ ]]; then
+    fail "could not read the container's memory, swap and cores"
+    return
+  fi
+  pass "the container shows $((mem_kib / 1024)) MiB memory, $((swap_kib / 1024)) MiB swap and ${cores} cores"
+
+  if [[ -n "$max_bytes" ]]; then
+    if (( max_bytes <= mem_kib * 1024 - LIMIT_MEMORY_MARGIN_MIB * 1048576 )); then
+      pass "MemoryMax leaves at least ${LIMIT_MEMORY_MARGIN_MIB} MiB of the container's memory to the rest of the host"
+    else
+      fail "MemoryMax is above the container's memory minus the ${LIMIT_MEMORY_MARGIN_MIB} MiB margin kept for SSH, journald, nftables and the deploy timer"
+    fi
+  fi
+  if [[ -n "$quota_ms" ]]; then
+    if (( quota_ms < cores * 1000 )); then
+      pass "the CPU quota stays below the container's ${cores} cores"
+    else
+      fail "the CPU quota is at or above the whole of the container's ${cores} cores"
+    fi
+  fi
 }
 
 check_path() {
@@ -208,6 +354,103 @@ check_owner_port_firewall() {
     pass "the firewall admits the owner port 5082 from one source address only"
   else
     fail "the firewall has no rule that admits the owner port 5082 from one source address only"
+  fi
+}
+
+###
+### Tries to open a TCP connection to port 80 of ADDRESS ($1) and prints what
+### happened: connected, refused when it failed within 2 seconds (the outbound
+### block answers at once) or timeout when it took longer. Prints no address.
+###
+egress_probe() {
+  local address="$1" started elapsed
+  started="${EPOCHREALTIME//[.,]/}"
+  # shellcheck disable=SC2016 # the inner shell expands the address argument
+  if timeout 5 bash -c 'exec 3<>/dev/tcp/"$1"/80' _ "$address" 2>/dev/null; then
+    echo connected
+    return
+  fi
+  elapsed=$((${EPOCHREALTIME//[.,]/} - started))
+  if ((elapsed < 2000000)); then
+    echo refused
+  else
+    echo timeout
+  fi
+}
+
+### Prints the body of chain $1 from nft ruleset listing $2.
+chain_body() {
+  awk -v chain="$1" '
+    $0 ~ "^[[:space:]]*chain " chain " [{]" { inside = 1; next }
+    inside && /^[[:space:]]*}[[:space:]]*$/ { exit }
+    inside { print }
+  ' <<<"$2"
+}
+
+### Prints the first host address of the first network in the destination set of nft rule line $1.
+first_blocked_host() {
+  local rule="$1" set first octets set_pattern='ip daddr \{ ([^}]+) \}'
+  [[ "$rule" =~ $set_pattern ]] || return 0
+  set="${BASH_REMATCH[1]}"
+  first="${set%%,*}"
+  first="${first// /}"
+  first="${first%%/*}"
+  [[ "$first" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] || return 0
+  octets=$(((BASH_REMATCH[1] << 24 | BASH_REMATCH[2] << 16 | BASH_REMATCH[3] << 8 | BASH_REMATCH[4]) + 1))
+  printf '%d.%d.%d.%d' $((octets >> 24 & 255)) $((octets >> 16 & 255)) $((octets >> 8 & 255)) $((octets & 255))
+}
+
+###
+### Proves the outbound block: the output chain must hold a reject rule for
+### an IPv4 and for an IPv6 destination set, and a connection attempt to the
+### first host of the first blocked IPv4 network must be refused at once, not
+### left to time out. The probe address is derived from the loaded rule, so
+### no address is written down anywhere, and none is printed.
+###
+check_egress() {
+  local ruleset output_chain line v4_rule="" v6_rule="" host outcome
+  local v4_pattern='^[[:space:]]*ip daddr \{[^}]+\}.* reject'
+  local v6_pattern='^[[:space:]]*ip6 daddr \{[^}]+\}.* reject'
+  if ! ruleset="$(nft list table inet cabinet_filter 2>&1)"; then
+    fail "could not read the firewall table cabinet_filter: ${ruleset}"
+    return
+  fi
+  output_chain="$(chain_body output "$ruleset")"
+  while IFS= read -r line; do
+    [[ "$line" =~ $v4_pattern ]] && v4_rule="$line"
+    [[ "$line" =~ $v6_pattern ]] && v6_rule="$line"
+  done <<<"$output_chain"
+
+  if [[ -z "$v4_rule" || -z "$v6_rule" ]]; then
+    fail "the firewall output chain does not reject new connections to both the blocked IPv4 and IPv6 ranges"
+    return
+  fi
+  pass "the firewall output chain rejects new connections to the blocked IPv4 and IPv6 ranges"
+
+  host="$(first_blocked_host "$v4_rule")"
+  if [[ -z "$host" ]]; then
+    fail "could not work out a probe address from the blocked IPv4 ranges"
+    return
+  fi
+  outcome="$(egress_probe "$host")"
+  if [[ "$outcome" == "refused" ]]; then
+    pass "a connection to the first blocked network is refused at once"
+  else
+    fail "a connection to the first blocked network was not refused at once (${outcome})"
+  fi
+}
+
+### Succeeds when the name $1 resolves through the configured DNS.
+resolve_name() {
+  getent ahosts "$1" >/dev/null 2>&1
+}
+
+### Proves DNS still works while the outbound block is loaded.
+check_dns() {
+  if resolve_name api.github.com; then
+    pass "DNS resolution works"
+  else
+    fail "DNS resolution failed; check CABINET_EGRESS_RESOLVERS in provision.conf"
   fi
 }
 
@@ -389,10 +632,13 @@ main() {
   fi
 
   check_units
+  check_limits
   check_modes
   check_listeners
   check_owner_wall
   check_firewall
+  check_egress
+  check_dns
   check_health
   check_provisioning_current
   check_ssh

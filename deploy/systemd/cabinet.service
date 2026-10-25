@@ -10,10 +10,21 @@ ExecStart=/usr/bin/dotnet /opt/cabinet/current/app/Cabinet.Service.dll
 EnvironmentFile=/etc/cabinet/cabinet.env
 Environment=DOTNET_NOLOGO=1
 Environment=HOME=/var/lib/cabinet
+Environment=DOTNET_gcServer=0
+Environment=DOTNET_gcConcurrent=0
 StateDirectory=cabinet
 Restart=always
 RestartSec=10
 SyslogIdentifier=cabinet
+
+# Resource limits, sized from measured load and kept below the container's own limits.
+MemoryHigh=450M
+MemoryMax=600M
+MemorySwapMax=0
+CPUQuota=80%
+CPUWeight=50
+TasksMax=512
+LimitNOFILE=4096
 
 NoNewPrivileges=yes
 PrivateTmp=yes

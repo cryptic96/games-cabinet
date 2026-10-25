@@ -97,6 +97,9 @@ PROVISION_CONF_ALLOWED_KEYS=(
   CABINET_TRAEFIK_IP
   CABINET_ADMIN_SSH_SOURCES
   CABINET_GITHUB_REPO
+  CABINET_EGRESS_RESOLVERS
+  CABINET_EGRESS_BLOCKED_RANGES
+  CABINET_EGRESS_BLOCKED_RANGES6
 )
 
 provision_load_conf() {
@@ -230,6 +233,86 @@ provision_validate_cidr_list() {
 }
 
 ###
+### Validates that VALUE is one or more comma-separated IPv4 addresses (no
+### whitespace, no empty entry, no CIDR prefix).
+###
+provision_validate_ipv4_list() {
+  local value="$1" entry
+  local -a entries
+  [[ -n "$value" && "$value" != ,* && "$value" != *, && "$value" != *,,* ]] || return 1
+  IFS=',' read -r -a entries <<< "$value"
+  [[ "${#entries[@]}" -ge 1 ]] || return 1
+  for entry in "${entries[@]}"; do
+    provision_validate_ipv4 "$entry" || return 1
+  done
+  return 0
+}
+
+###
+### Counts the colon-separated IPv6 groups in TEXT ($1) into
+### PROVISION_IPV6_GROUPS. Succeeds only when every group is one to four
+### hexadecimal digits; an empty TEXT has no groups.
+###
+_provision_count_ipv6_groups() {
+  local text="$1" group
+  local -a groups
+  PROVISION_IPV6_GROUPS=0
+  [[ -z "$text" ]] && return 0
+  IFS=':' read -r -a groups <<< "${text}:"
+  for group in "${groups[@]}"; do
+    [[ "$group" =~ ^[0-9A-Fa-f]{1,4}$ ]] || return 1
+  done
+  PROVISION_IPV6_GROUPS="${#groups[@]}"
+  return 0
+}
+
+###
+### Validates that VALUE is a single IPv6 CIDR ("addr/nn"): hexadecimal groups
+### of up to four digits separated by colons, at most one "::" shortening, and
+### a prefix length of 0-128. Without "::" the address has exactly eight
+### groups; with it, at most seven.
+###
+provision_validate_ipv6_cidr() {
+  local value="$1" addr prefix head tail
+  [[ "$value" == */* ]] || return 1
+  addr="${value%/*}"
+  prefix="${value#*/}"
+  [[ "$prefix" =~ ^[0-9]{1,3}$ ]] || return 1
+  (( 10#$prefix <= 128 )) || return 1
+  [[ "$addr" =~ ^[0-9A-Fa-f:]+$ && "$addr" == *:* && "$addr" != *:::* ]] || return 1
+
+  if [[ "$addr" == *::* ]]; then
+    head="${addr%%::*}"
+    tail="${addr#*::}"
+    [[ "$tail" != *::* ]] || return 1
+    _provision_count_ipv6_groups "$head" || return 1
+    local head_groups="$PROVISION_IPV6_GROUPS"
+    _provision_count_ipv6_groups "$tail" || return 1
+    (( head_groups + PROVISION_IPV6_GROUPS <= 7 )) || return 1
+  else
+    _provision_count_ipv6_groups "$addr" || return 1
+    (( PROVISION_IPV6_GROUPS == 8 )) || return 1
+  fi
+  return 0
+}
+
+###
+### Validates that VALUE is one or more comma-separated IPv6 CIDRs (no
+### whitespace, no empty entry).
+###
+provision_validate_ipv6_cidr_list() {
+  local value="$1" entry
+  local -a entries
+  [[ -n "$value" && "$value" != ,* && "$value" != *, && "$value" != *,,* ]] || return 1
+  IFS=',' read -r -a entries <<< "$value"
+  [[ "${#entries[@]}" -ge 1 ]] || return 1
+  for entry in "${entries[@]}"; do
+    provision_validate_ipv6_cidr "$entry" || return 1
+  done
+  return 0
+}
+
+###
 ### Validates that VALUE is a GitHub "owner/name" repository slug: two
 ### non-empty parts made of letters, digits, dots, hyphens and underscores,
 ### neither of which is only dots.
@@ -257,10 +340,12 @@ provision_validate_safe_value() {
 }
 
 ###
-### Checks the three server-side settings loaded from provision.conf: the
+### Checks the six server-side settings loaded from provision.conf: the
 ### Traefik address must be an IPv4 address, the admin SSH sources a CIDR
-### list and the repository an owner/name slug. Placeholder values from the
-### example file fail these shapes, so provisioning never applies them.
+### list, the repository an owner/name slug, the egress resolvers a list of
+### IPv4 addresses and the two blocked-range lists an IPv4 and an IPv6 CIDR
+### list. Placeholder values from the example file fail these shapes, so
+### provisioning never applies them.
 ###
 provision_validate_conf() {
   provision_validate_ipv4 "${CABINET_TRAEFIK_IP:-}" \
@@ -269,14 +354,23 @@ provision_validate_conf() {
     || provision_die "CABINET_ADMIN_SSH_SOURCES is not a valid comma-separated CIDR list: ${CABINET_ADMIN_SSH_SOURCES:-<unset>}"
   provision_validate_repo_slug "${CABINET_GITHUB_REPO:-}" \
     || provision_die "CABINET_GITHUB_REPO is not an owner/name slug: ${CABINET_GITHUB_REPO:-<unset>}"
+  provision_validate_ipv4_list "${CABINET_EGRESS_RESOLVERS:-}" \
+    || provision_die "CABINET_EGRESS_RESOLVERS is not a valid comma-separated IPv4 address list: ${CABINET_EGRESS_RESOLVERS:-<unset>}"
+  provision_validate_cidr_list "${CABINET_EGRESS_BLOCKED_RANGES:-}" \
+    || provision_die "CABINET_EGRESS_BLOCKED_RANGES is not a valid comma-separated CIDR list: ${CABINET_EGRESS_BLOCKED_RANGES:-<unset>}"
+  provision_validate_ipv6_cidr_list "${CABINET_EGRESS_BLOCKED_RANGES6:-}" \
+    || provision_die "CABINET_EGRESS_BLOCKED_RANGES6 is not a valid comma-separated IPv6 CIDR list: ${CABINET_EGRESS_BLOCKED_RANGES6:-<unset>}"
 }
 
 ###
 ### Renders TEMPLATE to OUTPUT by replacing every @NAME@ token with the
 ### value from a same-named "NAME=VALUE" argument. Every value is checked
 ### against provision_validate_safe_value; a value for a token with a
-### known stricter shape (CABINET_TRAEFIK_IP: IPv4, CABINET_ADMIN_SSH_SOURCES:
-### a comma-separated CIDR list) is additionally checked against that shape.
+### known stricter shape (CABINET_TRAEFIK_IP: IPv4, CABINET_ADMIN_SSH_SOURCES
+### and CABINET_EGRESS_BLOCKED_RANGES: a comma-separated CIDR list,
+### CABINET_EGRESS_RESOLVERS: a comma-separated IPv4 address list,
+### CABINET_EGRESS_BLOCKED_RANGES6: a comma-separated IPv6 CIDR list) is
+### additionally checked against that shape.
 ### Fails, and never writes OUTPUT, if any value is invalid or if any @TOKEN@
 ### remains unreplaced in the result.
 ###
@@ -302,9 +396,17 @@ provision_render_template() {
         provision_validate_ipv4 "$value" \
           || provision_die "@${name}@ value is not a valid IPv4 address: ${value}"
         ;;
-      CABINET_ADMIN_SSH_SOURCES)
+      CABINET_ADMIN_SSH_SOURCES | CABINET_EGRESS_BLOCKED_RANGES)
         provision_validate_cidr_list "$value" \
           || provision_die "@${name}@ value is not a valid comma-separated CIDR list: ${value}"
+        ;;
+      CABINET_EGRESS_RESOLVERS)
+        provision_validate_ipv4_list "$value" \
+          || provision_die "@${name}@ value is not a valid comma-separated IPv4 address list: ${value}"
+        ;;
+      CABINET_EGRESS_BLOCKED_RANGES6)
+        provision_validate_ipv6_cidr_list "$value" \
+          || provision_die "@${name}@ value is not a valid comma-separated IPv6 CIDR list: ${value}"
         ;;
     esac
 

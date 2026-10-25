@@ -129,19 +129,26 @@ cat >"$conf_real" <<'EOF'
 CABINET_TRAEFIK_IP=192.0.2.10
 CABINET_ADMIN_SSH_SOURCES=192.0.2.0/24,198.51.100.0/24
 CABINET_GITHUB_REPO=example-owner/example-repo
+CABINET_EGRESS_RESOLVERS=192.0.2.53
+CABINET_EGRESS_BLOCKED_RANGES=10.0.0.0/8,100.64.0.0/10
+CABINET_EGRESS_BLOCKED_RANGES6=fc00::/7,2001:db8:1::/64
 EOF
 chmod 600 "$conf_real"
 
 if (
-  unset CABINET_TRAEFIK_IP CABINET_ADMIN_SSH_SOURCES CABINET_GITHUB_REPO
+  unset CABINET_TRAEFIK_IP CABINET_ADMIN_SSH_SOURCES CABINET_GITHUB_REPO \
+    CABINET_EGRESS_RESOLVERS CABINET_EGRESS_BLOCKED_RANGES CABINET_EGRESS_BLOCKED_RANGES6
   _provision_parse_kv_file "$conf_real" PROVISION_CONF_ALLOWED_KEYS
   [[ "$CABINET_TRAEFIK_IP" == "192.0.2.10" \
     && "$CABINET_ADMIN_SSH_SOURCES" == "192.0.2.0/24,198.51.100.0/24" \
-    && "$CABINET_GITHUB_REPO" == "example-owner/example-repo" ]]
+    && "$CABINET_GITHUB_REPO" == "example-owner/example-repo" \
+    && "$CABINET_EGRESS_RESOLVERS" == "192.0.2.53" \
+    && "$CABINET_EGRESS_BLOCKED_RANGES" == "10.0.0.0/8,100.64.0.0/10" \
+    && "$CABINET_EGRESS_BLOCKED_RANGES6" == "fc00::/7,2001:db8:1::/64" ]]
 ); then
-  pass "config parser: accepts the three provision.conf keys"
+  pass "config parser: accepts the six provision.conf keys"
 else
-  failtest "config parser: accepts the three provision.conf keys"
+  failtest "config parser: accepts the six provision.conf keys"
 fi
 
 conf_other_key="${WORK_DIR}/conf-other-key"
@@ -204,6 +211,79 @@ assert_refuses "provision_validate_cidr_list: refuses whitespace around entries"
 assert_refuses "provision_validate_cidr_list: refuses the example placeholder" \
   provision_validate_cidr_list "CHANGE-ME"
 
+assert_accepts "provision_validate_ipv4_list: accepts one resolver" \
+  provision_validate_ipv4_list "192.0.2.53"
+assert_accepts "provision_validate_ipv4_list: accepts two resolvers" \
+  provision_validate_ipv4_list "192.0.2.53,198.51.100.53"
+assert_refuses "provision_validate_ipv4_list: refuses an empty list" \
+  provision_validate_ipv4_list ""
+assert_refuses "provision_validate_ipv4_list: refuses a CIDR entry" \
+  provision_validate_ipv4_list "192.0.2.0/24"
+assert_refuses "provision_validate_ipv4_list: refuses one bad entry" \
+  provision_validate_ipv4_list "192.0.2.53,192.0.2.256"
+assert_refuses "provision_validate_ipv4_list: refuses an empty entry" \
+  provision_validate_ipv4_list "192.0.2.53,,198.51.100.53"
+assert_refuses "provision_validate_ipv4_list: refuses a trailing comma" \
+  provision_validate_ipv4_list "192.0.2.53,"
+assert_refuses "provision_validate_ipv4_list: refuses whitespace around entries" \
+  provision_validate_ipv4_list "192.0.2.53, 198.51.100.53"
+assert_refuses "provision_validate_ipv4_list: refuses the example placeholder" \
+  provision_validate_ipv4_list "CHANGE-ME"
+
+assert_accepts "provision_validate_ipv6_cidr: accepts a unique-local block" \
+  provision_validate_ipv6_cidr "fc00::/7"
+assert_accepts "provision_validate_ipv6_cidr: accepts a link-local block" \
+  provision_validate_ipv6_cidr "fe80::/10"
+assert_accepts "provision_validate_ipv6_cidr: accepts a documentation prefix" \
+  provision_validate_ipv6_cidr "2001:db8:1::/64"
+assert_accepts "provision_validate_ipv6_cidr: accepts a full eight-group address" \
+  provision_validate_ipv6_cidr "2001:db8:0:1:0:0:0:0/64"
+assert_accepts "provision_validate_ipv6_cidr: accepts the whole address space" \
+  provision_validate_ipv6_cidr "::/0"
+assert_accepts "provision_validate_ipv6_cidr: accepts a shortening in the middle" \
+  provision_validate_ipv6_cidr "2001:db8::1/128"
+assert_refuses "provision_validate_ipv6_cidr: refuses a missing prefix" \
+  provision_validate_ipv6_cidr "fc00::"
+assert_refuses "provision_validate_ipv6_cidr: refuses a prefix above 128" \
+  provision_validate_ipv6_cidr "fc00::/129"
+assert_refuses "provision_validate_ipv6_cidr: refuses a non-numeric prefix" \
+  provision_validate_ipv6_cidr "fc00::/x"
+assert_refuses "provision_validate_ipv6_cidr: refuses an IPv4 range" \
+  provision_validate_ipv6_cidr "10.0.0.0/8"
+assert_refuses "provision_validate_ipv6_cidr: refuses two shortenings" \
+  provision_validate_ipv6_cidr "2001:db8::1::2/64"
+assert_refuses "provision_validate_ipv6_cidr: refuses three colons in a row" \
+  provision_validate_ipv6_cidr "2001:db8:::1/64"
+assert_refuses "provision_validate_ipv6_cidr: refuses a group of five digits" \
+  provision_validate_ipv6_cidr "fc000::/16"
+assert_refuses "provision_validate_ipv6_cidr: refuses a non-hex group" \
+  provision_validate_ipv6_cidr "fg00::/16"
+assert_refuses "provision_validate_ipv6_cidr: refuses too few groups without a shortening" \
+  provision_validate_ipv6_cidr "2001:db8:1:2:3/64"
+assert_refuses "provision_validate_ipv6_cidr: refuses too many groups" \
+  provision_validate_ipv6_cidr "1:2:3:4:5:6:7:8:9/64"
+assert_refuses "provision_validate_ipv6_cidr: refuses a shortening with eight groups" \
+  provision_validate_ipv6_cidr "1:2:3:4::5:6:7:8/64"
+assert_refuses "provision_validate_ipv6_cidr: refuses a leading single colon" \
+  provision_validate_ipv6_cidr ":1::2/64"
+assert_refuses "provision_validate_ipv6_cidr: refuses a name" \
+  provision_validate_ipv6_cidr "example.com"
+assert_refuses "provision_validate_ipv6_cidr: refuses the example placeholder" \
+  provision_validate_ipv6_cidr "CHANGE-ME"
+
+assert_accepts "provision_validate_ipv6_cidr_list: accepts two ranges" \
+  provision_validate_ipv6_cidr_list "fc00::/7,fe80::/10"
+assert_refuses "provision_validate_ipv6_cidr_list: refuses an empty list" \
+  provision_validate_ipv6_cidr_list ""
+assert_refuses "provision_validate_ipv6_cidr_list: refuses one bad entry" \
+  provision_validate_ipv6_cidr_list "fc00::/7,fe80::"
+assert_refuses "provision_validate_ipv6_cidr_list: refuses an empty entry" \
+  provision_validate_ipv6_cidr_list "fc00::/7,,fe80::/10"
+assert_refuses "provision_validate_ipv6_cidr_list: refuses a trailing comma" \
+  provision_validate_ipv6_cidr_list "fc00::/7,"
+assert_refuses "provision_validate_ipv6_cidr_list: refuses whitespace around entries" \
+  provision_validate_ipv6_cidr_list "fc00::/7, fe80::/10"
+
 assert_accepts "provision_validate_repo_slug: accepts owner/name" \
   provision_validate_repo_slug "example-owner/example-repo"
 assert_refuses "provision_validate_repo_slug: refuses a missing owner" \
@@ -227,35 +307,72 @@ assert_refuses "provision_validate_safe_value: refuses a newline" \
 # shellcheck disable=SC2329
 validate_with() {
   CABINET_TRAEFIK_IP="$1" CABINET_ADMIN_SSH_SOURCES="$2" CABINET_GITHUB_REPO="$3" \
+    CABINET_EGRESS_RESOLVERS="$4" CABINET_EGRESS_BLOCKED_RANGES="$5" CABINET_EGRESS_BLOCKED_RANGES6="$6" \
     provision_validate_conf
 }
 assert_accepts "provision_validate_conf: accepts valid documentation values" \
-  validate_with "192.0.2.10" "192.0.2.0/24" "example-owner/example-repo"
+  validate_with "192.0.2.10" "192.0.2.0/24" "example-owner/example-repo" "192.0.2.53" "10.0.0.0/8" "fc00::/7"
 assert_refuses "provision_validate_conf: refuses a placeholder proxy address" \
-  validate_with "CHANGE-ME" "192.0.2.0/24" "example-owner/example-repo"
+  validate_with "CHANGE-ME" "192.0.2.0/24" "example-owner/example-repo" "192.0.2.53" "10.0.0.0/8" "fc00::/7"
 assert_refuses "provision_validate_conf: refuses a placeholder SSH range" \
-  validate_with "192.0.2.10" "CHANGE-ME" "example-owner/example-repo"
+  validate_with "192.0.2.10" "CHANGE-ME" "example-owner/example-repo" "192.0.2.53" "10.0.0.0/8" "fc00::/7"
 assert_refuses "provision_validate_conf: refuses a malformed repository" \
-  validate_with "192.0.2.10" "192.0.2.0/24" "not a slug"
+  validate_with "192.0.2.10" "192.0.2.0/24" "not a slug" "192.0.2.53" "10.0.0.0/8" "fc00::/7"
+assert_refuses "provision_validate_conf: refuses a placeholder resolver" \
+  validate_with "192.0.2.10" "192.0.2.0/24" "example-owner/example-repo" "CHANGE-ME" "10.0.0.0/8" "fc00::/7"
+assert_refuses "provision_validate_conf: refuses a placeholder blocked list" \
+  validate_with "192.0.2.10" "192.0.2.0/24" "example-owner/example-repo" "192.0.2.53" "CHANGE-ME" "fc00::/7"
+assert_refuses "provision_validate_conf: refuses a malformed IPv6 list" \
+  validate_with "192.0.2.10" "192.0.2.0/24" "example-owner/example-repo" "192.0.2.53" "10.0.0.0/8" "fc00::/200"
+assert_refuses "provision_validate_conf: refuses missing egress values" \
+  validate_with "192.0.2.10" "192.0.2.0/24" "example-owner/example-repo" "" "" ""
 
 example_conf="${DEPLOY_DIR}/provision.conf.example"
 # shellcheck disable=SC2329
 validate_example() {
-  unset CABINET_TRAEFIK_IP CABINET_ADMIN_SSH_SOURCES CABINET_GITHUB_REPO
+  unset CABINET_TRAEFIK_IP CABINET_ADMIN_SSH_SOURCES CABINET_GITHUB_REPO \
+    CABINET_EGRESS_RESOLVERS CABINET_EGRESS_BLOCKED_RANGES CABINET_EGRESS_BLOCKED_RANGES6
   _provision_parse_kv_file "$example_conf" PROVISION_CONF_ALLOWED_KEYS
   provision_validate_conf
 }
 assert_refuses "provision_validate_conf: refuses the shipped example as it stands" \
   validate_example
 
-if (
-  unset CABINET_TRAEFIK_IP CABINET_ADMIN_SSH_SOURCES CABINET_GITHUB_REPO
-  _provision_parse_kv_file "$example_conf" PROVISION_CONF_ALLOWED_KEYS
-  provision_validate_repo_slug "$CABINET_GITHUB_REPO"
-); then
+###
+### Parses the shipped example and succeeds when the validator named by "$1"
+### accepts the value of the variable named by "$2".
+###
+example_value_passes() {
+  (
+    unset CABINET_TRAEFIK_IP CABINET_ADMIN_SSH_SOURCES CABINET_GITHUB_REPO \
+      CABINET_EGRESS_RESOLVERS CABINET_EGRESS_BLOCKED_RANGES CABINET_EGRESS_BLOCKED_RANGES6
+    _provision_parse_kv_file "$example_conf" PROVISION_CONF_ALLOWED_KEYS
+    "$1" "${!2}"
+  )
+}
+
+if example_value_passes provision_validate_repo_slug CABINET_GITHUB_REPO; then
   pass "provision.conf.example: ships a valid repository slug"
 else
   failtest "provision.conf.example: ships a valid repository slug"
+fi
+
+if example_value_passes provision_validate_cidr_list CABINET_EGRESS_BLOCKED_RANGES; then
+  pass "provision.conf.example: ships a valid blocked IPv4 range list"
+else
+  failtest "provision.conf.example: ships a valid blocked IPv4 range list"
+fi
+
+if example_value_passes provision_validate_ipv6_cidr_list CABINET_EGRESS_BLOCKED_RANGES6; then
+  pass "provision.conf.example: ships a valid blocked IPv6 range list"
+else
+  failtest "provision.conf.example: ships a valid blocked IPv6 range list"
+fi
+
+if example_value_passes provision_validate_ipv4_list CABINET_EGRESS_RESOLVERS; then
+  failtest "provision.conf.example: ships a placeholder resolver, not a real one"
+else
+  pass "provision.conf.example: ships a placeholder resolver, not a real one"
 fi
 
 if provision_version_ge "2.101.0" "2.49.0"; then
