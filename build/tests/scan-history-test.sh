@@ -186,6 +186,32 @@ colon_path_case() {
 
 check "the scanner hides a denylisted value in a path that contains a colon" colon_path_case
 
+PLACEHOLDER_REPO="$WORK_DIR/placeholder-paths"
+new_repo "$PLACEHOLDER_REPO"
+printf 'an elided example %s and a pattern %s\n' "$(printf '/%s/.../.cache' 'home')" "$(printf "'/%s/|/%s/'" 'home' 'mnt')" >"$PLACEHOLDER_REPO/notes.txt"
+commit_all "$PLACEHOLDER_REPO" "add files"
+run_scan "$PLACEHOLDER_REPO"
+
+placeholder_case() {
+  output_has 'PASS absolute-paths'
+}
+
+check "the scanner does not report an elided example or a regex alternation as an absolute local path" placeholder_case
+
+VOLUME_REPO="$WORK_DIR/volume-path"
+new_repo "$VOLUME_REPO"
+printf 'copied from %s\n' "$(printf '/%s/%s/repos/x' 'mnt' 'Data')" >"$VOLUME_REPO/notes.txt"
+commit_all "$VOLUME_REPO" "add files"
+run_scan "$VOLUME_REPO"
+
+volume_case() {
+  [ "$LAST_STATUS" -eq 1 ] &&
+    output_has 'FAIL absolute-paths' &&
+    output_has 'line 1 absolute local path'
+}
+
+check "the scanner still reports a path under a named mounted volume" volume_case
+
 CLEAN_REPO="$WORK_DIR/clean"
 new_repo "$CLEAN_REPO"
 printf 'an ordinary line\n' >"$CLEAN_REPO/notes.txt"
