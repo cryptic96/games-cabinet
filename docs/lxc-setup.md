@@ -20,9 +20,12 @@ directory it owns.
 | Operations and health endpoint | port 5081, loopback only | processes on the container itself; no route through the reverse proxy |
 | SSH | port 22 | the admin address ranges only, with keys only |
 
-Outbound, the container needs HTTPS to GitHub (to find and download releases)
-and to the public transparency service that release attestations are checked
-against. Everything else inbound is dropped by default.
+Outbound traffic to the internet stays open: GitHub releases and the public
+transparency service that release attestations are checked against,
+BoardGameGeek and its image host, package mirrors, and DNS to the resolver.
+New connections from the container into the home network are refused, so a
+flaw in the application cannot be used to reach other machines at home.
+Everything else inbound is dropped by default.
 
 ## Prerequisites
 
@@ -57,6 +60,28 @@ One core, 1 GB of memory and an 8 GB disk are a starting point. They are
 small on purpose for a shared, low-power host; tune them later from the load
 you actually see. Nesting is needed so the service sandboxing that the app
 unit and the selfcheck rely on works inside an unprivileged container.
+
+### Container limits
+
+The container's own limits are set from the Proxmox host, and can be changed
+while it runs. Replace every `{placeholder}` with the host's own value:
+
+```bash
+pct set {ctid} --cores {cores} --memory {memory-mb} --swap {swap-mb} --cpuunits {cpu-units}
+```
+
+- Give the container a CPU weight (`--cpuunits`) lower than the reverse
+  proxy's, so the proxy always wins when the host is busy.
+- The container cannot read its own CPU weight, so check it on the host with
+  `pct config {ctid}`. Values that wait for a restart show up with
+  `pct pending {ctid}`.
+- The application unit has limits of its own (memory, swap, CPU share, task
+  count and open files), and they sit below the container's, so SSH and the
+  deploy timer keep room even when the application is at its ceiling. The
+  numbers shipped in the unit are starting values; size them from the memory
+  and CPU you see during a sync and a picture rebuild. The selfcheck fails when
+  the unit's memory ceiling leaves less than a small margin below the
+  container's memory, or when its CPU quota reaches the container's cores.
 
 The remaining steps run as root inside the container (`pct enter {ctid}`
 puts you there; this also keeps working if a firewall mistake ever locks SSH
@@ -93,6 +118,9 @@ Open `/etc/cabinet/provision.conf` and replace every `CHANGE-ME` value:
 | `CABINET_TRAEFIK_IP` | the address of the Traefik container; the app trusts forwarded headers only from it and the firewall admits port 5080 only from it |
 | `CABINET_ADMIN_SSH_SOURCES` | comma-separated CIDR ranges allowed to reach SSH, for example `192.0.2.0/24,198.51.100.0/24` |
 | `CABINET_GITHUB_REPO` | the `owner/name` of the public repository releases are pulled from |
+| `CABINET_EGRESS_RESOLVERS` | the address, or comma-separated addresses, the container's DNS queries go to, as `resolvectl status` or `/etc/resolv.conf` shows them; DNS to these stays open |
+| `CABINET_EGRESS_BLOCKED_RANGES` | comma-separated IPv4 ranges the container may not open new connections to; the example lists the private, shared and link-local blocks, which cover the home network and the common VPN range |
+| `CABINET_EGRESS_BLOCKED_RANGES6` | the same for IPv6; when the home network has IPv6, append its own global prefix to the list |
 
 Then run provisioning again:
 
@@ -106,6 +134,38 @@ its directories, writes `/etc/cabinet/cabinet.env` (once, and never again),
 loads the default-drop firewall, installs the installer, the selfcheck and
 the systemd units, and enables the poll timer and the application. The
 application is not started until the first release is installed.
+
+### The outbound block
+
+The block refuses new connections from the container to the blocked ranges
+with an immediate "administratively prohibited" answer rather than silence, so
+a mistaken block fails visibly instead of hanging until a timeout. Replies to
+connections that came in (the reverse proxy, SSH sessions), loopback, IPv6
+neighbour discovery and DNS to the configured resolvers stay open, and so does
+everything on the internet.
+
+Mind the order. Add the three `CABINET_EGRESS_*` keys to an existing
+`provision.conf` before re-running provisioning, because provisioning refuses
+an old file that lacks them. The example file lists the keys with a placeholder
+resolver, so it is refused as it stands.
+
+Side effects to know about:
+
+- The container can no longer use services on the home network: a local
+  package cache, a time server on the home network or home-network monitoring
+  that the container would call out to. Packages and releases come from the
+  internet.
+- The owner tools' link check fetches web pages for the owner, and it cannot
+  fetch addresses on the home network.
+- A container that gets its address by DHCP needs its DHCP server allowed.
+  The server normally sits inside a blocked range, and renewing the lease
+  would be refused. Give the container a fixed address, as the creation
+  command above does, or split the blocked ranges so that the DHCP server's
+  address is not covered.
+
+If the block ever locks you out of something you need, `pct enter {ctid}` on
+the Proxmox host gives a root shell on the container without going through
+the network, from which you can fix `provision.conf` and re-run provisioning.
 
 ## 5. Admin access
 
@@ -162,12 +222,29 @@ placeholder: the allowed LAN and VPN ranges, the hostname and the address of
 this container. The route is limited to the LAN and VPN ranges until the site
 is deliberately made public; making it public means removing the allow-list
 middleware from the real file on the Traefik container, nothing in this
-repository.
+repository. [The go-public checklist](go-public.md) has the checks to pass
+first, the exact steps and how to close the site again.
 
-The route's security-headers middleware sets HSTS, nosniff, frame denial and
-the referrer policy. It sets no Content-Security-Policy on purpose: the
-application sends its own strict policy with every response, and a second
-policy added by the proxy would be enforced alongside it.
+The public router also carries an outer wall: a rate limit per client address
+and a cap on requests being served at once per client address. The proxy
+refuses a flood cheaply, before it reaches this container, and the limits
+leave room for a group of friends on one Wi-Fi network. The owner router has
+neither, on purpose: it is reachable from the home network and VPN only. The
+numbers in the example file are starting values; re-size them from a measured
+first visit. The application adds much stricter limits of its own for "sync
+now" and the live channel (see [the sync guide](bgg-sync.md)).
+
+The route's security-headers middleware adds only HSTS, because the proxy is
+the one that terminates TLS. The application sends the
+Content-Security-Policy and every other security header with every response,
+and they are tested together with the page; a header set by both would be
+sent twice, and a second policy added by the proxy would be enforced
+alongside the application's.
+
+The application answers only to the hostnames listed in `AllowedHosts` in the
+env file: the public one, the owner one, and loopback. Keep loopback in the
+list, or the deploy health check fails and the release rolls back. See
+[the deploy guide](deploy.md#host-settings-and-a-release).
 
 The route's service URL must point at this container's own address on port
 5080. The two addresses run in opposite directions: the route names this
@@ -265,7 +342,12 @@ This proves the host end to end and prints PASS or FAIL for each check:
   listens on it; the public port answers `404` for the owner pages, and when
   the owner port listens a request through loopback that claims an address
   outside the allowed ranges is refused with `403`;
-- the firewall's input chain drops by default;
+- the firewall's input chain drops by default, and its output chain refuses
+  new connections to the blocked ranges: a connection to the first blocked
+  network is refused at once, not left to time out, and no address is printed;
+- the application unit's resource limits match the loaded unit file, and sit
+  below the container's own memory and cores;
+- names resolve through the configured resolvers;
 - the health endpoint reports `Healthy` at exactly the version the `current`
   link points at;
 - the installed installer, its libraries and the systemd units match, byte
