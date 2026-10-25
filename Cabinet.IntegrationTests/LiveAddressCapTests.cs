@@ -127,12 +127,13 @@ public class LiveAddressCapTests
         }
 
         var refusalsBefore = host.Refusals.Refusals;
+        var problemsBefore = host.Logs.Problems.Count;
         var refused = await pages.TryStartAsync(SharedClient);
 
         refused.Should().BeFalse("the shipped cap is twenty live pages for one address");
         host.Refusals.Refusals.Should().BeGreaterThan(refusalsBefore, "the connect request was answered 429 before any handshake");
         host.Limiter.Count.Should().Be(ShippedCap);
-        host.Logs.Problems.Should().BeEmpty("a quiet refusal writes nothing at Warning or above");
+        host.Logs.Problems.Skip(problemsBefore).Should().BeEmpty("a quiet refusal writes nothing at Warning or above");
 
         await pages.StartHeldAsync(OtherClient, expectedCount: ShippedCap + 1);
     }
