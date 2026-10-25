@@ -86,6 +86,46 @@ public class LiveAddressCapTests
     }
 
     [Fact]
+    public async Task Connections_that_skip_negotiation_are_counted_in_the_window_and_the_one_over_it_is_refused_quietly()
+    {
+        await using var host = Host(new Dictionary<string, string?> { ["ClientLimits:LiveConnectsPerWindow"] = "2" });
+        await using var pages = new PageSet(host.Factory, HttpTransportType.WebSockets, skipNegotiation: true);
+        using var client = host.Factory.CreatePublicClient();
+        await pages.StartHeldAsync(forwardedFor: null, expectedCount: 1);
+        await pages.StartHeldAsync(forwardedFor: null, expectedCount: 2);
+        var refusalsBefore = host.Refusals.Refusals;
+        var problemsBefore = host.Logs.Problems.Count;
+
+        var refused = await pages.TryStartAsync(forwardedFor: null);
+        using var plain = await client.GetAsync(LiveEndpoints.Route, TestContext.Current.CancellationToken);
+        var other = await pages.TryStartAsync(OtherClient);
+
+        refused.Should().BeFalse("the window of two new connections is spent, and skipping the negotiation does not escape it");
+        host.Refusals.Refusals.Should().BeGreaterThan(refusalsBefore);
+        plain.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        plain.Headers.RetryAfter!.Delta!.Value.TotalSeconds.Should().BeInRange(1, 60);
+        plain.Headers.CacheControl!.NoStore.Should().BeTrue();
+        (await plain.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).Should().BeEmpty();
+        host.Limiter.Count.Should().Be(2, "a refused connection takes no place");
+        host.Logs.Problems.Skip(problemsBefore).Should().BeEmpty("a quiet refusal writes nothing at Warning or above");
+        other.Should().BeTrue("another address has a window of its own");
+    }
+
+    [Fact]
+    public async Task A_negotiated_connection_is_counted_once_so_a_window_of_two_admits_two_pages_and_refuses_the_third()
+    {
+        await using var host = Host(new Dictionary<string, string?> { ["ClientLimits:LiveConnectsPerWindow"] = "2" });
+        await using var pages = new PageSet(host.Factory, HttpTransportType.WebSockets);
+        await pages.StartHeldAsync(forwardedFor: null, expectedCount: 1);
+        await pages.StartHeldAsync(forwardedFor: null, expectedCount: 2);
+
+        var refused = await pages.TryStartAsync(forwardedFor: null);
+
+        refused.Should().BeFalse("two negotiated pages spent the window of two, one negotiate request each");
+        host.Limiter.Count.Should().Be(2);
+    }
+
+    [Fact]
     public async Task A_server_sent_events_page_outlives_several_pings_under_a_window_of_one_connect()
     {
         await using var host = Host(new Dictionary<string, string?> { ["ClientLimits:LiveConnectsPerWindow"] = "1" });
@@ -190,13 +230,13 @@ public class LiveAddressCapTests
         public ValueTask DisposeAsync() => Factory.DisposeAsync();
     }
 
-    private sealed class PageSet(CabinetWebApplicationFactory factory, HttpTransportType transport) : IAsyncDisposable
+    private sealed class PageSet(CabinetWebApplicationFactory factory, HttpTransportType transport, bool skipNegotiation = false) : IAsyncDisposable
     {
         private readonly List<Page> _pages = [];
 
         public async Task<Page> StartHeldAsync(string? forwardedFor, int expectedCount, TimeSpan? keepAlive = null)
         {
-            var page = new Page(factory, transport, forwardedFor, keepAlive);
+            var page = new Page(factory, transport, forwardedFor, keepAlive, skipNegotiation);
             _pages.Add(page);
             await page.Connection.StartAsync(TestContext.Current.CancellationToken);
             var limiter = factory.ServingServices.GetRequiredService<LiveConnectionLimiter>();
@@ -207,7 +247,7 @@ public class LiveAddressCapTests
 
         public async Task<bool> TryStartAsync(string? forwardedFor)
         {
-            var page = new Page(factory, transport, forwardedFor, null);
+            var page = new Page(factory, transport, forwardedFor, null, skipNegotiation);
 
             try
             {
@@ -237,7 +277,7 @@ public class LiveAddressCapTests
     {
         private readonly ConcurrentQueue<byte> _received = new();
 
-        public Page(CabinetWebApplicationFactory factory, HttpTransportType transport, string? forwardedFor, TimeSpan? keepAlive)
+        public Page(CabinetWebApplicationFactory factory, HttpTransportType transport, string? forwardedFor, TimeSpan? keepAlive, bool skipNegotiation)
         {
             Connection = new HubConnectionBuilder()
                 .WithUrl(
@@ -245,6 +285,7 @@ public class LiveAddressCapTests
                     options =>
                     {
                         options.Transports = transport;
+                        options.SkipNegotiation = skipNegotiation;
                         if (forwardedFor is not null)
                         {
                             options.Headers["X-Forwarded-For"] = forwardedFor;
