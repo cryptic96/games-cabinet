@@ -471,15 +471,18 @@ The proxy's own clock shows UTC plus one hour. The generator ran only inside the
 | measure-router | neighbour | FAIL |
 | measure-router | ssh | PASS |
 | measure-router | ops-health | PASS |
-| measure-router | host-cpu | pending owner |
+| measure-router | host-cpu | PASS (owner's reading) |
 | measure-router | recovery | PASS |
 | measure-direct | neighbour | FAIL |
 | measure-direct | ssh | PASS |
 | measure-direct | ops-health | PASS |
-| measure-direct | host-cpu | pending owner |
+| measure-direct | host-cpu | PASS (owner's reading) |
 | measure-direct | recovery | PASS |
 
 Both floods are valid under the plan's rule (no 400 in any step; the app answered 200 and 429). The `neighbour` rows are
 FAIL because of the aborts under the stop rule: router at 20, 10 and 5 unthrottled workers; direct at 20 workers on
 `/cabinet/status` and in the last second of the negotiate step. The caps cannot be accepted as proposed on the plan's
 own bar (every row PASS); the unit and container limits are not what failed.
+
+Host CPU, the owner's reading of the Proxmox graphs for the flood windows (given in chat on the evening of the floods,
+verbatim): "both graphs look perfectly fine. both below 30% usage".
