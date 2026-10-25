@@ -298,6 +298,40 @@ assert_matches "traefik example: warns about client networks in trustedIPs" \
 assert_lacks "traefik example: has no path prefix rule" \
   'PathPrefix' "$traefik_example"
 
+routers_section="$(sed -n '/^  routers:/,/^  services:/p' <<<"$traefik_example")"
+public_router="$(sed -n '/^    cabinet:$/,/^    cabinet-owner:$/p' <<<"$routers_section")"
+public_middlewares="$(sed -n '/^      middlewares:/,/^      service:/p' <<<"$public_router" | grep -oE '^ +- [a-z-]+$' | sed -E 's/^ +- //' | tr '\n' ' ')"
+owner_middlewares="$(sed -n '/^      middlewares:/,/^      service:/p' <<<"$owner_router" | grep -oE '^ +- [a-z-]+$' | sed -E 's/^ +- //' | tr '\n' ' ')"
+assert_eq "traefik example: the public router runs headers, allow-list, rate limit, then in-flight limit in that order" \
+  "cabinet-security-headers cabinet-lan-only cabinet-rate-limit cabinet-in-flight " "$public_middlewares"
+assert_eq "traefik example: the owner router lists only the allow-list and the security headers" \
+  "cabinet-lan-only cabinet-security-headers " "$owner_middlewares"
+assert_lacks "traefik example: the owner router has no rate limit" \
+  'cabinet-rate-limit' "$owner_router"
+assert_lacks "traefik example: the owner router has no in-flight limit" \
+  'cabinet-in-flight' "$owner_router"
+
+###
+### Prints the middleware definition named "$1" from the Traefik example: the
+### lines from its four-space key to the next four-space key or the routers.
+###
+traefik_middleware_block() {
+  sed -n '/^  middlewares:/,/^  routers:/p' <<<"$traefik_example" \
+    | sed -n "/^    $1:\$/,/^    [a-z#]/p" | sed '1!{/^    [a-z#]/d;}'
+}
+rate_limit_block="$(traefik_middleware_block cabinet-rate-limit)"
+in_flight_block="$(traefik_middleware_block cabinet-in-flight)"
+for key in 'rateLimit:' 'average:' 'period:' 'burst:' 'sourceCriterion:' 'ipStrategy:' 'ipv6Subnet: 64'; do
+  assert_matches "traefik example: the rate limit sets ${key}" "$key" "$rate_limit_block"
+done
+for key in 'inFlightReq:' 'amount:' 'sourceCriterion:' 'ipStrategy:' 'ipv6Subnet: 64'; do
+  assert_matches "traefik example: the in-flight limit sets ${key}" "$key" "$in_flight_block"
+done
+assert_lacks "traefik example: no source criterion counts by hop depth" \
+  '^ *depth:' "$traefik_example"
+assert_lacks "traefik example: no errors middleware styles the refusals" \
+  '^ *errors:' "$traefik_example"
+
 addresses="$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' <<<"$traefik_example" || true)"
 foreign_addresses="$(grep -vE '^(192\.0\.2|198\.51\.100|203\.0\.113)\.' <<<"$addresses" || true)"
 assert_eq "traefik example: every address is an RFC 5737 documentation address" \
