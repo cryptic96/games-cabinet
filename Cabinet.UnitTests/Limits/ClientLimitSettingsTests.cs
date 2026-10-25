@@ -12,6 +12,9 @@ public class ClientLimitSettingsTests
 {
     private const string PressesKey = "ClientLimits:SyncPressesPerWindow";
     private const string WindowKey = "ClientLimits:SyncWindowSeconds";
+    private const string LiveConnectionsKey = "ClientLimits:LiveConnectionsPerClient";
+    private const string LiveConnectsKey = "ClientLimits:LiveConnectsPerWindow";
+    private const string LiveWindowKey = "ClientLimits:LiveWindowSeconds";
 
     [Fact]
     public void The_committed_appsettings_bind_to_five_presses_per_minute()
@@ -21,7 +24,7 @@ public class ClientLimitSettingsTests
             .Build();
 
         ClientLimitSettings.FromConfiguration(configuration)
-            .Should().Be(new ClientLimitOptions(5, TimeSpan.FromSeconds(60)));
+            .Should().Be(new ClientLimitOptions(5, TimeSpan.FromSeconds(60), 20, 60, TimeSpan.FromSeconds(60)));
     }
 
     [Fact]
@@ -29,7 +32,10 @@ public class ClientLimitSettingsTests
     {
         ClientLimitSettings.FromConfiguration(Configure()).Should().Be(new ClientLimitOptions(
             ClientLimitOptions.DefaultSyncPressesPerWindow,
-            TimeSpan.FromSeconds(ClientLimitOptions.DefaultSyncWindowSeconds)));
+            TimeSpan.FromSeconds(ClientLimitOptions.DefaultSyncWindowSeconds),
+            ClientLimitOptions.DefaultLiveConnectionsPerClient,
+            ClientLimitOptions.DefaultLiveConnectsPerWindow,
+            TimeSpan.FromSeconds(ClientLimitOptions.DefaultLiveWindowSeconds)));
     }
 
     [Theory]
@@ -75,6 +81,57 @@ public class ClientLimitSettingsTests
         var act = () => ClientLimitSettings.FromConfiguration(Configure((WindowKey, text)));
 
         act.Should().Throw<InvalidOperationException>().WithMessage("*ClientLimits:SyncWindowSeconds*");
+    }
+
+    [Theory]
+    [InlineData("1", 1)]
+    [InlineData("35", 35)]
+    [InlineData("1000", 1000)]
+    public void A_live_connection_cap_in_range_is_used(string text, int expected)
+    {
+        ClientLimitSettings.FromConfiguration(Configure((LiveConnectionsKey, text))).LiveConnectionsPerClient.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("1", 1)]
+    [InlineData("120", 120)]
+    [InlineData("10000", 10000)]
+    public void A_live_connect_count_in_range_is_used(string text, int expected)
+    {
+        ClientLimitSettings.FromConfiguration(Configure((LiveConnectsKey, text))).LiveConnectsPerWindow.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("1", 1)]
+    [InlineData("30", 30)]
+    [InlineData("3600", 3600)]
+    public void A_live_window_in_range_is_used(string text, int expectedSeconds)
+    {
+        ClientLimitSettings.FromConfiguration(Configure((LiveWindowKey, text))).LiveWindow
+            .Should().Be(TimeSpan.FromSeconds(expectedSeconds));
+    }
+
+    [Theory]
+    [InlineData(LiveConnectionsKey, "0")]
+    [InlineData(LiveConnectionsKey, "1001")]
+    [InlineData(LiveConnectionsKey, "-5")]
+    [InlineData(LiveConnectionsKey, "many")]
+    [InlineData(LiveConnectionsKey, "")]
+    [InlineData(LiveConnectsKey, "0")]
+    [InlineData(LiveConnectsKey, "10001")]
+    [InlineData(LiveConnectsKey, "-5")]
+    [InlineData(LiveConnectsKey, "many")]
+    [InlineData(LiveConnectsKey, "")]
+    [InlineData(LiveWindowKey, "0")]
+    [InlineData(LiveWindowKey, "3601")]
+    [InlineData(LiveWindowKey, "-5")]
+    [InlineData(LiveWindowKey, "soon")]
+    [InlineData(LiveWindowKey, "")]
+    public void A_live_setting_out_of_range_or_not_a_number_is_rejected_naming_the_key(string key, string text)
+    {
+        var act = () => ClientLimitSettings.FromConfiguration(Configure((key, text)));
+
+        act.Should().Throw<InvalidOperationException>().WithMessage($"*{key}*");
     }
 
     [Fact]

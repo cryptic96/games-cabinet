@@ -1,0 +1,267 @@
+using System.Collections.Concurrent;
+using System.Net;
+using Cabinet.Domain.Collection;
+using Cabinet.FakeBgg;
+using Cabinet.FakeBgg.Testing;
+using Cabinet.IntegrationTests.Infrastructure;
+using Cabinet.Repository.Bgg;
+using Cabinet.Service.Live;
+using FluentAssertions;
+using Microsoft.AspNetCore.Http.Connections;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
+namespace Cabinet.IntegrationTests;
+
+/// <summary>
+/// Proves one client address can hold a game night's worth of live pages and no more, on both transports: the page over the
+/// cap is refused quietly before any handshake, the places free up as pages close, other addresses are unaffected, new
+/// connections are counted per window on the negotiate request only, and a Server-Sent Events page is never refused for
+/// the messages it posts to stay connected.
+/// </summary>
+[Trait("Category", "Live")]
+public class LiveAddressCapTests
+{
+    private const string OtherClient = "203.0.113.8";
+    private const string SharedClient = "203.0.113.7";
+    private const int ShippedCap = 20;
+
+    [Theory]
+    [InlineData(HttpTransportType.WebSockets)]
+    [InlineData(HttpTransportType.ServerSentEvents)]
+    public async Task A_second_page_from_one_address_is_refused_at_a_cap_of_one_and_another_address_is_not(HttpTransportType transport)
+    {
+        await using var host = Host(new Dictionary<string, string?> { ["ClientLimits:LiveConnectionsPerClient"] = "1" });
+        await using var pages = new PageSet(host.Factory, transport);
+        await pages.StartHeldAsync(forwardedFor: null, expectedCount: 1);
+        var refusalsBefore = host.Refusals.Refusals;
+
+        var refused = await pages.TryStartAsync(forwardedFor: null);
+
+        refused.Should().BeFalse("the address already holds its one place");
+        host.Refusals.Refusals.Should().BeGreaterThan(refusalsBefore, "the refusal is the server's 429 on the connect request");
+        host.Limiter.Count.Should().Be(1, "a refused page takes no place");
+
+        await pages.StartHeldAsync(OtherClient, expectedCount: 2);
+    }
+
+    [Theory]
+    [InlineData(HttpTransportType.WebSockets)]
+    [InlineData(HttpTransportType.ServerSentEvents)]
+    public async Task A_place_freed_by_a_closing_page_can_be_taken_by_the_next_page_from_the_same_address(HttpTransportType transport)
+    {
+        await using var host = Host(new Dictionary<string, string?> { ["ClientLimits:LiveConnectionsPerClient"] = "1" });
+        await using var pages = new PageSet(host.Factory, transport);
+        var first = await pages.StartHeldAsync(forwardedFor: null, expectedCount: 1);
+        (await pages.TryStartAsync(forwardedFor: null)).Should().BeFalse();
+
+        await first.Connection.StopAsync(TestContext.Current.CancellationToken);
+        await SyncHarness.WaitUntil(() => Task.FromResult(host.Limiter.Count == 0));
+
+        await SyncHarness.WaitUntil(() => pages.TryStartAsync(forwardedFor: null));
+        await SyncHarness.WaitUntil(() => Task.FromResult(host.Limiter.Count == 1));
+    }
+
+    [Fact]
+    public async Task Negotiate_requests_are_counted_per_address_in_a_window_and_refused_with_a_wait()
+    {
+        await using var host = Host(new Dictionary<string, string?> { ["ClientLimits:LiveConnectsPerWindow"] = "2" });
+        using var client = host.Factory.CreatePublicClient();
+
+        var first = await Negotiate(client, forwardedFor: null);
+        var second = await Negotiate(client, forwardedFor: null);
+        using var third = await NegotiateResponse(client, forwardedFor: null);
+        var other = await Negotiate(client, OtherClient);
+
+        first.Should().Be(HttpStatusCode.OK);
+        second.Should().Be(HttpStatusCode.OK);
+        third.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        third.Headers.RetryAfter!.Delta!.Value.TotalSeconds.Should().BeInRange(1, 60);
+        third.Headers.CacheControl!.NoStore.Should().BeTrue();
+        (await third.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).Should().BeEmpty();
+        other.Should().Be(HttpStatusCode.OK, "another address has a window of its own");
+    }
+
+    [Fact]
+    public async Task A_server_sent_events_page_outlives_several_pings_under_a_window_of_one_connect()
+    {
+        await using var host = Host(new Dictionary<string, string?> { ["ClientLimits:LiveConnectsPerWindow"] = "1" });
+        using var client = host.Factory.CreatePublicClient();
+        await using var pages = new PageSet(host.Factory, HttpTransportType.ServerSentEvents);
+        var page = await pages.StartHeldAsync(forwardedFor: null, expectedCount: 1, keepAlive: TimeSpan.FromMilliseconds(500));
+
+        await Task.Delay(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+        using var press = await client.PostAsync(SyncHarness.SyncRoute, content: null, TestContext.Current.CancellationToken);
+        await SyncHarness.WaitUntil(() => Task.FromResult(page.ReceivedCount >= 2));
+
+        page.Connection.State.Should().Be(HubConnectionState.Connected, "its pings are messages, which no limit counts");
+        host.Limiter.Count.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task The_host_caps_upgraded_connections_at_the_site_wide_live_limit()
+    {
+        await using var host = Host(new Dictionary<string, string?> { ["Live:MaxConnections"] = "7" });
+
+        var kestrel = host.Factory.ServingServices.GetRequiredService<IOptions<KestrelServerOptions>>().Value;
+        var live = host.Factory.ServingServices.GetRequiredService<LiveOptions>();
+
+        live.MaxConnections.Should().Be(7);
+        kestrel.Limits.MaxConcurrentUpgradedConnections.Should().Be(live.MaxConnections);
+    }
+
+    [Theory]
+    [InlineData(HttpTransportType.WebSockets)]
+    [InlineData(HttpTransportType.ServerSentEvents)]
+    public async Task The_shipped_per_address_cap_admits_twenty_pages_refuses_the_twenty_first_quietly_and_admits_another_address(HttpTransportType transport)
+    {
+        await using var host = Host(new Dictionary<string, string?>());
+        await using var pages = new PageSet(host.Factory, transport);
+
+        for (var count = 1; count <= ShippedCap; count++)
+        {
+            await pages.StartHeldAsync(SharedClient, expectedCount: count);
+        }
+
+        var refusalsBefore = host.Refusals.Refusals;
+        var refused = await pages.TryStartAsync(SharedClient);
+
+        refused.Should().BeFalse("the shipped cap is twenty live pages for one address");
+        host.Refusals.Refusals.Should().BeGreaterThan(refusalsBefore, "the connect request was answered 429 before any handshake");
+        host.Limiter.Count.Should().Be(ShippedCap);
+        host.Logs.Problems.Should().BeEmpty("a quiet refusal writes nothing at Warning or above");
+
+        await pages.StartHeldAsync(OtherClient, expectedCount: ShippedCap + 1);
+    }
+
+    private static TestHost Host(IReadOnlyDictionary<string, string?> settings)
+    {
+        var handler = ScriptedBggHandler.ForCollection(SyntheticBggCollection.Create(3));
+        var refusals = new LiveRefusalWatch();
+        var logs = new CapturingLoggerProvider();
+        var factory = new CabinetWebApplicationFactory(
+            settings,
+            services =>
+            {
+                services.AddSingleton(SyncHarness.Options());
+                services.AddSingleton<IRequestPacer>(new NoWaitPacer());
+                services.AddSingleton<TimeProvider>(SyncHarness.NewClock());
+                services.AddHttpClient<ICollectionSource, BggClient>().ConfigurePrimaryHttpMessageHandler(() => handler);
+                services.AddHttpClient<IEnrichmentSource, BggThingClient>().ConfigurePrimaryHttpMessageHandler(() => handler);
+                services.AddSingleton<ILoggerProvider>(logs);
+                refusals.Register(services);
+            });
+
+        return new TestHost(factory, refusals, logs);
+    }
+
+    private static async Task<HttpStatusCode> Negotiate(HttpClient client, string? forwardedFor)
+    {
+        using var response = await NegotiateResponse(client, forwardedFor);
+
+        return response.StatusCode;
+    }
+
+    private static Task<HttpResponseMessage> NegotiateResponse(HttpClient client, string? forwardedFor)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/cabinet/live/negotiate?negotiateVersion=1");
+        if (forwardedFor is not null)
+        {
+            request.Headers.Add("X-Forwarded-For", forwardedFor);
+        }
+
+        return client.SendAsync(request, TestContext.Current.CancellationToken);
+    }
+
+    private sealed class TestHost(CabinetWebApplicationFactory factory, LiveRefusalWatch refusals, CapturingLoggerProvider logs) : IAsyncDisposable
+    {
+        public CabinetWebApplicationFactory Factory { get; } = factory;
+
+        public LiveRefusalWatch Refusals { get; } = refusals;
+
+        public CapturingLoggerProvider Logs { get; } = logs;
+
+        public LiveConnectionLimiter Limiter => Factory.ServingServices.GetRequiredService<LiveConnectionLimiter>();
+
+        public ValueTask DisposeAsync() => Factory.DisposeAsync();
+    }
+
+    private sealed class PageSet(CabinetWebApplicationFactory factory, HttpTransportType transport) : IAsyncDisposable
+    {
+        private readonly List<Page> _pages = [];
+
+        public async Task<Page> StartHeldAsync(string? forwardedFor, int expectedCount, TimeSpan? keepAlive = null)
+        {
+            var page = new Page(factory, transport, forwardedFor, keepAlive);
+            _pages.Add(page);
+            await page.Connection.StartAsync(TestContext.Current.CancellationToken);
+            var limiter = factory.ServingServices.GetRequiredService<LiveConnectionLimiter>();
+            await SyncHarness.WaitUntil(() => Task.FromResult(limiter.Count == expectedCount));
+
+            return page;
+        }
+
+        public async Task<bool> TryStartAsync(string? forwardedFor)
+        {
+            var page = new Page(factory, transport, forwardedFor, null);
+
+            try
+            {
+                await page.Connection.StartAsync(TestContext.Current.CancellationToken);
+                _pages.Add(page);
+
+                return true;
+            }
+            catch (Exception exception) when (exception is AggregateException or HttpRequestException or InvalidOperationException or System.Net.WebSockets.WebSocketException)
+            {
+                await page.DisposeAsync();
+
+                return false;
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            foreach (var page in _pages)
+            {
+                await page.DisposeAsync();
+            }
+        }
+    }
+
+    private sealed class Page : IAsyncDisposable
+    {
+        private readonly ConcurrentQueue<byte> _received = new();
+
+        public Page(CabinetWebApplicationFactory factory, HttpTransportType transport, string? forwardedFor, TimeSpan? keepAlive)
+        {
+            Connection = new HubConnectionBuilder()
+                .WithUrl(
+                    new Uri($"http://127.0.0.1:{factory.PublicPort}/cabinet/live"),
+                    options =>
+                    {
+                        options.Transports = transport;
+                        if (forwardedFor is not null)
+                        {
+                            options.Headers["X-Forwarded-For"] = forwardedFor;
+                        }
+                    })
+                .Build();
+            Connection.On<object>("StatusChanged", _ => _received.Enqueue(0));
+
+            if (keepAlive is { } interval)
+            {
+                Connection.KeepAliveInterval = interval;
+            }
+        }
+
+        public HubConnection Connection { get; }
+
+        public int ReceivedCount => _received.Count;
+
+        public ValueTask DisposeAsync() => Connection.DisposeAsync();
+    }
+}
