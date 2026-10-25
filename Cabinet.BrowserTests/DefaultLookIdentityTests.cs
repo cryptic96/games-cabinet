@@ -119,7 +119,7 @@ public sealed class DefaultLookIdentityTests : CabinetPageTest
     {
         await page.SetViewportSizeAsync(width, height);
         await page.GotoAsync($"http://127.0.0.1:{PublicPort}{path}");
-        await page.WaitForSelectorAsync("#cabinet .section", new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached });
+        await Expect(page.Locator("#cabinet .section").First).ToBeVisibleAsync(new() { Timeout = LiveLookTests.FirstDrawTimeoutMs });
 
         var settled = 0;
         var lastHeight = -1;
@@ -127,7 +127,7 @@ public sealed class DefaultLookIdentityTests : CabinetPageTest
         {
             var scrollHeight = await page.EvaluateAsync<int>("() => document.documentElement.scrollHeight");
             await page.SetViewportSizeAsync(width, scrollHeight);
-            await page.WaitForFunctionAsync("() => [...document.images].every((image) => image.complete)");
+            await page.WaitForFunctionAsync("() => [...document.images].every((image) => image.complete)", null, new PageWaitForFunctionOptions { Timeout = LiveLookTests.FirstDrawTimeoutMs });
             await page.EvaluateAsync("() => document.fonts.ready");
             await page.EvaluateAsync("() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
             settled = scrollHeight == lastHeight ? settled + 1 : 0;
