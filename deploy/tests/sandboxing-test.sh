@@ -534,6 +534,51 @@ STUB_NFT_OUTPUT="$EGRESS_TABLE"
 check "selfcheck runs the egress check after the firewall check" "1" "$(file_has_line "$SELFCHECK" "  check_egress")"
 check "selfcheck runs the DNS check after the egress check" "1" "$(file_has_line "$SELFCHECK" "  check_dns")"
 
+check "selfcheck runs the IPv6 coverage check after the egress check" "1" \
+  "$(file_has_line "$SELFCHECK" "  check_egress_ipv6_coverage")"
+
+check "ipv6_groups expands a compressed address" "2001 0db8 0001 0000 0000 0000 0000 0001 " "$(ipv6_groups 2001:db8:1::1)"
+check "ipv6_groups expands a leading double colon" "0000 0000 0000 0000 0000 0000 0000 0001 " "$(ipv6_groups ::1)"
+check "ipv6_groups ignores a prefix length" "fc00 0000 0000 0000 0000 0000 0000 0000 " "$(ipv6_groups fc00::/7)"
+check "ipv6_groups rejects text that is not an address" "" "$(ipv6_groups not-an-address)"
+check "ipv6_groups rejects too many groups" "" "$(ipv6_groups 1:2:3:4:5:6:7:8:9)"
+check "an address inside a /64 is in range" "0" "$(ipv6_in_range 2001:db8:1:2::5 2001:db8:1:2::/64 && echo 0 || echo 1)"
+check "an address outside a /64 is not in range" "1" "$(ipv6_in_range 2001:db8:1:3::5 2001:db8:1:2::/64 && echo 0 || echo 1)"
+check "an address in a wider documentation block is in range of its /32" "0" "$(ipv6_in_range 2001:db8:3::1 2001:db8::/32 && echo 0 || echo 1)"
+check "a global address is not in fc00::/7" "1" "$(ipv6_in_range 2001:db8::1 fc00::/7 && echo 0 || echo 1)"
+check "a prefix that is not a multiple of sixteen bits is honoured" "0" "$(ipv6_in_range 2001:db8:0:7fff::1 2001:db8:0:7000::/52 && echo 0 || echo 1)"
+check "a prefix that is not a multiple of sixteen bits excludes what lies beyond it" "1" "$(ipv6_in_range 2001:db8:0:8000::1 2001:db8:0:7000::/52 && echo 0 || echo 1)"
+
+V6_TABLE=$'table inet cabinet_filter {\n\tchain output {\n\t\ttype filter hook output priority filter; policy accept;\n\t\tip daddr { 192.0.2.0/24 } counter packets 0 bytes 0 reject with icmpx admin-prohibited\n\t\tip6 daddr { fc00::/7, fe80::/10, 2001:db8:1::/48, 2001:db8:3::/48 } counter packets 0 bytes 0 reject with icmpx admin-prohibited\n\t}\n}'
+STUB_NFT_OUTPUT="$V6_TABLE"
+
+# shellcheck disable=SC2329 # replaces the selfcheck helper under test
+host_global_ipv6_addresses() { printf '%s\n' "$STUB_GLOBAL_IPV6"; }
+
+STUB_GLOBAL_IPV6=$'2001:db8:1:5::10\n2001:db8:3::10'
+run_selfcheck_function check_egress_ipv6_coverage
+check "ipv6 coverage passes when every global address is inside a blocked range" "1 0" "${RUN_PASSED} ${RUN_FAILED}"
+
+STUB_GLOBAL_IPV6=$'2001:db8:2:5::10\n2001:db8:3::10'
+run_selfcheck_function check_egress_ipv6_coverage
+check "ipv6 coverage fails when a global address is outside every blocked range" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "ipv6 coverage failure names the setting to change" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "CABINET_EGRESS_BLOCKED_RANGES6")"
+check "ipv6 coverage failure counts the uncovered addresses" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "1 of 2 global IPv6 addresses")"
+check "ipv6 coverage failure prints no address" "0" \
+  "$(count_lines_matching "${WORK_DIR}/run.out" -E '[0-9a-f]+:[0-9a-f:]+')"
+
+STUB_GLOBAL_IPV6=""
+run_selfcheck_function check_egress_ipv6_coverage
+check "ipv6 coverage passes when the host has no global IPv6 address" "1 0" "${RUN_PASSED} ${RUN_FAILED}"
+
+STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain output {\n\t\ttype filter hook output priority filter; policy accept;\n\t}\n}'
+STUB_GLOBAL_IPV6="2001:db8:1:5::10"
+run_selfcheck_function check_egress_ipv6_coverage
+check "ipv6 coverage fails when no IPv6 range is blocked and the host has a global address" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+STUB_NFT_OUTPUT="$EGRESS_TABLE"
+
 # shellcheck disable=SC2329 # replaces the selfcheck helper under test
 resolve_name() { return 0; }
 run_selfcheck_function check_dns

@@ -493,6 +493,110 @@ check_egress() {
   fi
 }
 
+### Prints the eight groups of IPv6 address $1 (a prefix length after a slash is ignored) as four-digit hex numbers
+### separated by spaces, or nothing when $1 is not an IPv6 address.
+ipv6_groups() {
+  local address="${1%%/*}" head tail group missing index
+  local -a front=() back=() all=()
+  address="${address,,}"
+  [[ "$address" =~ ^[0-9a-f:]+$ ]] || return 0
+  if [[ "$address" == *::* ]]; then
+    head="${address%%::*}"
+    tail="${address#*::}"
+    [[ "$tail" == *::* ]] && return 0
+    [[ -n "$head" ]] && IFS=: read -ra front <<<"$head"
+    [[ -n "$tail" ]] && IFS=: read -ra back <<<"$tail"
+    missing=$((8 - ${#front[@]} - ${#back[@]}))
+    ((missing >= 1)) || return 0
+    all=("${front[@]}")
+    for ((index = 0; index < missing; index++)); do
+      all+=(0)
+    done
+    all+=("${back[@]}")
+  else
+    IFS=: read -ra all <<<"$address"
+    ((${#all[@]} == 8)) || return 0
+  fi
+  for group in "${all[@]}"; do
+    [[ "$group" =~ ^[0-9a-f]{1,4}$ ]] || return 0
+    printf '%04x ' "$((16#$group))"
+  done
+}
+
+### Succeeds when IPv6 address $1 lies inside IPv6 range $2, written as an address and a prefix length.
+ipv6_in_range() {
+  local range="$2" prefix=128 index bits mask
+  local -a address_groups range_groups
+  [[ "$range" == */* ]] && prefix="${range#*/}"
+  [[ "$prefix" =~ ^[0-9]+$ ]] && ((prefix <= 128)) || return 1
+  read -ra address_groups <<<"$(ipv6_groups "$1")"
+  read -ra range_groups <<<"$(ipv6_groups "$range")"
+  ((${#address_groups[@]} == 8 && ${#range_groups[@]} == 8)) || return 1
+  for ((index = 0; index < 8; index++)); do
+    bits=$((prefix - index * 16))
+    if ((bits >= 16)); then
+      mask=$((0xffff))
+    elif ((bits <= 0)); then
+      mask=0
+    else
+      mask=$(((0xffff << (16 - bits)) & 0xffff))
+    fi
+    (((16#${address_groups[index]} & mask) == (16#${range_groups[index]} & mask))) || return 1
+  done
+}
+
+### Prints the global IPv6 addresses of this host, one per line, without any prefix length.
+host_global_ipv6_addresses() {
+  ip -6 -o addr show scope global 2>/dev/null | awk '{ split($4, parts, "/"); print parts[1] }'
+}
+
+### Prints the IPv6 destination ranges of the output chain's reject rule in nft ruleset listing $1, one per line.
+blocked_ipv6_ranges() {
+  local line set_pattern='ip6 daddr \{ ([^}]+) \}'
+  while IFS= read -r line; do
+    if [[ "$line" =~ $set_pattern && "$line" == *reject* ]]; then
+      tr ',' '\n' <<<"${BASH_REMATCH[1]}" | tr -d ' '
+    fi
+  done <<<"$(chain_body output "$1")"
+}
+
+###
+### Proves the IPv6 outbound block covers the network this host is on. The shipped
+### list holds only the private and link-local blocks, and a home network that has
+### IPv6 is usually reachable on a global prefix too, so every global address of
+### this host must lie inside one of the loaded blocked ranges. Prints how many
+### addresses are uncovered, never an address.
+###
+check_egress_ipv6_coverage() {
+  local ruleset address range covered uncovered=0 total=0
+  local -a ranges=()
+  if ! ruleset="$(nft list table inet cabinet_filter 2>&1)"; then
+    fail "could not read the firewall table cabinet_filter: ${ruleset}"
+    return
+  fi
+  mapfile -t ranges < <(blocked_ipv6_ranges "$ruleset")
+  while IFS= read -r address; do
+    [[ -n "$address" ]] || continue
+    total=$((total + 1))
+    covered=0
+    for range in "${ranges[@]}"; do
+      if ipv6_in_range "$address" "$range"; then
+        covered=1
+        break
+      fi
+    done
+    [[ "$covered" -eq 1 ]] || uncovered=$((uncovered + 1))
+  done <<<"$(host_global_ipv6_addresses)"
+
+  if [[ "$total" -eq 0 ]]; then
+    pass "this host has no global IPv6 address, so there is no IPv6 prefix to cover"
+  elif [[ "$uncovered" -eq 0 ]]; then
+    pass "every global IPv6 address of this host lies inside the blocked IPv6 ranges"
+  else
+    fail "${uncovered} of ${total} global IPv6 addresses of this host lie outside the blocked IPv6 ranges; add the network's prefix to CABINET_EGRESS_BLOCKED_RANGES6 in provision.conf and provision again"
+  fi
+}
+
 ### Succeeds when the name $1 resolves through the configured DNS.
 resolve_name() {
   getent ahosts "$1" >/dev/null 2>&1
@@ -692,6 +796,7 @@ main() {
   check_host_filter
   check_firewall
   check_egress
+  check_egress_ipv6_coverage
   check_dns
   check_health
   check_provisioning_current

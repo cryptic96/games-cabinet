@@ -144,6 +144,11 @@ connections that came in (the reverse proxy, SSH sessions), loopback, IPv6
 neighbour discovery and DNS to the configured resolvers stay open, and so does
 everything on the internet.
 
+The block applies to new connections only. A connection that was already open
+when the ruleset loaded keeps working until it closes, so a first provisioning
+run on a container that already talks to the home network is not fully in force
+until those connections end or the container restarts.
+
 Mind the order. Add the three `CABINET_EGRESS_*` keys to an existing
 `provision.conf` before re-running provisioning, because provisioning refuses
 an old file that lacks them. The example file lists the keys with a placeholder
@@ -346,6 +351,9 @@ This proves the host end to end and prints PASS or FAIL for each check:
   new connections to the blocked ranges: a connection to the first blocked
   network must be counted by the reject rule's own packet counter, and no
   address is printed;
+- every global IPv6 address of the container lies inside the blocked IPv6
+  ranges, so a home network reachable on its own global prefix is covered; the
+  check fails with a count, never an address, when the prefix is missing;
 - the application unit's resource limits match the loaded unit file, and sit
   below the container's own memory and cores;
 - names resolve through the configured resolvers;
