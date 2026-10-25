@@ -687,14 +687,14 @@ Plans:
   4. The container has CPU and memory caps sized from real image-processing and sync load, and a flood of requests slows the app without starving the other guests on the host.
   5. A go-public checklist (headers, rate limits, health not routed, BGG credit present, BGG terms re-read, no personal data in the repository) is completed, and only then does the router open the public route.
 
-**Plans:** 24 plans
+**Plans:** 3/24 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 08-01-PLAN.md — Tracer: per-client "sync now" limit, refused in the shape the page already explains
-- [ ] 08-02-PLAN.md — Container walls in the repo: unit caps and GC mode, outbound block, selfcheck checks
-- [ ] 08-03-PLAN.md — Scripted public route check (LAN or outside, headers, routes, noindex, credit, small sync-press burst)
+- [x] 08-01-PLAN.md — Tracer: per-client "sync now" limit, refused in the shape the page already explains
+- [x] 08-02-PLAN.md — Container walls in the repo: unit caps and GC mode, outbound block, selfcheck checks
+- [x] 08-03-PLAN.md — Scripted public route check (LAN or outside, headers, routes, noindex, credit, small sync-press burst)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -786,4 +786,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 6. Owner Tools & Persistence | 30/30 | Complete    | 2026-10-13 |
 | 6.1. Selectable Cabinet Finishes & Lighting (INSERTED) | 21/21 | Complete    | 2026-10-15 |
 | 7. Game-Night Filters & Location Cabinets | 47/47 | Complete    | 2026-10-19 |
-| 8. Public Hardening & Go-Public | 0/0 | Not started | - |
+| 8. Public Hardening & Go-Public | 3/24 | In Progress|  |
