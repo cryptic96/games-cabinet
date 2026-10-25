@@ -83,17 +83,16 @@ http:
           ipStrategy:
             ipv6Subnet: 64
 
-    # The application sends its own Content-Security-Policy with every
-    # response, so this middleware deliberately sets none: a second policy
-    # here would be combined with the application's and could block the page.
+    # The application sends its own Content-Security-Policy and the rest of
+    # the security headers with every response, and they are tested together
+    # with the page. The proxy adds only HSTS, because it is the one that
+    # terminates TLS. A header set in both places would be sent twice, and a
+    # second policy would be combined with the application's and could block
+    # the page. Do not add the preload flag: preload needs the apex domain,
+    # this is a sub-domain host, and a preload entry is slow to undo.
     cabinet-security-headers:
       headers:
         stsSeconds: 31536000
-        stsIncludeSubdomains: true
-        stsPreload: true
-        contentTypeNosniff: true
-        frameDeny: true
-        referrerPolicy: "strict-origin-when-cross-origin"
 
   routers:
     cabinet:

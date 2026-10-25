@@ -327,6 +327,17 @@ done
 for key in 'inFlightReq:' 'amount:' 'sourceCriterion:' 'ipStrategy:' 'ipv6Subnet: 64'; do
   assert_matches "traefik example: the in-flight limit sets ${key}" "$key" "$in_flight_block"
 done
+headers_block="$(traefik_middleware_block cabinet-security-headers)"
+assert_matches "traefik example: the proxy sets HSTS for one year" \
+  '^ +stsSeconds: 31536000$' "$headers_block"
+for key in stsPreload stsIncludeSubdomains contentTypeNosniff frameDeny referrerPolicy contentSecurityPolicy; do
+  assert_lacks "traefik example: the proxy's headers middleware leaves ${key} to the application" \
+    "$key" "$headers_block"
+done
+assert_eq "traefik example: the headers middleware sets exactly one key" \
+  "1" "$(grep -cE '^ {8}[A-Za-z]+:' <<<"$headers_block")"
+assert_eq "traefik example: both routers still list the security headers" \
+  "2" "$(grep -cE '^ +- cabinet-security-headers$' <<<"$routers_section")"
 assert_lacks "traefik example: no source criterion counts by hop depth" \
   '^ *depth:' "$traefik_example"
 assert_lacks "traefik example: no errors middleware styles the refusals" \
@@ -354,6 +365,12 @@ assert_matches "env example: documents the first owner range, commented out" \
   '^# *Owner__AllowedRanges__0=192\.0\.2\.0/24$' "$env_example"
 assert_matches "env example: documents the second owner range, commented out" \
   '^# *Owner__AllowedRanges__1=198\.51\.100\.0/24$' "$env_example"
+assert_matches "env example: lists the allowed hosts with the loopback entries, quoted" \
+  '^AllowedHosts="cabinet\.example\.com;owner\.example\.com;127\.0\.0\.1;localhost"$' "$env_example"
+assert_eq "env example: exactly one AllowedHosts line is active" \
+  "1" "$(grep -cE '^AllowedHosts=' <<<"$env_example")"
+assert_matches "env example: explains that loopback keeps the health check working" \
+  '^#.*health check' "$env_example"
 assert_lacks "env example: no owner setting is active" \
   '^(Kestrel__Endpoints__Owner|Owner__)' "$env_example"
 assert_matches "env example: says the known proxy must be the Traefik address" \
