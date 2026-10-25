@@ -212,6 +212,32 @@ version and commit, and finally shows that a copy of the archive with one
 byte changed is refused. It prints one PASS or FAIL line per check and exits 1
 on the first failure.
 
+`build/check-public-routes.sh` proves the public route the way a visitor
+reaches it, with the two hostnames in the environment and the vantage point
+stated:
+
+```bash
+CABINET_PUBLIC_HOST={public-hostname} CABINET_OWNER_HOST={owner-hostname} \
+  build/check-public-routes.sh --from-lan
+```
+
+Use `--from-lan` on the home network or VPN and `--from-outside` anywhere
+else; the owner hostname must answer `200` from the first and `403` from the
+second. It checks the redirect to HTTPS, the full set of security headers on a
+page and on a static file, that the health page and owner pages answer `404`
+on the public hostname, that the application, operations and owner ports
+answer nothing on it, the `noindex` request and the BoardGameGeek credit. It
+prints one PASS or FAIL line per check with labels and status codes only.
+
+Add `--burst` to also press "sync now" several times through one connection.
+The script sends 8 presses by default and refuses a requested count above 20
+(set `CABINET_BURST_COUNT` to change it). The application answers presses
+beyond 5 per 60 seconds with a `429`; the check passes when it sees that
+refusal. The first accepted press starts one real, cooldown-guarded sync and
+opens the shared cooldown window, so run the burst where that disturbs
+nothing. [The go-public checklist](go-public.md) says when to run each of
+these.
+
 ## Switching the owner tools on after a release
 
 A release never switches the owner tools on by itself: the owner endpoint and
@@ -240,6 +266,38 @@ firewall setup, prove the owner host two ways:
   address, and serves its home page without any `/owner` reference. It prints
   one PASS or FAIL line per check with status codes only; the hostnames are
   never printed and never written into the repository.
+
+## Host settings and a release
+
+Some settings live on the server rather than in a release, and a release can
+depend on one of them. Install the release first and the new version may fail
+its health check and roll back, or provisioning may refuse an old file. So the
+order is always:
+
+1. the env file keys (`/etc/cabinet/cabinet.env`), such as `AllowedHosts`;
+2. the `provision.conf` keys (`/etc/cabinet/provision.conf`), such as the
+   outbound block's three `CABINET_EGRESS_*` keys described in
+   [the container guide](lxc-setup.md#4-fill-in-provisionconf-and-run-again);
+3. the release;
+4. provisioning re-run from the active release
+   (`/opt/cabinet/current/deploy/provision.sh`);
+5. `cabinet-selfcheck`.
+
+Neither file is ever rewritten by a release or by provisioning. The settings
+below go in the env file; a value outside its range stops the service at
+start-up with a message that names the key.
+
+| Key | Default | Range | Meaning |
+| --- | --- | --- | --- |
+| `AllowedHosts` | `*` (everything) | semicolon-separated hostnames | The hostnames the site answers to. A request naming any other host gets a `400`. In production list the public hostname, the owner hostname, `127.0.0.1` and `localhost`, and quote the value because it contains semicolons. Loopback must stay in the list: the deploy health check and the selfcheck call the application on loopback, and without it a release fails its health check and rolls back. The live channel uses the same list, because it admits only pages whose origin is the host they were served from. |
+| `HostLimits__MaxConcurrentConnections` | `512` | 16 to 100000 | The most connections the server holds open at once. The ceiling applies to each listener separately, so the loopback operations listener keeps its own budget and the deploy health check still answers while the public listener is full. |
+| `HostLimits__MaxRequestBodyBytes` | `65536` | 1024 to 10485760 | The largest request body accepted. The one owner page that takes an uploaded owner-data file has a larger limit of its own. |
+| `HostLimits__RequestHeadersTimeoutSeconds` | `10` | 2 to 120 | How long a client may take to send its request headers, which turns away connections that open and then stall. |
+
+The per-client limits on "sync now" and on the live channel are in
+[the sync guide](bgg-sync.md). Every value listed here is a starting value
+that can be changed from the load you actually see. Opening the site to the
+public is covered by [the go-public checklist](go-public.md).
 
 ## Backing up owner data
 
