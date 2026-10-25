@@ -8,7 +8,8 @@ namespace Cabinet.Service.Limits;
 /// Counts presses of the sync button per client address in a fixed window. A refused press is answered the way the shared
 /// window answers one: 429 with a whole-second Retry-After and the outcome cooldown, but with no status object, so the page
 /// reads the Retry-After header and shows its existing sentence and button countdown. The refusal writes nothing to the
-/// log, because a flood would turn per-refusal lines into noise.
+/// log, because a flood would turn per-refusal lines into noise. The windows replenish lazily rather than on a timer of their
+/// own, so an address that has stopped pressing holds no timer and its window is dropped once it has expired.
 /// </summary>
 /// <param name="options">The press budget and the window it is counted in.</param>
 public sealed class SyncPressPolicy(ClientLimitOptions options) : IRateLimiterPolicy<string>
@@ -30,6 +31,7 @@ public sealed class SyncPressPolicy(ClientLimitOptions options) : IRateLimiterPo
                 PermitLimit = options.SyncPressesPerWindow,
                 Window = options.SyncWindow,
                 QueueLimit = 0,
+                AutoReplenishment = false,
             });
     }
 
