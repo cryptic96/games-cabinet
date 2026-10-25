@@ -181,3 +181,78 @@ Four lines were taken and kept in the session scratchpad only: owner data file (
 (hash of the sorted per-file hashes, 9 files), snapshot content projection and sync state projection (without start,
 finish and success times, last result and the shared window's end). A second reading right after the first was
 identical, so the projections are stable between syncs that change nothing.
+
+### Normal sync (restart, then one press on the container's own loopback)
+
+Sampled once a second from the unit's own cgroup counters (CPU time, memory current and peak, memory events, CPU and memory
+pressure). The unit's shipped limits were in force. A restart alone does not start a sync (the start-up sync only runs when
+the last success is older than the interval), so one press on the loopback started it.
+
+| Reading | Restart (start-up only) | The sync itself (about 7 s) |
+|---|---|---|
+| CPU used | 0.72 s | 1.08 s |
+| Highest one-second CPU share (of one core) | 0.37 | 0.37 |
+| Memory peak (unit's own `memory.peak`) | 48.6 MiB | 56.2 MiB |
+| Throttled periods and time | 6 periods, 0.11 s | 6 periods, 0.11 s |
+| `memory.events` change | none (high 0, max 0, oom 0, oom_kill 0) | none |
+| Swap used | 0 | 0 |
+| Memory pressure (`some`, 10 s average, highest) | 0.00 | 0.00 |
+| CPU pressure (`some`, 10 s average, highest) | 5.97 | 6.73 |
+| Result | | `unchanged` |
+
+### Picture rebuild (picture folder moved aside, two runs)
+
+Only the picture folder was moved aside; the unit was stopped for the move and started again. Run one was started by one
+press right after the shared ten-minute window of the normal sync ended, run two by one press right after the window of
+run one ended (ten minutes after run one's press, about eight and a half minutes after run one finished). `MemoryHigh` was never lifted; the high and max lines were not reached, so the
+repeat run with a lifted line was not needed and the unit's runtime properties were never changed.
+
+| Reading | Run one | Run two |
+|---|---|---|
+| Duration, press to finished | 102 s | 37 s |
+| Picture files missing in health, before to after | 138 to 36 | 36 to 0 |
+| Files in the picture folder, before to after | 2 to 156 | 156 to 209 |
+| CPU used | 13.62 s | 4.31 s |
+| Highest one-second CPU share (of one core) | 0.41 | 0.32 |
+| Memory peak (unit's own `memory.peak`, whole unit life at the end of the run) | 284.4 MiB | 314.1 MiB |
+| Throttled periods and time | 78 periods, 1.14 s | 23 periods, 0.34 s |
+| `memory.events` change | none | none |
+| Swap used | 0 | 0 |
+| Memory pressure (`some`, 10 s average, highest) | 0.00 | 0.00 |
+| CPU pressure (`some`, 10 s average, highest) | 9.42 | 9.68 |
+| Result | `unchanged` | `unchanged` |
+
+- The unit's memory peak after the second run read 314.1 MiB (`MemoryPeak` 329 347 072 bytes) against `MemoryHigh` 450 MiB
+  and `MemoryMax` 600 MiB: 136 MiB below the high line, 286 MiB below the max line. Run two fetched fewer pictures than run
+  one yet reached the higher peak, because the runtime's memory is not given back between runs (its own collector does not
+  size itself against the unit's limit, see the idle baseline). The peak is a whole-process figure that grows with the
+  work done since the start, not a per-run figure.
+- Health after run two: healthy, version 0.11.0, 0 pictures missing. The picture folder holds 209 files (baseline 212):
+  all 207 files that records reference are back, 2 files are not referenced by a record (the baseline had 5); the other
+  unreferenced files stayed in the moved-aside folder, which is exactly what the rebuild is expected to drop.
+- Disk: the new picture folder is 5.6 MiB, the moved-aside one 5.7 MiB.
+
+### Fingerprint after the rebuild: lines 1 and 2 differ, run stopped for a decision
+
+Taken with the same script as the baseline, after run two.
+
+| Line | Content | Result |
+|---|---|---|
+| 1 | owner data file (byte hash) | differs from the baseline |
+| 2 | owner data versions folder (hash of the sorted per-file hashes) | differs from the baseline |
+| 3 | snapshot content projection | matches the baseline |
+| 4 | sync state projection | matches the baseline |
+
+What the app's own log and the file times show (read-only; no values were opened):
+
+- At the start that followed the folder move (21:38 UTC) the app logged that it tidied the owner data (revision 48) and
+  then logged "Linked pictures: 1 stored, 0 not fetched". Both lines belong to the app's start-up and picture linking, not
+  to any command of this plan. The restart before the move (21:28 UTC) logged neither.
+- The owner data file was rewritten at that moment (same size, 21 137 bytes) and one new file appeared in the versions
+  folder (10 files now, 9 before). That new version file is byte-identical to the baseline owner data file: the app saved
+  the previous content as a version, then wrote the new one.
+- A structural comparison of the new owner data against the last earlier version shows two small value differences, one of
+  them a field that was empty and now holds a value, which is consistent with a stored picture link having been filled in.
+  That reading is an inference; the values were not displayed.
+- Nothing was restored and nothing was edited. The moved-aside picture folder was not deleted, because the plan removes it
+  only after the fingerprint matches. A person decides what happens to the owner data difference and to the backup folder.
