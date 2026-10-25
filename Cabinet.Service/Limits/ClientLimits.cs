@@ -157,11 +157,16 @@ public static class ClientLimits
         return services;
     }
 
-    /// <summary>Adds the limiter to the pipeline. Call it after the forwarded headers and after routing.</summary>
+    /// <summary>
+    /// Adds the live origin guard and then the limiter to the pipeline, so a page from another site is turned away before it
+    /// can spend any client address's budget. Call it after the forwarded headers and after routing.
+    /// </summary>
     /// <param name="app">The pipeline to add to.</param>
     public static IApplicationBuilder UseCabinetClientLimits(this IApplicationBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
+
+        app.UseLiveOriginGuard();
 
         return app.UseRateLimiter();
     }
