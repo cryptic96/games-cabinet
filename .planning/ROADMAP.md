@@ -687,7 +687,7 @@ Plans:
   4. The container has CPU and memory caps sized from real image-processing and sync load, and a flood of requests slows the app without starving the other guests on the host.
   5. A go-public checklist (headers, rate limits, health not routed, BGG credit present, BGG terms re-read, no personal data in the repository) is completed, and only then does the router open the public route.
 
-**Plans:** 3/24 plans executed
+**Plans:** 6/24 plans executed
 
 Plans:
 **Wave 1**
@@ -698,9 +698,9 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 08-05-PLAN.md — Live channel per-client caps (both transports), negotiate window, origin allow-list; AR-03-02/03 closed
-- [ ] 08-06-PLAN.md — Traefik example outer wall on the public router only, HSTS-only headers, AllowedHosts in the env example
-- [ ] 08-07-PLAN.md — Host filtering proven, validated Kestrel limits, runtime memory report
+- [x] 08-05-PLAN.md — Live channel per-client caps (both transports), negotiate window, origin allow-list; AR-03-02/03 closed
+- [x] 08-06-PLAN.md — Traefik example outer wall on the public router only, HSTS-only headers, AllowedHosts in the env example
+- [x] 08-07-PLAN.md — Host filtering proven, validated Kestrel limits, runtime memory report
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -786,4 +786,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 6. Owner Tools & Persistence | 30/30 | Complete    | 2026-10-13 |
 | 6.1. Selectable Cabinet Finishes & Lighting (INSERTED) | 21/21 | Complete    | 2026-10-15 |
 | 7. Game-Night Filters & Location Cabinets | 47/47 | Complete    | 2026-10-19 |
-| 8. Public Hardening & Go-Public | 3/24 | In Progress|  |
+| 8. Public Hardening & Go-Public | 6/24 | In Progress|  |
