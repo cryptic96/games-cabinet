@@ -81,7 +81,7 @@ actuals:
 
 **2. [Rule 3 - Blocking] Test fixtures tripped the repository's own secret scan**
 - **Found during:** Task 2 (lint run)
-- **Issue:** negative test values such as a malformed `10.0.0.0/33` range and `fc00::1::2/64` matched the private-range gitleaks rules.
+- **Issue:** negative test values (a malformed private IPv4 range and a malformed unique-local IPv6 range) matched the private-range gitleaks rules.
 - **Fix:** malformed examples use documentation prefixes (`192.0.2.0/33`, `2001:db8::1::2/64`, `2001:db8:::1/64`).
 - **Files modified:** `deploy/tests/render-templates-test.sh`, `deploy/tests/provision-logic-test.sh`
 - **Commit:** `d5e9402`
