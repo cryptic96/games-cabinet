@@ -20,8 +20,8 @@ public sealed class FilterKeyboardTests : CabinetPageTest
     private const string TabStops = Boxes + "[tabindex=\"0\"]";
     private const string OpenCard = "dialog.card-dialog[open]";
     private const string NoMatchQuery = "zzzzqxqx";
-    private const string ProbeScript = "(q) => { const field = document.getElementById('filter-q'); field.value = q; field.dispatchEvent(new Event('input', { bubbles: true })); const read = (box) => { const r = box.getBoundingClientRect(); return { key: box.dataset.entryId + '|' + box.dataset.kind, shelf: box.dataset.shelf ?? '', left: r.left, top: r.top, right: r.right, bottom: r.bottom }; }; const all = [...document.querySelectorAll('#cabinet .placement')]; return JSON.stringify({ lit: all.filter((box) => !box.hasAttribute('data-dim')).map(read), dim: all.filter((box) => box.hasAttribute('data-dim')).map(read) }); }";
-    private const string LitInReadingOrderScript = "() => { const lit = [...document.querySelectorAll('#cabinet .placement:not([data-dim])')].map((box) => { const r = box.getBoundingClientRect(); return { key: box.dataset.entryId + '|' + box.dataset.kind, left: r.left, top: r.top }; }); lit.sort((a, b) => a.top - b.top || a.left - b.left); const rows = []; let row = []; let rowTop = 0; for (const item of lit) { if (row.length > 0 && item.top > rowTop + 2) { rows.push(row); row = []; } if (row.length === 0) { rowTop = item.top; } row.push(item); } if (row.length > 0) { rows.push(row); } return rows.flatMap((one) => one.sort((a, b) => a.left - b.left)).map((item) => item.key); }";
+    private const string ProbeScript = "(q) => { const field = document.getElementById('filter-q'); field.value = q; field.dispatchEvent(new Event('input', { bubbles: true })); const read = (box) => { const r = box.getBoundingClientRect(); const cubby = box.closest('.cubby'); return { key: box.dataset.entryId + '|' + box.dataset.kind, shelf: box.dataset.shelf ?? '', left: r.left, top: r.top, right: r.right, bottom: r.bottom, shelfTop: cubby === null ? r.top : cubby.getBoundingClientRect().top }; }; const all = [...document.querySelectorAll('#cabinet .placement')]; return JSON.stringify({ lit: all.filter((box) => !box.hasAttribute('data-dim')).map(read), dim: all.filter((box) => box.hasAttribute('data-dim')).map(read) }); }";
+    private const string LitInReadingOrderScript = "() => { const lit = [...document.querySelectorAll('#cabinet .placement:not([data-dim])')].map((box) => { const r = box.getBoundingClientRect(); const cubby = box.closest('.cubby'); return { key: box.dataset.entryId + '|' + box.dataset.kind, left: r.left, top: r.top, shelfTop: cubby === null ? r.top : cubby.getBoundingClientRect().top }; }); lit.sort((a, b) => a.shelfTop - b.shelfTop || a.left - b.left || a.top - b.top); const rows = []; let row = []; let rowTop = 0; for (const item of lit) { if (row.length > 0 && item.shelfTop > rowTop + 2) { rows.push(row); row = []; } if (row.length === 0) { rowTop = item.shelfTop; } row.push(item); } if (row.length > 0) { rows.push(row); } return rows.flatMap((one) => one.sort((a, b) => a.left - b.left || a.top - b.top)).map((item) => item.key); }";
     private const string FocusedScript = "(() => { const e = document.activeElement; return { isBox: e.classList.contains('placement'), isDim: e.hasAttribute('data-dim'), key: (e.dataset.entryId ?? '') + '|' + (e.dataset.kind ?? '') }; })()";
     private const string TabStopScript = "(() => [...document.querySelectorAll('#cabinet .placement[tabindex=\"0\"]')].map((box) => box.dataset.entryId + '|' + box.dataset.kind + '|' + (box.hasAttribute('data-dim') ? 'dim' : 'lit')))()";
     private static readonly Dictionary<string, string?> PrototypeOn = new() { ["Prototype:Enabled"] = "true" };
@@ -40,6 +40,8 @@ public sealed class FilterKeyboardTests : CabinetPageTest
         public double Right { get; set; }
 
         public double Bottom { get; set; }
+
+        public double ShelfTop { get; set; }
     }
 
     private sealed class Probe
@@ -152,6 +154,26 @@ public sealed class FilterKeyboardTests : CabinetPageTest
         var firstMatch = (await ReadingOrderAsync())[0];
         firstMatch.Should().NotBe(moved.Key);
         (await TabIntoTheCabinetAsync()).Should().Be(firstMatch);
+        ConsoleErrors.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Tab_Home_and_End_read_a_shelf_left_to_right_when_its_boxes_differ_in_height()
+    {
+        var probes = await ProbeAllAsync();
+        var query = probes.First(candidate => candidate.Value.Lit.Count >= 2 && candidate.Value.Dim.Count >= 1 && TallerMatchRightOfTheFirst(candidate.Value.Lit)).Key;
+        var leftmost = FirstInReadingOrder(probes[query].Lit);
+
+        await Page.Locator(Field).FillAsync(query);
+        await Expect(Page.Locator(Boxes + "[data-dim]").First).ToBeAttachedAsync();
+        var order = await ReadingOrderAsync();
+        order[0].Should().Be(leftmost);
+
+        (await TabIntoTheCabinetAsync()).Should().Be(leftmost, "the first match is the leftmost one on the first shelf, however tall the others stand");
+        await Page.Keyboard.PressAsync("End");
+        (await FocusedAsync()).Key.Should().Be(order[^1]);
+        await Page.Keyboard.PressAsync("Home");
+        (await FocusedAsync()).Key.Should().Be(leftmost);
         ConsoleErrors.Should().BeEmpty();
     }
 
@@ -275,9 +297,9 @@ public sealed class FilterKeyboardTests : CabinetPageTest
         var row = new List<Rect>();
         var rowTop = 0.0;
 
-        foreach (var item in lit.OrderBy(box => box.Top).ThenBy(box => box.Left))
+        foreach (var item in lit.OrderBy(box => box.ShelfTop).ThenBy(box => box.Left).ThenBy(box => box.Top))
         {
-            if (row.Count > 0 && item.Top > rowTop + 2)
+            if (row.Count > 0 && item.ShelfTop > rowTop + 2)
             {
                 rows.Add(row);
                 row = [];
@@ -285,7 +307,7 @@ public sealed class FilterKeyboardTests : CabinetPageTest
 
             if (row.Count == 0)
             {
-                rowTop = item.Top;
+                rowTop = item.ShelfTop;
             }
 
             row.Add(item);
@@ -293,7 +315,19 @@ public sealed class FilterKeyboardTests : CabinetPageTest
 
         rows.Add(row);
 
-        return rows[0].OrderBy(box => box.Left).First().Key;
+        return rows[0].OrderBy(box => box.Left).ThenBy(box => box.Top).First().Key;
+    }
+
+    /// <summary>
+    /// Tells whether the first shelf that holds a match also holds, further right, a match that stands taller than the leftmost one,
+    /// which is where ordering by each box's own top edge and ordering by shelf part ways.
+    /// </summary>
+    private static bool TallerMatchRightOfTheFirst(List<Rect> lit)
+    {
+        var top = lit.Min(box => box.ShelfTop);
+        var shelf = lit.Where(box => box.ShelfTop <= top + 2).OrderBy(box => box.Left).ToList();
+
+        return shelf.Skip(1).Any(box => box.Top < shelf[0].Top - 2);
     }
 
     private static ShadowCase FindShadowCase(Dictionary<string, Probe> probes)

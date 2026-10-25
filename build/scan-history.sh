@@ -223,11 +223,14 @@ check_noreply_identities() {
 
 check_absolute_paths() {
   local findings=() commit hit hit_path line position
+  # The folder after the root must start the way a user or volume name does
+  # (a letter, digit or underscore), so an elided example such as /home/.../ or
+  # a regex alternation such as /home/|/mnt/ in notes is not reported as a path.
   local patterns=(
-    -e '/hom[e]/[^/[:space:]]+/'
-    -e '/mn[t]/[^/[:space:]]+/'
-    -e '/medi[a]/[^/[:space:]]+/'
-    -e '/User[s]/[^/[:space:]]+/'
+    -e '/hom[e]/[A-Za-z0-9_][^/[:space:]]*/'
+    -e '/mn[t]/[A-Za-z0-9_][^/[:space:]]*/'
+    -e '/medi[a]/[A-Za-z0-9_][^/[:space:]]*/'
+    -e '/User[s]/[A-Za-z0-9_][^/[:space:]]*/'
     -e '[A-Za-z]:[\\]User[s][\\]'
   )
   for commit in "${COMMITS[@]}"; do

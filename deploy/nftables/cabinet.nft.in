@@ -8,6 +8,15 @@
 ### inbound connection is dropped before it reaches any service. The operations listener binds to
 ### loopback only and has no rule here.
 ###
+### The output chain keeps the internet open but refuses new connections to
+### the home network: after loopback, replies (established traffic, so the
+### reverse proxy and SSH sessions keep working), ICMPv6 and DNS to the
+### configured resolvers, every new connection to the configured private,
+### shared and link-local ranges is rejected at once. Reject rather than drop,
+### so a mistaken block fails visibly instead of hanging until a timeout. There
+### is no time-protocol exception: the container runs no time daemon and takes
+### its clock from the host.
+###
 flush ruleset
 
 table inet cabinet_filter {
@@ -32,5 +41,15 @@ table inet cabinet_filter {
 
   chain output {
     type filter hook output priority 0; policy accept;
+
+    oif lo accept
+    ct state established,related accept
+    meta l4proto ipv6-icmp accept
+
+    ip daddr { @CABINET_EGRESS_RESOLVERS@ } udp dport 53 accept
+    ip daddr { @CABINET_EGRESS_RESOLVERS@ } tcp dport 53 accept
+
+    ip daddr { @CABINET_EGRESS_BLOCKED_RANGES@ } counter reject with icmpx type admin-prohibited
+    ip6 daddr { @CABINET_EGRESS_BLOCKED_RANGES6@ } counter reject with icmpx type admin-prohibited
   }
 }

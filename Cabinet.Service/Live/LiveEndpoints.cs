@@ -1,4 +1,5 @@
 using System.Globalization;
+using Cabinet.Service.Limits;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 
@@ -49,7 +50,8 @@ public static class LiveSettings
 
 /// <summary>
 /// Registers and maps the live channel: a hub that only broadcasts, over WebSockets or Server-Sent Events, with a cap on
-/// open connections and small message and buffer sizes for a low-power host that faces the internet.
+/// open connections for the whole site, a cap and a connect window for each client address, and small message and buffer
+/// sizes for a low-power host that faces the internet.
 /// </summary>
 public static class LiveEndpoints
 {
@@ -89,7 +91,10 @@ public static class LiveEndpoints
         return services;
     }
 
-    /// <summary>Maps the hub on WebSockets and Server-Sent Events only; long polling is not offered.</summary>
+    /// <summary>
+    /// Maps the hub on WebSockets and Server-Sent Events only; long polling is not offered. The per-client live policy is
+    /// attached to the hub's own endpoint builder, so it covers the negotiate route and the connect route alike.
+    /// </summary>
     public static IEndpointRouteBuilder MapCabinetLive(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
@@ -99,7 +104,7 @@ public static class LiveEndpoints
             connection.Transports = HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents;
             connection.ApplicationMaxBufferSize = ApplicationBufferBytes;
             connection.TransportMaxBufferSize = TransportBufferBytes;
-        });
+        }).RequireRateLimiting(ClientLimits.LiveConnectPolicyName);
 
         return endpoints;
     }

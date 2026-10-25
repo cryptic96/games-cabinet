@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 07
-current_phase_name: Game-Night Filters & Location Cabinets
+current_phase: 08
+current_phase_name: public-hardening-go-public
 status: executing
-stopped_at: Phase 7 UI-SPEC approved
-last_updated: "2026-10-16T07:06:29.401Z"
-last_activity: 2026-10-16
-last_activity_desc: Phase 07 execution started
+stopped_at: Phase 8 context gathered
+last_updated: "2026-10-25T12:44:44.939Z"
+last_activity: 2026-10-25
+last_activity_desc: Phase 08 execution started
 progress:
-  total_phases: 8
-  completed_phases: 7
-  total_plans: 163
-  completed_plans: 129
+  total_phases: 9
+  completed_phases: 8
+  total_plans: 200
+  completed_plans: 176
 ---
 
 # Project State
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-13)
 
 **Core value:** Anyone with the link sees an up-to-date, good-looking cabinet of exactly the games the owner owns on BGG, with no manual data entry in the app.
-**Current focus:** Phase 07 — Game-Night Filters & Location Cabinets
+**Current focus:** Phase 08 — public-hardening-go-public
 
 ## Current Position
 
-Phase: 07 (Game-Night Filters & Location Cabinets) — EXECUTING
-Plan: 1 of 34
-Status: Executing Phase 07
-Last activity: 2026-10-16 — Phase 07 execution started
+Phase: 08 (public-hardening-go-public) — EXECUTING
+Plan: 1 of 24
+Status: Executing Phase 08
+Last activity: 2026-10-25 — Phase 08 execution started
 
 Progress: [██████████] 100%
 
@@ -38,7 +38,7 @@ Progress: [██████████] 100%
 
 **Velocity:**
 
-- Total plans completed: 129
+- Total plans completed: 176
 - Average duration: - min
 - Total execution time: 0.0 hours
 
@@ -53,6 +53,7 @@ Progress: [██████████] 100%
 | 05 | 16 | - | - |
 | 06 | 30 | - | - |
 | 6.1 | 21 | - | - |
+| 07 | 47 | - | - |
 
 **Recent Trend:**
 
@@ -114,6 +115,7 @@ Recent decisions affecting current work:
 | 261004-vqo | Make out-of-date provisioning visible on the server (poll warning + selfcheck per-file check) | 2026-10-04 | fa25c8f | [261004-vqo-make-out-of-date-provisioning-visible-on](./quick/261004-vqo-make-out-of-date-provisioning-visible-on/) |
 | 2 | Move CI and release workflows to ubuntu-26.04 (actionlint label config added) | 2026-10-06 | 7d802a1 | — |
 | 3 | Fix flaky port race in integration tests (retry host start on fresh ports) | 2026-10-06 | 3376015 | — |
+| 261019-nyb | Fix the phase 7 code review product warnings (WR-A01 to WR-A04, WR-B01 in part, WR-B02; WR-C01 rejected with a code note) | 2026-10-19 | e1d2b4c | [261019-nyb-fix-phase-7-review-product-warnings](./quick/261019-nyb-fix-phase-7-review-product-warnings/) |
 
 ### Roadmap Evolution
 
@@ -129,6 +131,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-15T19:03:33.589Z
-Stopped at: Phase 7 UI-SPEC approved
-Resume file: .planning/phases/07-game-night-filters-location-cabinets/07-UI-SPEC.md
+Last session: 2026-10-20T06:11:05.773Z
+Stopped at: Phase 8 context gathered
+Resume file: .planning/phases/08-public-hardening-go-public/08-CONTEXT.md

@@ -5,6 +5,7 @@ using Cabinet.Repository.Bgg;
 using Cabinet.Repository.Images;
 using Cabinet.Repository.Storage;
 using Cabinet.Service.Collection;
+using Cabinet.Service.Limits;
 using Cabinet.Service.Owner;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -146,13 +147,15 @@ public static class SyncEndpoints
 
     /// <summary>
     /// Maps the route that asks for a sync, which answers 202 when one starts, 409 when one is already running and 429 with
-    /// a Retry-After header inside the shared window, and the route that reports the state of the sync.
+    /// a Retry-After header inside the shared window, and the route that reports the state of the sync. The press route also
+    /// has a limit per client address, which refuses an over-eager client with the same 429 and no status before the
+    /// handler runs; the status route is never limited.
     /// </summary>
     public static IEndpointRouteBuilder MapCabinetSync(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
-        endpoints.MapPost(SyncRoute, Handle);
+        endpoints.MapPost(SyncRoute, Handle).RequireRateLimiting(ClientLimits.SyncPressPolicyName);
         endpoints.MapGet(StatusRoute, ReadStatus);
 
         return endpoints;

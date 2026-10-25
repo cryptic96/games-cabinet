@@ -135,6 +135,7 @@ public sealed class LiveLookTests : CabinetPageTest
     private static readonly Regex DarkLogo = new(@"/img/powered-by-bgg-dark\.[^/]*svg", RegexOptions.None, TimeSpan.FromSeconds(1));
     private readonly TemporaryDirectory _storage = new();
     private readonly FakeTimeProvider _clock =SyncHarness.NewClock();
+    private CabinetWebApplicationFactory? _host;
 
     /// <summary>Makes the browser read the clock in a Central European zone, which has summer time.</summary>
     public override BrowserNewContextOptions ContextOptions()
@@ -237,7 +238,7 @@ public sealed class LiveLookTests : CabinetPageTest
         await Page.RouteAsync("**/cabinet/live**", route => route.AbortAsync());
         await StartCabinetAsync(waitForLiveChannel: false);
 
-        await PublishAsync(("wood", "oak"));
+        await PublishWithoutLiveChannelAsync(("wood", "oak"));
         await Task.Delay(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
 
         await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-wood", "brown");
@@ -247,7 +248,7 @@ public sealed class LiveLookTests : CabinetPageTest
 
         await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-wood", "oak", new() { Timeout = FollowTimeoutMs });
 
-        await PublishAsync(("wood", "mahogany"));
+        await PublishWithoutLiveChannelAsync(("wood", "mahogany"));
         await Page.ReloadAsync();
 
         await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-wood", "mahogany");
@@ -295,8 +296,7 @@ public sealed class LiveLookTests : CabinetPageTest
         await Expect(Page.Locator(OpenCard)).ToBeVisibleAsync();
         await Expect(Page.Locator("html[data-pull-kind]")).ToHaveCountAsync(1);
 
-        await PublishAsync(("wood", "oak"));
-        await Task.Delay(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+        await PublishUntilTheNextPushIsHeardAsync(("wood", "oak"));
 
         await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-wood", "brown");
         await Expect(Page.Locator("html[data-pull-kind]")).ToHaveCountAsync(1);
@@ -343,11 +343,12 @@ public sealed class LiveLookTests : CabinetPageTest
             bgg.Handler,
             _clock,
             new Dictionary<string, string?> { ["Storage:Directory"] = _storage.FullPath });
-        await StartAsync(factory);
+        _host = await StartAsync(factory);
         using var client = factory.CreatePublicClient();
         await SyncRounds.PressAndWait(client, _clock, advance: false);
         await Page.SetViewportSizeAsync(1440, 900);
         await Page.AddInitScriptAsync(TransitionSpy);
+        await Page.AddInitScriptAsync(LiveHearing.Spy);
 
         if (browserTime is not null)
         {
@@ -363,7 +364,46 @@ public sealed class LiveLookTests : CabinetPageTest
         }
     }
 
+    /// <summary>
+    /// Saves the choices for everyone on the owner page, after the page has proven it hears the live channel, and lets the quiet
+    /// period pass until the page shows every choice.
+    /// </summary>
+    /// <param name="choices">The look fields to set and the value of each.</param>
     private async Task PublishAsync(params (string Field, string Value)[] choices)
+    {
+        var shown = string.Join(" && ", choices.Select(choice => $"document.documentElement.getAttribute('data-{choice.Field}') === '{choice.Value}'"));
+
+        await LiveHearing.WaitUntilThePageHearsAPushAsync(Page, ServingServices);
+        await SaveForEveryoneAsync(choices);
+        await LiveHearing.LetTheQuietPeriodPassUntilAsync(Page, _clock, $"() => {shown}");
+    }
+
+    /// <summary>
+    /// Saves the choices for everyone for a page that is meant to hold the look back, and lets the quiet period pass until the page
+    /// has heard one more push, which is the only thing there is to wait for while the page leaves the look unapplied.
+    /// </summary>
+    /// <param name="choices">The look fields to set and the value of each.</param>
+    private async Task PublishUntilTheNextPushIsHeardAsync(params (string Field, string Value)[] choices)
+    {
+        await LiveHearing.WaitUntilThePageHearsAPushAsync(Page, ServingServices);
+        var heard = await Page.EvaluateAsync<int>(LiveHearing.HeardCountScript);
+        await SaveForEveryoneAsync(choices);
+        await LiveHearing.LetTheQuietPeriodPassUntilAsync(Page, _clock, $"() => window.__live.heard > {heard}");
+    }
+
+    /// <summary>
+    /// Saves the choices for everyone for a page whose live channel is blocked, so nothing can be heard: the quiet period passes once.
+    /// </summary>
+    /// <param name="choices">The look fields to set and the value of each.</param>
+    private async Task PublishWithoutLiveChannelAsync(params (string Field, string Value)[] choices)
+    {
+        await SaveForEveryoneAsync(choices);
+        _clock.Advance(OwnerChangeNotifier.QuietPeriod);
+    }
+
+    private IServiceProvider ServingServices => (_host ?? throw new InvalidOperationException("Start the cabinet first.")).ServingServices;
+
+    private async Task SaveForEveryoneAsync((string Field, string Value)[] choices)
     {
         var owner = await Page.Context.NewPageAsync();
 
@@ -379,7 +419,6 @@ public sealed class LiveLookTests : CabinetPageTest
 
             await owner.GetByRole(AriaRole.Button, new() { Name = "Use for everyone" }).ClickAsync();
             await Assertions.Expect(owner.Locator("#finish-status")).ToContainTextAsync(SavedText);
-            _clock.Advance(OwnerChangeNotifier.QuietPeriod);
         }
         finally
         {

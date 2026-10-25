@@ -22,7 +22,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: Game Detail, Accessibility & Language** - Pull-out animation, detail card, keyboard and screen-reader access, English and Dutch labels (completed 2026-10-12)
 - [x] **Phase 6: Owner Tools & Persistence** - Home/VPN-only image overrides (and location editing if needed), persisted and backed up (completed 2026-10-13)
 - [x] **Phase 6.1: Selectable Cabinet Finishes & Lighting** (INSERTED) - Seven owner-chosen finishes with their walls, lit cubbies with an optional day-and-night mode, and cubby depth (completed 2026-10-15)
-- [ ] **Phase 7: Game-Night Filters & Location Cabinets** - Dim-to-filter search and a per-location cabinet toggle
+- [x] **Phase 7: Game-Night Filters & Location Cabinets** - Dim-to-filter search and a per-location cabinet toggle (completed 2026-10-19)
 - [ ] **Phase 8: Public Hardening & Go-Public** - HTTPS exposure through Traefik with rate limits, headers, resource caps and a go-public checklist
 
 ## Phase Details
@@ -545,7 +545,7 @@ Plans:
   4. Every game's storage location is visible to every visitor, whether it was read from BGG or entered by the owner.
   5. A visitor can toggle between one big cabinet and one cabinet per storage location, with games that have no location placed in an "Unknown location" cabinet.
 
-**Plans:** 44/47 plans executed
+**Plans:** 47/47 plans complete
 
 Plans:
 **Wave 1**
@@ -660,15 +660,15 @@ Plans:
 
 **Wave 24** *(blocked on Wave 23 completion)*
 
-- [ ] 07-46-PLAN.md — Release v0.10.0 (provisional), part one: pull request, the owner's merge and tag, and a verified draft (owner-gated)
+- [x] 07-46-PLAN.md — Release v0.10.0 (provisional), part one: pull request, the owner's merge and tag, and a verified draft (owner-gated)
 
 **Wave 25** *(blocked on Wave 24 completion)*
 
-- [ ] 07-47-PLAN.md — Release v0.10.0 (provisional), part two: the owner publishes the verified draft, and the container runs it (owner-gated)
+- [x] 07-47-PLAN.md — Release v0.10.0 (provisional), part two: the owner publishes the verified draft, and the container runs it (owner-gated)
 
 **Wave 26** *(blocked on Wave 25 completion)*
 
-- [ ] 07-34-PLAN.md — The device round on the deployed release (owner-gated; moved last, runs on the rail-and-panel release)
+- [x] 07-34-PLAN.md — The device round on the deployed release (owner-gated; moved last, runs on the rail-and-panel release)
 
 **UI hint**: yes
 
@@ -687,7 +687,89 @@ Plans:
   4. The container has CPU and memory caps sized from real image-processing and sync load, and a flood of requests slows the app without starving the other guests on the host.
   5. A go-public checklist (headers, rate limits, health not routed, BGG credit present, BGG terms re-read, no personal data in the repository) is completed, and only then does the router open the public route.
 
-**Plans**: TBD
+**Plans:** 10/24 plans executed
+
+Plans:
+**Wave 1**
+
+- [x] 08-01-PLAN.md — Tracer: per-client "sync now" limit, refused in the shape the page already explains
+- [x] 08-02-PLAN.md — Container walls in the repo: unit caps and GC mode, outbound block, selfcheck checks
+- [x] 08-03-PLAN.md — Scripted public route check (LAN or outside, headers, routes, noindex, credit, small sync-press burst)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 08-05-PLAN.md — Live channel per-client caps (both transports), negotiate window, origin allow-list; AR-03-02/03 closed
+- [x] 08-06-PLAN.md — Traefik example outer wall on the public router only, HSTS-only headers, AllowedHosts in the env example
+- [x] 08-07-PLAN.md — Host filtering proven, validated Kestrel limits, runtime memory report
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 08-08-PLAN.md — Full security-header set from the app, header matrix, clean console in Chromium and WebKit, credit in every state
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [x] 08-04-PLAN.md — Flaky browser tests, part one: live-channel waits and the sample-400 first draw
+- [x] 08-10-PLAN.md — docs/go-public.md checklist and the hardening in the setup, deploy and settings docs
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [x] 08-09-PLAN.md — Flaky browser tests, part two: card closes, back button, sheet; todo closed
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 08-11-PLAN.md — Measurement release (0.x), part one: PR, owner's merge and tag, verified draft
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 08-12-PLAN.md — Measurement release, part two: host list first, deploy, provisioning, outbound block proven
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [ ] 08-13-PLAN.md — First visit and live connection cost measured; owner approves the exact proxy diff; outer wall applied
+
+**Wave 9** *(blocked on Wave 8 completion)*
+
+- [ ] 08-14-PLAN.md — Sync and full picture rebuild peaks (owner's go), cap proposal
+
+**Wave 10** *(blocked on Wave 9 completion)*
+
+- [ ] 08-15-PLAN.md — Owner sets container caps; controlled flood twice from the proxy (owner's go), verdict table per flood
+
+**Wave 11** *(blocked on Wave 10 completion)*
+
+- [ ] 08-16-PLAN.md — Sizing review and the owner's decision (host graph read; approve only with every verdict row PASS)
+
+**Wave 12** *(blocked on Wave 11 completion)*
+
+- [ ] 08-17-PLAN.md — Decided limits written into the repository; sizing todo closed
+
+**Wave 13** *(blocked on Wave 12 completion)*
+
+- [ ] 08-18-PLAN.md — v1.0.0 part one: one-way decision, merge, tag, verified draft
+
+**Wave 14** *(blocked on Wave 13 completion)*
+
+- [ ] 08-19-PLAN.md — v1.0.0 part two: deploy, provisioning, proxy at decided numbers, LAN-route proof
+
+**Wave 15** *(blocked on Wave 14 completion)*
+
+- [ ] 08-20-PLAN.md — Verification flood on v1.0.0 (owner's go)
+
+**Wave 16** *(blocked on Wave 15 completion)*
+
+- [ ] 08-21-PLAN.md — Checklist filled, BGG terms re-read, proxy SSH restricted, AR-08/AR-06-05 re-accepted (review 90 days after go-public)
+
+**Wave 17** *(blocked on Wave 16 completion)*
+
+- [ ] 08-22-PLAN.md — Go: owner signs off, public router opens (owner router untouched), SSL Labs/Observatory/securityheaders scans, review date set
+
+**Wave 18** *(blocked on Wave 17 completion)*
+
+- [ ] 08-23-PLAN.md — Phone probe from mobile data (close again at once on failure), real client address
+
+**Wave 19** *(blocked on Wave 18 completion)*
+
+- [ ] 08-24-PLAN.md — Owner locks the maintenance keys; Claude verifies the lock without a passphrase
 
 ## Progress
 
@@ -703,5 +785,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. Game Detail, Accessibility & Language | 16/16 | Complete    | 2026-10-12 |
 | 6. Owner Tools & Persistence | 30/30 | Complete    | 2026-10-13 |
 | 6.1. Selectable Cabinet Finishes & Lighting (INSERTED) | 21/21 | Complete    | 2026-10-15 |
-| 7. Game-Night Filters & Location Cabinets | 44/47 | In Progress|  |
-| 8. Public Hardening & Go-Public | 0/0 | Not started | - |
+| 7. Game-Night Filters & Location Cabinets | 47/47 | Complete    | 2026-10-19 |
+| 8. Public Hardening & Go-Public | 10/24 | In Progress|  |

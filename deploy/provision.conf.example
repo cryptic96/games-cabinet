@@ -14,3 +14,17 @@ CABINET_ADMIN_SSH_SOURCES=CHANGE-ME
 
 # owner/name of the public GitHub repository releases are pulled from.
 CABINET_GITHUB_REPO=cryptic96/games-cabinet
+
+# The address, or comma-separated addresses, the container's DNS queries go
+# to, as resolvectl status or /etc/resolv.conf shows them. DNS to these stays
+# open while new connections to the blocked ranges below are refused.
+CABINET_EGRESS_RESOLVERS=CHANGE-ME
+
+# IPv4 ranges the container may not open new connections to: the private,
+# shared and link-local blocks, which cover the home network and the common
+# VPN range. Comma-separated CIDR list.
+CABINET_EGRESS_BLOCKED_RANGES=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10,169.254.0.0/16
+
+# The same for IPv6. When the home network has IPv6, append its own global
+# prefix to this list (for example 2001:db8:1::/64).
+CABINET_EGRESS_BLOCKED_RANGES6=fc00::/7,fe80::/10

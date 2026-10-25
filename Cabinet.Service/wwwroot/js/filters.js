@@ -131,7 +131,7 @@ function watchPinning(bar) {
  * them, and the entity tag of the layout the records belong to, so the other titles are read again when the collection changed; a
  * quiet one only replaces the model and leaves the boxes on screen alone, for a draw that follows at once), a
  * fresh pass over the drawn boxes, showing or hiding the bar, switching off and on the controls that need the card data, and the
- * current state.
+ * visitor's current question, with the choices that need the card data kept while their controls are off.
  */
 export function initFilters({ bar, mount, copy, language, getRecords, initial = EMPTY_FILTERS, storage = null }) {
   const field = bar.querySelector('#filter-q');
@@ -163,6 +163,7 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
 
   let state = { ...initial };
   let cardFiltersOff = false;
+  let suspended = null;
   let locations = [];
   let names = null;
   let namesState = 'unasked';
@@ -180,6 +181,15 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
   watchPinning(bar);
 
   const dock = rail !== null && panel !== null ? initFilterDock({ rail, panel, field, fallbackFocus: openButton }) : null;
+
+  /**
+   * Gives the visitor's question as it is kept for the tab: the state in force, with the players, time and location chosen before the
+   * card details failed put back while those controls are off, so a failure never overwrites them.
+   * @returns {{ q: string, players: number | null, time: number | null, location: string | null }}
+   */
+  function kept() {
+    return suspended === null ? state : { ...state, ...suspended };
+  }
 
   /**
    * Lists the entries the count works on for the view on screen: one list for the whole collection, or one per location cabinet.
@@ -460,7 +470,7 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
 
     if (location !== state.location) {
       state = { ...state, location };
-      writer.write(state);
+      writer.write(kept());
     }
 
     result = evaluate(state, model);
@@ -573,7 +583,7 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
     fetchNames();
     state = { ...state, q: field.value };
     apply();
-    writer.write(state);
+    writer.write(kept());
     announceSoon();
   }
 
@@ -592,7 +602,7 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
 
     state = { ...state, [group.name]: value };
     apply();
-    writer.write(state);
+    writer.write(kept());
     announceSoon();
   }
 
@@ -608,7 +618,7 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
 
     state = { ...state, location: value };
     apply();
-    writer.write(state);
+    writer.write(kept());
     announceSoon();
   }
 
@@ -641,6 +651,7 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
     }
 
     state = { ...EMPTY_FILTERS };
+    suspended = null;
     apply();
     writer.write(state);
     live.textContent = announcement();
@@ -657,12 +668,9 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
   }
 
   /**
-   * Shows the state the tab kept in the controls: the text in the field and the chip each group stands on. The location select is
-   * filled from the card data, so it takes its value when that arrives.
+   * Checks the chip each group stands on in the state in force.
    */
-  function showRestoredState() {
-    field.value = state.q;
-
+  function showChips() {
     for (const group of groups) {
       const chosen = state[group.name];
       const chip = group.element.querySelector(`input[value="${chosen === null ? '' : chosen}"]`);
@@ -671,6 +679,15 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
         chip.checked = true;
       }
     }
+  }
+
+  /**
+   * Shows the state the tab kept in the controls: the text in the field and the chip each group stands on. The location select is
+   * filled from the card data, so it takes its value when that arrives.
+   */
+  function showRestoredState() {
+    field.value = state.q;
+    showChips();
   }
 
   /**
@@ -693,10 +710,15 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
   }
 
   /**
-   * Switches off the players, time and location controls because the card data they need did not load: they are put to Any, disabled,
-   * and the note says why. Search keeps working on the titles alone.
+   * Switches off the players, time and location controls because the card data they need did not load: they show Any, are disabled,
+   * and the note says why. Search keeps working on the titles alone. What the visitor chose in them steps aside rather than being
+   * forgotten: it is set apart, still kept for the tab, and comes back when the card data loads after all.
    */
   function disableCardFilters() {
+    if (suspended === null) {
+      suspended = { players: state.players, time: state.time, location: state.location };
+    }
+
     cardFiltersOff = true;
     state = { ...state, players: null, time: null, location: null };
     resetChips();
@@ -716,11 +738,12 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
     }
 
     apply();
-    writer.write(state);
   }
 
   /**
-   * Switches the controls that need the card data back on once the data is held.
+   * Switches the controls that need the card data back on once the data is held, with the choices that stepped aside back in them.
+   * The rebuild that follows with the card data judges them again, so a kept location is checked against the owner's locations the
+   * data brings rather than against none.
    */
   function enableCardFilters() {
     if (!cardFiltersOff) {
@@ -728,6 +751,12 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
     }
 
     cardFiltersOff = false;
+
+    if (suspended !== null) {
+      state = { ...state, ...suspended };
+      suspended = null;
+      showChips();
+    }
 
     for (const input of document.querySelectorAll('.filter-group input')) {
       input.disabled = false;
@@ -797,6 +826,7 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
       cabinet: mount,
       copy,
       getCount: () => ({ lit: tally.lit, total: tally.total, active: result.active }),
+      fallbackFocus: [rail?.querySelector('.filter-menu') ?? null, panel?.querySelector('.filter-menu') ?? null, field],
       units: {
         find: bar.querySelector('.filter-find'),
         count,
@@ -874,7 +904,7 @@ export function initFilters({ bar, mount, copy, language, getRecords, initial = 
     enableCardFilters,
 
     get state() {
-      return state;
+      return kept();
     },
   };
 }

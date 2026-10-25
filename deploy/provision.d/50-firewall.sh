@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 ###
 ### Idempotent module: renders /etc/nftables.conf from
-### deploy/nftables/cabinet.nft.in using the admin SSH sources and reverse
-### proxy address from provision.conf, dry-run checks the result before
+### deploy/nftables/cabinet.nft.in using the admin SSH sources, reverse proxy
+### address, DNS resolvers and blocked home-network ranges from
+### provision.conf, dry-run checks the result before
 ### ever loading it, then loads it in a single atomic transaction so a bad
 ### or interrupted reload can never leave a partial ruleset active - the
 ### previous ruleset stays in force until the new one fully applies.
@@ -22,7 +23,10 @@ if [[ "${CABINET_PROVISION_LIB_ONLY:-0}" != "1" ]]; then
   rendered="$(mktemp)"
   provision_render_template "${DEPLOY_DIR}/nftables/cabinet.nft.in" "$rendered" \
     "CABINET_ADMIN_SSH_SOURCES=${CABINET_ADMIN_SSH_SOURCES:-}" \
-    "CABINET_TRAEFIK_IP=${CABINET_TRAEFIK_IP:-}"
+    "CABINET_TRAEFIK_IP=${CABINET_TRAEFIK_IP:-}" \
+    "CABINET_EGRESS_RESOLVERS=${CABINET_EGRESS_RESOLVERS:-}" \
+    "CABINET_EGRESS_BLOCKED_RANGES=${CABINET_EGRESS_BLOCKED_RANGES:-}" \
+    "CABINET_EGRESS_BLOCKED_RANGES6=${CABINET_EGRESS_BLOCKED_RANGES6:-}"
 
   provision_log "Checking the rendered ruleset before loading it"
   if ! nft -c -f "$rendered"; then
@@ -39,5 +43,6 @@ if [[ "${CABINET_PROVISION_LIB_ONLY:-0}" != "1" ]]; then
   systemctl enable --now nftables.service
 
   provision_log "Default-drop firewall loaded: SSH is admitted only from ${CABINET_ADMIN_SSH_SOURCES:-<unset>}, the app port 5080 and the owner port 5082 only from ${CABINET_TRAEFIK_IP:-<unset>}."
+  provision_log "New outbound connections to the configured private ranges are refused; DNS to the configured resolvers and the internet stay open."
   provision_log "If the SSH sources were set wrongly, 'pct enter <ctid>' from the Proxmox host still works - it never goes through this firewall."
 fi

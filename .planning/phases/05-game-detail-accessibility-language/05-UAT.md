@@ -3,7 +3,7 @@ status: partial
 phase: 05-game-detail-accessibility-language
 source: [05-VERIFICATION.md]
 started: 2026-10-12T00:00:00Z
-updated: 2026-10-12T12:30:00Z
+updated: 2026-10-19T12:00:00Z
 ---
 
 ## Current Test
@@ -14,9 +14,9 @@ updated: 2026-10-12T12:30:00Z
 
 ### 1. Chrome for Android Back
 expected: First Back (button or gesture, straight after opening and after tapping inside the card) closes the card; a second Back leaves the site. The owner has no Android device, so this needs a borrowed phone.
-result: blocked
-blocked_by: physical-device
-reason: "I can't test on android, as i don't have an android."
+result: pass
+checked: 2026-10-19, see 07-DEVICE-ROUND.md (A1 to A5)
+note: "Blocked in this round (the owner had no Android device: \"I can't test on android, as i don't have an android.\"). Checked later on an Android phone in Chrome, in the phase 7 device round on v0.10.0: A1 to A5 all passed."
 
 ### 2. iOS Safari second swipe
 expected: After the edge swipe has closed a card (already confirmed), a second edge swipe leaves the site.
@@ -42,11 +42,11 @@ result: pass
 ## Summary
 
 total: 6
-passed: 4
+passed: 5
 issues: 0
 pending: 0
 skipped: 1
-blocked: 1
+blocked: 0
 
 ## Gaps
 

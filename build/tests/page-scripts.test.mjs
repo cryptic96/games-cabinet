@@ -1002,6 +1002,19 @@ test('a refusal without a readable body still counts down from the seconds the s
   });
 });
 
+test('a refusal that names no status still counts down from the seconds the server asked to wait', async () => {
+  const refusal = { status: 429, ok: false, json: async () => ({ outcome: 'cooldown' }), headers: { get: (name) => (name === 'Retry-After' ? '45' : null) } };
+  const server = countingFetch(() => refusal);
+
+  await withPage({ fetchImpl: server.fetchImpl }, async ({ button, note, press }) => {
+    await press();
+
+    assert.equal(note.textContent, 'You can sync again in less than a minute.');
+    assert.equal(button.textContent, 'Sync again in 0:45');
+    assert.equal(button.getAttribute('aria-disabled'), 'true');
+  });
+});
+
 test('an own press whose result is held back ends with the held-back sentence and nothing else', async () => {
   let server = running(0);
 
