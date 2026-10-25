@@ -322,6 +322,24 @@ check_owner_wall() {
   fi
 }
 
+###
+### Proves host filtering is switched on. The committed default lets every host
+### through, and only the server env file narrows it, so a host provisioned
+### before the setting existed, or one where it was forgotten, would otherwise
+### run unfiltered with no sign of it. A request that names a host the site does
+### not serve must be refused with a 400; any other answer means the list of
+### allowed hosts is missing or is a wildcard. Reports a status code only.
+###
+check_host_filter() {
+  local status
+  status="$(http_status "http://127.0.0.1:5080/" -H "Host: unlisted.example.org")"
+  if [[ "$status" == "400" ]]; then
+    pass "the app refuses a request for a host that is not listed"
+  else
+    fail "the app answers status ${status} to a request for an unlisted host, expected 400; set AllowedHosts in /etc/cabinet/cabinet.env"
+  fi
+}
+
 check_firewall() {
   local ruleset pattern='hook input priority [^;]*; policy drop'
   if ! ruleset="$(nft list table inet cabinet_filter 2>&1)"; then
@@ -636,6 +654,7 @@ main() {
   check_modes
   check_listeners
   check_owner_wall
+  check_host_filter
   check_firewall
   check_egress
   check_dns

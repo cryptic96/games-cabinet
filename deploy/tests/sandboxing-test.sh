@@ -268,6 +268,7 @@ case "$(basename "$0")" in
   sshd) printf '%s\n' "${STUB_SSHD_OUTPUT:-}" ;;
   curl)
     case "$*" in
+      *unlisted.example.org*) printf '%s' "${STUB_CURL_STATUS_UNLISTED:-000}" ;;
       *:5082*) printf '%s' "${STUB_CURL_STATUS_OWNER:-000}" ;;
       *:5080*) printf '%s' "${STUB_CURL_STATUS_APP:-000}" ;;
       *) printf '000' ;;
@@ -398,6 +399,26 @@ check "owner wall still fails an owner page on the public port when the owner po
 
 check "selfcheck runs the owner wall check" "1" \
   "$(file_has_line "$SELFCHECK" "  check_owner_wall")"
+
+STUB_CURL_STATUS_UNLISTED=400
+export STUB_CURL_STATUS_UNLISTED
+run_selfcheck_function check_host_filter
+check "host filter passes when an unlisted host gets a 400" "1 0" "${RUN_PASSED} ${RUN_FAILED}"
+check "host filter sends the unlisted host to the public port" "1" \
+  "$(file_has_text "$STUB_ARGS_LOG" "Host: unlisted.example.org")"
+
+STUB_CURL_STATUS_UNLISTED=200
+run_selfcheck_function check_host_filter
+check "host filter fails when an unlisted host is served" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "host filter reports the status code and names the setting" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "status 200 to a request for an unlisted host")"
+
+STUB_CURL_STATUS_UNLISTED=000
+run_selfcheck_function check_host_filter
+check "host filter fails when the app gives no answer" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+
+check "selfcheck runs the host filter check" "1" \
+  "$(file_has_line "$SELFCHECK" "  check_host_filter")"
 
 STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain input {\n\t\ttype filter hook input priority filter; policy drop;\n\t}\n}'
 export STUB_NFT_OUTPUT
