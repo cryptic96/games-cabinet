@@ -1,5 +1,6 @@
 using System.Net;
 using Cabinet.Service.Hosting;
+using Cabinet.Service.Limits;
 using Cabinet.Service.Owner;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -45,6 +46,8 @@ internal sealed class UntrustedPeerHost : IAsyncDisposable
         {
             ["Kestrel:Endpoints:Owner:Url"] = $"http://127.0.0.1:{OwnerPort}",
             ["ReverseProxy:KnownProxies:0"] = knownProxy,
+            ["ClientLimits:SyncPressesPerWindow"] = "1",
+            ["ClientLimits:SyncWindowSeconds"] = "60",
         };
         for (var index = 0; index < ranges.Length; index++)
         {
@@ -53,6 +56,7 @@ internal sealed class UntrustedPeerHost : IAsyncDisposable
 
         builder.Configuration.AddInMemoryCollection(settings);
         builder.Services.AddSingleton(OwnerAccess.FromConfiguration(builder.Configuration));
+        builder.Services.AddCabinetClientLimits(builder.Configuration);
         builder.Services.Configure<ForwardedHeadersOptions>(
             options => ForwardedHeadersSetup.Configure(options, builder.Configuration));
 
@@ -60,8 +64,13 @@ internal sealed class UntrustedPeerHost : IAsyncDisposable
         app.UseConnectionPeer();
         app.UseForwardedHeaders();
         app.UseOwnerClientRange();
+        app.UseRouting();
+        app.UseCabinetClientLimits();
         app.MapGet("/probe", context => context.Response.WriteAsync(
             context.Connection.RemoteIpAddress?.ToString() ?? string.Empty));
+        app.MapPost("/limited", context => context.Response.WriteAsync(
+            context.Connection.RemoteIpAddress?.ToString() ?? string.Empty))
+            .RequireRateLimiting(ClientLimits.SyncPressPolicyName);
 
         await app.StartAsync();
 
@@ -89,6 +98,29 @@ internal sealed class UntrustedPeerHost : IAsyncDisposable
         using var reader = new StreamReader(context.Response.Body);
 
         return (context.Response.StatusCode, await reader.ReadToEndAsync());
+    }
+
+    /// <summary>
+    /// Posts once to the route that carries the sync press limit as if the request came from the given peer, and returns the
+    /// status code. The host allows one request per client in each window.
+    /// </summary>
+    /// <param name="peer">The address of the connection's remote end.</param>
+    /// <param name="forwardedFor">The forwarding header value to send, or null to send none.</param>
+    public async Task<int> PostLimitedAsync(string peer, string? forwardedFor)
+    {
+        var context = await _server.SendAsync(http =>
+        {
+            http.Request.Method = HttpMethods.Post;
+            http.Request.Path = "/limited";
+            http.Connection.RemoteIpAddress = IPAddress.Parse(peer);
+            http.Connection.LocalPort = PublicPort;
+            if (forwardedFor is not null)
+            {
+                http.Request.Headers["X-Forwarded-For"] = forwardedFor;
+            }
+        });
+
+        return context.Response.StatusCode;
     }
 
     /// <inheritdoc />
