@@ -122,7 +122,7 @@ Every item names the command or place that proves it. Tick them in order.
    a restart.
 8. **The outbound firewall is active.** `cabinet-selfcheck` confirms the
    output chain rejects new connections to the blocked ranges, and that a
-   connection to the first blocked network is refused at once.
+   connection to the first blocked network is counted by the reject rule.
 9. **Search engines are asked not to index.** The home page carries
    `noindex` (the script checks it), and there is no `robots.txt` that blocks
    crawlers, because a crawler that cannot read the page never sees the

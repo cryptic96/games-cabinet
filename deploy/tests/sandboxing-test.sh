@@ -256,6 +256,7 @@ set +e
 STUB_BIN="${WORK_DIR}/stub-bin"
 mkdir -p "$STUB_BIN"
 export STUB_ARGS_LOG="${WORK_DIR}/stub-args.log"
+export STUB_NFT_CALLS="${WORK_DIR}/stub-nft-calls"
 
 for stub in systemd-run ss nft sshd curl; do
   cat > "${STUB_BIN}/${stub}" <<'STUB'
@@ -264,7 +265,16 @@ printf '%s\n' "$*" >> "${STUB_ARGS_LOG}"
 case "$(basename "$0")" in
   systemd-run) printf '%s\n' "${STUB_SYSTEMD_RUN_OUTPUT:-}" ;;
   ss) printf '%s\n' "${STUB_SS_OUTPUT:-}" ;;
-  nft) printf '%s\n' "${STUB_NFT_OUTPUT:-}" ;;
+  nft)
+    calls="$(cat "$STUB_NFT_CALLS" 2>/dev/null || echo 0)"
+    calls=$((calls + 1))
+    printf '%s' "$calls" > "$STUB_NFT_CALLS"
+    if [ "$calls" -ge 2 ] && [ -n "${STUB_NFT_OUTPUT_AFTER:-}" ]; then
+      printf '%s\n' "$STUB_NFT_OUTPUT_AFTER"
+    else
+      printf '%s\n' "${STUB_NFT_OUTPUT:-}"
+    fi
+    ;;
   sshd) printf '%s\n' "${STUB_SSHD_OUTPUT:-}" ;;
   curl)
     case "$*" in
@@ -288,6 +298,7 @@ run_selfcheck_function() {
   PASSED=0
   FAILED=0
   : > "$STUB_ARGS_LOG"
+  : > "$STUB_NFT_CALLS"
   "$1" > "${WORK_DIR}/run.out" 2>&1
   RUN_PASSED="$PASSED"
   RUN_FAILED="$FAILED"
@@ -457,6 +468,7 @@ check "firewall asks nothing about the owner port when the owner tools are off" 
 ### Selfcheck: the outbound block and DNS
 ###
 EGRESS_TABLE=$'table inet cabinet_filter {\n\tchain input {\n\t\ttype filter hook input priority filter; policy drop;\n\t}\n\tchain output {\n\t\ttype filter hook output priority filter; policy accept;\n\t\toif "lo" accept\n\t\tct state established,related accept\n\t\tmeta l4proto ipv6-icmp accept\n\t\tip daddr { 192.0.2.53 } udp dport 53 accept\n\t\tip daddr { 192.0.2.53 } tcp dport 53 accept\n\t\tip daddr { 192.0.2.0/24, 198.51.100.0/24 } counter packets 0 bytes 0 reject with icmpx admin-prohibited\n\t\tip6 daddr { 2001:db8:1::/64 } counter packets 0 bytes 0 reject with icmpx admin-prohibited\n\t}\n}'
+EGRESS_TABLE_COUNTED="${EGRESS_TABLE/counter packets 0/counter packets 1}"
 EGRESS_PROBE_LOG="${WORK_DIR}/egress-probe.log"
 STUB_EGRESS_OUTCOME=refused
 REAL_EGRESS_PROBE="$(declare -f egress_probe)"
@@ -469,23 +481,40 @@ egress_probe() {
 }
 
 STUB_NFT_OUTPUT="$EGRESS_TABLE"
+STUB_NFT_OUTPUT_AFTER="$EGRESS_TABLE_COUNTED"
+export STUB_NFT_OUTPUT_AFTER
 : > "$EGRESS_PROBE_LOG"
 run_selfcheck_function check_egress
-check "egress passes twice with both reject rules loaded and a refused probe" "2 0" "${RUN_PASSED} ${RUN_FAILED}"
+check "egress passes twice when the reject rule counted the probe" "2 0" "${RUN_PASSED} ${RUN_FAILED}"
 check "egress probes the first host of the first blocked network" "192.0.2.1" "$(cat "$EGRESS_PROBE_LOG")"
+check "egress says the reject rule counted the connection" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "counted by the reject rule")"
 check "egress report prints no address" "0" \
   "$(count_lines_matching "${WORK_DIR}/run.out" -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+|[0-9a-f]+:[0-9a-f:]+')"
 
 STUB_EGRESS_OUTCOME=timeout
 run_selfcheck_function check_egress
-check "egress fails when the probe times out" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
-check "egress says the connection was not refused at once" "1" \
-  "$(file_has_text "${WORK_DIR}/run.out" "not refused at once")"
+check "egress trusts the rule counter when the probe was slow to fail" "2 0" "${RUN_PASSED} ${RUN_FAILED}"
+
+STUB_NFT_OUTPUT_AFTER="$EGRESS_TABLE"
+STUB_EGRESS_OUTCOME=refused
+run_selfcheck_function check_egress
+check "egress fails when the probe fails at once but the reject rule counted nothing" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "egress says the reject rule did not count the connection" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "not counted by the reject rule")"
 
 STUB_EGRESS_OUTCOME=connected
 run_selfcheck_function check_egress
-check "egress fails when the probe connects" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "egress fails when the probe connects and nothing was counted" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
 STUB_EGRESS_OUTCOME=refused
+
+STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain output {\n\t\ttype filter hook output priority filter; policy accept;\n\t\tip daddr { 192.0.2.0/24 } counter reject\n\t\tip6 daddr { 2001:db8:1::/64 } counter reject\n\t}\n}'
+STUB_NFT_OUTPUT_AFTER="$STUB_NFT_OUTPUT"
+run_selfcheck_function check_egress
+check "egress fails when the reject rule shows no packet counter" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "egress says the probe cannot be confirmed without a counter" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "cannot be confirmed")"
+unset STUB_NFT_OUTPUT_AFTER
 
 STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain input {\n\t\ttype filter hook input priority filter; policy drop;\n\t}\n\tchain output {\n\t\ttype filter hook output priority filter; policy accept;\n\t}\n}'
 : > "$EGRESS_PROBE_LOG"
@@ -533,8 +562,14 @@ check "the real probe reports a slow failure as a timeout" "timeout" "$(egress_p
 unset -f timeout
 check "first_blocked_host adds one to the network address" "192.0.2.1" \
   "$(first_blocked_host 'ip daddr { 192.0.2.0/24, 198.51.100.0/24 } reject')"
-check "first_blocked_host carries into the next octet" "192.0.3.0" \
+check "first_blocked_host probes the address itself when the entry is one address" "192.0.2.255" \
   "$(first_blocked_host 'ip daddr { 192.0.2.255/32 } reject')"
+check "first_blocked_host probes a single address written without a prefix" "192.0.2.9" \
+  "$(first_blocked_host 'ip daddr { 192.0.2.9 } reject')"
+check "first_blocked_host stays inside a two-address network" "192.0.2.1" \
+  "$(first_blocked_host 'ip daddr { 192.0.2.0/31 } reject')"
+check "first_blocked_host carries into the next octet" "192.0.3.0" \
+  "$(first_blocked_host 'ip daddr { 192.0.2.255/24 } reject')"
 
 ###
 ### Selfcheck: the unit's limits against the loaded unit file and the container

@@ -344,7 +344,8 @@ This proves the host end to end and prints PASS or FAIL for each check:
   outside the allowed ranges is refused with `403`;
 - the firewall's input chain drops by default, and its output chain refuses
   new connections to the blocked ranges: a connection to the first blocked
-  network is refused at once, not left to time out, and no address is printed;
+  network must be counted by the reject rule's own packet counter, and no
+  address is printed;
 - the application unit's resource limits match the loaded unit file, and sit
   below the container's own memory and cores;
 - names resolve through the configured resolvers;

@@ -405,37 +405,64 @@ chain_body() {
   ' <<<"$2"
 }
 
-### Prints the first host address of the first network in the destination set of nft rule line $1.
+###
+### Prints an address inside the first network in the destination set of nft rule line $1: the address after the network
+### address, or the network address itself when the entry is a single address.
+###
 first_blocked_host() {
-  local rule="$1" set first octets set_pattern='ip daddr \{ ([^}]+) \}'
+  local rule="$1" set first prefix=32 octets set_pattern='ip daddr \{ ([^}]+) \}'
   [[ "$rule" =~ $set_pattern ]] || return 0
   set="${BASH_REMATCH[1]}"
   first="${set%%,*}"
   first="${first// /}"
-  first="${first%%/*}"
+  if [[ "$first" == */* ]]; then
+    prefix="${first#*/}"
+    first="${first%%/*}"
+  fi
   [[ "$first" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] || return 0
-  octets=$(((BASH_REMATCH[1] << 24 | BASH_REMATCH[2] << 16 | BASH_REMATCH[3] << 8 | BASH_REMATCH[4]) + 1))
+  octets=$((BASH_REMATCH[1] << 24 | BASH_REMATCH[2] << 16 | BASH_REMATCH[3] << 8 | BASH_REMATCH[4]))
+  if [[ "$prefix" =~ ^[0-9]+$ ]] && ((prefix < 32)); then
+    octets=$((octets + 1))
+  fi
   printf '%d.%d.%d.%d' $((octets >> 24 & 255)) $((octets >> 16 & 255)) $((octets >> 8 & 255)) $((octets & 255))
+}
+
+### Prints the IPv4 reject rule of the output chain in nft ruleset listing $1, or nothing when there is none.
+output_v4_reject_rule() {
+  local line rule="" v4_pattern='^[[:space:]]*ip daddr \{[^}]+\}.* reject'
+  while IFS= read -r line; do
+    [[ "$line" =~ $v4_pattern ]] && rule="$line"
+  done <<<"$(chain_body output "$1")"
+  printf '%s' "$rule"
+}
+
+### Prints the packet count the counter in nft rule line $1 shows, or nothing when the rule has no packet count.
+rule_packets() {
+  local counter_pattern='counter packets ([0-9]+)'
+  [[ "$1" =~ $counter_pattern ]] && printf '%s' "${BASH_REMATCH[1]}"
+  return 0
 }
 
 ###
 ### Proves the outbound block: the output chain must hold a reject rule for
-### an IPv4 and for an IPv6 destination set, and a connection attempt to the
-### first host of the first blocked IPv4 network must be refused at once, not
-### left to time out. The probe address is derived from the loaded rule, so
-### no address is written down anywhere, and none is printed.
+### an IPv4 and for an IPv6 destination set, and a connection attempt to an
+### address inside the first blocked IPv4 network must be counted by the reject
+### rule. The rule's own packet counter is the evidence, because a connection
+### that fails quickly for any other reason, such as a host that answers with a
+### reset or a missing route, would look the same from the outside. The probe
+### address is derived from the loaded rule, so no address is written down
+### anywhere, and none is printed.
 ###
 check_egress() {
-  local ruleset output_chain line v4_rule="" v6_rule="" host outcome
-  local v4_pattern='^[[:space:]]*ip daddr \{[^}]+\}.* reject'
+  local ruleset output_chain line v4_rule="" v6_rule="" host outcome before after
   local v6_pattern='^[[:space:]]*ip6 daddr \{[^}]+\}.* reject'
   if ! ruleset="$(nft list table inet cabinet_filter 2>&1)"; then
     fail "could not read the firewall table cabinet_filter: ${ruleset}"
     return
   fi
   output_chain="$(chain_body output "$ruleset")"
+  v4_rule="$(output_v4_reject_rule "$ruleset")"
   while IFS= read -r line; do
-    [[ "$line" =~ $v4_pattern ]] && v4_rule="$line"
     [[ "$line" =~ $v6_pattern ]] && v6_rule="$line"
   done <<<"$output_chain"
 
@@ -450,11 +477,19 @@ check_egress() {
     fail "could not work out a probe address from the blocked IPv4 ranges"
     return
   fi
+  before="$(rule_packets "$v4_rule")"
   outcome="$(egress_probe "$host")"
-  if [[ "$outcome" == "refused" ]]; then
-    pass "a connection to the first blocked network is refused at once"
+  if ! ruleset="$(nft list table inet cabinet_filter 2>&1)"; then
+    fail "could not read the firewall table cabinet_filter after the probe: ${ruleset}"
+    return
+  fi
+  after="$(rule_packets "$(output_v4_reject_rule "$ruleset")")"
+  if [[ -z "$before" || -z "$after" ]]; then
+    fail "the blocked IPv4 reject rule shows no packet counter, so the probe cannot be confirmed"
+  elif ((after > before)); then
+    pass "a connection to the first blocked network was counted by the reject rule"
   else
-    fail "a connection to the first blocked network was not refused at once (${outcome})"
+    fail "a connection to the first blocked network was not counted by the reject rule (${outcome})"
   fi
 }
 
