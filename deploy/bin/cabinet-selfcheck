@@ -40,7 +40,9 @@ Usage: cabinet-selfcheck [-h|--help]
 Checks, as root, that this host is correctly provisioned: units, the app
 unit's resource limits against the container's own, file modes,
 listeners (the app, the loopback ops port and the optional owner port),
-the owner tools' address walls when the owner port is on, firewall, health at the installed version, that the installed
+the owner tools' address walls when the owner port is on, firewall, the
+outbound block that refuses new connections to the home network (and that DNS
+still works), health at the installed version, that the installed
 scripts, libraries and units match the active release, SSH key-only login, no
 GitHub credential or Actions runner, and the image smoke in a sandbox.
 Prints PASS or FAIL per check and exits 1 when any check fails.
@@ -355,6 +357,103 @@ check_owner_port_firewall() {
   fi
 }
 
+###
+### Tries to open a TCP connection to port 80 of ADDRESS ($1) and prints what
+### happened: connected, refused when it failed within 2 seconds (the outbound
+### block answers at once) or timeout when it took longer. Prints no address.
+###
+egress_probe() {
+  local address="$1" started elapsed
+  started="${EPOCHREALTIME//[.,]/}"
+  # shellcheck disable=SC2016 # the inner shell expands the address argument
+  if timeout 5 bash -c 'exec 3<>/dev/tcp/"$1"/80' _ "$address" 2>/dev/null; then
+    echo connected
+    return
+  fi
+  elapsed=$((${EPOCHREALTIME//[.,]/} - started))
+  if ((elapsed < 2000000)); then
+    echo refused
+  else
+    echo timeout
+  fi
+}
+
+### Prints the body of chain $1 from nft ruleset listing $2.
+chain_body() {
+  awk -v chain="$1" '
+    $0 ~ "^[[:space:]]*chain " chain " [{]" { inside = 1; next }
+    inside && /^[[:space:]]*}[[:space:]]*$/ { exit }
+    inside { print }
+  ' <<<"$2"
+}
+
+### Prints the first host address of the first network in the destination set of nft rule line $1.
+first_blocked_host() {
+  local rule="$1" set first octets set_pattern='ip daddr \{ ([^}]+) \}'
+  [[ "$rule" =~ $set_pattern ]] || return 0
+  set="${BASH_REMATCH[1]}"
+  first="${set%%,*}"
+  first="${first// /}"
+  first="${first%%/*}"
+  [[ "$first" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] || return 0
+  octets=$(((BASH_REMATCH[1] << 24 | BASH_REMATCH[2] << 16 | BASH_REMATCH[3] << 8 | BASH_REMATCH[4]) + 1))
+  printf '%d.%d.%d.%d' $((octets >> 24 & 255)) $((octets >> 16 & 255)) $((octets >> 8 & 255)) $((octets & 255))
+}
+
+###
+### Proves the outbound block: the output chain must hold a reject rule for
+### an IPv4 and for an IPv6 destination set, and a connection attempt to the
+### first host of the first blocked IPv4 network must be refused at once, not
+### left to time out. The probe address is derived from the loaded rule, so
+### no address is written down anywhere, and none is printed.
+###
+check_egress() {
+  local ruleset output_chain line v4_rule="" v6_rule="" host outcome
+  local v4_pattern='^[[:space:]]*ip daddr \{[^}]+\}.* reject'
+  local v6_pattern='^[[:space:]]*ip6 daddr \{[^}]+\}.* reject'
+  if ! ruleset="$(nft list table inet cabinet_filter 2>&1)"; then
+    fail "could not read the firewall table cabinet_filter: ${ruleset}"
+    return
+  fi
+  output_chain="$(chain_body output "$ruleset")"
+  while IFS= read -r line; do
+    [[ "$line" =~ $v4_pattern ]] && v4_rule="$line"
+    [[ "$line" =~ $v6_pattern ]] && v6_rule="$line"
+  done <<<"$output_chain"
+
+  if [[ -z "$v4_rule" || -z "$v6_rule" ]]; then
+    fail "the firewall output chain does not reject new connections to both the blocked IPv4 and IPv6 ranges"
+    return
+  fi
+  pass "the firewall output chain rejects new connections to the blocked IPv4 and IPv6 ranges"
+
+  host="$(first_blocked_host "$v4_rule")"
+  if [[ -z "$host" ]]; then
+    fail "could not work out a probe address from the blocked IPv4 ranges"
+    return
+  fi
+  outcome="$(egress_probe "$host")"
+  if [[ "$outcome" == "refused" ]]; then
+    pass "a connection to the first blocked network is refused at once"
+  else
+    fail "a connection to the first blocked network was not refused at once (${outcome})"
+  fi
+}
+
+### Succeeds when the name $1 resolves through the configured DNS.
+resolve_name() {
+  getent ahosts "$1" >/dev/null 2>&1
+}
+
+### Proves DNS still works while the outbound block is loaded.
+check_dns() {
+  if resolve_name api.github.com; then
+    pass "DNS resolution works"
+  else
+    fail "DNS resolution failed; check CABINET_EGRESS_RESOLVERS in provision.conf"
+  fi
+}
+
 ops_url() {
   local configured=""
   if [[ -r "$DEPLOY_CONF" ]]; then
@@ -538,6 +637,8 @@ main() {
   check_listeners
   check_owner_wall
   check_firewall
+  check_egress
+  check_dns
   check_health
   check_provisioning_current
   check_ssh

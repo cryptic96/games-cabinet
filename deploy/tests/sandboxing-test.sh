@@ -433,6 +433,89 @@ run_selfcheck_function check_firewall
 check "firewall asks nothing about the owner port when the owner tools are off" "1 0" "${RUN_PASSED} ${RUN_FAILED}"
 
 ###
+### Selfcheck: the outbound block and DNS
+###
+EGRESS_TABLE=$'table inet cabinet_filter {\n\tchain input {\n\t\ttype filter hook input priority filter; policy drop;\n\t}\n\tchain output {\n\t\ttype filter hook output priority filter; policy accept;\n\t\toif "lo" accept\n\t\tct state established,related accept\n\t\tmeta l4proto ipv6-icmp accept\n\t\tip daddr { 192.0.2.53 } udp dport 53 accept\n\t\tip daddr { 192.0.2.53 } tcp dport 53 accept\n\t\tip daddr { 192.0.2.0/24, 198.51.100.0/24 } counter packets 0 bytes 0 reject with icmpx admin-prohibited\n\t\tip6 daddr { 2001:db8:1::/64 } counter packets 0 bytes 0 reject with icmpx admin-prohibited\n\t}\n}'
+EGRESS_PROBE_LOG="${WORK_DIR}/egress-probe.log"
+STUB_EGRESS_OUTCOME=refused
+REAL_EGRESS_PROBE="$(declare -f egress_probe)"
+REAL_RESOLVE_NAME="$(declare -f resolve_name)"
+
+# shellcheck disable=SC2329 # replaces the selfcheck helper under test
+egress_probe() {
+  printf '%s\n' "$1" >> "$EGRESS_PROBE_LOG"
+  echo "$STUB_EGRESS_OUTCOME"
+}
+
+STUB_NFT_OUTPUT="$EGRESS_TABLE"
+: > "$EGRESS_PROBE_LOG"
+run_selfcheck_function check_egress
+check "egress passes twice with both reject rules loaded and a refused probe" "2 0" "${RUN_PASSED} ${RUN_FAILED}"
+check "egress probes the first host of the first blocked network" "192.0.2.1" "$(cat "$EGRESS_PROBE_LOG")"
+check "egress report prints no address" "0" \
+  "$(count_lines_matching "${WORK_DIR}/run.out" -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+|[0-9a-f]+:[0-9a-f:]+')"
+
+STUB_EGRESS_OUTCOME=timeout
+run_selfcheck_function check_egress
+check "egress fails when the probe times out" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "egress says the connection was not refused at once" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "not refused at once")"
+
+STUB_EGRESS_OUTCOME=connected
+run_selfcheck_function check_egress
+check "egress fails when the probe connects" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+STUB_EGRESS_OUTCOME=refused
+
+STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain input {\n\t\ttype filter hook input priority filter; policy drop;\n\t}\n\tchain output {\n\t\ttype filter hook output priority filter; policy accept;\n\t}\n}'
+: > "$EGRESS_PROBE_LOG"
+run_selfcheck_function check_egress
+check "egress fails with no output reject rule" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "egress does not probe when no reject rule is loaded" "" "$(cat "$EGRESS_PROBE_LOG")"
+
+STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain output {\n\t\ttype filter hook output priority filter; policy accept;\n\t\tip daddr { 192.0.2.0/24 } counter packets 0 bytes 0 reject with icmpx admin-prohibited\n\t}\n}'
+run_selfcheck_function check_egress
+check "egress fails when the IPv6 reject rule is missing" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+
+STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain input {\n\t\ttype filter hook input priority filter; policy drop;\n\t\tip daddr { 192.0.2.0/24 } counter reject\n\t\tip6 daddr { 2001:db8:1::/64 } counter reject\n\t}\n\tchain output {\n\t\ttype filter hook output priority filter; policy accept;\n\t}\n}'
+run_selfcheck_function check_egress
+check "egress ignores reject rules outside the output chain" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+
+STUB_NFT_OUTPUT="$EGRESS_TABLE"
+check "selfcheck runs the egress check after the firewall check" "1" "$(file_has_line "$SELFCHECK" "  check_egress")"
+check "selfcheck runs the DNS check after the egress check" "1" "$(file_has_line "$SELFCHECK" "  check_dns")"
+
+# shellcheck disable=SC2329 # replaces the selfcheck helper under test
+resolve_name() { return 0; }
+run_selfcheck_function check_dns
+check "dns passes when the name resolves" "1 0" "${RUN_PASSED} ${RUN_FAILED}"
+
+# shellcheck disable=SC2329
+resolve_name() { return 2; }
+run_selfcheck_function check_dns
+check "dns fails when the name does not resolve" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "dns failure points at the resolver setting" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "CABINET_EGRESS_RESOLVERS")"
+unset -f egress_probe resolve_name
+eval "$REAL_EGRESS_PROBE"
+eval "$REAL_RESOLVE_NAME"
+
+STUB_TIMEOUT_STATUS=1
+# shellcheck disable=SC2329 # stands in for the timeout command the probe runs
+timeout() { return "$STUB_TIMEOUT_STATUS"; }
+check "the real probe reports a failed connection as refused when it fails at once" "refused" \
+  "$(egress_probe 192.0.2.1)"
+STUB_TIMEOUT_STATUS=0
+check "the real probe reports an open connection as connected" "connected" "$(egress_probe 192.0.2.1)"
+# shellcheck disable=SC2329
+timeout() { sleep 2.1; return 1; }
+check "the real probe reports a slow failure as a timeout" "timeout" "$(egress_probe 192.0.2.1)"
+unset -f timeout
+check "first_blocked_host adds one to the network address" "192.0.2.1" \
+  "$(first_blocked_host 'ip daddr { 192.0.2.0/24, 198.51.100.0/24 } reject')"
+check "first_blocked_host carries into the next octet" "192.0.3.0" \
+  "$(first_blocked_host 'ip daddr { 192.0.2.255/32 } reject')"
+
+###
 ### Selfcheck: the unit's limits against the loaded unit file and the container
 ###
 LIMITS_FIXTURE_UNIT="${WORK_DIR}/limits-cabinet.service"
