@@ -21,7 +21,7 @@ public class ClientLimitSettingsTests
             .Build();
 
         ClientLimitSettings.FromConfiguration(configuration)
-            .Should().Be(new ClientLimitOptions(5, TimeSpan.FromSeconds(60)));
+            .Should().Be(new ClientLimitOptions(5, TimeSpan.FromSeconds(60), 20, 60, TimeSpan.FromSeconds(60)));
     }
 
     [Fact]
@@ -29,7 +29,10 @@ public class ClientLimitSettingsTests
     {
         ClientLimitSettings.FromConfiguration(Configure()).Should().Be(new ClientLimitOptions(
             ClientLimitOptions.DefaultSyncPressesPerWindow,
-            TimeSpan.FromSeconds(ClientLimitOptions.DefaultSyncWindowSeconds)));
+            TimeSpan.FromSeconds(ClientLimitOptions.DefaultSyncWindowSeconds),
+            ClientLimitOptions.DefaultLiveConnectionsPerClient,
+            ClientLimitOptions.DefaultLiveConnectsPerWindow,
+            TimeSpan.FromSeconds(ClientLimitOptions.DefaultLiveWindowSeconds)));
     }
 
     [Theory]
