@@ -67,7 +67,7 @@ var app = builder.Build();
 
 var opsPort = OpsEndpoint.FromConfiguration(app.Configuration);
 
-app.UseContentSecurityPolicy();
+app.UseSecurityHeaders();
 app.UseConnectionPeer();
 app.UseForwardedHeaders();
 app.UseOwnerClientRange();
