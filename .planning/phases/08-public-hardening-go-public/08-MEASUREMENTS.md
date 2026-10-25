@@ -256,3 +256,40 @@ What the app's own log and the file times show (read-only; no values were opened
   That reading is an inference; the values were not displayed.
 - Nothing was restored and nothing was edited. The moved-aside picture folder was not deleted, because the plan removes it
   only after the fingerprint matches. A person decides what happens to the owner data difference and to the backup folder.
+
+## Flood
+
+Measured against the real containers on 2026-10-25 (release 0.11.0, unit limits as shipped, container caps not yet changed).
+Numbers and plain descriptions only. The sections below are filled in as the flood steps run.
+
+### Before the flood (read-only)
+
+Neighbour site: a page of another site behind the same reverse proxy that answers 200 with a small body, timed from the
+workstation once a second, 30 requests. The address is held in a shell variable only.
+
+| Reading | Value |
+|---|---|
+| Neighbour response time, 30 requests, all 200 | median 24.0 ms, 95th percentile 34.6 ms (nearest rank), fastest 22.8 ms, slowest 49.7 ms |
+| Stop-rule threshold (2 x baseline median) | 48.0 ms |
+| SSH round trip into the cabinet container, 10 runs | median 9 ms, slowest 10 ms |
+| Cabinet unit restarts since last start | 0 |
+| Cabinet unit `memory.events` | low 0, high 0, max 0, oom 0, oom_kill 0 |
+| Cabinet unit memory now / whole-life peak | 298.4 MiB / 314.1 MiB |
+| Cabinet unit memory limits now | high 450 MiB, max 600 MiB |
+| Cabinet container as it sees itself | 1 GiB memory, 512 MiB swap, 1 core |
+| Cabinet container memory pressure (`some`, 10 s average) | 0.00 |
+| Proxy container as it sees itself | 512 MiB memory, 512 MiB swap, 1 core |
+| Proxy container memory now / whole-life peak (cgroup) | 393.1 MiB / 510.0 MiB |
+| Proxy container memory now, split | 53.8 MiB program memory, 311.6 MiB file cache, swap used 0 |
+| Proxy container `memory.events` | high 0, max 0, oom 0, oom_kill 0 |
+| Proxy access log size, no rotation | 107.1 MiB (112 257 140 bytes) |
+| Proxy load average (1, 5, 15 min) | 0.32, 0.33, 0.21 |
+| Load generator on the proxy | not installed; archive offers a 0.1.4 build |
+
+What the numbers say:
+
+- The proxy's whole-life memory peak of 510 MiB sits at its 512 MiB limit, but 311.6 MiB of its present use is file
+  cache (the access log among it), which the kernel drops under pressure; its program memory is 53.8 MiB. The peak is
+  therefore not evidence of a squeeze, but it means a flood that writes a large access log can push the proxy's cache out
+ . The access log grows with every flood request and is not rotated; the flood adds to it.
+- The neighbour's baseline is tight (median 24.0 ms, 95th percentile 34.6 ms), so the stop rule trips at 48.0 ms.
