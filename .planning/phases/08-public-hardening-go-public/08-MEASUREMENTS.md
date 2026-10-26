@@ -486,3 +486,55 @@ own bar (every row PASS); the unit and container limits are not what failed.
 
 Host CPU, the owner's reading of the Proxmox graphs for the flood windows (given in chat on the evening of the floods,
 verbatim): "both graphs look perfectly fine. both below 30% usage".
+
+## Verification flood on the public version
+
+Measured read-only on 2026-10-26 at 12:2x UTC against release 1.0.0 with the decided limits in force and the route still
+LAN-only. Nothing was installed or started. Numbers and plain descriptions only. The flood steps below are filled in only
+after the owner's go.
+
+### Before the flood (read-only)
+
+Neighbour site: a page of another site behind the same reverse proxy that answers 200 with a small body (a different one
+from the first flood's, since the earlier choice was not written down), timed from the workstation once a second, 30
+requests, with this one sampler running alone. The address is held in a shell variable only.
+
+| Reading | Value |
+|---|---|
+| Neighbour response time, 30 requests, all 200, one sampler | median 24.5 ms, 95th percentile 27.3 ms (nearest rank), fastest 23.0 ms, slowest 27.4 ms |
+| Stop-rule threshold (2 x baseline median) | 49.0 ms |
+| SSH round trip into the cabinet container, 10 runs | median 8 ms, slowest 9 ms |
+| Cabinet release and health | 1.0.0, `Healthy`, no missing art |
+| Cabinet unit restarts since last start | 0 |
+| Cabinet unit `memory.events` | low 0, high 0, max 0, oom 0, oom_kill 0, oom_group_kill 0 |
+| Cabinet unit memory now / peak since the 12:18 UTC start | 82.9 MiB / 91.9 MiB |
+| Cabinet unit limits in force | `MemoryHigh` 480 MiB, `MemoryMax` 600 MiB, `MemorySwapMax` 0, CPU quota 800 ms per second, `CPUWeight` 50, `TasksMax` 512, `LimitNOFILE` 4096, heap hard limit 384 MiB |
+| Runtime line in the journal after the last start | sees 384 MB of memory and 1 processors, workstation GC |
+| Cabinet container as it sees itself | 1 GiB memory, 512 MiB swap, 1 core |
+| Cabinet container memory pressure (`some`, 10 s / 60 s / 300 s averages) | 0.00 / 0.00 / 0.00 |
+| Cabinet container load average (1, 5, 15 min) | 0.05, 0.18, 0.18 |
+| Out-of-memory lines in the cabinet unit's journal and the kernel log since the last start | 0 and 0 |
+| Proxy container as it sees itself | 512 MiB memory, 512 MiB swap, 1 core, no CPU limit set |
+| Proxy container memory now / whole-life peak (cgroup) | 193.1 MiB / 510.0 MiB (the peak is unchanged since the first flood's baseline) |
+| Proxy container memory now, split | 46.4 MiB program memory, 122.0 MiB file cache, swap used 9.3 MiB |
+| Proxy container `memory.events` | low 0, high 0, max 0, oom 0, oom_kill 0, oom_group_kill 0, sock_throttled 2 |
+| Proxy container pressure, memory `some` 10 s average / CPU `some` 10 s average | 0.00 / 0.00 |
+| Proxy access log size, no rotation | 118.8 MiB (124 583 916 bytes); it was 107.1 MiB before the first flood |
+| Proxy load average (1, 5, 15 min) | 0.05, 0.18, 0.18; the busiest process uses 0.0 % |
+| Load generator on the proxy | not installed; the archive offers a 0.1.4 build |
+| Load generator on the workstation | not installed; the archive offers a 0.1.4 build |
+| CPU controller delegated inside the proxy container (needed to cap the generator with a scope) | yes (`cpu`, `memory`, `pids` enabled for child groups), systemd 255 |
+
+What the numbers say:
+
+- With one sampler running alone the neighbour's median is 24.5 ms, close to the first flood's 24.0 ms, and the stop-rule
+  threshold is 49.0 ms. The first flood's four parallel samplers raised the idle median to 31.5 to 36.2 ms and cut the
+  headroom to 12 to 16 ms; this flood keeps the samplers light (one neighbour sampler, one SSH sampler, cabinet counters
+  read over one SSH session) so that the headroom stays near 24 ms.
+- The cabinet runs with the decided limits and a 384 MiB heap limit, and nothing has grown since the start: 91.9 MiB peak,
+  all event counters 0.
+- The proxy has 512 MiB and one core. Its program memory is 46.4 MiB; the high whole-life peak is file cache from the
+  access log, which the kernel drops under pressure. The log has grown by 11.7 MiB since the first flood, and a flood will
+  add to it.
+- The proxy container has no CPU limit, and its cgroup delegates the CPU controller, so a generator can be confined to a
+  share of the core with a transient scope without touching the container's configuration.
