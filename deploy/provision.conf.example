@@ -26,5 +26,6 @@ CABINET_EGRESS_RESOLVERS=CHANGE-ME
 CABINET_EGRESS_BLOCKED_RANGES=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10,169.254.0.0/16
 
 # The same for IPv6. When the home network has IPv6, append its own global
-# prefix to this list (for example 2001:db8:1::/64).
+# prefix to this list (for example 2001:db8:1::/64). The selfcheck fails while a
+# global IPv6 address of the container lies outside this list.
 CABINET_EGRESS_BLOCKED_RANGES6=fc00::/7,fe80::/10

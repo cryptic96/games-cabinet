@@ -100,9 +100,10 @@ for directive in \
   RestrictNamespaces=yes LockPersonality=yes \
   RestrictAddressFamilies=AF_UNIX\ AF_INET\ AF_INET6 \
   CapabilityBoundingSet= SystemCallArchitectures=native \
-  MemoryHigh=450M MemoryMax=600M MemorySwapMax=0 CPUQuota=80% CPUWeight=50 \
+  MemoryHigh=480M MemoryMax=600M MemorySwapMax=0 CPUQuota=80% CPUWeight=50 \
   TasksMax=512 LimitNOFILE=4096 \
-  Environment=DOTNET_gcServer=0 Environment=DOTNET_gcConcurrent=0; do
+  Environment=DOTNET_gcServer=0 Environment=DOTNET_gcConcurrent=0 \
+  Environment=DOTNET_GCHeapHardLimit=0x18000000; do
   check "app unit has ${directive}" "1" "$(file_has_line "$APP_UNIT" "$directive")"
 done
 
@@ -111,6 +112,11 @@ APP_MEMORY_MAX_MIB="$(sed -n 's/^MemoryMax=\([0-9]*\)M$/\1/p' "$APP_UNIT")"
 APP_CPU_QUOTA_PERCENT="$(sed -n 's/^CPUQuota=\([0-9]*\)%$/\1/p' "$APP_UNIT")"
 check "app unit keeps MemoryHigh below MemoryMax" "below" \
   "$([ "${APP_MEMORY_HIGH_MIB:-0}" -lt "${APP_MEMORY_MAX_MIB:-0}" ] && echo below || echo not-below)"
+APP_HEAP_LIMIT_HEX="$(sed -n 's/^Environment=DOTNET_GCHeapHardLimit=0x\([0-9A-Fa-f]*\)$/\1/p' "$APP_UNIT")"
+APP_HEAP_LIMIT_MIB="$(( 0x${APP_HEAP_LIMIT_HEX:-0} / 1048576 ))"
+check "app unit sets the runtime heap hard limit to 384 MiB" "384" "$APP_HEAP_LIMIT_MIB"
+check "app unit keeps the runtime heap limit below MemoryHigh" "below" \
+  "$([ "$APP_HEAP_LIMIT_MIB" -gt 0 ] && [ "$APP_HEAP_LIMIT_MIB" -lt "${APP_MEMORY_HIGH_MIB:-0}" ] && echo below || echo not-below)"
 check "app unit keeps the CPU quota below one whole core" "below" \
   "$([ "${APP_CPU_QUOTA_PERCENT:-100}" -lt 100 ] && echo below || echo not-below)"
 
@@ -256,6 +262,7 @@ set +e
 STUB_BIN="${WORK_DIR}/stub-bin"
 mkdir -p "$STUB_BIN"
 export STUB_ARGS_LOG="${WORK_DIR}/stub-args.log"
+export STUB_NFT_CALLS="${WORK_DIR}/stub-nft-calls"
 
 for stub in systemd-run ss nft sshd curl; do
   cat > "${STUB_BIN}/${stub}" <<'STUB'
@@ -264,10 +271,20 @@ printf '%s\n' "$*" >> "${STUB_ARGS_LOG}"
 case "$(basename "$0")" in
   systemd-run) printf '%s\n' "${STUB_SYSTEMD_RUN_OUTPUT:-}" ;;
   ss) printf '%s\n' "${STUB_SS_OUTPUT:-}" ;;
-  nft) printf '%s\n' "${STUB_NFT_OUTPUT:-}" ;;
+  nft)
+    calls="$(cat "$STUB_NFT_CALLS" 2>/dev/null || echo 0)"
+    calls=$((calls + 1))
+    printf '%s' "$calls" > "$STUB_NFT_CALLS"
+    if [ "$calls" -ge 2 ] && [ -n "${STUB_NFT_OUTPUT_AFTER:-}" ]; then
+      printf '%s\n' "$STUB_NFT_OUTPUT_AFTER"
+    else
+      printf '%s\n' "${STUB_NFT_OUTPUT:-}"
+    fi
+    ;;
   sshd) printf '%s\n' "${STUB_SSHD_OUTPUT:-}" ;;
   curl)
     case "$*" in
+      *unlisted.example.org*) printf '%s' "${STUB_CURL_STATUS_UNLISTED:-000}" ;;
       *:5082*) printf '%s' "${STUB_CURL_STATUS_OWNER:-000}" ;;
       *:5080*) printf '%s' "${STUB_CURL_STATUS_APP:-000}" ;;
       *) printf '000' ;;
@@ -287,6 +304,7 @@ run_selfcheck_function() {
   PASSED=0
   FAILED=0
   : > "$STUB_ARGS_LOG"
+  : > "$STUB_NFT_CALLS"
   "$1" > "${WORK_DIR}/run.out" 2>&1
   RUN_PASSED="$PASSED"
   RUN_FAILED="$FAILED"
@@ -399,6 +417,26 @@ check "owner wall still fails an owner page on the public port when the owner po
 check "selfcheck runs the owner wall check" "1" \
   "$(file_has_line "$SELFCHECK" "  check_owner_wall")"
 
+STUB_CURL_STATUS_UNLISTED=400
+export STUB_CURL_STATUS_UNLISTED
+run_selfcheck_function check_host_filter
+check "host filter passes when an unlisted host gets a 400" "1 0" "${RUN_PASSED} ${RUN_FAILED}"
+check "host filter sends the unlisted host to the public port" "1" \
+  "$(file_has_text "$STUB_ARGS_LOG" "Host: unlisted.example.org")"
+
+STUB_CURL_STATUS_UNLISTED=200
+run_selfcheck_function check_host_filter
+check "host filter fails when an unlisted host is served" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "host filter reports the status code and names the setting" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "status 200 to a request for an unlisted host")"
+
+STUB_CURL_STATUS_UNLISTED=000
+run_selfcheck_function check_host_filter
+check "host filter fails when the app gives no answer" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+
+check "selfcheck runs the host filter check" "1" \
+  "$(file_has_line "$SELFCHECK" "  check_host_filter")"
+
 STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain input {\n\t\ttype filter hook input priority filter; policy drop;\n\t}\n}'
 export STUB_NFT_OUTPUT
 run_selfcheck_function check_firewall
@@ -436,6 +474,7 @@ check "firewall asks nothing about the owner port when the owner tools are off" 
 ### Selfcheck: the outbound block and DNS
 ###
 EGRESS_TABLE=$'table inet cabinet_filter {\n\tchain input {\n\t\ttype filter hook input priority filter; policy drop;\n\t}\n\tchain output {\n\t\ttype filter hook output priority filter; policy accept;\n\t\toif "lo" accept\n\t\tct state established,related accept\n\t\tmeta l4proto ipv6-icmp accept\n\t\tip daddr { 192.0.2.53 } udp dport 53 accept\n\t\tip daddr { 192.0.2.53 } tcp dport 53 accept\n\t\tip daddr { 192.0.2.0/24, 198.51.100.0/24 } counter packets 0 bytes 0 reject with icmpx admin-prohibited\n\t\tip6 daddr { 2001:db8:1::/64 } counter packets 0 bytes 0 reject with icmpx admin-prohibited\n\t}\n}'
+EGRESS_TABLE_COUNTED="${EGRESS_TABLE/counter packets 0/counter packets 1}"
 EGRESS_PROBE_LOG="${WORK_DIR}/egress-probe.log"
 STUB_EGRESS_OUTCOME=refused
 REAL_EGRESS_PROBE="$(declare -f egress_probe)"
@@ -448,23 +487,40 @@ egress_probe() {
 }
 
 STUB_NFT_OUTPUT="$EGRESS_TABLE"
+STUB_NFT_OUTPUT_AFTER="$EGRESS_TABLE_COUNTED"
+export STUB_NFT_OUTPUT_AFTER
 : > "$EGRESS_PROBE_LOG"
 run_selfcheck_function check_egress
-check "egress passes twice with both reject rules loaded and a refused probe" "2 0" "${RUN_PASSED} ${RUN_FAILED}"
+check "egress passes twice when the reject rule counted the probe" "2 0" "${RUN_PASSED} ${RUN_FAILED}"
 check "egress probes the first host of the first blocked network" "192.0.2.1" "$(cat "$EGRESS_PROBE_LOG")"
+check "egress says the reject rule counted the connection" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "counted by the reject rule")"
 check "egress report prints no address" "0" \
   "$(count_lines_matching "${WORK_DIR}/run.out" -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+|[0-9a-f]+:[0-9a-f:]+')"
 
 STUB_EGRESS_OUTCOME=timeout
 run_selfcheck_function check_egress
-check "egress fails when the probe times out" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
-check "egress says the connection was not refused at once" "1" \
-  "$(file_has_text "${WORK_DIR}/run.out" "not refused at once")"
+check "egress trusts the rule counter when the probe was slow to fail" "2 0" "${RUN_PASSED} ${RUN_FAILED}"
+
+STUB_NFT_OUTPUT_AFTER="$EGRESS_TABLE"
+STUB_EGRESS_OUTCOME=refused
+run_selfcheck_function check_egress
+check "egress fails when the probe fails at once but the reject rule counted nothing" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "egress says the reject rule did not count the connection" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "not counted by the reject rule")"
 
 STUB_EGRESS_OUTCOME=connected
 run_selfcheck_function check_egress
-check "egress fails when the probe connects" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "egress fails when the probe connects and nothing was counted" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
 STUB_EGRESS_OUTCOME=refused
+
+STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain output {\n\t\ttype filter hook output priority filter; policy accept;\n\t\tip daddr { 192.0.2.0/24 } counter reject\n\t\tip6 daddr { 2001:db8:1::/64 } counter reject\n\t}\n}'
+STUB_NFT_OUTPUT_AFTER="$STUB_NFT_OUTPUT"
+run_selfcheck_function check_egress
+check "egress fails when the reject rule shows no packet counter" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "egress says the probe cannot be confirmed without a counter" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "cannot be confirmed")"
+unset STUB_NFT_OUTPUT_AFTER
 
 STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain input {\n\t\ttype filter hook input priority filter; policy drop;\n\t}\n\tchain output {\n\t\ttype filter hook output priority filter; policy accept;\n\t}\n}'
 : > "$EGRESS_PROBE_LOG"
@@ -483,6 +539,51 @@ check "egress ignores reject rules outside the output chain" "0 1" "${RUN_PASSED
 STUB_NFT_OUTPUT="$EGRESS_TABLE"
 check "selfcheck runs the egress check after the firewall check" "1" "$(file_has_line "$SELFCHECK" "  check_egress")"
 check "selfcheck runs the DNS check after the egress check" "1" "$(file_has_line "$SELFCHECK" "  check_dns")"
+
+check "selfcheck runs the IPv6 coverage check after the egress check" "1" \
+  "$(file_has_line "$SELFCHECK" "  check_egress_ipv6_coverage")"
+
+check "ipv6_groups expands a compressed address" "2001 0db8 0001 0000 0000 0000 0000 0001 " "$(ipv6_groups 2001:db8:1::1)"
+check "ipv6_groups expands a leading double colon" "0000 0000 0000 0000 0000 0000 0000 0001 " "$(ipv6_groups ::1)"
+check "ipv6_groups ignores a prefix length" "fc00 0000 0000 0000 0000 0000 0000 0000 " "$(ipv6_groups fc00::/7)"
+check "ipv6_groups rejects text that is not an address" "" "$(ipv6_groups not-an-address)"
+check "ipv6_groups rejects too many groups" "" "$(ipv6_groups 1:2:3:4:5:6:7:8:9)"
+check "an address inside a /64 is in range" "0" "$(ipv6_in_range 2001:db8:1:2::5 2001:db8:1:2::/64 && echo 0 || echo 1)"
+check "an address outside a /64 is not in range" "1" "$(ipv6_in_range 2001:db8:1:3::5 2001:db8:1:2::/64 && echo 0 || echo 1)"
+check "an address in a wider documentation block is in range of its /32" "0" "$(ipv6_in_range 2001:db8:3::1 2001:db8::/32 && echo 0 || echo 1)"
+check "a global address is not in fc00::/7" "1" "$(ipv6_in_range 2001:db8::1 fc00::/7 && echo 0 || echo 1)"
+check "a prefix that is not a multiple of sixteen bits is honoured" "0" "$(ipv6_in_range 2001:db8:0:7fff::1 2001:db8:0:7000::/52 && echo 0 || echo 1)"
+check "a prefix that is not a multiple of sixteen bits excludes what lies beyond it" "1" "$(ipv6_in_range 2001:db8:0:8000::1 2001:db8:0:7000::/52 && echo 0 || echo 1)"
+
+V6_TABLE=$'table inet cabinet_filter {\n\tchain output {\n\t\ttype filter hook output priority filter; policy accept;\n\t\tip daddr { 192.0.2.0/24 } counter packets 0 bytes 0 reject with icmpx admin-prohibited\n\t\tip6 daddr { fc00::/7, fe80::/10, 2001:db8:1::/48, 2001:db8:3::/48 } counter packets 0 bytes 0 reject with icmpx admin-prohibited\n\t}\n}'
+STUB_NFT_OUTPUT="$V6_TABLE"
+
+# shellcheck disable=SC2329 # replaces the selfcheck helper under test
+host_global_ipv6_addresses() { printf '%s\n' "$STUB_GLOBAL_IPV6"; }
+
+STUB_GLOBAL_IPV6=$'2001:db8:1:5::10\n2001:db8:3::10'
+run_selfcheck_function check_egress_ipv6_coverage
+check "ipv6 coverage passes when every global address is inside a blocked range" "1 0" "${RUN_PASSED} ${RUN_FAILED}"
+
+STUB_GLOBAL_IPV6=$'2001:db8:2:5::10\n2001:db8:3::10'
+run_selfcheck_function check_egress_ipv6_coverage
+check "ipv6 coverage fails when a global address is outside every blocked range" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "ipv6 coverage failure names the setting to change" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "CABINET_EGRESS_BLOCKED_RANGES6")"
+check "ipv6 coverage failure counts the uncovered addresses" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "1 of 2 global IPv6 addresses")"
+check "ipv6 coverage failure prints no address" "0" \
+  "$(count_lines_matching "${WORK_DIR}/run.out" -E '[0-9a-f]+:[0-9a-f:]+')"
+
+STUB_GLOBAL_IPV6=""
+run_selfcheck_function check_egress_ipv6_coverage
+check "ipv6 coverage passes when the host has no global IPv6 address" "1 0" "${RUN_PASSED} ${RUN_FAILED}"
+
+STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain output {\n\t\ttype filter hook output priority filter; policy accept;\n\t}\n}'
+STUB_GLOBAL_IPV6="2001:db8:1:5::10"
+run_selfcheck_function check_egress_ipv6_coverage
+check "ipv6 coverage fails when no IPv6 range is blocked and the host has a global address" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+STUB_NFT_OUTPUT="$EGRESS_TABLE"
 
 # shellcheck disable=SC2329 # replaces the selfcheck helper under test
 resolve_name() { return 0; }
@@ -512,8 +613,14 @@ check "the real probe reports a slow failure as a timeout" "timeout" "$(egress_p
 unset -f timeout
 check "first_blocked_host adds one to the network address" "192.0.2.1" \
   "$(first_blocked_host 'ip daddr { 192.0.2.0/24, 198.51.100.0/24 } reject')"
-check "first_blocked_host carries into the next octet" "192.0.3.0" \
+check "first_blocked_host probes the address itself when the entry is one address" "192.0.2.255" \
   "$(first_blocked_host 'ip daddr { 192.0.2.255/32 } reject')"
+check "first_blocked_host probes a single address written without a prefix" "192.0.2.9" \
+  "$(first_blocked_host 'ip daddr { 192.0.2.9 } reject')"
+check "first_blocked_host stays inside a two-address network" "192.0.2.1" \
+  "$(first_blocked_host 'ip daddr { 192.0.2.0/31 } reject')"
+check "first_blocked_host carries into the next octet" "192.0.3.0" \
+  "$(first_blocked_host 'ip daddr { 192.0.2.255/24 } reject')"
 
 ###
 ### Selfcheck: the unit's limits against the loaded unit file and the container
@@ -523,7 +630,7 @@ LIMITS_UNIT_WITHOUT_CPU="${WORK_DIR}/limits-no-cpu.service"
 cp "${DEPLOY_DIR}/systemd/cabinet.service" "$LIMITS_FIXTURE_UNIT"
 grep -v "^CPUQuota=" "${DEPLOY_DIR}/systemd/cabinet.service" > "$LIMITS_UNIT_WITHOUT_CPU"
 STUB_UNIT_PATH="$LIMITS_FIXTURE_UNIT"
-LIMITS_GOOD_SHOW=$'MemoryHigh=471859200\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=800ms\nCPUWeight=50\nTasksMax=512'
+LIMITS_GOOD_SHOW=$'MemoryHigh=503316480\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=800ms\nCPUWeight=50\nTasksMax=512'
 STUB_SYSTEMCTL_SHOW_OUTPUT="$LIMITS_GOOD_SHOW"
 STUB_CONTAINER_MEMORY_KIB=1048576
 STUB_CONTAINER_SWAP_KIB=524288
@@ -552,16 +659,16 @@ check "limits report the container's memory, swap and cores as numbers" "1" \
 check "limits read the effective values with one systemctl show" "1" \
   "$(count_lines_matching "$STUB_ARGS_LOG" -F 'systemctl show cabinet.service --property=MemoryHigh,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,CPUWeight,TasksMax')"
 
-STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=471859200\nMemoryMax=infinity\nMemorySwapMax=0\nCPUQuotaPerSecUSec=800ms\nCPUWeight=50\nTasksMax=512'
+STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=503316480\nMemoryMax=infinity\nMemorySwapMax=0\nCPUQuotaPerSecUSec=800ms\nCPUWeight=50\nTasksMax=512'
 run_selfcheck_function check_limits
 check "limits fail when MemoryMax is infinity" "1" "$(file_has_text "${WORK_DIR}/run.out" "FAIL - MemoryMax")"
 check "limits count one failure for an infinite MemoryMax" "1" "$RUN_FAILED"
 
-STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=471859200\nMemoryMax=629145600\nMemorySwapMax=infinity\nCPUQuotaPerSecUSec=800ms\nCPUWeight=50\nTasksMax=512'
+STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=503316480\nMemoryMax=629145600\nMemorySwapMax=infinity\nCPUQuotaPerSecUSec=800ms\nCPUWeight=50\nTasksMax=512'
 run_selfcheck_function check_limits
 check "limits fail when swap is not capped at zero" "1" "$(file_has_text "${WORK_DIR}/run.out" "FAIL - MemorySwapMax")"
 
-STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=471859200\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=500ms\nCPUWeight=50\nTasksMax=512'
+STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=503316480\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=500ms\nCPUWeight=50\nTasksMax=512'
 run_selfcheck_function check_limits
 check "limits fail when the effective CPU quota differs from the unit file" "1" \
   "$(file_has_text "${WORK_DIR}/run.out" "FAIL - CPUQuota")"
@@ -585,21 +692,21 @@ check "limits name the margin when it is not left over" "1" \
   "$(file_has_text "${WORK_DIR}/run.out" "128 MiB margin")"
 STUB_CONTAINER_MEMORY_KIB=1048576
 
-STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=471859200\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=1s\nCPUWeight=50\nTasksMax=512'
+STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=503316480\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=1s\nCPUWeight=50\nTasksMax=512'
 sed -i 's/^CPUQuota=80%$/CPUQuota=100%/' "$LIMITS_FIXTURE_UNIT"
 run_selfcheck_function check_limits
 check "limits fail with one core and a quota of a whole core" "1" "$RUN_FAILED"
 check "limits say the CPU quota reaches the container's cores" "1" \
   "$(file_has_text "${WORK_DIR}/run.out" "FAIL - the CPU quota")"
 
-STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=471859200\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=1.2s\nCPUWeight=50\nTasksMax=512'
+STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=503316480\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=1.2s\nCPUWeight=50\nTasksMax=512'
 sed -i 's/^CPUQuota=100%$/CPUQuota=120%/' "$LIMITS_FIXTURE_UNIT"
 run_selfcheck_function check_limits
 check "limits fail with one core and a quota above a whole core" "1" \
   "$(file_has_text "${WORK_DIR}/run.out" "FAIL - the CPU quota")"
 
 STUB_CONTAINER_CORES=2
-STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=471859200\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=1s\nCPUWeight=50\nTasksMax=512'
+STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=503316480\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=1s\nCPUWeight=50\nTasksMax=512'
 sed -i 's/^CPUQuota=120%$/CPUQuota=100%/' "$LIMITS_FIXTURE_UNIT"
 run_selfcheck_function check_limits
 check "limits pass with two cores and a quota of a whole core" "9 0" "${RUN_PASSED} ${RUN_FAILED}"

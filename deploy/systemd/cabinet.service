@@ -12,13 +12,17 @@ Environment=DOTNET_NOLOGO=1
 Environment=HOME=/var/lib/cabinet
 Environment=DOTNET_gcServer=0
 Environment=DOTNET_gcConcurrent=0
+Environment=DOTNET_GCHeapHardLimit=0x18000000
 StateDirectory=cabinet
 Restart=always
 RestartSec=10
 SyslogIdentifier=cabinet
 
-# Resource limits, sized from measured load and kept below the container's own limits.
-MemoryHigh=450M
+# Resource limits, sized from the measured sync, picture rebuild and flood (the peak of the whole
+# process was about 314 MiB, and one worst-case picture decode adds about 144 MiB) and kept below
+# the container's own limits. The runtime does not see the unit's memory limit, so the managed heap
+# gets a hard limit of 384 MiB (0x18000000 bytes) of its own, below MemoryHigh.
+MemoryHigh=480M
 MemoryMax=600M
 MemorySwapMax=0
 CPUQuota=80%

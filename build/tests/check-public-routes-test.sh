@@ -453,6 +453,18 @@ check "a refusal without Retry-After exits 1" "1" "$RUN_STATUS"
 check "a refusal without Retry-After gives one FAIL naming the header" "1" "$(count_matching '^FAIL - .*without Retry-After')"
 check "a refusal without Retry-After gives no other FAIL" "1" "$(count_matching '^FAIL - ')"
 
+write_burst_table "202=${STARTED}=" "409=${BUSY}=" "409=${BUSY}=" "409=${BUSY}=" "409=${BUSY}=" \
+  "429=${SHARED}=${COOLDOWN_HEADERS}" "429=${SHARED}=${COOLDOWN_HEADERS}" "429=${COOLDOWN}=Cache-Control: no-store"
+run_lan --burst
+check "another refusal's Retry-After does not stand in for the app's own missing one, exit 1" "1" "$RUN_STATUS"
+check "another refusal's Retry-After does not stand in for the app's own missing one, one FAIL names the header" "1" \
+  "$(count_matching '^FAIL - .*without Retry-After')"
+
+write_burst_table "202=${STARTED}=" "409=${BUSY}=" "409=${BUSY}=" "409=${BUSY}=" "409=${BUSY}=" \
+  "429=${SHARED}=Cache-Control: no-store" "429=${COOLDOWN}=${COOLDOWN_HEADERS}" "429=${COOLDOWN}=${COOLDOWN_HEADERS}"
+run_lan --burst
+check "every app refusal with its own Retry-After passes even when a shared refusal has none" "0" "$RUN_STATUS"
+
 write_burst_table "202=${STARTED}=" "409=${BUSY}="
 run_lan --burst
 check "a burst without any 429 exits 1" "1" "$RUN_STATUS"

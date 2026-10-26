@@ -687,7 +687,7 @@ Plans:
   4. The container has CPU and memory caps sized from real image-processing and sync load, and a flood of requests slows the app without starving the other guests on the host.
   5. A go-public checklist (headers, rate limits, health not routed, BGG credit present, BGG terms re-read, no personal data in the repository) is completed, and only then does the router open the public route.
 
-**Plans:** 10/24 plans executed
+**Plans:** 17/24 plans executed
 
 Plans:
 **Wave 1**
@@ -717,31 +717,31 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 08-11-PLAN.md — Measurement release (0.x), part one: PR, owner's merge and tag, verified draft
+- [x] 08-11-PLAN.md — Measurement release (0.x), part one: PR, owner's merge and tag, verified draft
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 08-12-PLAN.md — Measurement release, part two: host list first, deploy, provisioning, outbound block proven
+- [x] 08-12-PLAN.md — Measurement release, part two: host list first, deploy, provisioning, outbound block proven
 
 **Wave 8** *(blocked on Wave 7 completion)*
 
-- [ ] 08-13-PLAN.md — First visit and live connection cost measured; owner approves the exact proxy diff; outer wall applied
+- [x] 08-13-PLAN.md — First visit and live connection cost measured; owner approves the exact proxy diff; outer wall applied
 
 **Wave 9** *(blocked on Wave 8 completion)*
 
-- [ ] 08-14-PLAN.md — Sync and full picture rebuild peaks (owner's go), cap proposal
+- [x] 08-14-PLAN.md — Sync and full picture rebuild peaks (owner's go), cap proposal
 
 **Wave 10** *(blocked on Wave 9 completion)*
 
-- [ ] 08-15-PLAN.md — Owner sets container caps; controlled flood twice from the proxy (owner's go), verdict table per flood
+- [x] 08-15-PLAN.md — Owner sets container caps; controlled flood twice from the proxy (owner's go), verdict table per flood
 
 **Wave 11** *(blocked on Wave 10 completion)*
 
-- [ ] 08-16-PLAN.md — Sizing review and the owner's decision (host graph read; approve only with every verdict row PASS)
+- [x] 08-16-PLAN.md — Sizing review and the owner's decision (host graph read; approve only with every verdict row PASS)
 
 **Wave 12** *(blocked on Wave 11 completion)*
 
-- [ ] 08-17-PLAN.md — Decided limits written into the repository; sizing todo closed
+- [x] 08-17-PLAN.md — Decided limits written into the repository; sizing todo closed
 
 **Wave 13** *(blocked on Wave 12 completion)*
 
@@ -786,4 +786,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 6. Owner Tools & Persistence | 30/30 | Complete    | 2026-10-13 |
 | 6.1. Selectable Cabinet Finishes & Lighting (INSERTED) | 21/21 | Complete    | 2026-10-15 |
 | 7. Game-Night Filters & Location Cabinets | 47/47 | Complete    | 2026-10-19 |
-| 8. Public Hardening & Go-Public | 10/24 | In Progress|  |
+| 8. Public Hardening & Go-Public | 17/24 | In Progress|  |
