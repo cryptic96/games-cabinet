@@ -446,16 +446,19 @@ rule_packets() {
 ###
 ### Proves the outbound block: the output chain must hold a reject rule for
 ### an IPv4 and for an IPv6 destination set, and a connection attempt to an
-### address inside the first blocked IPv4 network must be counted by the reject
-### rule. The rule's own packet counter is the evidence, because a connection
-### that fails quickly for any other reason, such as a host that answers with a
-### reset or a missing route, would look the same from the outside. The probe
-### address is derived from the loaded rule, so no address is written down
-### anywhere, and none is printed.
+### address inside the first blocked IPv4 network must be rejected by that rule.
+### Three things must hold together. The probe must not connect. It must fail at
+### once, which is how a reject answers, rather than after a timeout, which a
+### silent drop or a missing route also produces. And the reject rule's own packet
+### counter must rise by about what one probe sends, read immediately before and
+### after the probe with nothing else in between, so traffic that reaches the rule
+### from elsewhere cannot stand in for the probe. The probe address is derived from
+### the loaded rule, so no address is written down anywhere, and none is printed.
 ###
 check_egress() {
-  local ruleset output_chain line v4_rule="" v6_rule="" host outcome before after
+  local ruleset output_chain line v4_rule="" v6_rule="" host outcome before after delta
   local v6_pattern='^[[:space:]]*ip6 daddr \{[^}]+\}.* reject'
+  local max_probe_packets=3
   if ! ruleset="$(nft list table inet cabinet_filter 2>&1)"; then
     fail "could not read the firewall table cabinet_filter: ${ruleset}"
     return
@@ -477,19 +480,33 @@ check_egress() {
     fail "could not work out a probe address from the blocked IPv4 ranges"
     return
   fi
-  before="$(rule_packets "$v4_rule")"
+  if ! ruleset="$(nft list table inet cabinet_filter 2>&1)"; then
+    fail "could not read the firewall table cabinet_filter before the probe: ${ruleset}"
+    return
+  fi
+  before="$(rule_packets "$(output_v4_reject_rule "$ruleset")")"
   outcome="$(egress_probe "$host")"
   if ! ruleset="$(nft list table inet cabinet_filter 2>&1)"; then
     fail "could not read the firewall table cabinet_filter after the probe: ${ruleset}"
     return
   fi
   after="$(rule_packets "$(output_v4_reject_rule "$ruleset")")"
-  if [[ -z "$before" || -z "$after" ]]; then
+
+  if [[ "$outcome" == connected ]]; then
+    fail "a connection to the first blocked network was opened, so the outbound block does not hold"
+  elif [[ -z "$before" || -z "$after" ]]; then
     fail "the blocked IPv4 reject rule shows no packet counter, so the probe cannot be confirmed"
-  elif ((after > before)); then
-    pass "a connection to the first blocked network was counted by the reject rule"
+  elif [[ "$outcome" != refused ]]; then
+    fail "a connection to the first blocked network did not fail at once (${outcome}), so the reject rule cannot be shown to have answered it"
   else
-    fail "a connection to the first blocked network was not counted by the reject rule (${outcome})"
+    delta=$((after - before))
+    if ((delta < 1)); then
+      fail "a connection to the first blocked network was not counted by the reject rule (${outcome})"
+    elif ((delta > max_probe_packets)); then
+      fail "the reject rule counted ${delta} packets for one probe, so other traffic reaches the blocked ranges and the probe cannot be confirmed"
+    else
+      pass "a connection to the first blocked network was rejected and counted by the reject rule"
+    fi
   fi
 }
 

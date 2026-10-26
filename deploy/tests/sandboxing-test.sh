@@ -275,7 +275,7 @@ case "$(basename "$0")" in
     calls="$(cat "$STUB_NFT_CALLS" 2>/dev/null || echo 0)"
     calls=$((calls + 1))
     printf '%s' "$calls" > "$STUB_NFT_CALLS"
-    if [ "$calls" -ge 2 ] && [ -n "${STUB_NFT_OUTPUT_AFTER:-}" ]; then
+    if [ "$calls" -ge 3 ] && [ -n "${STUB_NFT_OUTPUT_AFTER:-}" ]; then
       printf '%s\n' "$STUB_NFT_OUTPUT_AFTER"
     else
       printf '%s\n' "${STUB_NFT_OUTPUT:-}"
@@ -500,10 +500,18 @@ check "egress report prints no address" "0" \
 
 STUB_EGRESS_OUTCOME=timeout
 run_selfcheck_function check_egress
-check "egress trusts the rule counter when the probe was slow to fail" "2 0" "${RUN_PASSED} ${RUN_FAILED}"
+check "egress fails when the probe was slow to fail even though the counter rose" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "egress says the probe did not fail at once" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "did not fail at once")"
+
+STUB_EGRESS_OUTCOME=connected
+run_selfcheck_function check_egress
+check "egress fails when the probe connected even though the counter rose" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "egress says the probe connected" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "was opened")"
+STUB_EGRESS_OUTCOME=refused
 
 STUB_NFT_OUTPUT_AFTER="$EGRESS_TABLE"
-STUB_EGRESS_OUTCOME=refused
 run_selfcheck_function check_egress
 check "egress fails when the probe fails at once but the reject rule counted nothing" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
 check "egress says the reject rule did not count the connection" "1" \
@@ -513,6 +521,14 @@ STUB_EGRESS_OUTCOME=connected
 run_selfcheck_function check_egress
 check "egress fails when the probe connects and nothing was counted" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
 STUB_EGRESS_OUTCOME=refused
+
+STUB_NFT_OUTPUT_AFTER="${EGRESS_TABLE/counter packets 0/counter packets 40}"
+run_selfcheck_function check_egress
+check "egress fails when the counter rose by far more than one probe sends" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "egress says other traffic reaches the blocked ranges" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "other traffic")"
+check "egress report on a busy counter prints no address" "0" \
+  "$(count_lines_matching "${WORK_DIR}/run.out" -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+|[0-9a-f]+:[0-9a-f:]+')"
 
 STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain output {\n\t\ttype filter hook output priority filter; policy accept;\n\t\tip daddr { 192.0.2.0/24 } counter reject\n\t\tip6 daddr { 2001:db8:1::/64 } counter reject\n\t}\n}'
 STUB_NFT_OUTPUT_AFTER="$STUB_NFT_OUTPUT"
