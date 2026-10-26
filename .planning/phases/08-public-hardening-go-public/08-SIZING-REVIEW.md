@@ -340,6 +340,16 @@ New at this decision:
 
 Not changed: `provision.sh` does not print the detected IPv6 prefix.
 
+### SEC-06 amendment after the verification flood
+
+The verification flood on v1.0.0 (plan 08-20, generator confined to 25 % of the reverse proxy's core) failed one row: `verify-router | neighbour`. The cabinet passed every other row (direct flood to 200 workers with the neighbour under the stop line, no restart, no memory event, the in-flight cap measured and working per address). The failing row comes from the shared reverse proxy's single core: refusing about 5,400 requests per second from one address costs the proxy process about 44 % of its core and lifts a neighbour site's median from about 24 ms to about 48-67 ms for the duration of the flood; rate-capped load (about 1,800 req/s) left the neighbour unchanged, and everything recovered by itself.
+
+The owner was offered a second core for the proxy container, a higher CPU weight, accepting the row with a written reason, or holding. The owner's answer, verbatim: "Accept with reason". The reason, as put to the owner: this limit belongs to the shared reverse proxy in front of every site, not to the cabinet, and a doubling of a neighbour's response time (about 24 ms to about 50 ms) while one address floods is not starvation.
+
+Amended definition: SEC-06 is done when the container and unit caps are sized from the measured peaks plus the stated headroom and every verdict row of the verification flood passes, except a `neighbour` row whose only cause is the shared reverse proxy's own CPU spent refusing a single-address flood, provided the neighbour stays answering (no errors, no timeouts) and recovers by itself; such a row is recorded as accepted with this reason. The proxy container's core count remains an owner maintenance option outside the repository.
+
+Host CPU reading for the verification flood windows: pending; the owner will report it ("I'll check later"), collected with the go-public checklist.
+
 ### Values changed at this decision (for the verification flood plan)
 
 1. `MemoryHigh` 450 MiB to 480 MiB.

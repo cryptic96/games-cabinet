@@ -57,6 +57,10 @@ Recovery and clean-up: restart count 0, `memory.events` all 0, 0 out-of-memory l
 
 Going public needs every row PASS, so the router flood's FAIL stops the way to going public until it is settled. Nothing the release ships failed: the cabinet's limits held and recovered by themselves. What failed is the proxy container's single core under refused-request volume, which lives outside the release (the container's core count and the proxy's own settings), so a fix there is re-checked by repeating this flood on the same version, not by a `v1.0.1`.
 
+## Owner decision on the failed row
+
+The owner was shown the verdict (router `neighbour` FAIL, every other row PASS) and the options (second core for the proxy container and a repeat of the router flood, a higher CPU weight, accepting the row with a written reason, or hold). The owner's answer, verbatim: "Accept with reason". The row stays recorded as measured (FAIL) and is accepted under the amended SEC-06 definition written in `08-SIZING-REVIEW.md` ("SEC-06 amendment after the verification flood"): the only cause is the shared reverse proxy's own CPU spent refusing a single-address flood, the neighbour kept answering and recovered by itself. Host CPU rows: pending the owner's reading ("I'll check later"), collected with the go-public checklist.
+
 ## Deviations from Plan
 
 ### Auto-fixed Issues
