@@ -152,10 +152,12 @@ From the owner's phone on mobile data (Wi-Fi off), the only vantage point outsid
 
 | Check | Expected answer | Result |
 |---|---|---|
-| The public site (`https://{public-hostname}/`) | loads, valid certificate, the cabinet and the BGG credit visible | pending owner |
-| `https://{public-hostname}/health` | 404 | pending owner |
-| `https://{public-hostname}:5081/` (operations port) | no connection | pending owner |
-| `https://{owner-hostname}/` | 403 (or no connection) | pending owner |
-| Time of the first page load | about HH:MM, for the access-log check (public client address seen: yes or no) | pending owner |
+| The public site (`https://{public-hostname}/`) | loads, valid certificate, the cabinet and the BGG credit visible | PASS (owner: loads) |
+| `https://{public-hostname}/health` | 404 | PASS: 404 with an empty body (Safari offers the empty answer as a download; confirmed 404 by the orchestrator) |
+| `https://{public-hostname}:5081/` (operations port) | no connection | PASS (owner: not accessible) |
+| `https://{owner-hostname}/` | 403 (or no connection) | PASS (owner: not accessible) |
+| Access-log check | the phone's request classified by the proxy's access log | public address seen: yes |
 
 If any of the three addresses that must fail answers, the site is closed again at once (the allow-list line goes back into the public router) before anything else.
+
+The owner's words, verbatim: "3 and 4 are not accessible. 2 results in a file download in safari which doesn't download anything (nothing loads)? So I suppose it's invalid?" The orchestrator confirmed the public `/health` answers 404 with an empty body and no content type (so Safari offers an empty download); the health details exist only on the loopback operations port. Every external check passed; nothing private answered, so the site stays open. Every gate of the go-public checklist is passed; the maintenance-key passphrases remain the final step.
