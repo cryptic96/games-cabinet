@@ -15,14 +15,16 @@ namespace Cabinet.UnitTests.Limits;
 /// </summary>
 public class LiveConnectWindowTests
 {
+    private const string DoubleSlash = "/" + "/";
+
     [Theory]
     [InlineData("POST", "/cabinet/live/negotiate", "?negotiateVersion=1", true)]
     [InlineData("POST", "/cabinet/live/negotiate/", "?negotiateVersion=1", true)]
-    [InlineData("POST", "/cabinet/live/negotiate//", "?negotiateVersion=1", true)]
+    [InlineData("POST", "/cabinet/live/negotiate" + DoubleSlash, "?negotiateVersion=1", true)]
     [InlineData("POST", "/cabinet/live/NEGOTIATE", "?negotiateVersion=1", true)]
     [InlineData("POST", "/Cabinet/Live/Negotiate/", "?negotiateVersion=1", true)]
-    [InlineData("POST", "/cabinet/live//negotiate", "?negotiateVersion=1", true)]
-    [InlineData("POST", "/cabinet/live//negotiate/", "", true)]
+    [InlineData("POST", "/cabinet/live" + DoubleSlash + "negotiate", "?negotiateVersion=1", true)]
+    [InlineData("POST", "/cabinet/live" + DoubleSlash + "negotiate/", "", true)]
     [InlineData("GET", "/cabinet/live/negotiate/", "", true)]
     [InlineData("OPTIONS", "/cabinet/live/negotiate/", "", true)]
     [InlineData("POST", "/cabinet/live/negotiate/", "?id=abc", true)]

@@ -29,6 +29,7 @@ public class LiveAddressCapTests
     private const string OtherClient = "203.0.113.8";
     private const string SharedClient = "203.0.113.7";
     private const string ThirdClient = "203.0.113.9";
+    private const string DoubleSlash = "/" + "/";
     private const string NegotiatePath = "/cabinet/live/negotiate?negotiateVersion=1";
     private const int ShippedCap = 20;
     private const int SeveralPings = 4;
@@ -175,8 +176,8 @@ public class LiveAddressCapTests
     [InlineData("/cabinet/live/negotiate/?negotiateVersion=1")]
     [InlineData("/cabinet/live/NEGOTIATE?negotiateVersion=1")]
     [InlineData("/Cabinet/Live/Negotiate/?negotiateVersion=1")]
-    [InlineData("/cabinet/live//negotiate?negotiateVersion=1")]
-    [InlineData("/cabinet/live/negotiate//?negotiateVersion=1")]
+    [InlineData("/cabinet/live" + DoubleSlash + "negotiate?negotiateVersion=1")]
+    [InlineData("/cabinet/live/negotiate" + DoubleSlash + "?negotiateVersion=1")]
     public async Task A_negotiate_in_any_spelling_of_its_path_is_counted_per_address_and_the_one_over_the_window_is_refused(string path)
     {
         await using var host = Host(new Dictionary<string, string?> { ["ClientLimits:LiveConnectsPerWindow"] = "2" });
@@ -198,7 +199,7 @@ public class LiveAddressCapTests
     [Theory]
     [InlineData("/cabinet/live/negotiate/?negotiateVersion=1")]
     [InlineData("/cabinet/live/NEGOTIATE?negotiateVersion=1")]
-    [InlineData("/cabinet/live//negotiate?negotiateVersion=1")]
+    [InlineData("/cabinet/live" + DoubleSlash + "negotiate?negotiateVersion=1")]
     public async Task A_negotiate_in_any_spelling_of_its_path_is_counted_site_wide_and_a_new_address_is_refused(string path)
     {
         await using var host = Host(new Dictionary<string, string?> { ["ClientLimits:LiveConnectsSiteWidePerWindow"] = "2" });
