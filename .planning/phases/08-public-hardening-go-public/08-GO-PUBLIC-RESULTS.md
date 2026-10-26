@@ -4,7 +4,7 @@ Filled in from `docs/go-public.md`, one row per item. Run on 2026-10-26 against 
 the attested release published by the owner that day) on the LAN-only route. Every hostname, address and range is
 omitted on purpose; real values stay on the servers and in chat.
 
-Overall state: ready for sign-off; maintenance-key passphrases are the final step after the switch. Every item is done
+Overall state: public route open since 2026-10-26 (see "The switch"); was ready for sign-off; maintenance-key passphrases are the final step after the switch. Every item is done
 and evidenced except two that can only happen later: the phone check from mobile data (after the switch, plan 08-23) and the
 maintenance-key passphrases (final step, by the owner, plan 08-24).
 
@@ -113,4 +113,27 @@ non-public address there closes the site again at once.
    allowed, and the review date (go-public date plus 90 days) in both risk registers.
 6. Closing again is putting the allow-list line back into the public router's list.
 
-State: waiting for the owner's decision (signed off and go, with or without the scanners, or hold).
+State: the owner decided; see "The switch" below.
+
+## The switch
+
+Owner's answer, verbatim: "signed off, go, scanners yes".
+
+| Item | Outcome |
+|---|---|
+| switch time (UTC) | 2026-10-26T15:04:40Z (go-public date 2026-10-26) |
+| Live file checked first | checksum equal to the one recorded at sign-off (`10cb3100...`); changed to `fb455ad7...` by the move |
+| Backup taken | yes, a stamped copy of the live file outside the watched folder on the proxy (UTC stamp 20261026T150430Z), kept |
+| Edited copy | built outside the watched folder from a copy with the same owner and mode; only line 42 of the live file was removed |
+| Guard before the move | PASS: exactly one removed line, no added line, the line names the recorded allow-list middleware (the one the example calls `cabinet-lan-only`), it lies inside the public router's block, the owner router's block has the same hash before and after. The guard was also run against two deliberately wrong edits (a line removed from the owner router, a different line removed) and failed both |
+| One line removed | the public router's allow-list entry; the public router now lists headers, rate limit, in-flight cap |
+| Owner router | unchanged (allow-list, headers) |
+| Proxy accepted the file | yes: moved in one step, service active with no restart, no error in the proxy's logs naming the cabinet file, a router or a middleware during the 30 seconds that followed (only the known, older certificate-renewal rate-limit errors for other sites' names) |
+| Route check after the move | `build/check-public-routes.sh --from-lan`: exit 0, 31 PASS, 0 FAIL (owner host still 200 from the home network) |
+| From a non-allowed source address | a request made on the proxy itself (source outside the allow-list): public host 200 with HSTS, owner host 403. The phone check from mobile data in plan 08-23 covers the real outside view |
+| Review point for maintenance access | 2027-01-24 (90 days after going public), recorded in the AR-08 row of `01-SECURITY.md` and the AR-06-05 row of `06-SECURITY.md` |
+| Closing again | put the allow-list line back into the public router's list; the backup is the file as it was |
+
+## Scanners
+
+Scanners: run by the orchestrator, results recorded below
