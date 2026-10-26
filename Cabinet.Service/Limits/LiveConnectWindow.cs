@@ -11,16 +11,13 @@ namespace Cabinet.Service.Limits;
 /// that carries no connection identifier is a client that skipped negotiation, which a WebSocket client may do, or one the hub
 /// turns away without opening anything; it is counted too, so no way of asking buys an unlimited rate of new connections.
 /// Every request that carries an identifier, which in practice is the connect request after a negotiation and the messages a
-/// Server-Sent Events page posts back with its close request, is not counted.
-/// The site-wide window is a backstop on the same requests: it holds however many addresses a flood comes from, and it is
-/// asked after the per-address window, so an address that is already refused spends nothing of the site's budget.
+/// Server-Sent Events page posts back with its close request, is not counted. The site-wide window is a backstop on the same
+/// requests: it holds however many addresses a flood comes from. A request refused by either window spends nothing of the other.
 /// </summary>
 public static class LiveConnectWindow
 {
     private const string NegotiateSuffix = "/negotiate";
     private const string ConnectionIdKey = "id";
-    private const string NotCounted = "not-counted";
-    private const string SiteWideKey = "connect|site";
 
     /// <summary>Whether the request asks the live route for a new connection and so spends a place in the window.</summary>
     /// <param name="request">The request to classify.</param>
@@ -44,42 +41,16 @@ public static class LiveConnectWindow
     }
 
     /// <summary>
-    /// Builds the limiter that counts new live connections: first per client address, then site-wide. Both replenish
-    /// lazily, so an idle address holds no timer and its window is dropped once it has expired.
+    /// Builds the limiter that counts new live connections per client address and site-wide. A refusal by either budget
+    /// spends nothing from the other, and both are measured on the clock when asked, so an idle address holds no timer and
+    /// its window is dropped once it has expired.
     /// </summary>
     /// <param name="options">The budgets and the window they are counted in.</param>
-    public static PartitionedRateLimiter<HttpContext> CreateLimiter(ClientLimitOptions options)
+    /// <param name="clock">The clock the windows are measured on; the system clock when absent.</param>
+    public static PartitionedRateLimiter<HttpContext> CreateLimiter(ClientLimitOptions options, TimeProvider? clock = null)
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        return PartitionedRateLimiter.CreateChained(CreatePerAddressLimiter(options), CreateSiteWideLimiter(options));
+        return new LiveConnectWindowLimiter(options, clock ?? TimeProvider.System);
     }
-
-    private static PartitionedRateLimiter<HttpContext> CreatePerAddressLimiter(ClientLimitOptions options) =>
-        PartitionedRateLimiter.Create<HttpContext, string>(context =>
-            CountsAsNewConnection(context.Request)
-                ? RateLimitPartition.GetFixedWindowLimiter(
-                    $"connect|{ClientAddress.PartitionKey(context)}",
-                    _ => new FixedWindowRateLimiterOptions
-                    {
-                        PermitLimit = options.LiveConnectsPerWindow,
-                        Window = options.LiveWindow,
-                        QueueLimit = 0,
-                        AutoReplenishment = false,
-                    })
-                : RateLimitPartition.GetNoLimiter(NotCounted));
-
-    private static PartitionedRateLimiter<HttpContext> CreateSiteWideLimiter(ClientLimitOptions options) =>
-        PartitionedRateLimiter.Create<HttpContext, string>(context =>
-            CountsAsNewConnection(context.Request)
-                ? RateLimitPartition.GetFixedWindowLimiter(
-                    SiteWideKey,
-                    _ => new FixedWindowRateLimiterOptions
-                    {
-                        PermitLimit = options.LiveConnectsSiteWide,
-                        Window = options.LiveWindow,
-                        QueueLimit = 0,
-                        AutoReplenishment = false,
-                    })
-                : RateLimitPartition.GetNoLimiter(NotCounted));
 }
