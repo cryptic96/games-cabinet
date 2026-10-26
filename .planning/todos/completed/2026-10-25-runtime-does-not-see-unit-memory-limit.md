@@ -16,3 +16,7 @@ After provisioning the measurement release with `MemoryHigh`/`MemoryMax` on `cab
 ## Solution
 
 When the final unit numbers are written (plan 08-17), set an explicit absolute heap limit in the unit, `Environment=DOTNET_GCHeapHardLimit=<hex bytes>` sized below `MemoryHigh` (a percentage limit would be a percentage of the wrong 15 GB figure), and have the selfcheck or the start-up report confirm the runtime's figure matches. Optionally find out why cgroup v2 detection misses the service cgroup inside the LXC under the unit's sandboxing directives. Verify on the container after provisioning: the start-up line reports about the configured limit.
+
+## Closed 2026-10-26
+
+Plan 08-17 sets `Environment=DOTNET_GCHeapHardLimit=0x18000000` (384 MiB, an absolute value, below `MemoryHigh` of 480 MiB) in `deploy/systemd/cabinet.service`, pinned by `deploy/tests/sandboxing-test.sh`. The start-up runtime line should report about 384 MiB after provisioning; that is verified later on the container, in the verification flood and a picture rebuild. Why cgroup detection misses the service cgroup was not investigated; the absolute limit makes it unnecessary.

@@ -91,7 +91,7 @@ Settings, all optional, in the same env file:
 | `Sync__StartupJitterMaxSeconds` | `120` | 10 to 3600 | The latest the start-up sync may begin after the service starts. |
 | `Sync__StaleAfterHours` | `3` | 1 to 168 | How old the collection may get before a page treats it as out of date and shows a calm note. |
 | `ClientLimits__SyncPressesPerWindow` | `5` | 1 to 1000 | How many times one client address may press the button within the window below. |
-| `ClientLimits__SyncWindowSeconds` | `60` | 1 to 3600 | Length of that per-address window, in seconds. |
+| `ClientLimits__SyncWindowSeconds` | `60` | 1 to 600 | Length of that per-address window, in seconds. A window of an hour would keep a refused group out for up to an hour, so the largest accepted value is 10 minutes. |
 
 The two `ClientLimits__Sync*` keys limit how often one client address may press
 the button, whatever the shared window says. A press over the limit gets the
@@ -141,7 +141,8 @@ safe on the internet:
 | `Live__MaxConnections` | `100` | 1 to 10000 | The most live connections held open at once. A page that is refused is closed right after it connects, without permission to reconnect by itself; it follows the slow retry schedule above and meanwhile uses the one-minute status check. |
 | `ClientLimits__LiveConnectionsPerClient` | `20` | 1 to 1000 | The most live connections one client address may hold open at once. A page over the cap is refused with a `429` before the connection is set up and falls back the same way as a refused page. |
 | `ClientLimits__LiveConnectsPerWindow` | `60` | 1 to 10000 | How many new live connections one client address may ask for within the window below. |
-| `ClientLimits__LiveWindowSeconds` | `60` | 1 to 3600 | Length of that per-address window, in seconds. |
+| `ClientLimits__LiveWindowSeconds` | `60` | 1 to 600 | Length of the per-address window above and of the site-wide window below, in seconds. The largest accepted value is 10 minutes. |
+| `ClientLimits__LiveConnectsSiteWidePerWindow` | `600` | 1 to 100000 | How many new live connections the whole site accepts within that window, from all addresses together. It backs up the per-address window when a flood comes from many addresses. It counts exactly the requests the per-address window counts, so connections already held and the messages a Server-Sent Events page posts are not affected. A request over the limit is refused quietly with a `429`, a `Retry-After` and no body. |
 
 A value outside the range stops the service at start-up with a message that names
 the key. The live channel admits only pages served by the site's own

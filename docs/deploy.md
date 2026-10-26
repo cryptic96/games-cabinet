@@ -295,8 +295,9 @@ start-up with a message that names the key.
 | `HostLimits__RequestHeadersTimeoutSeconds` | `10` | 2 to 120 | How long a client may take to send its request headers, which turns away connections that open and then stall. |
 
 The per-client limits on "sync now" and on the live channel are in
-[the sync guide](bgg-sync.md). Every value listed here is a starting value
-that can be changed from the load you actually see. Opening the site to the
+[the sync guide](bgg-sync.md). Every default listed here is sized from
+the measured first visit, sync, picture rebuild and flood, with room above the
+measured peaks, and can be changed from the load you actually see. Opening the site to the
 public is covered by [the go-public checklist](go-public.md).
 
 ## Backing up owner data

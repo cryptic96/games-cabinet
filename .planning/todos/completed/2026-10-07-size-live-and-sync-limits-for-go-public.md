@@ -22,3 +22,11 @@ The live channel and the sync press were built with placeholder limits for a hom
 ## Solution
 
 Part of the Phase 8 go-public checklist: size the caps from measured load on the container, add an origin allow-list for `/cabinet/live` from the configured public host, add a per-client fixed-window limiter (behind the forwarded-headers setup) for `POST /cabinet/sync` and for negotiate, add a Traefik rate-limit middleware in front of both, and add tests for each limit. Then revisit AR-03-02 and AR-03-03.
+
+## Closed 2026-10-26
+
+Done across plans 08-01, 08-05, 08-06 and 08-13 to 08-17:
+
+- Origin allow-list for the live route, per-client limiters on the sync press and on negotiate behind the forwarded-headers setup, and a Traefik rate limit and in-flight cap in front: plans 08-01, 08-05 and 08-06, with a test for each. Accepted risks AR-03-02 and AR-03-03 are closed by them.
+- Caps sized from measured load (the first visit, the sync, the picture rebuild and the floods), reviewed with the owner and decided: plans 08-13 to 08-16, decision recorded in `08-SIZING-REVIEW.md`.
+- The decided values written into the committed settings, the code defaults, the unit, the Traefik example and the docs, with tests pinning them, plus the site-wide live-connect backstop and the 600 s ceiling on the window settings: plan 08-17.
