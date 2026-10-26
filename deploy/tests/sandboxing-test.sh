@@ -100,9 +100,10 @@ for directive in \
   RestrictNamespaces=yes LockPersonality=yes \
   RestrictAddressFamilies=AF_UNIX\ AF_INET\ AF_INET6 \
   CapabilityBoundingSet= SystemCallArchitectures=native \
-  MemoryHigh=450M MemoryMax=600M MemorySwapMax=0 CPUQuota=80% CPUWeight=50 \
+  MemoryHigh=480M MemoryMax=600M MemorySwapMax=0 CPUQuota=80% CPUWeight=50 \
   TasksMax=512 LimitNOFILE=4096 \
-  Environment=DOTNET_gcServer=0 Environment=DOTNET_gcConcurrent=0; do
+  Environment=DOTNET_gcServer=0 Environment=DOTNET_gcConcurrent=0 \
+  Environment=DOTNET_GCHeapHardLimit=0x18000000; do
   check "app unit has ${directive}" "1" "$(file_has_line "$APP_UNIT" "$directive")"
 done
 
@@ -111,6 +112,11 @@ APP_MEMORY_MAX_MIB="$(sed -n 's/^MemoryMax=\([0-9]*\)M$/\1/p' "$APP_UNIT")"
 APP_CPU_QUOTA_PERCENT="$(sed -n 's/^CPUQuota=\([0-9]*\)%$/\1/p' "$APP_UNIT")"
 check "app unit keeps MemoryHigh below MemoryMax" "below" \
   "$([ "${APP_MEMORY_HIGH_MIB:-0}" -lt "${APP_MEMORY_MAX_MIB:-0}" ] && echo below || echo not-below)"
+APP_HEAP_LIMIT_HEX="$(sed -n 's/^Environment=DOTNET_GCHeapHardLimit=0x\([0-9A-Fa-f]*\)$/\1/p' "$APP_UNIT")"
+APP_HEAP_LIMIT_MIB="$(( 0x${APP_HEAP_LIMIT_HEX:-0} / 1048576 ))"
+check "app unit sets the runtime heap hard limit to 384 MiB" "384" "$APP_HEAP_LIMIT_MIB"
+check "app unit keeps the runtime heap limit below MemoryHigh" "below" \
+  "$([ "$APP_HEAP_LIMIT_MIB" -gt 0 ] && [ "$APP_HEAP_LIMIT_MIB" -lt "${APP_MEMORY_HIGH_MIB:-0}" ] && echo below || echo not-below)"
 check "app unit keeps the CPU quota below one whole core" "below" \
   "$([ "${APP_CPU_QUOTA_PERCENT:-100}" -lt 100 ] && echo below || echo not-below)"
 
@@ -624,7 +630,7 @@ LIMITS_UNIT_WITHOUT_CPU="${WORK_DIR}/limits-no-cpu.service"
 cp "${DEPLOY_DIR}/systemd/cabinet.service" "$LIMITS_FIXTURE_UNIT"
 grep -v "^CPUQuota=" "${DEPLOY_DIR}/systemd/cabinet.service" > "$LIMITS_UNIT_WITHOUT_CPU"
 STUB_UNIT_PATH="$LIMITS_FIXTURE_UNIT"
-LIMITS_GOOD_SHOW=$'MemoryHigh=471859200\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=800ms\nCPUWeight=50\nTasksMax=512'
+LIMITS_GOOD_SHOW=$'MemoryHigh=503316480\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=800ms\nCPUWeight=50\nTasksMax=512'
 STUB_SYSTEMCTL_SHOW_OUTPUT="$LIMITS_GOOD_SHOW"
 STUB_CONTAINER_MEMORY_KIB=1048576
 STUB_CONTAINER_SWAP_KIB=524288
@@ -653,16 +659,16 @@ check "limits report the container's memory, swap and cores as numbers" "1" \
 check "limits read the effective values with one systemctl show" "1" \
   "$(count_lines_matching "$STUB_ARGS_LOG" -F 'systemctl show cabinet.service --property=MemoryHigh,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,CPUWeight,TasksMax')"
 
-STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=471859200\nMemoryMax=infinity\nMemorySwapMax=0\nCPUQuotaPerSecUSec=800ms\nCPUWeight=50\nTasksMax=512'
+STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=503316480\nMemoryMax=infinity\nMemorySwapMax=0\nCPUQuotaPerSecUSec=800ms\nCPUWeight=50\nTasksMax=512'
 run_selfcheck_function check_limits
 check "limits fail when MemoryMax is infinity" "1" "$(file_has_text "${WORK_DIR}/run.out" "FAIL - MemoryMax")"
 check "limits count one failure for an infinite MemoryMax" "1" "$RUN_FAILED"
 
-STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=471859200\nMemoryMax=629145600\nMemorySwapMax=infinity\nCPUQuotaPerSecUSec=800ms\nCPUWeight=50\nTasksMax=512'
+STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=503316480\nMemoryMax=629145600\nMemorySwapMax=infinity\nCPUQuotaPerSecUSec=800ms\nCPUWeight=50\nTasksMax=512'
 run_selfcheck_function check_limits
 check "limits fail when swap is not capped at zero" "1" "$(file_has_text "${WORK_DIR}/run.out" "FAIL - MemorySwapMax")"
 
-STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=471859200\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=500ms\nCPUWeight=50\nTasksMax=512'
+STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=503316480\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=500ms\nCPUWeight=50\nTasksMax=512'
 run_selfcheck_function check_limits
 check "limits fail when the effective CPU quota differs from the unit file" "1" \
   "$(file_has_text "${WORK_DIR}/run.out" "FAIL - CPUQuota")"
@@ -686,21 +692,21 @@ check "limits name the margin when it is not left over" "1" \
   "$(file_has_text "${WORK_DIR}/run.out" "128 MiB margin")"
 STUB_CONTAINER_MEMORY_KIB=1048576
 
-STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=471859200\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=1s\nCPUWeight=50\nTasksMax=512'
+STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=503316480\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=1s\nCPUWeight=50\nTasksMax=512'
 sed -i 's/^CPUQuota=80%$/CPUQuota=100%/' "$LIMITS_FIXTURE_UNIT"
 run_selfcheck_function check_limits
 check "limits fail with one core and a quota of a whole core" "1" "$RUN_FAILED"
 check "limits say the CPU quota reaches the container's cores" "1" \
   "$(file_has_text "${WORK_DIR}/run.out" "FAIL - the CPU quota")"
 
-STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=471859200\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=1.2s\nCPUWeight=50\nTasksMax=512'
+STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=503316480\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=1.2s\nCPUWeight=50\nTasksMax=512'
 sed -i 's/^CPUQuota=100%$/CPUQuota=120%/' "$LIMITS_FIXTURE_UNIT"
 run_selfcheck_function check_limits
 check "limits fail with one core and a quota above a whole core" "1" \
   "$(file_has_text "${WORK_DIR}/run.out" "FAIL - the CPU quota")"
 
 STUB_CONTAINER_CORES=2
-STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=471859200\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=1s\nCPUWeight=50\nTasksMax=512'
+STUB_SYSTEMCTL_SHOW_OUTPUT=$'MemoryHigh=503316480\nMemoryMax=629145600\nMemorySwapMax=0\nCPUQuotaPerSecUSec=1s\nCPUWeight=50\nTasksMax=512'
 sed -i 's/^CPUQuota=120%$/CPUQuota=100%/' "$LIMITS_FIXTURE_UNIT"
 run_selfcheck_function check_limits
 check "limits pass with two cores and a quota of a whole core" "9 0" "${RUN_PASSED} ${RUN_FAILED}"

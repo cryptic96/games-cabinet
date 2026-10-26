@@ -50,9 +50,14 @@ http:
     # over the limit is delayed a little first and then refused with
     # Traefik's plain 429 response; no styled error page is added.
     #
-    # The numbers are starting values. Re-size them from a measured first
-    # visit, so that several friends on one Wi-Fi network opening the link at
-    # the same moment all get every picture.
+    # The numbers come from a measured first visit and from flooding the
+    # public router. One first visit is about 60 requests, all started within
+    # a few seconds. A burst of 800 holds about 8 simultaneous first visits
+    # from one address (roughly 470 requests) with room to spare, and still
+    # holds 8 visits if the collection grows by about two thirds. An average
+    # of 60 per second refills one visit's worth of requests every second. A
+    # flood from one address gets through about 800 requests plus 60 per
+    # second and is refused with the plain 429 after that.
     #
     # The source criterion is set explicitly on purpose. Without it the
     # in-flight limit would count per request host, which puts every client
@@ -62,9 +67,9 @@ http:
     # into one client.
     cabinet-rate-limit:
       rateLimit:
-        average: 50
+        average: 60
         period: 1s
-        burst: 1000
+        burst: 800
         sourceCriterion:
           ipStrategy:
             ipv6Subnet: 64
@@ -75,10 +80,13 @@ http:
     # its whole life (the controlled flood test verifies this with about 20
     # held streams), so the amount must stay above the application's own
     # per-address live-connection cap plus the parallel page loads of a group
-    # of friends on one address. These are starting values too.
+    # of friends on one address. The amount of 200 is sized as follows: one
+    # first visit has at most 17 requests in flight, 8 simultaneous visits make
+    # 136, and up to 20 held live streams make 156, which leaves about 28 percent
+    # of room.
     cabinet-in-flight:
       inFlightReq:
-        amount: 150
+        amount: 200
         sourceCriterion:
           ipStrategy:
             ipv6Subnet: 64

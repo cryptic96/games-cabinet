@@ -20,14 +20,17 @@ only one; each catches what the others might miss.
   do the work: a rate limit per client address and a cap on requests being
   served at once per client address. Both are sized generously on purpose, so
   a group of friends opening the link on one Wi-Fi network all get every
-  picture. The numbers in the example file are starting values; they are
-  re-sized from a measured first visit.
+  picture. The numbers in the example file (60 requests per second on
+  average, a burst of 800, and 200 requests in flight, per client address) come
+  from a measured first visit and leave room for about 8 simultaneous first
+  visits from one address.
 - **The application adds much stricter limits where a visitor can cause real
   work.** Pressing "sync now" is limited to a handful of presses a minute for
   each client address, and a press over the limit gets the same answer as the
   shared cooldown, so the page shows its usual countdown. The live channel
   limits how many pages one address may hold open and how often it may ask for
-  a new connection. The live channel also admits only pages served by the
+  a new connection, and a site-wide limit on new connections backs that up when
+  a flood comes from many addresses. The live channel also admits only pages served by the
   site's own hostnames, so a page on another site cannot use it. The limits
   and their settings are in [the sync guide](bgg-sync.md).
 - **The application sends the security headers; the proxy adds only HSTS.**

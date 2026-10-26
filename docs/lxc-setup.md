@@ -56,9 +56,9 @@ pct start {ctid}
 pct enter {ctid}
 ```
 
-One core, 1 GB of memory and an 8 GB disk are a starting point. They are
-small on purpose for a shared, low-power host; tune them later from the load
-you actually see. Nesting is needed so the service sandboxing that the app
+One core, 1 GB of memory and an 8 GB disk are enough for the measured load. They
+are small on purpose for a shared, low-power host; change them only if the load
+you actually see calls for it. Nesting is needed so the service sandboxing that the app
 unit and the selfcheck rely on works inside an unprivileged container.
 
 ### Container limits
@@ -70,6 +70,14 @@ while it runs. Replace every `{placeholder}` with the host's own value:
 pct set {ctid} --cores {cores} --memory {memory-mb} --swap {swap-mb} --cpuunits {cpu-units}
 ```
 
+The values the unit's limits were checked against, as a worked example (replace
+`{ctid}` with the container's id): one core, 1 GiB of memory, 512 MiB of swap
+and a CPU weight of 50.
+
+```bash
+pct set {ctid} --cores 1 --memory 1024 --swap 512 --cpuunits 50
+```
+
 - Give the container a CPU weight (`--cpuunits`) lower than the reverse
   proxy's, so the proxy always wins when the host is busy.
 - The container cannot read its own CPU weight, so check it on the host with
@@ -78,9 +86,18 @@ pct set {ctid} --cores {cores} --memory {memory-mb} --swap {swap-mb} --cpuunits 
 - The application unit has limits of its own (memory, swap, CPU share, task
   count and open files), and they sit below the container's, so SSH and the
   deploy timer keep room even when the application is at its ceiling. The
-  numbers shipped in the unit are starting values; size them from the memory
-  and CPU you see during a sync and a picture rebuild. The selfcheck fails when
-  the unit's memory ceiling leaves less than a small margin below the
+  numbers shipped in the unit are sized from what was measured: the whole
+  service peaked at about 314 MiB through a sync, a full picture rebuild of a
+  few hundred games and a deliberate flood, and one worst-case picture decode
+  adds about 144 MiB on top. The unit shows the values: 480 MiB where the
+  kernel starts reclaiming memory, 600 MiB as the hard ceiling, no swap, 80
+  percent of one core, a CPU weight of 50, 512 tasks and 4096 open files. The
+  runtime does not see the unit's memory limit and reports the host's memory
+  instead, so the unit also gives the managed heap a hard limit of 384 MiB
+  (`DOTNET_GCHeapHardLimit=0x18000000`), below the point where reclaim starts;
+  after provisioning, the start-up line the service logs reports about that
+  limit. The selfcheck fails when the unit's memory ceiling leaves less than a
+  small margin below the
   container's memory, or when its CPU quota reaches the container's cores.
 
 The remaining steps run as root inside the container (`pct enter {ctid}`
@@ -235,8 +252,9 @@ and a cap on requests being served at once per client address. The proxy
 refuses a flood cheaply, before it reaches this container, and the limits
 leave room for a group of friends on one Wi-Fi network. The owner router has
 neither, on purpose: it is reachable from the home network and VPN only. The
-numbers in the example file are starting values; re-size them from a measured
-first visit. The application adds much stricter limits of its own for "sync
+numbers in the example file (60 requests per second on average, a burst of
+800 and 200 requests in flight, per client address) come from a measured first
+visit and leave room for about 8 simultaneous first visits from one address. The application adds much stricter limits of its own for "sync
 now" and the live channel (see [the sync guide](bgg-sync.md)).
 
 The route's security-headers middleware adds only HSTS, because the proxy is

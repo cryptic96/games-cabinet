@@ -324,6 +324,10 @@ in_flight_block="$(traefik_middleware_block cabinet-in-flight)"
 for key in 'rateLimit:' 'average:' 'period:' 'burst:' 'sourceCriterion:' 'ipStrategy:' 'ipv6Subnet: 64'; do
   assert_matches "traefik example: the rate limit sets ${key}" "$key" "$rate_limit_block"
 done
+for decided in '^ +average: 60$' '^ +period: 1s$' '^ +burst: 800$'; do
+  assert_matches "traefik example: the rate limit carries the decided value ${decided}" "$decided" "$rate_limit_block"
+done
+assert_matches "traefik example: the in-flight limit carries the decided amount" '^ +amount: 200$' "$in_flight_block"
 for key in 'inFlightReq:' 'amount:' 'sourceCriterion:' 'ipStrategy:' 'ipv6Subnet: 64'; do
   assert_matches "traefik example: the in-flight limit sets ${key}" "$key" "$in_flight_block"
 done
