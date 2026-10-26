@@ -66,3 +66,51 @@ floods (plan 08-15) are superseded by this verification and are not asked about.
 - Maintenance access (development admin account on the cabinet container, maintenance key on the proxy container) is
   kept past go-public with passphrase-protected keys; the review point is 90 days after the go-public date. No
   question is asked about it in this plan.
+
+## Sign-off
+
+Prepared on 2026-10-26 for the owner's decision to open the public route. Nothing on any host was changed by these
+re-checks; they only read.
+
+### Re-checks before the go question
+
+| Check | Outcome |
+|---|---|
+| `build/check-public-routes.sh --from-lan` (no burst, so no sync was started) | exit 0, 31 PASS lines, 0 FAIL |
+| `cabinet-selfcheck` on the cabinet container | 39 passed, 0 failed |
+| Proxy file for the cabinet routes | read-only; its checksum is unchanged since the proxy plan (the file is the version the earlier plans edited) |
+| Public router's middleware list | headers, allow-list, rate limit, in-flight cap, in that order |
+| Owner router's middleware list | allow-list, headers; it keeps the allow-list for good |
+| Same allow-list middleware on both routers | yes: one middleware, named in the live file; its name stays in chat and the session scratchpad |
+
+### Open item closed: client addresses preserved: yes
+
+The proxy's access log, last 20,000 lines, counted by the class of the first field and only for the proxy's other
+public sites (the lines of the cabinet's own routers were left out, since they are the flood tests):
+
+| Class | Lines |
+|---|---|
+| private | 654 |
+| shared | 0 |
+| gateway | 0 |
+| public | 1151 (19 distinct addresses) |
+
+Public visitor addresses reach the proxy, so the port forward preserves them and the per-address limits count real
+visitors. The phone check from mobile data after the switch (plan 08-23) confirms it for the cabinet itself; a
+non-public address there closes the site again at once.
+
+### The switch, in placeholder words
+
+1. On the reverse proxy, copy the dynamic file for the cabinet to a backup outside the watched folder, stamped with
+   the UTC time.
+2. Make a second copy outside the watched folder and remove from it only the allow-list line in the public router's
+   middleware list. Nothing is added, and the owner router is not touched.
+3. Run the guard on backup and copy: exactly one removed line, none added, the line lies inside the public router's
+   block, it names the recorded allow-list middleware, and the owner router's block has the same hash in both.
+4. Only if the guard passes, move the copy over the live file in one step; watch the proxy's log for 30 seconds for a
+   configuration error. On any failure, restore the backup the same way and stop.
+5. Run the route check from the home network again. Record the UTC switch time, the grades of any scanner the owner
+   allowed, and the review date (go-public date plus 90 days) in both risk registers.
+6. Closing again is putting the allow-list line back into the public router's list.
+
+State: waiting for the owner's decision (signed off and go, with or without the scanners, or hold).
