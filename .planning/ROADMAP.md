@@ -23,7 +23,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 6: Owner Tools & Persistence** - Home/VPN-only image overrides (and location editing if needed), persisted and backed up (completed 2026-10-13)
 - [x] **Phase 6.1: Selectable Cabinet Finishes & Lighting** (INSERTED) - Seven owner-chosen finishes with their walls, lit cubbies with an optional day-and-night mode, and cubby depth (completed 2026-10-15)
 - [x] **Phase 7: Game-Night Filters & Location Cabinets** - Dim-to-filter search and a per-location cabinet toggle (completed 2026-10-19)
-- [ ] **Phase 8: Public Hardening & Go-Public** - HTTPS exposure through Traefik with rate limits, headers, resource caps and a go-public checklist
+- [x] **Phase 8: Public Hardening & Go-Public** - HTTPS exposure through Traefik with rate limits, headers, resource caps and a go-public checklist (completed 2026-10-26)
 
 ## Phase Details
 
@@ -687,7 +687,7 @@ Plans:
   4. The container has CPU and memory caps sized from real image-processing and sync load, and a flood of requests slows the app without starving the other guests on the host.
   5. A go-public checklist (headers, rate limits, health not routed, BGG credit present, BGG terms re-read, no personal data in the repository) is completed, and only then does the router open the public route.
 
-**Plans:** 24/24 plans executed
+**Plans:** 24/24 plans complete
 
 Plans:
 **Wave 1**
@@ -786,4 +786,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 6. Owner Tools & Persistence | 30/30 | Complete    | 2026-10-13 |
 | 6.1. Selectable Cabinet Finishes & Lighting (INSERTED) | 21/21 | Complete    | 2026-10-15 |
 | 7. Game-Night Filters & Location Cabinets | 47/47 | Complete    | 2026-10-19 |
-| 8. Public Hardening & Go-Public | 24/24 | In Progress|  |
+| 8. Public Hardening & Go-Public | 24/24 | Complete    | 2026-10-26 |
