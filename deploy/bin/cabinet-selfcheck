@@ -562,9 +562,12 @@ ipv6_in_range() {
   done
 }
 
-### Prints the global IPv6 addresses of this host, one per line, without any prefix length.
+### Prints the global IPv6 addresses of this host, one per line, without any prefix length. Prints nothing and
+### succeeds when the host has none; fails, printing nothing, when the address list could not be read.
 host_global_ipv6_addresses() {
-  ip -6 -o addr show scope global 2>/dev/null | awk '{ split($4, parts, "/"); print parts[1] }'
+  local listing
+  listing="$(ip -6 -o addr show scope global 2>&1)" || return 1
+  awk 'NF { split($4, parts, "/"); print parts[1] }' <<<"$listing"
 }
 
 ### Prints the IPv6 destination ranges of the output chain's reject rule in nft ruleset listing $1, one per line.
@@ -585,10 +588,14 @@ blocked_ipv6_ranges() {
 ### addresses are uncovered, never an address.
 ###
 check_egress_ipv6_coverage() {
-  local ruleset address range covered uncovered=0 total=0
+  local ruleset addresses address range covered uncovered=0 total=0
   local -a ranges=()
   if ! ruleset="$(nft list table inet cabinet_filter 2>&1)"; then
     fail "could not read the firewall table cabinet_filter: ${ruleset}"
+    return
+  fi
+  if ! addresses="$(host_global_ipv6_addresses)"; then
+    fail "could not read the global IPv6 addresses of this host, so the IPv6 coverage cannot be checked"
     return
   fi
   mapfile -t ranges < <(blocked_ipv6_ranges "$ruleset")
@@ -603,7 +610,7 @@ check_egress_ipv6_coverage() {
       fi
     done
     [[ "$covered" -eq 1 ]] || uncovered=$((uncovered + 1))
-  done <<<"$(host_global_ipv6_addresses)"
+  done <<<"$addresses"
 
   if [[ "$total" -eq 0 ]]; then
     pass "this host has no global IPv6 address, so there is no IPv6 prefix to cover"
