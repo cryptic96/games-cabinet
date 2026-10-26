@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 1
+open_count: 0
 waived_count: 0
-fixed_count: 0
+fixed_count: 1
 total_count: 1
-last_updated: 2026-10-25T22:37:20.308Z
+last_updated: 2026-10-26T12:58:24.980Z
 ---
 
 # Broken Windows Ledger
@@ -15,7 +15,7 @@ last_updated: 2026-10-25T22:37:20.308Z
 
 | id | phase | kind | file | line | description | status | reason | recorded_at | resolved_at |
 |----|-------|------|------|------|-------------|--------|--------|-------------|-------------|
-| 1 | 08 | unmet-truth | .planning/phases/08-public-hardening-go-public/08-MEASUREMENTS.md |  | Flood: in-flight refusal point (C0, C20), A2 and the in-flight half of A3 not measured; the stop rule ended every unthrottled step before the in-flight cap could be reached | open |  | 2026-10-25T22:37:20.308Z |  |
+| 1 | 08 | unmet-truth | .planning/phases/08-public-hardening-go-public/08-MEASUREMENTS.md |  | Flood: in-flight refusal point (C0, C20), A2 and the in-flight half of A3 not measured; the stop rule ended every unthrottled step before the in-flight cap could be reached | fixed |  | 2026-10-25T22:37:20.308Z | 2026-10-26T12:58:24.980Z |
 
 ````json
 [
@@ -26,10 +26,10 @@ last_updated: 2026-10-25T22:37:20.308Z
     "file": ".planning/phases/08-public-hardening-go-public/08-MEASUREMENTS.md",
     "line": null,
     "description": "Flood: in-flight refusal point (C0, C20), A2 and the in-flight half of A3 not measured; the stop rule ended every unthrottled step before the in-flight cap could be reached",
-    "status": "open",
+    "status": "fixed",
     "reason": "",
     "recorded_at": "2026-10-25T22:37:20.308Z",
-    "resolved_at": null
+    "resolved_at": "2026-10-26T12:58:24.980Z"
   }
 ]
 ````

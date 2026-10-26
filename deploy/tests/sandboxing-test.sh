@@ -264,7 +264,7 @@ mkdir -p "$STUB_BIN"
 export STUB_ARGS_LOG="${WORK_DIR}/stub-args.log"
 export STUB_NFT_CALLS="${WORK_DIR}/stub-nft-calls"
 
-for stub in systemd-run ss nft sshd curl; do
+for stub in systemd-run ss nft sshd curl ip; do
   cat > "${STUB_BIN}/${stub}" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "${STUB_ARGS_LOG}"
@@ -275,13 +275,17 @@ case "$(basename "$0")" in
     calls="$(cat "$STUB_NFT_CALLS" 2>/dev/null || echo 0)"
     calls=$((calls + 1))
     printf '%s' "$calls" > "$STUB_NFT_CALLS"
-    if [ "$calls" -ge 2 ] && [ -n "${STUB_NFT_OUTPUT_AFTER:-}" ]; then
+    if [ "$calls" -ge 3 ] && [ -n "${STUB_NFT_OUTPUT_AFTER:-}" ]; then
       printf '%s\n' "$STUB_NFT_OUTPUT_AFTER"
     else
       printf '%s\n' "${STUB_NFT_OUTPUT:-}"
     fi
     ;;
   sshd) printf '%s\n' "${STUB_SSHD_OUTPUT:-}" ;;
+  ip)
+    printf '%s' "${STUB_IP_OUTPUT:-}"
+    exit "${STUB_IP_STATUS:-0}"
+    ;;
   curl)
     case "$*" in
       *unlisted.example.org*) printf '%s' "${STUB_CURL_STATUS_UNLISTED:-000}" ;;
@@ -500,10 +504,18 @@ check "egress report prints no address" "0" \
 
 STUB_EGRESS_OUTCOME=timeout
 run_selfcheck_function check_egress
-check "egress trusts the rule counter when the probe was slow to fail" "2 0" "${RUN_PASSED} ${RUN_FAILED}"
+check "egress fails when the probe was slow to fail even though the counter rose" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "egress says the probe did not fail at once" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "did not fail at once")"
+
+STUB_EGRESS_OUTCOME=connected
+run_selfcheck_function check_egress
+check "egress fails when the probe connected even though the counter rose" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "egress says the probe connected" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "was opened")"
+STUB_EGRESS_OUTCOME=refused
 
 STUB_NFT_OUTPUT_AFTER="$EGRESS_TABLE"
-STUB_EGRESS_OUTCOME=refused
 run_selfcheck_function check_egress
 check "egress fails when the probe fails at once but the reject rule counted nothing" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
 check "egress says the reject rule did not count the connection" "1" \
@@ -513,6 +525,14 @@ STUB_EGRESS_OUTCOME=connected
 run_selfcheck_function check_egress
 check "egress fails when the probe connects and nothing was counted" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
 STUB_EGRESS_OUTCOME=refused
+
+STUB_NFT_OUTPUT_AFTER="${EGRESS_TABLE/counter packets 0/counter packets 40}"
+run_selfcheck_function check_egress
+check "egress fails when the counter rose by far more than one probe sends" "1 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "egress says other traffic reaches the blocked ranges" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "other traffic")"
+check "egress report on a busy counter prints no address" "0" \
+  "$(count_lines_matching "${WORK_DIR}/run.out" -E '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+|[0-9a-f]+:[0-9a-f:]+')"
 
 STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain output {\n\t\ttype filter hook output priority filter; policy accept;\n\t\tip daddr { 192.0.2.0/24 } counter reject\n\t\tip6 daddr { 2001:db8:1::/64 } counter reject\n\t}\n}'
 STUB_NFT_OUTPUT_AFTER="$STUB_NFT_OUTPUT"
@@ -558,8 +578,22 @@ check "a prefix that is not a multiple of sixteen bits excludes what lies beyond
 V6_TABLE=$'table inet cabinet_filter {\n\tchain output {\n\t\ttype filter hook output priority filter; policy accept;\n\t\tip daddr { 192.0.2.0/24 } counter packets 0 bytes 0 reject with icmpx admin-prohibited\n\t\tip6 daddr { fc00::/7, fe80::/10, 2001:db8:1::/48, 2001:db8:3::/48 } counter packets 0 bytes 0 reject with icmpx admin-prohibited\n\t}\n}'
 STUB_NFT_OUTPUT="$V6_TABLE"
 
+STUB_IP_OUTPUT=$'2: eth0    inet6 2001:db8:1:5::10/64 scope global\n2: eth0    inet6 2001:db8:3::10/128 scope global\n'
+STUB_IP_STATUS=0
+export STUB_IP_OUTPUT STUB_IP_STATUS
+check "the real address listing prints each global address without its prefix length" $'2001:db8:1:5::10\n2001:db8:3::10' "$(host_global_ipv6_addresses)"
+STUB_IP_OUTPUT=""
+IPV6_NONE="$(host_global_ipv6_addresses; echo "status $?")"
+check "the real address listing succeeds with no output when the host has no global address" "status 0" "$IPV6_NONE"
+STUB_IP_OUTPUT="Cannot open netlink socket"
+STUB_IP_STATUS=1
+IPV6_FAILED="$(host_global_ipv6_addresses; echo "status $?")"
+check "the real address listing fails when the ip command fails" "status 1" "$IPV6_FAILED"
+STUB_IP_OUTPUT=""
+STUB_IP_STATUS=0
+
 # shellcheck disable=SC2329 # replaces the selfcheck helper under test
-host_global_ipv6_addresses() { printf '%s\n' "$STUB_GLOBAL_IPV6"; }
+host_global_ipv6_addresses() { printf '%s\n' "$STUB_GLOBAL_IPV6"; return "${STUB_GLOBAL_IPV6_STATUS:-0}"; }
 
 STUB_GLOBAL_IPV6=$'2001:db8:1:5::10\n2001:db8:3::10'
 run_selfcheck_function check_egress_ipv6_coverage
@@ -578,6 +612,16 @@ check "ipv6 coverage failure prints no address" "0" \
 STUB_GLOBAL_IPV6=""
 run_selfcheck_function check_egress_ipv6_coverage
 check "ipv6 coverage passes when the host has no global IPv6 address" "1 0" "${RUN_PASSED} ${RUN_FAILED}"
+
+STUB_GLOBAL_IPV6=""
+STUB_GLOBAL_IPV6_STATUS=1
+run_selfcheck_function check_egress_ipv6_coverage
+check "ipv6 coverage fails when the host's addresses cannot be read" "0 1" "${RUN_PASSED} ${RUN_FAILED}"
+check "ipv6 coverage says the addresses could not be read" "1" \
+  "$(file_has_text "${WORK_DIR}/run.out" "could not read the global IPv6 addresses")"
+check "ipv6 coverage does not claim there is no global address when it could not read them" "0" \
+  "$(count_lines_matching "${WORK_DIR}/run.out" -E 'has no global IPv6 address')"
+STUB_GLOBAL_IPV6_STATUS=0
 
 STUB_NFT_OUTPUT=$'table inet cabinet_filter {\n\tchain output {\n\t\ttype filter hook output priority filter; policy accept;\n\t}\n}'
 STUB_GLOBAL_IPV6="2001:db8:1:5::10"

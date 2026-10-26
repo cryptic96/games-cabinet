@@ -486,3 +486,296 @@ own bar (every row PASS); the unit and container limits are not what failed.
 
 Host CPU, the owner's reading of the Proxmox graphs for the flood windows (given in chat on the evening of the floods,
 verbatim): "both graphs look perfectly fine. both below 30% usage".
+
+## Verification flood on the public version
+
+Measured read-only on 2026-10-26 at 12:2x UTC against release 1.0.0 with the decided limits in force and the route still
+LAN-only. Nothing was installed or started. Numbers and plain descriptions only. The flood steps below are filled in only
+after the owner's go.
+
+### Before the flood (read-only)
+
+Neighbour site: a page of another site behind the same reverse proxy that answers 200 with a small body (a different one
+from the first flood's, since the earlier choice was not written down), timed from the workstation once a second, 30
+requests, with this one sampler running alone. The address is held in a shell variable only.
+
+| Reading | Value |
+|---|---|
+| Neighbour response time, 30 requests, all 200, one sampler | median 24.5 ms, 95th percentile 27.3 ms (nearest rank), fastest 23.0 ms, slowest 27.4 ms |
+| Stop-rule threshold (2 x baseline median) | 49.0 ms |
+| SSH round trip into the cabinet container, 10 runs | median 8 ms, slowest 9 ms |
+| Cabinet release and health | 1.0.0, `Healthy`, no missing art |
+| Cabinet unit restarts since last start | 0 |
+| Cabinet unit `memory.events` | low 0, high 0, max 0, oom 0, oom_kill 0, oom_group_kill 0 |
+| Cabinet unit memory now / peak since the 12:18 UTC start | 82.9 MiB / 91.9 MiB |
+| Cabinet unit limits in force | `MemoryHigh` 480 MiB, `MemoryMax` 600 MiB, `MemorySwapMax` 0, CPU quota 800 ms per second, `CPUWeight` 50, `TasksMax` 512, `LimitNOFILE` 4096, heap hard limit 384 MiB |
+| Runtime line in the journal after the last start | sees 384 MB of memory and 1 processors, workstation GC |
+| Cabinet container as it sees itself | 1 GiB memory, 512 MiB swap, 1 core |
+| Cabinet container memory pressure (`some`, 10 s / 60 s / 300 s averages) | 0.00 / 0.00 / 0.00 |
+| Cabinet container load average (1, 5, 15 min) | 0.05, 0.18, 0.18 |
+| Out-of-memory lines in the cabinet unit's journal and the kernel log since the last start | 0 and 0 |
+| Proxy container as it sees itself | 512 MiB memory, 512 MiB swap, 1 core, no CPU limit set |
+| Proxy container memory now / whole-life peak (cgroup) | 193.1 MiB / 510.0 MiB (the peak is unchanged since the first flood's baseline) |
+| Proxy container memory now, split | 46.4 MiB program memory, 122.0 MiB file cache, swap used 9.3 MiB |
+| Proxy container `memory.events` | low 0, high 0, max 0, oom 0, oom_kill 0, oom_group_kill 0, sock_throttled 2 |
+| Proxy container pressure, memory `some` 10 s average / CPU `some` 10 s average | 0.00 / 0.00 |
+| Proxy access log size, no rotation | 118.8 MiB (124 583 916 bytes); it was 107.1 MiB before the first flood |
+| Proxy load average (1, 5, 15 min) | 0.05, 0.18, 0.18; the busiest process uses 0.0 % |
+| Load generator on the proxy | not installed; the archive offers a 0.1.4 build |
+| Load generator on the workstation | not installed; the archive offers a 0.1.4 build |
+| CPU controller delegated inside the proxy container (needed to cap the generator with a scope) | yes (`cpu`, `memory`, `pids` enabled for child groups), systemd 255 |
+
+What the numbers say:
+
+- With one sampler running alone the neighbour's median is 24.5 ms, close to the first flood's 24.0 ms, and the stop-rule
+  threshold is 49.0 ms. The first flood's four parallel samplers raised the idle median to 31.5 to 36.2 ms and cut the
+  headroom to 12 to 16 ms; this flood keeps the samplers light (one neighbour sampler, one SSH sampler, cabinet counters
+  read over one SSH session) so that the headroom stays near 24 ms.
+- The cabinet runs with the decided limits and a 384 MiB heap limit, and nothing has grown since the start: 91.9 MiB peak,
+  all event counters 0.
+- The proxy has 512 MiB and one core. Its program memory is 46.4 MiB; the high whole-life peak is file cache from the
+  access log, which the kernel drops under pressure. The log has grown by 11.7 MiB since the first flood, and a flood will
+  add to it.
+- The proxy container has no CPU limit, and its cgroup delegates the CPU controller, so a generator can be confined to a
+  share of the core with a transient scope without touching the container's configuration.
+
+### Method
+
+Owner's answer to the plan, verbatim: "Go A (Recommended)". Generator placement A: the flood tool ran on the proxy
+container only inside a transient systemd scope with `CPUQuota=25%` and `MemoryMax=128M` (the scope's `cpu.max` read
+25000 100000 and `memory.max` 134217728 before the first step), and the tool is the archive build 0.1.4. Everything else
+was as in the first flood: the cabinet's decided limits with no run-time override, the container caps unchanged.
+
+- Name resolution on the proxy: resolution local: yes (pinned: no). Nothing was written to the proxy's hosts file.
+- Pre-flood request from the proxy before the allow-list entry: 403. After each entry swap: 200 (checked before the
+  first step of every window).
+- Allow-list entry: the live routing file's checksum was checked equal to the expected one before the first edit and
+  before every swap; the backup was copied with its owner and mode to a path outside the watched folder; each edited
+  copy was built outside the watched folder from the backup and checked with `diff` to be exactly 1 line added and 0
+  removed or changed, then moved into place; each restore copied the backup back the same way and the checksum was
+  verified equal to the original (every swap reported it). After the last restore the proxy's own address
+  gets 403 again and the live file is byte-identical to the backup.
+- Samplers, kept light after the first run was voided: the neighbour once a second (one `curl`), a round trip into the
+  cabinet container every 5 seconds, one persistent session inside the cabinet container that reads its CPU counters,
+  memory and `memory.events` once a second and the loopback health every 2 seconds. In the router flood a cabinet page
+  load from the workstation (a second source address) ran once a second, offset by half a second from the neighbour
+  sample; started at the same instant as the neighbour sample it raised the neighbour's idle median by about 10 ms
+  (24 ms to 34 ms) in a test, which is what had inflated the first flood's idle median.
+- Stop rule: the median of the neighbour's last 5 one-second samples above 49.0 ms (2 x the 24.5 ms baseline taken with
+  one sampler) aborts the running step at once; after an abort the allow-list entry was restored, the neighbour was waited
+  back to within 1.25 x baseline, and the run stepped down to the previous size (or to half of the first size), then once
+  more to half of that; escalation stopped after the first abort of a path. The allow-list entry is swapped in only after
+  the neighbour has settled from the routing reload (a reload of the proxy's routing files itself slows the neighbour for a
+  few seconds).
+- Generator share and proxy process share are process ticks over each second (one core = 100 %); the generator's scope
+  also reported its throttled periods. Neighbour column: median in the 6 s before / median in the step / slowest sample,
+  in ms. Cabinet CPU is the unit's CPU time against its own 80 % quota (percent of one core).
+
+Voided first run of the router flood (12:32 to 12:36 UTC, superseded). It ran with a workstation page-load sampler
+started at the same instant as the neighbour sample, so the idle median was 34.7 ms, and the first step began 3 s after the
+routing reload while the neighbour was still slow: the 20-worker step was aborted 0.4 s in (39 requests, neighbour 61.8 ms
+before the generator had reached speed), the 10-worker step aborted after 3.6 s (neighbour 73.5 ms, started 3 s after a
+reload) and the 5-worker step completed (35.4 ms against 34.9 ms idle). Its numbers are not used in the verdict; it is
+listed in the windows because the generator ran then.
+
+### Flood one: through the public router with TLS (generator on the proxy inside its 25 % cap)
+
+Counts are answers from the flood tool; "other" is anything that was not 200 or 429 (no 400s and no connection errors in
+any step of any flood).
+
+| Step (UTC window) | Workers, rate cap | 200 | 429 | other | Requests/s | Latency (median / 95th, ms) | Neighbour | SSH slowest (ms) | Generator (mean / peak %) | Proxy process (mean / peak %) | Cabinet CPU (mean / peak %) | Cabinet memory peak | Result |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `/` 12:39:03 to 12:39:13 | 20, none | 1 350 | 49 101 | 0 | 5 483 | 0.1 / 22.5 | 23.8 / 47.8 / 80.9 | 7 | 25.0 / 25.6 | 44.4 / 46.2 | 5.8 / 24.9 | 81.4 MiB | aborted after 9.2 s (last-5 median 67.3 ms) |
+| `/` 12:39:23 to 12:39:36 | 10, none | 1 495 | 62 212 | 0 | 5 489 | 0.1 / 9.5 | 24.1 / 43.8 / 63.7 | 7 | 25.0 / 25.4 | 44.0 / 46.0 | 3.5 / 4.1 | 81.1 MiB | aborted after 11.6 s (last-5 median 50.3 ms) |
+| `/` 12:39:45 to 12:39:55 | 5, none | 1 351 | 47 659 | 0 | 5 326 | 0.1 / 3.3 | 24.0 / 40.8 / 58.4 | 7 | 25.2 / 26.4 | 43.7 / 44.9 | 4.0 / 9.4 | 78.1 MiB | aborted after 9.2 s (last-5 median 53.2 ms) |
+| `/cabinet/status` 12:40:36 to 12:40:43 | 20, none | 1 111 | 26 885 | 0 | 5 379 | 0.1 / 21.4 | 23.6 / 44.4 / 69.2 | 6 | 25.0 / 25.3 | 44.1 / 44.8 | 4.7 / 9.8 | 85.3 MiB | aborted after 5.2 s (last-5 median 49.3 ms) |
+| `/cabinet/status` 12:40:52 to 12:40:55 | 10, none | 967 | 13 099 | 0 | 4 999 | 0.1 / 8.8 | 23.7 / 53.8 / 57.2 | 7 | 24.4 / 24.4 | 42.9 / 42.9 | 1.8 / 1.8 | 85.4 MiB | aborted after 2.8 s (last-5 median 51.3 ms) |
+| `/cabinet/status` 12:41:06 to 12:41:27 | 5, none | 1 997 | 109 508 | 0 | 5 570 | 0.1 / 3.0 | 24.2 / 27.0 / 34.0 | 7 | 24.9 / 25.7 | 43.9 / 45.2 | 1.9 / 2.8 | 85.5 MiB | completed 20 s |
+| `/` 12:41:58 to 12:42:18 | 5, 400 per worker per second | 1 998 | 34 599 | 0 | 1 830 | 0.3 / 1.9 | 23.9 / 24.2 / 26.6 | 7 | 10.5 / 10.8 | 18.4 / 19.6 | 4.2 / 23.8 | 85.4 MiB | completed 20 s |
+
+- The planned sizes of 50, 100 and 200 workers were not reached on either path: the first size (20 workers) already
+  slowed the neighbour past the stop rule and escalation stopped there, as the rule requires.
+- The generator never took more than its cap: 25.0 % mean and 26.4 % peak of the proxy's core in every step at full speed
+  (10.5 % in the rate-capped step), with 41 to 184 throttled periods per step. No step is flagged generator-dominated (the
+  flag needs more than 50 %).
+- The proxy process used 43 to 46 % of the core to refuse about 5 400 requests per second; generator and proxy process
+  together used about 69 % of the one core, and the neighbour's median rose to 41 to 54 ms in the aborted steps (idle 24
+  ms). At about 1 830 requests per second (generator 10.5 %, proxy process 18.4 %) the neighbour did not move (24.2 ms
+  against 23.9 ms idle). At the same unthrottled rate the 5-worker step on `/cabinet/status` completed with the neighbour
+  at 27.0 ms (slowest 34.0 ms) while the 5-worker step on `/` aborted at 53.2 ms: at about 5 400 requests per second the
+  neighbour sits at the edge of the stop rule.
+- Each step let about 1 000 to 2 000 requests through to the app (the outer wall's burst plus its refill) and answered the
+  rest with 429 at the outer wall; the cabinet's CPU stayed at or below 25 % at its peak and its memory moved by under
+  1 MiB.
+- Neighbour answered 200 in every sample of every step. The workstation (a second source address) loaded the cabinet's
+  page with 200 in every sample of every step (10, 12, 11, 6, 3, 20 and 20 loads; slowest 69, 62, 46, 72, 69, 28 and
+  32 ms) while the proxy's own address was being refused.
+
+### Live streams, the second address and the in-flight cap (from the proxy through the public router)
+
+The proxy's in-flight cap is 200 requests per address. Because the outer wall refuses before the in-flight cap counts, a
+flood of refused requests never reaches it, and the app's page routes answer in a few milliseconds. The cap was therefore
+tried with synchronized bursts: N TLS connections opened first and idle, then N page requests sent at the same instant
+(low request rate: one burst of at most 320 requests per 20 s, far inside the outer wall's 800 burst), run from the
+generator's scope. The refusal from the in-flight cap carries the body "max connections reached: 200", which is neither
+the outer wall's nor the app's, and the app has no limit on page requests, so every such 429 is the cap.
+
+| Run | Burst size N | 200 | In-flight refusals (429, "max connections reached: 200") | Burst length |
+|---|---|---|---|---|
+| no streams held | 150 | 150 | 0 | 0.13 s |
+| no streams held | 190 | 190 | 0 | 0.15 s |
+| no streams held | 210 | 210 | 0 | 0.14 s |
+| no streams held | 260 | 230 | 30 | 0.14 s |
+| no streams held | 320 | 248 | 72 | 0.17 s |
+| 20 live streams held | 150 | 150 | 0 | 0.10 s |
+| 20 live streams held | 170 | 170 | 0 | 0.08 s |
+| 20 live streams held | 190 | 181 | 9 | 0.11 s |
+| 20 live streams held | 210 | 181 | 29 | 0.09 s |
+| 20 live streams held | 260 | 189 | 71 | 0.12 s |
+| separate run (second-address check) | 320 | 223 | 97 | 0.24 s |
+
+| Check | Result |
+|---|---|
+| 20 live streams opened from the proxy through the public router | 20 of 20 established (101 on the upgrade); all 20 alive when released after about 130 s (12:45:27 to 12:47:45) |
+| 21st stream from the same address | refused with 429 by the app's per-address stream cap |
+| C0 (burst size at which the in-flight cap first refuses, no streams held) | between 210 and 260 (first refusals at 260; requests that finish during the burst free slots, so 230 to 248 were admitted) |
+| C20 (the same with 20 streams held) | between 170 and 190 (first refusals at 190; 181 admitted at 190 and 210, 189 at 260) |
+| A2 confirmed (an open stream counts as in flight for its whole life) | yes: with 20 streams held the cap admitted at most 189 requests, against 230 to 248 without; the bracket moved down by about 20 |
+| A3 (second address served while the first address's in-flight cap is full) | yes: in the separate run the workstation loaded the cabinet's page 20 times a second for 14 s (280 loads, all 200); 7 of them overlapped the 0.24 s in which the proxy's address was being refused by the cap (97 refusals), and all 7 answered 200; across the two earlier runs all 268 workstation loads were 200 |
+| Neighbour during runs 1 and 2 | answered 200 in all 268 samples; median 32.9 ms, slowest 106.8 ms (with a second sampler running and the bursts' 300 TLS handshakes on the same core, the burst moments show a few slow samples) |
+
+Not exercised: the site-wide live-connection cap (100) and the site-wide connect backstop (600 per 60 s); only 21 streams
+from one address were opened.
+
+### Flood two: straight at the app port (public name sent as Host, forwarded test address, generator inside its 25 % cap)
+
+| Step (UTC window) | Workers, rate cap | 200 | 429 | other | Requests/s | Latency (median / 95th, ms) | Neighbour | SSH slowest (ms) | Generator (mean / peak %) | Proxy process (mean / peak %) | Cabinet CPU (mean / peak %) | Cabinet memory peak | Result |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `/` 12:49:10 to 12:49:31 | 20, none | 87 783 | 0 | 0 | 4 389 | 3.6 / 8.2 | 23.7 / 28.2 / 42.3 | 7 | 23.7 / 25.5 | 1.3 / 2.0 | 79.6 / 81.7 | 92.6 MiB | completed 20 s |
+| `/` 12:49:46 to 12:50:06 | 50, none | 88 427 | 0 | 0 | 4 420 | 10.1 / 27.4 | 23.4 / 28.4 / 31.1 | 8 | 22.7 / 23.6 | 1.4 / 2.0 | 79.9 / 82.6 | 97.8 MiB | completed 20 s |
+| `/` 12:50:21 to 12:50:42 | 100, none | 88 387 | 0 | 0 | 4 416 | 20.8 / 38.8 | 24.4 / 27.0 / 41.3 | 7 | 22.2 / 24.5 | 1.5 / 2.0 | 80.1 / 83.3 | 109.1 MiB | completed 20 s |
+| `/` 12:50:57 to 12:51:17 | 200, none | 85 607 | 0 | 0 | 4 274 | 46.5 / 67.2 | 24.9 / 25.6 / 37.8 | 7 | 20.3 / 21.6 | 1.3 / 2.0 | 78.8 / 85.6 | 93.1 MiB | completed 20 s |
+| `/cabinet/status` 12:51:52 to 12:52:13 | 20, none | 145 075 | 0 | 0 | 7 250 | 0.7 / 1.8 | 24.2 / 24.0 / 33.0 | 7 | 25.0 / 26.3 | 1.3 / 2.0 | 25.3 / 27.7 | 90.0 MiB | completed 20 s |
+| `/cabinet/status` 12:52:28 to 12:52:48 | 50, none | 143 133 | 0 | 0 | 7 153 | 1.8 / 75.8 | 24.4 / 24.4 / 27.5 | 7 | 25.0 / 27.3 | 1.3 / 2.0 | 25.2 / 27.4 | 92.9 MiB | completed 20 s |
+| `/cabinet/status` 12:53:03 to 12:53:24 | 100, none | 137 464 | 0 | 0 | 6 850 | 4.0 / 79.5 | 24.2 / 37.1 / 47.9 | 9 | 24.9 / 26.3 | 1.4 / 2.9 | 25.5 / 27.3 | 92.8 MiB | completed 20 s |
+| `/cabinet/status` 12:53:39 to 12:53:59 | 200, none | 128 770 | 0 | 0 | 6 437 | 9.4 / 86.3 | 25.3 / 24.1 / 29.6 | 7 | 25.0 / 26.4 | 1.3 / 2.0 | 24.9 / 26.8 | 106.3 MiB | completed 20 s |
+| negotiate POST 12:54:33 to 12:54:43 | 2, 15 per worker per second | 60 | 240 | 0 | 30 | 0.4 / 0.5 | 23.7 / 24.6 / 27.7 | 7 | 0.5 / 1.0 | 1.4 / 2.0 | 2.5 / 11.6 | 91.2 MiB | completed 10 s |
+
+- Zero 400 answers in any step: host filtering accepted the public name as Host. The app answered 200 on every page and
+  status request and 429 on the negotiate burst (60 admitted per window, as configured), so the flood reached the app.
+- No step aborted. The 20-worker steps of the first flood already ended at 45.3 and 57.1 ms; here the generator is
+  capped and the neighbour's step medians stay between 24.0 and 37.1 ms (the 100-worker step on `/cabinet/status` is the
+  highest: 37.1 ms median, 47.9 ms slowest, 1.5 x its idle median and under the 49.0 ms stop line).
+- The cabinet's CPU reached its 80 % quota on the heavier page route (79.6 to 80.1 % mean, 85.6 % peak) while health,
+  SSH and the neighbour stayed normal; its memory peak was 109.1 MiB, far under `MemoryHigh` 480 MiB and the 384 MiB heap
+  limit.
+
+### Recovery and unit limits
+
+| Reading (12:55:32 to 12:56:00 UTC, about 50 s to 80 s after the last step) | Value |
+|---|---|
+| Cabinet unit restarts | 0, unchanged |
+| Cabinet unit `memory.events` | low 0, high 0, max 0, oom 0, oom_kill 0, oom_group_kill 0, unchanged |
+| Cabinet unit memory peak since its 12:18 UTC start / now | 119.9 MiB (was 91.9 MiB before the floods) / 90.9 MiB |
+| Out-of-memory lines in the cabinet unit's journal and the kernel logs since 12:29 UTC | 0 and 0; no warnings in the unit's journal in that period |
+| Cabinet health | `Healthy`, version 1.0.0 |
+| Loopback health probes during all steps | router flood 40 of 40 answered 200; direct flood 87 of 87 answered 200 |
+| SSH round trips during all steps | router flood 21 taken, 0 failed, slowest 7 ms; direct flood 34 taken, 0 failed, slowest 9 ms (limit 5 s) |
+| Cabinet container memory pressure (`some`, 10 s average) | 0.00 |
+| Neighbour after | median 23.9 ms, slowest 25.2 ms over 10 samples at 12:56 UTC |
+| Home page from the home network | 200 |
+| Route check from the home network (`--from-lan`) | 31 passed, 0 failed |
+| Self-check on the container | 39 passed, 0 failed |
+| Proxy access log size | 118.8 MiB before; 170.9 MiB (179 213 877 bytes) after |
+| Proxy container memory whole-life peak / now | 510.1 MiB (was 510.0 MiB) / 282.5 MiB |
+| Proxy container memory events | high 0, max 0, oom 0, oom_kill 0, sock_throttled 2 (unchanged) |
+
+### Clean-up
+
+| Item | Result |
+|---|---|
+| Load generator on the proxy | removed and purged (`dpkg` finds no such package, the command is not found, no process is running); an autoremove removed 0 packages |
+| Flood scopes | none left (all transient and gone with their processes) |
+| Name pin in the proxy's hosts file | none was made |
+| Helper scripts and output files on the proxy | the three helper scripts and the per-step output files removed from `/tmp` (nothing matching is left) |
+| Routing file | restored; checksum equal to the original; the allow-list entry is not present; byte-identical to the backup; no edited copy is left in the watched folder or beside it |
+| Backup of the routing file | left outside the watched folder, byte-identical to the live file (as after the first flood) |
+| Run-time changes on the cabinet | none were made (the decided limits were not touched) |
+
+### Flood windows (UTC, for the owner's reading of the Proxmox host CPU graph)
+
+The workstation's and the proxy's clocks agree within 10 ms; both are shown in UTC. The generator ran only inside these
+windows, always inside its 25 % cap:
+
+| Window | Flood |
+|---|---|
+| flood window 12:32:41 to 12:32:42 | router, 20 workers, voided first run (aborted at 0.4 s) |
+| flood window 12:34:15 to 12:34:20 | router, 10 workers, voided first run (aborted) |
+| flood window 12:35:53 to 12:36:14 | router, 5 workers, voided first run (completed) |
+| flood window 12:39:03 to 12:39:13 | router, `/`, 20 workers (aborted) |
+| flood window 12:39:23 to 12:39:36 | router, `/`, 10 workers (aborted) |
+| flood window 12:39:45 to 12:39:55 | router, `/`, 5 workers (aborted) |
+| flood window 12:40:36 to 12:40:43 | router, `/cabinet/status`, 20 workers (aborted) |
+| flood window 12:40:52 to 12:40:55 | router, `/cabinet/status`, 10 workers (aborted) |
+| flood window 12:41:06 to 12:41:27 | router, `/cabinet/status`, 5 workers (completed) |
+| flood window 12:41:58 to 12:42:18 | router, `/`, 5 workers, rate-capped (completed) |
+| flood window 12:43:10 to 12:45:07 | router, bursts of 150 to 320 requests, no streams (light load between bursts) |
+| flood window 12:45:27 to 12:47:45 | router, 20 live streams held and bursts of 150 to 260 requests |
+| flood window 12:48:41 to 12:48:49 | router, one burst of 320 requests and the second-address check |
+| flood window 12:49:10 to 12:49:31 | direct, `/`, 20 workers (completed) |
+| flood window 12:49:46 to 12:50:06 | direct, `/`, 50 workers (completed) |
+| flood window 12:50:21 to 12:50:42 | direct, `/`, 100 workers (completed) |
+| flood window 12:50:57 to 12:51:17 | direct, `/`, 200 workers (completed) |
+| flood window 12:51:52 to 12:52:13 | direct, `/cabinet/status`, 20 workers (completed) |
+| flood window 12:52:28 to 12:52:48 | direct, `/cabinet/status`, 50 workers (completed) |
+| flood window 12:53:03 to 12:53:24 | direct, `/cabinet/status`, 100 workers (completed) |
+| flood window 12:53:39 to 12:53:59 | direct, `/cabinet/status`, 200 workers (completed) |
+| flood window 12:54:33 to 12:54:43 | direct, negotiate burst (completed) |
+
+Allow-list entry in place (UTC, router flood only; the direct flood never needed it): 12:32:38 to 12:32:42, 12:34:12 to
+12:34:20, 12:35:50 to 12:36:14, 12:38:56 to 12:39:13, 12:39:16 to 12:39:36, 12:39:38 to 12:39:55, 12:40:29 to 12:40:43,
+12:40:45 to 12:40:55, 12:40:59 to 12:41:27, 12:41:51 to 12:42:33, 12:42:57 to 12:47:47, 12:48:35 to 12:48:50.
+
+### What the numbers say
+
+- The cabinet is not what limits. With the decided limits as shipped, 200 workers straight at the app (about 4 300
+  page requests per second and 6 400 to 7 250 status requests per second from a capped generator) put the cabinet at its
+  80 % CPU quota on pages, left its memory at 109 MiB peak, and health, SSH and the neighbour answered throughout; the
+  restart count and every `memory.events` counter are unchanged and there is no out-of-memory line.
+- The in-flight cap works and counts per address: it first refuses between 210 and 260 simultaneous requests, and
+  with 20 live streams held between 170 and 190, so an open stream counts for its whole life (A2) and the cap is
+  200 in flight per address; a second address was served throughout (A3). The open entry about the in-flight cap in the
+  broken-windows ledger is closed by these measurements.
+- The router flood still slows the neighbour past the stop rule at unthrottled sizes of 5 to 20 workers, now with the
+  generator confined to 25 % of the proxy's core. The proxy process alone used 43 to 46 % of the core to refuse about
+  5 400 requests per second, and with the capped generator the one core was about 69 % busy and the neighbour's median
+  reached 41 to 54 ms against 24 ms idle. At about 1 830 requests per second it did not move. One 5-worker step passed
+  at about 5 570 requests per second, so the edge lies near 5 000 to 5 500 refused requests per second from one source address. A flood from another machine would take no generator share, but the proxy process's own 44 % at
+  that rate is the cost of refusing requests and stays; so does the finding of the first flood that the proxy's single
+  core, not the cabinet, is the pressure point.
+- The outer wall keeps the cabinet quiet in a router flood (cabinet CPU at most 25 % at its peak in every router step,
+  against 80 % when the proxy is bypassed).
+
+### Verdict
+
+| Flood | Row | Value |
+|---|---|---|
+| verify-router | neighbour | FAIL |
+| verify-router | ssh | PASS |
+| verify-router | ops-health | PASS |
+| verify-router | host-cpu | PASS (owner: nothing reached 100 %) |
+| verify-router | recovery | PASS |
+| verify-direct | neighbour | PASS |
+| verify-direct | ssh | PASS |
+| verify-direct | ops-health | PASS |
+| verify-direct | host-cpu | PASS (owner: nothing reached 100 %) |
+| verify-direct | recovery | PASS |
+
+Both floods are valid under the plan's rule (no 400 in any step; the app answered 200 and 429). The router flood's
+`neighbour` row is FAIL because of the aborts under the stop rule: `/` at 20, 10 and 5 unthrottled workers and
+`/cabinet/status` at 20 and 10 (planned sizes 50, 100 and 200 were not reached). The direct flood reached the agreed
+largest step of 200 workers on both page routes with the neighbour's step medians between 24.0 and 37.1 ms (no abort),
+so its row is PASS. Host CPU was read by the owner from the Proxmox graphs for the windows above (plan 08-21): nothing
+reached 100 %, so both host-cpu rows are PASS. The router flood's `neighbour` FAIL stays recorded as measured; the owner
+accepted it with a written reason under the amended SEC-06 definition (see `08-SIZING-REVIEW.md`), so it no longer stops
+going public.
