@@ -137,3 +137,25 @@ Owner's answer, verbatim: "signed off, go, scanners yes".
 ## Scanners
 
 Scanners: run by the orchestrator, results recorded below
+
+Run from the orchestrator's in-app browser on 2026-10-26 between 15:07 and 15:10 UTC, after the switch, with the owner's "signed off, go, scanners yes". Only grades and finding names are recorded.
+
+| Scanner | Setting | Grade | Notes |
+|---|---|---|---|
+| securityheaders.com | results hidden, redirects followed | A+ | every graded header present (CSP, Permissions-Policy, Referrer-Policy, HSTS, X-Content-Type-Options, X-Frame-Options); only "upcoming" note: Cross-Origin-Embedder-Policy |
+| Mozilla HTTP Observatory | default | A+ | score 135/100, 12 of 12 tests passed |
+| Qualys SSL Labs | "do not show the results on the boards" (report marked hidden) | A+ | certificate, protocol support, key exchange and cipher strength all high; TLS 1.3; post-quantum key exchange; HSTS with long duration; chain complete, trusted by all major stores |
+
+## External probe
+
+From the owner's phone on mobile data (Wi-Fi off), the only vantage point outside the home network. No scan was handed to the owner (all three scanners ran from the orchestrator's browser), so there is no extra scan step here.
+
+| Check | Expected answer | Result |
+|---|---|---|
+| The public site (`https://{public-hostname}/`) | loads, valid certificate, the cabinet and the BGG credit visible | pending owner |
+| `https://{public-hostname}/health` | 404 | pending owner |
+| `https://{public-hostname}:5081/` (operations port) | no connection | pending owner |
+| `https://{owner-hostname}/` | 403 (or no connection) | pending owner |
+| Time of the first page load | about HH:MM, for the access-log check (public client address seen: yes or no) | pending owner |
+
+If any of the three addresses that must fail answers, the site is closed again at once (the allow-list line goes back into the public router) before anything else.

@@ -47,6 +47,14 @@ The public router's allow-list entry was removed in one guarded, atomic move at 
 
 Scanners: run by the orchestrator, results recorded below
 
+Run from the orchestrator's in-app browser on 2026-10-26 between 15:07 and 15:10 UTC, after the switch, with the owner's "signed off, go, scanners yes". Only grades and finding names are recorded.
+
+| Scanner | Setting | Grade | Notes |
+|---|---|---|---|
+| securityheaders.com | results hidden, redirects followed | A+ | every graded header present (CSP, Permissions-Policy, Referrer-Policy, HSTS, X-Content-Type-Options, X-Frame-Options); only "upcoming" note: Cross-Origin-Embedder-Policy |
+| Mozilla HTTP Observatory | default | A+ | score 135/100, 12 of 12 tests passed |
+| Qualys SSL Labs | "do not show the results on the boards" (report marked hidden) | A+ | certificate, protocol support, key exchange and cipher strength all high; TLS 1.3; post-quantum key exchange; HSTS with long duration; chain complete, trusted by all major stores |
+
 ## Deviations from Plan
 
 None - the plan was executed as written. The scanner step (task 3, step 4) was carved out of this run on purpose; the orchestrator runs it in its in-app browser and fills in the results above and in `08-GO-PUBLIC-RESULTS.md`.
