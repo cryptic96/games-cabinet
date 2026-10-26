@@ -41,12 +41,14 @@ Anyone with the link sees an up-to-date, good-looking cabinet of exactly the gam
 - ✓ Visitors toggle between one big cabinet and one cabinet per storage location, in the owner's order, with unplaced games in an "Unknown location" cabinet — Phase 7
 - ✓ Filters stay out of sight until asked for: a folded rail of symbols at the left on desktop opens a filter panel (beside the cabinet on wide screens, over it below that), and phones keep a slim bar with a Filters sheet; the choices last for the tab and the view for the device — Phase 7 (owner-requested rework after v0.9.0)
 - ✓ Storage locations are kept per copy, so two copies of one game can stand in different places; the owner tools place each copy, and the location list's game counts and delete warnings count copies — Phase 7
+- ✓ Site is public and read-only with no accounts, reachable over HTTPS through the existing Traefik reverse proxy; the LAN/VPN allow-list was dropped from the public route only after a go-public checklist passed, and the owner tools, health and ops endpoints stay unreachable from the internet (phone probe from mobile data; SSL Labs, securityheaders.com and the Mozilla Observatory all A+) — Phase 8 (opened 2026-10-26, v1.0.0, patched as v1.0.1)
+- ✓ Floods are limited per visitor address at the proxy (rate and in-flight) and in the app (sync presses, live connections, a site-wide cap on new live connections); every answer carries a strict CSP and the full security-header set — Phase 8
+- ✓ The service runs under measured memory and CPU caps with a .NET heap limit, cannot reach the home network, and a flood slows it without starving other guests; the one neighbour slowdown seen (the shared proxy's single core refusing a single-address flood) was accepted by the owner under an amended definition — Phase 8
+- ✓ The two maintenance accesses (cabinet and reverse proxy) are kept by the owner's decision, pinned to the workstation and reachable only from the admin sources; review point 2027-01-24 — Phase 8
 
 ### Active
 
-- [ ] Before the site goes public: revoke or downgrade the development admin account (passwordless sudo) on the server, and drop the LAN/VPN allow-list from the route
-- [ ] Site is public and read-only with no accounts, reachable from the internet through the existing Traefik reverse proxy (the owner tools already stay home/VPN-only)
-- [ ] Before the site goes public: also downgrade or revoke the maintenance key on the reverse-proxy container, added in Phase 6 to switch the owner host on
+- [ ] Follow-ups after going public (todos): a not-found page instead of an empty 404, Chromium page stalls on CI outside the containment test, rotating the reverse proxy's access log (owner maintenance), the intermittent test-host crash; optional: the sync button only for the home network and VPN
 
 ### Out of Scope
 
@@ -161,4 +163,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-19 after Phase 7 (game-night filters and location cabinets; released as v0.9.0 and, with the filter rail and panel, v0.10.0)*
+*Last updated: 2026-10-26 after Phase 8 (public hardening and go-public; the site opened on 2026-10-26 as v1.0.0, patched as v1.0.1)*
