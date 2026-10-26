@@ -24,10 +24,19 @@ public abstract class CabinetPageTest : PageTest
     /// </summary>
     private const float DefaultExpectTimeoutMs = 15000;
 
+    /// <summary>The file in the screenshot directory that names every stalled page a test gave up on, one line each.</summary>
+    private const string StallRecordFileName = "stalled-pages.txt";
+
+    /// <summary>How long closing a page that stalled may take before it is left to the end of the test, in milliseconds.</summary>
+    private const int StalledPageCloseTimeoutMs = 5000;
+
+    private static readonly object StallRecordLock = new();
+
     private readonly object _recordLock = new();
     private readonly List<string> _consoleErrors = [];
     private readonly HashSet<string> _requestHosts = new(StringComparer.Ordinal);
     private CabinetWebApplicationFactory? _factory;
+    private IPage? _replacement;
 
     /// <summary>Sets the wait of every retrying assertion once, before the first test of the process creates its page.</summary>
     static CabinetPageTest() => Assertions.SetDefaultExpectTimeout(DefaultExpectTimeoutMs);
@@ -62,6 +71,9 @@ public abstract class CabinetPageTest : PageTest
     /// <summary>The loopback port the owner listener of the running host uses.</summary>
     protected int OwnerPort => (_factory ?? throw new InvalidOperationException("Call StartAsync before using the host.")).OwnerPort;
 
+    /// <summary>The page the test is driving now: the page the test base made, or the fresh page that took its place after it stalled.</summary>
+    protected IPage ActivePage => _replacement ?? Page;
+
     /// <summary>
     /// Starts the host with the given settings and prepares the page to talk to it. Module scripts are only served with a
     /// JavaScript content type when the browser asks for no content encoding, because the test host does not run against
@@ -86,11 +98,48 @@ public abstract class CabinetPageTest : PageTest
         _factory = factory;
 
         await Page.Context.SetExtraHTTPHeadersAsync(new Dictionary<string, string> { ["Accept-Encoding"] = "identity" });
-        Page.Console += (_, message) => RecordConsoleMessage(message);
-        Page.PageError += (_, error) => RecordConsoleError(error);
-        Page.Request += (_, request) => RecordRequest(request);
+        RecordPage(Page);
 
         return factory;
+    }
+
+    /// <summary>
+    /// Runs a piece of work against the page and, when it does not end within the budget or one of its waits times out, closes that page,
+    /// opens a fresh one in the same browser context and runs the work again, up to the given number of attempts. A browser that is
+    /// short of processor time can, rarely, leave the renderer of one page unresponsive: a script it was asked to run, an animation
+    /// frame or a screenshot is never answered, and the page does not come back, while a new page in the same browser works at once.
+    /// The work must therefore start from nothing, as a view that loads its own address does. Only a timeout starts another attempt;
+    /// a failed check inside the work ends the test as it always did. What the fresh page logs is recorded the same way as what the
+    /// first page logged, and each page given up on is named in <c>stalled-pages.txt</c> in the screenshot directory.
+    /// </summary>
+    /// <param name="work">What to do with the page. It is given the page of the attempt, the page the test started with at first.</param>
+    /// <param name="budget">How long one attempt may take in all before its page is taken to be stuck.</param>
+    /// <param name="attempts">How many attempts at most; the timeout of the last one ends the test.</param>
+    /// <returns>A task that ends when an attempt has finished its work.</returns>
+    /// <exception cref="TimeoutException">Every attempt timed out.</exception>
+    protected async Task RunOnFreshPageWhenStalledAsync(Func<IPage, Task> work, TimeSpan budget, int attempts)
+    {
+        ArgumentNullException.ThrowIfNull(work);
+        ArgumentOutOfRangeException.ThrowIfLessThan(attempts, 1);
+
+        for (var attempt = 1; ; attempt++)
+        {
+            var page = ActivePage;
+            var running = work(page);
+
+            try
+            {
+                await running.WaitAsync(budget, TestContext.Current.CancellationToken);
+
+                return;
+            }
+            catch (TimeoutException) when (attempt < attempts)
+            {
+                _ = running.ContinueWith(static ended => _ = ended.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+                RecordStalledPage(attempt, page);
+                await GiveUpOnAsync(page);
+            }
+        }
     }
 
     /// <summary>
@@ -281,12 +330,22 @@ public abstract class CabinetPageTest : PageTest
     /// </summary>
     /// <param name="pathAndQuery">The path and query to open, such as <c>/?sample=65</c>.</param>
     /// <returns>The absolute address that was opened.</returns>
-    protected async Task<string> GotoCabinetAsync(string pathAndQuery)
+    protected Task<string> GotoCabinetAsync(string pathAndQuery) => GotoCabinetAsync(Page, pathAndQuery);
+
+    /// <summary>
+    /// Opens a page of the running host in the given page and waits until the cabinet has drawn its first box or shown its own message.
+    /// </summary>
+    /// <param name="page">The page to open it in, such as the fresh page of a repeated attempt.</param>
+    /// <param name="pathAndQuery">The path and query to open, such as <c>/?sample=65</c>.</param>
+    /// <returns>The absolute address that was opened.</returns>
+    protected async Task<string> GotoCabinetAsync(IPage page, string pathAndQuery)
     {
+        ArgumentNullException.ThrowIfNull(page);
+
         var address = $"http://127.0.0.1:{PublicPort}{pathAndQuery}";
 
-        await Page.GotoAsync(address);
-        await Page.WaitForSelectorAsync(CabinetReadySelector, new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached });
+        await page.GotoAsync(address);
+        await page.WaitForSelectorAsync(CabinetReadySelector, new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached });
 
         return address;
     }
@@ -312,8 +371,17 @@ public abstract class CabinetPageTest : PageTest
     /// a full-page capture resizes the viewport, which moves the open card and drops focus, so the visible window is saved instead.
     /// </summary>
     /// <param name="name">The file name without extension.</param>
-    protected async Task SaveScreenshotAsync(string name)
+    protected Task SaveScreenshotAsync(string name) => SaveScreenshotAsync(Page, name);
+
+    /// <summary>
+    /// Saves a screenshot of the given page the way <see cref="SaveScreenshotAsync(string)"/> does.
+    /// </summary>
+    /// <param name="page">The page to take the picture of, such as the fresh page of a repeated attempt.</param>
+    /// <param name="name">The file name without extension.</param>
+    protected async Task SaveScreenshotAsync(IPage page, string name)
     {
+        ArgumentNullException.ThrowIfNull(page);
+
         var directory = Environment.GetEnvironmentVariable(ScreenshotDirectoryVariable);
         if (string.IsNullOrWhiteSpace(directory))
         {
@@ -321,8 +389,8 @@ public abstract class CabinetPageTest : PageTest
         }
 
         Directory.CreateDirectory(directory);
-        var dialogOpen = await Page.Locator("dialog[open]").CountAsync() > 0;
-        await Page.ScreenshotAsync(new PageScreenshotOptions { Path = Path.Combine(directory, $"{name}.png"), FullPage = !dialogOpen });
+        var dialogOpen = await page.Locator("dialog[open]").CountAsync() > 0;
+        await page.ScreenshotAsync(new PageScreenshotOptions { Path = Path.Combine(directory, $"{name}.png"), FullPage = !dialogOpen });
     }
 
     /// <inheritdoc />
@@ -337,6 +405,57 @@ public abstract class CabinetPageTest : PageTest
         }
 
         GC.SuppressFinalize(this);
+    }
+
+    private void RecordPage(IPage page)
+    {
+        page.Console += (_, message) => RecordConsoleMessage(message);
+        page.PageError += (_, error) => RecordConsoleError(error);
+        page.Request += (_, request) => RecordRequest(request);
+    }
+
+    /// <summary>
+    /// Closes a page that stalled and makes a fresh page of the same browser context the active one, recorded like the first. A page
+    /// that is stuck may not close at once, so the wait is bounded; the browser context ends it with the test in any case.
+    /// </summary>
+    /// <param name="stalled">The page to give up on.</param>
+    private async Task GiveUpOnAsync(IPage stalled)
+    {
+        try
+        {
+            await stalled.CloseAsync(new PageCloseOptions { RunBeforeUnload = false }).WaitAsync(TimeSpan.FromMilliseconds(StalledPageCloseTimeoutMs), TestContext.Current.CancellationToken);
+        }
+        catch (Exception exception) when (exception is TimeoutException or PlaywrightException)
+        {
+            _ = exception;
+        }
+
+        var fresh = await stalled.Context.NewPageAsync();
+        RecordPage(fresh);
+        _replacement = fresh;
+    }
+
+    /// <summary>
+    /// Appends a line naming the running test to <c>stalled-pages.txt</c> in the screenshot directory, so a stall the test rode out
+    /// is still visible in the files a run keeps. Nothing is written when no screenshot directory is set.
+    /// </summary>
+    /// <param name="attempt">The attempt whose page stalled.</param>
+    /// <param name="page">The page that stalled.</param>
+    private static void RecordStalledPage(int attempt, IPage page)
+    {
+        var directory = Environment.GetEnvironmentVariable(ScreenshotDirectoryVariable);
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            return;
+        }
+
+        var test = TestContext.Current.Test?.TestDisplayName ?? "a test that is not running";
+
+        lock (StallRecordLock)
+        {
+            Directory.CreateDirectory(directory);
+            File.AppendAllText(Path.Combine(directory, StallRecordFileName), $"{DateTimeOffset.UtcNow:O} attempt {attempt} stalled on {page.Url}: {test}{Environment.NewLine}");
+        }
     }
 
     private void RecordConsoleMessage(IConsoleMessage message)

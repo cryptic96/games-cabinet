@@ -239,6 +239,8 @@ CI runs the suite as five parallel jobs, each with a filter that picks its slice
 
 Set `CABINET_SCREENSHOT_DIR` to a directory to keep the screenshots the tests take; without it they are not written. A screenshot covers the whole page, except while a card is open, when only the visible window is saved, because a full-page capture resizes the window and would disturb the open card.
 
+On a runner that is short of processor time the browser can, rarely, leave the renderer of one page unresponsive: a script, an animation frame or a screenshot it was asked for is never answered, and the page does not come back, while a new page in the same browser works at once. A test that takes many screenshots, such as the look containment check, therefore runs each view with a time budget and, when the budget runs out or a screenshot times out, closes the page, opens a fresh one in the same browser context and runs that view again, up to three times; a failed check is never run again. When `CABINET_SCREENSHOT_DIR` is set, each page given up on is named in `stalled-pages.txt` in that directory, so the CI artifact shows how often it happens.
+
 The geometry and look tests measure real text, and the font the browser picks for `system-ui` decides how wide that text is, so a test can pass on one machine and fail on another. GitHub's runners draw `system-ui` wider than most desktops do (DejaVu Sans). To run the browser tests the way CI sees them, keep a font configuration file outside the repository that maps the three families the pages ask for to DejaVu Sans, and point `FONTCONFIG_FILE` at it:
 
 ```xml
