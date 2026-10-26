@@ -14,7 +14,7 @@ public sealed class LiveRefusalWatch : IStartupFilter
 {
     private const string LiveRoutePrefix = "/cabinet/live";
 
-    private const string NegotiateSuffix = "/negotiate";
+    private const string ConnectionIdKey = "id";
 
     private int _refusals;
     private int _messages;
@@ -56,8 +56,7 @@ public sealed class LiveRefusalWatch : IStartupFilter
                 {
                     Interlocked.Increment(ref _refusals);
                 }
-                else if (HttpMethods.IsPost(context.Request.Method)
-                    && context.Request.Path.Value?.EndsWith(NegotiateSuffix, StringComparison.OrdinalIgnoreCase) != true)
+                else if (HttpMethods.IsPost(context.Request.Method) && context.Request.Query.ContainsKey(ConnectionIdKey))
                 {
                     Interlocked.Increment(ref _messages);
                 }
