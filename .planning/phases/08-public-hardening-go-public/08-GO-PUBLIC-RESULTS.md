@@ -4,9 +4,7 @@ Filled in from `docs/go-public.md`, one row per item. Run on 2026-10-26 against 
 the attested release published by the owner that day) on the LAN-only route. Every hostname, address and range is
 omitted on purpose; real values stay on the servers and in chat.
 
-Overall state: public route open since 2026-10-26 (see "The switch"); was ready for sign-off; maintenance-key passphrases are the final step after the switch. Every item is done
-and evidenced except two that can only happen later: the phone check from mobile data (after the switch, plan 08-23) and the
-maintenance-key passphrases (final step, by the owner, plan 08-24).
+Overall state: complete. The public route is open since 2026-10-26 (see "The switch"); every item is done and evidenced, including the phone check from mobile data (plan 08-23, "External probe"). The maintenance keys were accepted by the owner without a passphrase at the final step (plan 08-24, "Maintenance keys").
 
 ## Before you open
 
@@ -26,10 +24,10 @@ maintenance-key passphrases (final step, by the owner, plan 08-24).
 | 4 | BoardGameGeek credit on every page | Script today: linked credit on the home page. Browser tests `CreditVisibilityTests` (drawn cabinet, filling message before the first sync, empty collection, failed layout load, each at 1440x900 and 390x800), `CreditTests` (every Razor page renders the linked credit) and the header console tests passed in CI for the merge that carries `v1.0.0` (run of 2026-10-26, all seven jobs, including the WebKit job). Real-route Chromium check in plan 08-19: credit visible at both sizes | done |
 | 5 | BoardGameGeek terms re-read | Claude re-read the newest archive captures (live pages answer 403 to automated requests): the API guide, capture 2026-09-24, version date 2025-07-02, and the terms page, capture 2026-10-02. No newer captures exist. Rules compared with the access-rules table: credit by name plus linked logo, non-commercial only (no ads, no donations, no payments), no modification of data, server-side requests with cached results, token in the Authorization header on the host without a leading `www`, no relaying services, no AI training: all unchanged. Summary in `08-GO-PUBLIC-REVIEW.md` | done. The owner skimmed the live pages in a browser and confirmed the "Using the XML API" page still shows version date 2025-07-02 with nothing new on commercial use, donations, the logo or a numeric limit; the owner's words: "Yes, unchanged" |
 | 6 | No personal data in the repository | `build/scan-history.sh` (full history): exit 0, all six checks PASS (denylist-trees, denylist-messages, denylist-identities, noreply-identities, absolute-paths, gitleaks-all-refs). `build/lint.sh` (working tree): repo-rules, workflows, shell, secrets and script-tests all PASS | done |
-| 7 | Resource caps applied and verified | `cabinet-selfcheck` today: the six unit limits in force as the unit file sets them (memory high and max, no swap, CPU quota 80 %, CPU weight 50, task and file limits), the container shows 1024 MiB memory, 512 MiB swap and 1 core, memory max leaves at least 128 MiB to the rest of the host, the CPU quota stays below the container's core; the .NET heap limit of 384 MiB is what the runtime reports (plan 08-19). Container caps were set by the owner on the host (plan 08-15). Host CPU graph for the verification windows: peak below 100 % in every window (owner: "nothing reached 100%") | done |
+| 7 | Resource caps applied and verified | `cabinet-selfcheck` today: the six unit limits in force as the unit file sets them (memory high and max, no swap, CPU quota 80 %, CPU weight 50, task limit; the file-descriptor limit is read from `systemctl show`, not compared by the selfcheck), the container shows 1024 MiB memory, 512 MiB swap and 1 core, memory max leaves at least 128 MiB to the rest of the host, the CPU quota stays below the container's core; the .NET heap limit of 384 MiB is what the runtime reports (plan 08-19). Container caps were set by the owner on the host (plan 08-15). Host CPU graph for the verification windows: peak below 100 % in every window (owner: "nothing reached 100%") | done |
 | 8 | Outbound firewall active | `cabinet-selfcheck` today: the output chain rejects new connections to the blocked IPv4 and IPv6 ranges, and a connection to the first blocked network was counted by the reject rule; the input chain drops by default and admits the owner port from one source address only | done |
 | 9 | Search engines asked not to index | Script today: the home page carries the robots noindex meta tag, and robots.txt is absent. Explicit check: robots.txt: no root disallow (status 404). `CreditTests` also asserts the noindex request on every Razor page | done |
-| 10 | Maintenance SSH keys protected | The passphrase step is the last step of this phase, done by the owner after the switch, and verified by Claude without a passphrase (plan 08-24) | final step, after the switch, by the owner |
+| 10 | Maintenance SSH keys protected | The owner declined the passphrase step at the final step and accepted the keys as they are: `from=` pinning present on both containers, SSH reachable only from the admin sources on both; recorded in "Maintenance keys" and in the AR-08 / AR-06-05 register rows (plan 08-24) | accepted by the owner (no passphrase) |
 | 11 | Reverse proxy's own SSH limited | Before: the proxy accepted SSH from every address on the network (no filter rule, empty firewall tables). The owner applied the supplied admin-address rule and kept the workstation's address in it. Checked read-only after the change: SSH from the workstation works, the rule is present (present: yes), and the persistent firewall file carries it as well. Password logins on the proxy's SSH are still allowed (optional step not taken, see known items) | done |
 
 ## Verification flood on `v1.0.0` (plan 08-20)
@@ -64,8 +62,8 @@ floods (plan 08-15) are superseded by this verification and are not asked about.
 ## Decisions carried forward
 
 - Maintenance access (development admin account on the cabinet container, maintenance key on the proxy container) is
-  kept past go-public with passphrase-protected keys; the review point is 90 days after the go-public date. No
-  question is asked about it in this plan.
+  kept past go-public. Planned with passphrase-protected keys; at the final step the owner accepted the keys without a
+  passphrase (see "Maintenance keys"). The review point is 2027-01-24, 90 days after the go-public date.
 
 ## Sign-off
 
@@ -160,7 +158,7 @@ From the owner's phone on mobile data (Wi-Fi off), the only vantage point outsid
 
 If any of the three addresses that must fail answers, the site is closed again at once (the allow-list line goes back into the public router) before anything else.
 
-The owner's words, verbatim: "3 and 4 are not accessible. 2 results in a file download in safari which doesn't download anything (nothing loads)? So I suppose it's invalid?" The orchestrator confirmed the public `/health` answers 404 with an empty body and no content type (so Safari offers an empty download); the health details exist only on the loopback operations port. Every external check passed; nothing private answered, so the site stays open. Every gate of the go-public checklist is passed; the maintenance-key passphrases remain the final step.
+The owner's words, verbatim: "3 and 4 are not accessible. 2 results in a file download in safari which doesn't download anything (nothing loads)? So I suppose it's invalid?" The orchestrator confirmed the public `/health` answers 404 with an empty body and no content type (so Safari offers an empty download); the health details exist only on the loopback operations port. Every external check passed; nothing private answered, so the site stays open. Every gate of the go-public checklist is passed; the maintenance keys were settled at the final step (see "Maintenance keys").
 
 ## Maintenance keys
 
@@ -172,7 +170,7 @@ from= pinning present on both containers: yes (every authorized key line of the 
 | Passphrase on the proxy container's maintenance key (alias `traefik-lxc`) | not set: accepted by the owner without a passphrase |
 | Both keys removed from the SSH agent (or the agent locked) | not needed under the owner's decision |
 
-The owner sets the passphrases with `ssh-keygen -p -f <key>` (Claude never sees or types them), removes both keys from the agent, and loads them with `ssh-add <key>` only when Claude should work on the servers again. Claude then verifies the lock without any passphrase.
+As planned, the owner would set the passphrases with `ssh-keygen -p -f <key>` (Claude never sees or types them), removes both keys from the agent, and loads them with `ssh-add <key>` only when Claude should work on the servers again. Claude then verifies the lock without any passphrase.
 
 Owner's decision at the final step, verbatim: "I think, since you can only access it from within my local network, i'll accept these access tokens." The maintenance keys stay without a passphrase; the accepted mitigation is the `from=` pinning to the workstation (present on both containers) and SSH reachable only from the admin sources on both containers. Residual risk, told to the owner: anything running on the workstation can use the keys, with admin rights on the cabinet and on the reverse proxy that fronts every site; a passphrase can be added at any time. Review point unchanged: 2027-01-24. The registers (AR-08, AR-06-05) carry the same decision.
 
