@@ -101,7 +101,6 @@ public class LiveAddressCapTests
 
         var refused = await pages.TryStartAsync(forwardedFor: null);
         using var plain = await client.GetAsync(LiveEndpoints.Route, TestContext.Current.CancellationToken);
-        var other = await pages.TryStartAsync(OtherClient);
 
         refused.Should().BeFalse("the window of two new connections is spent, and skipping the negotiation does not escape it");
         host.Refusals.Refusals.Should().BeGreaterThan(refusalsBefore);
@@ -111,7 +110,11 @@ public class LiveAddressCapTests
         (await plain.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).Should().BeEmpty();
         host.Limiter.Count.Should().Be(2, "a refused connection takes no place");
         host.Logs.Problems.Skip(problemsBefore).Should().BeEmpty("a quiet refusal writes nothing at Warning or above");
+
+        var other = await pages.TryStartAsync(OtherClient);
+
         other.Should().BeTrue("another address has a window of its own");
+        await SyncHarness.WaitUntil(() => Task.FromResult(host.Limiter.Count == 3));
     }
 
     [Fact]
