@@ -109,12 +109,12 @@ Requirements for the initial release. Each maps to a roadmap phase.
 
 ### Public Exposure & Security
 
-- [ ] **SEC-01**: The site is reachable from the public internet over HTTPS through the existing Traefik reverse proxy.
-- [ ] **SEC-02**: Public traffic is rate-limited, with a much stricter limit on "sync now".
-- [ ] **SEC-03**: Every response carries security headers, including a strict Content-Security-Policy.
-- [ ] **SEC-04**: Health and ops endpoints are not reachable from the internet, and neither are any owner tools (OWN-01).
+- [x] **SEC-01**: The site is reachable from the public internet over HTTPS through the existing Traefik reverse proxy.
+- [x] **SEC-02**: Public traffic is rate-limited, with a much stricter limit on "sync now".
+- [x] **SEC-03**: Every response carries security headers, including a strict Content-Security-Policy.
+- [x] **SEC-04**: Health and ops endpoints are not reachable from the internet, and neither are any owner tools (OWN-01).
 - [x] **SEC-05**: The BGG username and token exist only in server-side configuration. Visitors can never supply a username or cause BGG calls beyond the cooldown-guarded sync.
-- [ ] **SEC-06**: The app's container has CPU and memory caps, so a traffic flood cannot starve the other guests on the host.
+- [x] **SEC-06**: The app's container has CPU and memory caps, so a traffic flood cannot starve the other guests on the host.
 
 ## v2 Requirements
 
@@ -217,12 +217,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | OPS-03 | Phase 1 | Complete |
 | OPS-04 | Phase 1 | Complete |
 | OPS-05 | Phase 1 | Complete |
-| SEC-01 | Phase 8 | Pending |
-| SEC-02 | Phase 8 | Pending |
-| SEC-03 | Phase 8 | Pending |
-| SEC-04 | Phase 8 | Pending |
+| SEC-01 | Phase 8 | Complete |
+| SEC-02 | Phase 8 | Complete |
+| SEC-03 | Phase 8 | Complete |
+| SEC-04 | Phase 8 | Complete |
 | SEC-05 | Phase 3 | Complete |
-| SEC-06 | Phase 8 | Pending |
+| SEC-06 | Phase 8 | Complete |
 
 **Coverage:**
 

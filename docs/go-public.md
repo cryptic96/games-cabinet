@@ -67,14 +67,39 @@ only one; each catches what the others might miss.
    release, then provisioning re-run from the active release, then
    `cabinet-selfcheck`. The reasons and the full table are in
    [the deploy guide](deploy.md#host-settings-and-a-release).
-3. **Measure on a pre-release.** The caps and the proxy limits ship as starting
-   values. On a pre-release, force a picture rebuild and a sync and watch the
-   container's memory and CPU, then set the caps with room to spare. Run a
-   short controlled flood from the proxy container itself, so the traffic never
-   crosses the home gateway or its intrusion prevention, and confirm that the
-   proxy refuses the flood while a normal request still succeeds. Hold about
-   twenty live streams open during that test, to see that open live
-   connections count as requests in flight for as long as they stay open.
+3. **Measure on a pre-release.** The caps and the proxy limits are sized from
+   measured load (see [the container guide](lxc-setup.md)); measure again when
+   a release changes what the site does. On a pre-release, force a picture
+   rebuild and a sync and watch the container's memory and CPU, then set the
+   caps with room to spare. Then run a short controlled flood from the proxy
+   container itself, so the traffic never crosses the home gateway or its
+   intrusion prevention:
+
+   - **Tool.** A small HTTP load generator from the distribution archive (for
+     example `hey`), installed on the proxy container for the test and removed
+     afterwards. Run it inside its own CPU limit, for example
+     `sudo systemd-run --scope -p CPUQuota=25% -p MemoryMax=128M hey ...`, so
+     the generator itself cannot take the proxy's core.
+   - **Reaching the route.** While the public route still has its allow-list,
+     the proxy's own address is refused; add that one address to the allow-list
+     for the duration of the test (backup first, one added line, restored right
+     after), as in "Opening the site" below.
+   - **Steps.** About 20 seconds each at 20, 50, 100 and 200 concurrent
+     workers, through the public router and, separately, straight at the
+     application port.
+   - **Stop rule.** Sample a small page of another site behind the proxy once a
+     second. Measure its median response time at rest first. Abort the running
+     step at once when the median of its last five samples is more than twice
+     that resting median, and step down to the previous size.
+   - **What passes.** Every answer is `200` or `429` (never `400`), SSH into the
+     container and the loopback health check keep answering, and the service
+     shows no restart and no memory event (`systemctl show cabinet`, and
+     `memory.events` in its cgroup) afterwards.
+   - **Live connections.** Hold about twenty live streams open during one step
+     (a small script that negotiates and then keeps each Server-Sent Events
+     stream open). Open streams count as requests in flight for as long as they
+     stay open, and the twenty-first from one address is refused by the
+     application.
 
 ## The checklist
 
@@ -109,7 +134,9 @@ Every item names the command or place that proves it. Tick them in order.
    it, and that the owner hostname answers `403` from outside the home
    network. Confirm the last part with a phone on mobile data: the public
    hostname's `/health`, the operations port and the owner hostname must all
-   fail to load.
+   fail to load. `/health` answers `404` with an empty body, which a browser may
+   show as a blank page or, in Safari, as an empty download; both count as
+   failing (`curl -I` shows the status).
 4. **The BoardGameGeek credit is on every page.** Look for the linked "Powered
    by BGG" credit in the footer on the cabinet, the empty cabinet, the error
    view and a phone-sized window.
@@ -157,7 +184,8 @@ effect as soon as the file is saved in the watched folder, so work on copies.
 6. Watch the proxy's log accept the file, with no parse error.
 7. Probe from outside, with a phone on mobile data: open the site; try
    `/health` on the public hostname, the operations port and the owner
-   hostname, which must all fail; then run the SSL and security-header
+   hostname, which must all fail (a blank page or an empty download for
+   `/health` counts as failing); then run the SSL and security-header
    scanners of your choice against the public hostname. Keep scanner output out
    of this repository.
 8. Run `build/check-public-routes.sh --from-outside` from a machine outside the
