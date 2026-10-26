@@ -259,3 +259,96 @@ Flood windows, in UTC, for reference (the proxy's own clock shows UTC plus one h
   by the verification flood on the release, and that flood must pass every row before going public. The neighbour rows
   would be re-measured there with the generator placed off the proxy.
 - **Reflood:** the flood runs again first, with the generator off the proxy or limited on it, before anything is decided.
+
+## Decided values
+
+Decision: **approve with changes.** "Approve as proposed" was not available because the `neighbour` rows of both floods
+are FAIL. The owner approved every value in the proposal tables above with the three new values added.
+
+### The owner's answers, verbatim
+
+- Final values: "Approve with the 3 new values (Recommended)". The option text: "Keep every measured value as
+  proposed and add the heap limit (~384 MiB), the global live-connect backstop (600/60 s) and the 600 s window ceiling;
+  the v1.0.0 verification flood must pass every row (generator off the proxy)."
+- SEC-06 definition: "Accepted (Recommended)". The question text: "SEC-06 (a flood can't starve the other guests)
+  counts as done when caps are sized from measured peaks plus headroom AND every verdict row passes - with the
+  generator-on-the-proxy artifact carved out, so the v1.0.0 verification flood (generator elsewhere) is the proof."
+- Reverse proxy container core: "Leave it for now". One core and the default weight stay; revisit if the verification
+  flood shows the same.
+- Host CPU graphs: "both graphs look perfectly fine. both below 30% usage".
+
+### Host CPU reading
+
+Peak below 30 % in every flood window; never 100 %. The `host-cpu` row of every flood reads PASS in the verdict tables
+above. The `neighbour` rows stay FAIL as measured; the verification flood on the release re-measures them with the
+generator off the proxy.
+
+### SEC-06 definition
+
+Accepted. SEC-06 counts as done when the caps are sized from measured peaks plus headroom and every verdict row passes,
+with the generator-on-the-proxy artifact carved out. The verification flood on `v1.0.0`, run with the generator on a
+different host than the proxy, is the proof, and it must pass every row.
+
+### Decided values
+
+Service unit (`cabinet.service`):
+
+- `MemoryHigh`: 480 MiB (changed from 450 MiB)
+- `MemoryMax`: 600 MiB
+- `MemorySwapMax`: 0
+- `CPUQuota`: 80 %
+- `CPUWeight`: 50
+- `TasksMax`: 512
+- `LimitNOFILE`: 4096
+- .NET heap limit (new): a hard heap limit of about 384 MiB, below `MemoryHigh`
+
+Container (set by the owner, unchanged): memory 1 GiB, swap 512 MiB, 1 core, `cpuunits` 50.
+
+Reverse proxy (public router), exact lines for the live-file comparison:
+
+```
+proxy-average: 60
+proxy-period: 1s
+proxy-burst: 800
+proxy-amount: 200
+```
+
+The app's per-client limits (unchanged):
+
+- `SyncPressesPerWindow`: 5
+- `SyncWindowSeconds`: 60
+- `LiveConnectionsPerClient`: 20
+- `LiveConnectsPerWindow`: 60
+- `LiveWindowSeconds`: 60
+
+Site-wide live cap and listener ceiling (unchanged):
+
+- `Live:MaxConnections`: 100
+- `HostLimits:MaxConcurrentConnections`: 512 per listener
+
+Kestrel host limits (unchanged):
+
+- `MaxRequestBodyBytes`: 65,536
+- `RequestHeadersTimeoutSeconds`: 10 s
+
+New at this decision:
+
+- Global live-connect backstop (new): a site-wide token bucket on new connects of 600 new connects per 60 s, on top of
+  the per-address window.
+- Window ceiling (new): an upper bound of 600 s on `SyncWindowSeconds` and `LiveWindowSeconds`, down from 3600 s. A
+  server env value above 600 s is refused at start-up.
+
+Not changed: `provision.sh` does not print the detected IPv6 prefix.
+
+### Values changed at this decision (for the verification flood plan)
+
+1. `MemoryHigh` 450 MiB to 480 MiB.
+2. .NET heap limit of about 384 MiB, new and unmeasured; exercised in the verification flood and a picture rebuild.
+3. Global live-connect backstop of 600 new connects per 60 s site-wide, new and unmeasured at that rate.
+4. Window ceiling of 600 s on the two window settings, down from 3600 s.
+
+The proxy's `average` 60, `burst` 800 and `amount` 200 are the values already live since the last change (the example
+file still holds 50, 1000 and 150 and is brought in line when the decided values are written into the repository).
+
+The verification flood on `v1.0.0` runs with the generator off the proxy, must pass every verdict row, and also closes
+the open in-flight-cap check (up to about 200 concurrent requests, with and without 20 streams held).
