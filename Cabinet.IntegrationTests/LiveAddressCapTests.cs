@@ -29,6 +29,8 @@ public class LiveAddressCapTests
     private const string OtherClient = "203.0.113.8";
     private const string SharedClient = "203.0.113.7";
     private const string ThirdClient = "203.0.113.9";
+    private const string DoubleSlash = "/" + "/";
+    private const string NegotiatePath = "/cabinet/live/negotiate?negotiateVersion=1";
     private const int ShippedCap = 20;
     private const int SeveralPings = 4;
 
@@ -170,6 +172,68 @@ public class LiveAddressCapTests
         host.Logs.Problems.Skip(problemsBefore).Should().BeEmpty("a quiet refusal writes nothing at Warning or above");
     }
 
+    [Theory]
+    [InlineData("/cabinet/live/negotiate/?negotiateVersion=1")]
+    [InlineData("/cabinet/live/NEGOTIATE?negotiateVersion=1")]
+    [InlineData("/Cabinet/Live/Negotiate/?negotiateVersion=1")]
+    [InlineData("/cabinet/live" + DoubleSlash + "negotiate?negotiateVersion=1")]
+    [InlineData("/cabinet/live/negotiate" + DoubleSlash + "?negotiateVersion=1")]
+    public async Task A_negotiate_in_any_spelling_of_its_path_is_counted_per_address_and_the_one_over_the_window_is_refused(string path)
+    {
+        await using var host = Host(new Dictionary<string, string?> { ["ClientLimits:LiveConnectsPerWindow"] = "2" });
+        using var client = host.Factory.CreatePublicClient();
+
+        using var first = await NegotiateResponse(client, SharedClient, path);
+        using var second = await NegotiateResponse(client, SharedClient, path);
+        using var third = await NegotiateResponse(client, SharedClient, path);
+        using var plain = await NegotiateResponse(client, SharedClient);
+        using var other = await NegotiateResponse(client, OtherClient, path);
+
+        first.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
+        second.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
+        third.StatusCode.Should().Be(HttpStatusCode.TooManyRequests, "the spelling of the path does not escape the window");
+        plain.StatusCode.Should().Be(HttpStatusCode.TooManyRequests, "the plain spelling shares the same window");
+        other.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests, "another address has a window of its own");
+    }
+
+    [Theory]
+    [InlineData("/cabinet/live/negotiate/?negotiateVersion=1")]
+    [InlineData("/cabinet/live/NEGOTIATE?negotiateVersion=1")]
+    [InlineData("/cabinet/live" + DoubleSlash + "negotiate?negotiateVersion=1")]
+    public async Task A_negotiate_in_any_spelling_of_its_path_is_counted_site_wide_and_a_new_address_is_refused(string path)
+    {
+        await using var host = Host(new Dictionary<string, string?> { ["ClientLimits:LiveConnectsSiteWidePerWindow"] = "2" });
+        using var client = host.Factory.CreatePublicClient();
+
+        using var first = await NegotiateResponse(client, SharedClient, path);
+        using var second = await NegotiateResponse(client, OtherClient, path);
+        using var third = await NegotiateResponse(client, ThirdClient, path);
+
+        first.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
+        second.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
+        third.StatusCode.Should().Be(HttpStatusCode.TooManyRequests, "the site's window is spent whatever the path spelling");
+    }
+
+    [Fact]
+    public async Task Pages_and_other_routes_are_unaffected_by_a_spent_live_window()
+    {
+        await using var host = Host(new Dictionary<string, string?>
+        {
+            ["ClientLimits:LiveConnectsPerWindow"] = "1",
+            ["ClientLimits:LiveConnectsSiteWidePerWindow"] = "1",
+        });
+        using var client = host.Factory.CreatePublicClient();
+        using var spent = await NegotiateResponse(client, SharedClient);
+        using var refused = await NegotiateResponse(client, SharedClient, "/cabinet/live/negotiate/?negotiateVersion=1");
+
+        using var home = await client.GetAsync("/", TestContext.Current.CancellationToken);
+        using var cabinet = await client.GetAsync("/cabinet", TestContext.Current.CancellationToken);
+
+        refused.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        home.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
+        cabinet.StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
+    }
+
     [Fact]
     public async Task A_refused_address_spends_nothing_of_the_site_budget()
     {
@@ -292,9 +356,9 @@ public class LiveAddressCapTests
         return response.StatusCode;
     }
 
-    private static Task<HttpResponseMessage> NegotiateResponse(HttpClient client, string? forwardedFor)
+    private static Task<HttpResponseMessage> NegotiateResponse(HttpClient client, string? forwardedFor, string path = NegotiatePath)
     {
-        var request = new HttpRequestMessage(HttpMethod.Post, "/cabinet/live/negotiate?negotiateVersion=1");
+        var request = new HttpRequestMessage(HttpMethod.Post, path);
         if (forwardedFor is not null)
         {
             request.Headers.Add("X-Forwarded-For", forwardedFor);

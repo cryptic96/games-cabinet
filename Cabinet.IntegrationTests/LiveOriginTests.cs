@@ -22,6 +22,7 @@ public class LiveOriginTests
 {
     private const string NegotiatePath = "/cabinet/live/negotiate?negotiateVersion=1";
     private const string ConnectPath = "/cabinet/live?id=unknown";
+    private const string UpgradePath = "/cabinet/live";
 
     public enum Listener
     {
@@ -162,7 +163,7 @@ public class LiveOriginTests
 
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
-        (response.StatusCode != HttpStatusCode.Forbidden).Should().Be(admitted);
+        response.StatusCode.Should().Be(admitted ? HttpStatusCode.OK : HttpStatusCode.Forbidden);
     }
 
     [Theory]
@@ -182,16 +183,22 @@ public class LiveOriginTests
         socket.Options.SetRequestHeader("X-Forwarded-For", "203.0.113.7");
         socket.Options.CollectHttpResponseDetails = true;
 
-        var act = () => socket.ConnectAsync(new Uri($"ws://127.0.0.1:{factory.PublicPort}{ConnectPath}"), TestContext.Current.CancellationToken);
-        try
+        var address = new Uri($"ws://127.0.0.1:{factory.PublicPort}{UpgradePath}");
+
+        if (admitted)
         {
-            await act();
-        }
-        catch (WebSocketException)
-        {
+            await socket.ConnectAsync(address, TestContext.Current.CancellationToken);
+
+            socket.State.Should().Be(WebSocketState.Open);
+            socket.HttpStatusCode.Should().Be(HttpStatusCode.SwitchingProtocols);
+
+            return;
         }
 
-        (socket.HttpStatusCode != HttpStatusCode.Forbidden).Should().Be(admitted);
+        var refused = () => socket.ConnectAsync(address, TestContext.Current.CancellationToken);
+
+        await refused.Should().ThrowAsync<WebSocketException>();
+        socket.HttpStatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     private static CabinetWebApplicationFactory CreateFactory(IReadOnlyDictionary<string, string?>? settings = null)

@@ -144,6 +144,22 @@ safe on the internet:
 | `ClientLimits__LiveWindowSeconds` | `60` | 1 to 600 | Length of the per-address window above and of the site-wide window below, in seconds. The largest accepted value is 10 minutes. |
 | `ClientLimits__LiveConnectsSiteWidePerWindow` | `600` | 1 to 100000 | How many new live connections the whole site accepts within that window, from all addresses together. It backs up the per-address window when a flood comes from many addresses. It counts exactly the requests the per-address window counts, so connections already held and the messages a Server-Sent Events page posts are not affected. A request over the limit is refused quietly with a `429`, a `Retry-After` and no body. |
 
+A request is counted as a new connection by what it asks for, not by how its path
+is written: a negotiate counts whether or not its path ends in a slash or uses
+other letter case, and any request on the live route that carries no connection
+identifier counts too. A request refused by either window spends nothing of the
+other, so a visitor turned away while the site is out of budget keeps their own
+allowance for when the site window resets.
+
+The site-wide window is a trade-off, accepted on purpose. It keeps a flood from
+many addresses from costing the server anything beyond the refusals, but it also
+means that about ten addresses each using their full allowance can spend the
+whole site budget, and while that window lasts no new live connection is
+accepted for anyone. Pages already connected are not affected, and a refused
+page falls back to the one-minute status check, so the cost to a visitor is that
+updates arrive up to a minute later. Raise the site-wide setting if a real crowd
+needs more.
+
 A value outside the range stops the service at start-up with a message that names
 the key. The live channel admits only pages served by the site's own
 hostnames: a request whose origin is another site, or whose origin is not a

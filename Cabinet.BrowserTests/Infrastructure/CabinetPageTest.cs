@@ -30,6 +30,9 @@ public abstract class CabinetPageTest : PageTest
     /// <summary>How long closing a page that stalled may take before it is left to the end of the test, in milliseconds.</summary>
     private const int StalledPageCloseTimeoutMs = 5000;
 
+    /// <summary>How long a page may take to answer a trivial script before it is taken to be stuck, in milliseconds.</summary>
+    private const int ResponsivenessProbeTimeoutMs = 3000;
+
     private static readonly object StallRecordLock = new();
 
     private readonly object _recordLock = new();
@@ -104,19 +107,22 @@ public abstract class CabinetPageTest : PageTest
     }
 
     /// <summary>
-    /// Runs a piece of work against the page and, when it does not end within the budget or one of its waits times out, closes that page,
-    /// opens a fresh one in the same browser context and runs the work again, up to the given number of attempts. A browser that is
-    /// short of processor time can, rarely, leave the renderer of one page unresponsive: a script it was asked to run, an animation
-    /// frame or a screenshot is never answered, and the page does not come back, while a new page in the same browser works at once.
-    /// The work must therefore start from nothing, as a view that loads its own address does. Only a timeout starts another attempt;
-    /// a failed check inside the work ends the test as it always did. What the fresh page logs is recorded the same way as what the
-    /// first page logged, and each page given up on is named in <c>stalled-pages.txt</c> in the screenshot directory.
+    /// Runs a piece of work against the page and, when it does not end within the budget or one of its waits times out and the page
+    /// then proves unresponsive, closes that page, opens a fresh one in the same browser context and runs the work again, up to the
+    /// given number of attempts. A browser that is short of processor time can, rarely, leave the renderer of one page unresponsive:
+    /// a script it was asked to run, an animation frame or a screenshot is never answered, and the page does not come back, while a
+    /// new page in the same browser works at once. The work must therefore start from nothing, as a view that loads its own address
+    /// does. A timeout alone is not a stall, because Playwright reports a wait that ran out, such as a box that never drew, as a
+    /// timeout too, and that is a real failure. So after a timeout the page is asked to evaluate a trivial script within a short
+    /// budget; only a page that does not answer is replaced, and a page that answers ends the test with the original timeout. A failed
+    /// check inside the work ends the test as it always did. What the fresh page logs is recorded the same way as what the first page
+    /// logged, and each page given up on is written to the test output and named in <c>stalled-pages.txt</c> in the screenshot directory.
     /// </summary>
     /// <param name="work">What to do with the page. It is given the page of the attempt, the page the test started with at first.</param>
-    /// <param name="budget">How long one attempt may take in all before its page is taken to be stuck.</param>
+    /// <param name="budget">How long one attempt may take in all before its page is checked for being stuck.</param>
     /// <param name="attempts">How many attempts at most; the timeout of the last one ends the test.</param>
     /// <returns>A task that ends when an attempt has finished its work.</returns>
-    /// <exception cref="TimeoutException">Every attempt timed out.</exception>
+    /// <exception cref="TimeoutException">An attempt timed out on a page that still answers, or every attempt timed out on a stuck page.</exception>
     protected async Task RunOnFreshPageWhenStalledAsync(Func<IPage, Task> work, TimeSpan budget, int attempts)
     {
         ArgumentNullException.ThrowIfNull(work);
@@ -133,8 +139,15 @@ public abstract class CabinetPageTest : PageTest
 
                 return;
             }
-            catch (TimeoutException) when (attempt < attempts)
+            catch (TimeoutException)
             {
+                var stalled = attempt < attempts && !await AnswersAsync(page);
+
+                if (!stalled)
+                {
+                    throw;
+                }
+
                 _ = running.ContinueWith(static ended => _ = ended.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
                 RecordStalledPage(attempt, page);
                 await GiveUpOnAsync(page);
@@ -436,25 +449,53 @@ public abstract class CabinetPageTest : PageTest
     }
 
     /// <summary>
-    /// Appends a line naming the running test to <c>stalled-pages.txt</c> in the screenshot directory, so a stall the test rode out
-    /// is still visible in the files a run keeps. Nothing is written when no screenshot directory is set.
+    /// Asks the page to evaluate a trivial script and tells whether it answered within the probe budget. A page whose renderer is
+    /// stuck never answers, and a page that is closed or crashed fails the call, so both count as not answering.
+    /// </summary>
+    /// <param name="page">The page to ask.</param>
+    /// <returns>True when the page answered in time.</returns>
+    private static async Task<bool> AnswersAsync(IPage page)
+    {
+        var probe = page.EvaluateAsync<int>("() => 1");
+
+        try
+        {
+            await probe.WaitAsync(TimeSpan.FromMilliseconds(ResponsivenessProbeTimeoutMs), TestContext.Current.CancellationToken);
+
+            return true;
+        }
+        catch (Exception exception) when (exception is TimeoutException or PlaywrightException)
+        {
+            _ = probe.ContinueWith(static ended => _ = ended.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Writes a line naming the running test to the test output, so a stall the test rode out is visible in the run itself, and
+    /// appends the same line to <c>stalled-pages.txt</c> in the screenshot directory when one is set.
     /// </summary>
     /// <param name="attempt">The attempt whose page stalled.</param>
     /// <param name="page">The page that stalled.</param>
     private static void RecordStalledPage(int attempt, IPage page)
     {
+        var test = TestContext.Current.Test?.TestDisplayName ?? "a test that is not running";
+        var line = $"{DateTimeOffset.UtcNow:O} attempt {attempt} stalled on {page.Url}: {test}";
+
+        TestContext.Current.TestOutputHelper?.WriteLine($"Stalled page replaced: {line}");
+        Console.Error.WriteLine($"Stalled page replaced: {line}");
+
         var directory = Environment.GetEnvironmentVariable(ScreenshotDirectoryVariable);
         if (string.IsNullOrWhiteSpace(directory))
         {
             return;
         }
 
-        var test = TestContext.Current.Test?.TestDisplayName ?? "a test that is not running";
-
         lock (StallRecordLock)
         {
             Directory.CreateDirectory(directory);
-            File.AppendAllText(Path.Combine(directory, StallRecordFileName), $"{DateTimeOffset.UtcNow:O} attempt {attempt} stalled on {page.Url}: {test}{Environment.NewLine}");
+            File.AppendAllText(Path.Combine(directory, StallRecordFileName), line + Environment.NewLine);
         }
     }
 
