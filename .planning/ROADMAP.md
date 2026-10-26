@@ -687,7 +687,7 @@ Plans:
   4. The container has CPU and memory caps sized from real image-processing and sync load, and a flood of requests slows the app without starving the other guests on the host.
   5. A go-public checklist (headers, rate limits, health not routed, BGG credit present, BGG terms re-read, no personal data in the repository) is completed, and only then does the router open the public route.
 
-**Plans:** 15/24 plans executed
+**Plans:** 16/24 plans executed
 
 Plans:
 **Wave 1**
@@ -737,7 +737,7 @@ Plans:
 
 **Wave 11** *(blocked on Wave 10 completion)*
 
-- [ ] 08-16-PLAN.md — Sizing review and the owner's decision (host graph read; approve only with every verdict row PASS)
+- [x] 08-16-PLAN.md — Sizing review and the owner's decision (host graph read; approve only with every verdict row PASS)
 
 **Wave 12** *(blocked on Wave 11 completion)*
 
@@ -786,4 +786,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 6. Owner Tools & Persistence | 30/30 | Complete    | 2026-10-13 |
 | 6.1. Selectable Cabinet Finishes & Lighting (INSERTED) | 21/21 | Complete    | 2026-10-15 |
 | 7. Game-Night Filters & Location Cabinets | 47/47 | Complete    | 2026-10-19 |
-| 8. Public Hardening & Go-Public | 15/24 | In Progress|  |
+| 8. Public Hardening & Go-Public | 16/24 | In Progress|  |
