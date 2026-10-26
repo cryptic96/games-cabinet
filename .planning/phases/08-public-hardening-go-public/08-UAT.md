@@ -124,6 +124,7 @@ expected: A reader with only `docs/go-public.md` and the guides it links can run
 result: issue
 reported: "Opening, closing and re-checking are followable (backup first, edit a copy outside the watched folder, check, move over, watch the log, probe from outside, close by putting the allow-list back; the route-check commands, the burst, the thresholds and the selfcheck are all stated). Two places leave a reader stuck: (a) 'Before you open' step 3 and checklist item 2 tell the reader to run a controlled flood from the proxy container and to hold about twenty live streams open, but name no tool, command, confinement or stop rule, so the step cannot be reproduced from the repository; (b) checklist item 3 and 'Opening the site' step 7 say the public /health, the operations port and the owner hostname 'must all fail to load', but the public /health answers 404 with no body and no content type, which Safari on a phone shows as an empty download, and the owner took exactly that for a failure to investigate."
 severity: minor
+resolution: fixed after the walk-through in commit 7b2121d (the guide now has a flood recipe: tool from the archive under its own CPU limit, the temporary one-address allow-list entry, steps, stop rule, pass rows, twenty held streams; and a sentence that a blank page or an empty download for `/health` counts as failing, with `curl -I` for the status). Re-read: followable end to end.
 
 ### 23. The guides agree with the shipped values and with each other
 expected: The numbers in the container, deploy and go-public guides match the unit file, the settings defaults and the proxy example; every internal link and anchor resolves; no placeholder is real.
@@ -135,6 +136,7 @@ expected: The README's guide list leads to every guide a maintainer needs, inclu
 result: issue
 reported: "The README's list of guides names releasing, deploying, layout, looks, server setup, sync, review sheet, access check, vendored assets and repository settings, but not docs/go-public.md, and its 'Current state' says nothing about the public hardening. The guide is reachable only through links inside the deploy and container guides."
 severity: minor
+resolution: fixed after the walk-through in commit 7b2121d (README guide list links the go-public guide; 'Current state' says the site is public and names its walls).
 
 ### 25. A real phone on mobile data: visit, tap a box, watch a live change arrive
 expected: On the owner's phone with Wi-Fi off, the public site shows the cabinet and the linked credit, a tap on a box opens its card, and a change made while the page is open arrives on the phone without a reload.
@@ -145,7 +147,7 @@ owner_instruction: "On your phone (Wi-Fi off) open the public site and leave the
 
 total: 25
 passed: 22
-issues: 2
+issues: 2 (both resolved after the walk-through)
 pending: 1
 skipped: 0
 blocked: 0
@@ -154,10 +156,11 @@ blocked: 0
 
 - gap_id: G-08-22
   truth: "A reader with only docs/go-public.md and the guides it links can run the before-you-open steps and the checklist, open the route safely, close it again and re-check later, with every command and expected answer given."
-  status: failed
+  status: resolved
   reason: "Claude found: the controlled-flood step has no tool, command, confinement or stop rule; and 'must all fail to load' hides that the public /health answers 404 with an empty body, which Safari offers as an empty download, a result the owner took for a failure."
   severity: minor
   test: 22
+  resolved: "7b2121d"
   root_cause: "The measurement flood generator was a throwaway, confined to a quarter of the proxy container's core and removed after each run, so nothing in the repository describes how to run it; the guide states the intent only. Separately, the public 404 for the health route is deliberately empty (no body, no content type, nothing that says what the route would have been), and the guide's wording was written for a browser that shows a blank error rather than for Safari's download offer for an empty answer."
   artifacts:
     - path: "docs/go-public.md"
@@ -171,10 +174,11 @@ blocked: 0
 
 - gap_id: G-08-24
   truth: "The README's guide list leads to every guide a maintainer needs, including the one for opening the site."
-  status: failed
+  status: resolved
   reason: "Claude found: README.md links ten guides and not docs/go-public.md; 'Current state' does not mention the public hardening."
   severity: minor
   test: 24
+  resolved: "7b2121d"
   root_cause: "The README's guide list and its current-state text were last extended for earlier work; the go-public guide was linked from the deploy and container guides when it was written, and the README was not updated."
   artifacts:
     - path: "README.md"
