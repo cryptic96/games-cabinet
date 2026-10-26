@@ -14,6 +14,8 @@ The owner has a second set of pages that open only from the home network or a VP
 
 The owner also chooses what the cabinet looks like for everyone, from the settings page: one of seven furniture designs, one of five woods (each with its own wall), plain or painted backs, a flat, shaded or deep look inside the cubbies, and a warm light in the cubbies that is off, always on, or on only in the evening by each visitor's own clock. A preview shows the real cabinet before anything is published, and pages that are already open follow a new look within a few seconds. The default look is the original cabinet, unchanged.
 
+The site is public: anyone with the link can see the cabinet over HTTPS, while the owner pages, the health check and the operations port stay reachable only from the home network. Each visitor's address gets its own small budget for "sync now" and for live updates, live updates accept only the site's own pages, every answer carries a strict Content-Security-Policy and the other security headers, and the service runs within measured memory and processor limits and cannot reach the home network. [Going public](docs/go-public.md) holds the checklist it opened against and how to close it again.
+
 ## How releases work
 
 - A version tag builds, tests and attests a release as a draft.
@@ -27,6 +29,7 @@ The details live in the guides:
 - [Cabinet layout](docs/cabinet-layout.md): how the cabinet is arranged, the settings that tune it and what stays put when the collection changes.
 - [Cabinet looks](docs/cabinet-looks.md): the owner's choices of design, wood, backs, lights and depth, how the evening lights decide when to switch on, and what visitors see when the look changes.
 - [Server setup](docs/lxc-setup.md): provisioning the container the site runs in.
+- [Going public](docs/go-public.md): the checklist before the site opens to the internet, how to open it, how to close it again and how to re-check it later.
 - [BoardGameGeek sync](docs/bgg-sync.md): how the collection is synced, its settings and what happens when BoardGameGeek fails; also covers game details, box art, picking the picture and spine colour, and box sizes.
 - [Review sheet](docs/review-sheet.md): building pages on the server that show which picture each game uses, to check the art, spine colours and box sizes against the real boxes, and fetching and deleting them afterwards.
 - [BoardGameGeek access check](docs/bgg-access-check.md): checking that the server's access to BoardGameGeek works.
