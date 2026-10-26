@@ -8,13 +8,15 @@ namespace Cabinet.Service.Limits;
 /// <param name="LiveConnectionsPerClient">The most live connections one client address may hold open at once.</param>
 /// <param name="LiveConnectsPerWindow">The most new live connections one client address may ask for in one window.</param>
 /// <param name="LiveWindow">The length of the window the new live connections are counted in.</param>
-/// <remarks>The defaults are starting values, to be sized later from a measured first visit.</remarks>
+/// <param name="LiveConnectsSiteWide">The most new live connections the whole site accepts in one live window, from all addresses together.</param>
+/// <remarks>The defaults come from the measured first visit and the measured floods: a game night on one shared address is well inside them, and a flood hits them long before it hurts the host.</remarks>
 public sealed record ClientLimitOptions(
     int SyncPressesPerWindow,
     TimeSpan SyncWindow,
     int LiveConnectionsPerClient,
     int LiveConnectsPerWindow,
-    TimeSpan LiveWindow)
+    TimeSpan LiveWindow,
+    int LiveConnectsSiteWide)
 {
     /// <summary>The presses allowed per window when the setting is absent.</summary>
     public const int DefaultSyncPressesPerWindow = 5;
@@ -30,6 +32,9 @@ public sealed record ClientLimitOptions(
 
     /// <summary>The length of the live connect window in seconds when the setting is absent.</summary>
     public const int DefaultLiveWindowSeconds = 60;
+
+    /// <summary>The new live connections the whole site accepts per live window when the setting is absent; a backstop on top of the per-address window.</summary>
+    public const int DefaultLiveConnectsSiteWide = 600;
 }
 
 /// <summary>
@@ -43,14 +48,17 @@ public static class ClientLimitSettings
     private const string LiveConnectionsKey = "ClientLimits:LiveConnectionsPerClient";
     private const string LiveConnectsKey = "ClientLimits:LiveConnectsPerWindow";
     private const string LiveWindowKey = "ClientLimits:LiveWindowSeconds";
+    private const string LiveSiteWideKey = "ClientLimits:LiveConnectsSiteWidePerWindow";
     private const int SmallestPresses = 1;
     private const int LargestPresses = 1000;
     private const int SmallestWindowSeconds = 1;
-    private const int LargestWindowSeconds = 3600;
+    private const int LargestWindowSeconds = 600;
     private const int SmallestLiveConnections = 1;
     private const int LargestLiveConnections = 1000;
     private const int SmallestLiveConnects = 1;
     private const int LargestLiveConnects = 10_000;
+    private const int SmallestSiteWideConnects = 1;
+    private const int LargestSiteWideConnects = 100_000;
 
     /// <summary>Reads the ClientLimits keys. An absent key takes the default; a value that is not a whole number in range throws.</summary>
     /// <param name="configuration">The configuration to read.</param>
@@ -90,13 +98,20 @@ public static class ClientLimitSettings
             ClientLimitOptions.DefaultLiveWindowSeconds,
             SmallestWindowSeconds,
             LargestWindowSeconds);
+        var siteWide = ReadWholeNumber(
+            configuration,
+            LiveSiteWideKey,
+            ClientLimitOptions.DefaultLiveConnectsSiteWide,
+            SmallestSiteWideConnects,
+            LargestSiteWideConnects);
 
         return new ClientLimitOptions(
             presses,
             TimeSpan.FromSeconds(windowSeconds),
             liveConnections,
             liveConnects,
-            TimeSpan.FromSeconds(liveWindowSeconds));
+            TimeSpan.FromSeconds(liveWindowSeconds),
+            siteWide);
     }
 
     private static int ReadWholeNumber(IConfiguration configuration, string key, int fallback, int smallest, int largest)
