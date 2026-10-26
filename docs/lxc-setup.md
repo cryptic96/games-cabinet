@@ -99,6 +99,17 @@ pct set {ctid} --cores 1 --memory 1024 --swap 512 --cpuunits 50
   limit. The selfcheck fails when the unit's memory ceiling leaves less than a
   small margin below the
   container's memory, or when its CPU quota reaches the container's cores.
+- The margins are worth knowing before changing any of these numbers. The 314
+  MiB peak is the whole process, native memory included, so the managed heap's
+  own peak is lower, and the 384 MiB heap limit sits at least 70 MiB above it. A
+  worst-case picture decode adds about 144 MiB, which brings the whole process
+  to about 458 MiB: inside the 480 MiB reclaim point with 22 MiB to spare, and
+  well inside the 600 MiB ceiling. A picture decode and a sync's own peak do not
+  normally coincide. A heap limit turns an overshoot into an out-of-memory error
+  in the sync or picture rebuild that hit it, not a gradual slowdown, so that run
+  fails and the next one tries again. Nothing on the host checks that the runtime
+  took the value beyond the start-up line mentioned above, so look at that line
+  after changing the limit.
 
 The remaining steps run as root inside the container (`pct enter {ctid}`
 puts you there; this also keeps working if a firewall mistake ever locks SSH
