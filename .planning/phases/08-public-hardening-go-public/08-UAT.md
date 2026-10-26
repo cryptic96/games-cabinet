@@ -1,14 +1,14 @@
 ---
-status: partial
+status: complete
 phase: 08-public-hardening-go-public
 source: [08-01-SUMMARY.md, 08-02-SUMMARY.md, 08-03-SUMMARY.md, 08-04-SUMMARY.md, 08-05-SUMMARY.md, 08-06-SUMMARY.md, 08-07-SUMMARY.md, 08-08-SUMMARY.md, 08-09-SUMMARY.md, 08-10-SUMMARY.md, 08-11-SUMMARY.md, 08-12-SUMMARY.md, 08-13-SUMMARY.md, 08-14-SUMMARY.md, 08-15-SUMMARY.md, 08-16-SUMMARY.md, 08-17-SUMMARY.md, 08-18-SUMMARY.md, 08-19-SUMMARY.md, 08-20-SUMMARY.md, 08-21-SUMMARY.md, 08-22-SUMMARY.md, 08-23-SUMMARY.md, 08-24-SUMMARY.md]
 started: 2026-10-26T19:14:00Z
-updated: 2026-10-26T19:40:00Z
+updated: 2026-10-26T20:05:00Z
 ---
 
 ## Current Test
 
-[testing paused - 1 item outstanding for the owner, 2 minor documentation gaps diagnosed]
+[testing complete]
 
 ## Tests
 
@@ -140,15 +140,16 @@ resolution: fixed after the walk-through in commit 7b2121d (README guide list li
 
 ### 25. A real phone on mobile data: visit, tap a box, watch a live change arrive
 expected: On the owner's phone with Wi-Fi off, the public site shows the cabinet and the linked credit, a tap on a box opens its card, and a change made while the page is open arrives on the phone without a reload.
-result: [pending]
+result: pass
+reported: "pass" (owner, on the phone with Wi-Fi off)
 owner_instruction: "On your phone (Wi-Fi off) open the public site and leave the page open; tap a box and check the card opens and the credit is visible at the bottom. Then, at home, either press Sync now on the page (it starts one real sync) and watch the sync line on the phone change, or change the look on the owner settings page (for example the lights) and watch the cabinet on the phone change; either should arrive within a few seconds without reloading. If you changed the look, change it back. Answer pass, or describe what you saw."
 
 ## Summary
 
 total: 25
-passed: 22
+passed: 23
 issues: 2 (both resolved after the walk-through)
-pending: 1
+pending: 0
 skipped: 0
 blocked: 0
 
