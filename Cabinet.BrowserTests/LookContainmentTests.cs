@@ -33,6 +33,21 @@ public sealed class LookContainmentTests : CabinetPageTest, IDisposable
 
     private const int FaceInset = 3;
 
+    /// <summary>
+    /// How long one run of a view may take in all, in seconds. A view of the largest sample takes a few seconds even on a slow runner, so
+    /// a page that has not finished after this long is stuck, not slow.
+    /// </summary>
+    private const int ViewBudgetSeconds = 60;
+
+    /// <summary>How many times a view is run, each time on a fresh page, before a stuck page ends the test.</summary>
+    private const int ViewAttempts = 3;
+
+    /// <summary>
+    /// How long one screenshot of a section may wait for the browser, in milliseconds. A capture takes well under a second even on a slow
+    /// runner, so one that waits this long is stuck, and the view is run again on a fresh page.
+    /// </summary>
+    private const float CaptureTimeoutMs = 10000;
+
     private const string LitOnTheWall = "() => document.documentElement.hasAttribute('data-lit') && [...document.querySelectorAll('#cabinet .section-light')].every((layer) => Number(getComputedStyle(layer).opacity) === 1)";
 
     private const string StatusColourIsWallText = """
@@ -86,16 +101,10 @@ public sealed class LookContainmentTests : CabinetPageTest, IDisposable
 
         foreach (var (width, path) in Views)
         {
-            await Page.SetViewportSizeAsync(width, ViewportHeight);
-            await GotoCabinetAsync(path);
-            await Page.WaitForSelectorAsync("#cabinet .section", new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached });
-
-            await CheckEverySectionAsync($"{design} with the lights {lights}, {width} px, {path}");
-
-            if (path.EndsWith("65", StringComparison.Ordinal))
-            {
-                await SaveScreenshotAsync($"design-{design}-{lights}-{width}");
-            }
+            await RunOnFreshPageWhenStalledAsync(
+                page => CheckViewAsync(page, $"{design} with the lights {lights}, {width} px, {path}", width, path, $"design-{design}-{lights}-{width}"),
+                TimeSpan.FromSeconds(ViewBudgetSeconds),
+                ViewAttempts);
         }
 
         ConsoleErrors.Should().BeEmpty();
@@ -126,7 +135,7 @@ public sealed class LookContainmentTests : CabinetPageTest, IDisposable
                 await SetAsync(("backs", backs));
 
                 var where = $"{design} on {wood} with {backs} backs, Deep, lit, {width} px";
-                await CheckEverySectionAsync(where);
+                await CheckEverySectionAsync(Page, where);
                 (await SidewaysOverflowAsync()).Should().BeLessThanOrEqualTo(0, where);
             }
 
@@ -195,7 +204,7 @@ public sealed class LookContainmentTests : CabinetPageTest, IDisposable
                 (await Page.Locator("#cabinet .cubby").CountAsync()).Should().BeGreaterThan(0, $"{where}: bare cubbies");
                 (await Page.Locator("#cabinet .placement").CountAsync()).Should().Be(0, $"{where}: nothing in them");
 
-                await CheckEverySectionAsync(where);
+                await CheckEverySectionAsync(Page, where);
                 (await SidewaysOverflowAsync()).Should().BeLessThanOrEqualTo(0, where);
 
                 var colours = await Page.EvaluateAsync<string[]>(StatusColourIsWallText);
@@ -217,7 +226,7 @@ public sealed class LookContainmentTests : CabinetPageTest, IDisposable
         await GotoCabinetAsync("/?sample=65");
         await AdoptAsync(".section-base { box-shadow: 0 0 40px 40px rgb(255 0 0 / 0.8); }");
 
-        (await EdgeRingOffendersAsync(await ReadSectionAsync(0))).Should().NotBeEmpty();
+        (await EdgeRingOffendersAsync(Page, await ReadSectionAsync(Page, 0))).Should().NotBeEmpty();
     }
 
     /// <summary>
@@ -332,28 +341,53 @@ public sealed class LookContainmentTests : CabinetPageTest, IDisposable
         Page.EvaluateAsync<double>("() => document.documentElement.scrollWidth - window.innerWidth");
 
     /// <summary>
+    /// Sets the width of the viewport, loads one view in the given page and checks every section of it, then keeps a picture for
+    /// review when the view is the small sample. It starts from nothing, so it can be run again on a fresh page.
+    /// </summary>
+    /// <param name="page">The page to load the view in.</param>
+    /// <param name="where">What is being drawn, for the failure message.</param>
+    /// <param name="width">The width of the viewport.</param>
+    /// <param name="path">The path and query of the view.</param>
+    /// <param name="pictureName">The name the review picture is kept under.</param>
+    private async Task CheckViewAsync(IPage page, string where, int width, string path, string pictureName)
+    {
+        await page.SetViewportSizeAsync(width, ViewportHeight);
+        await GotoCabinetAsync(page, path);
+        await page.WaitForSelectorAsync("#cabinet .section", new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached });
+
+        await CheckEverySectionAsync(page, where);
+
+        if (path.EndsWith("65", StringComparison.Ordinal))
+        {
+            await SaveScreenshotAsync(page, pictureName);
+        }
+    }
+
+    /// <summary>
     /// Reads every section of the page: each part of its furniture must lie inside its box, and the one-pixel ring at its edge must be
     /// what the wall is just outside it.
     /// </summary>
+    /// <param name="page">The page to read.</param>
     /// <param name="where">What is being drawn, for the failure message.</param>
-    private async Task CheckEverySectionAsync(string where)
+    private async Task CheckEverySectionAsync(IPage page, string where)
     {
-        var count = await Page.Locator("#cabinet .section").CountAsync();
+        var count = await page.Locator("#cabinet .section").CountAsync();
         count.Should().BeGreaterThan(0, where);
 
         for (var index = 0; index < count; index++)
         {
-            var section = $"{where}, section {index + 1} of {count}";            var reading = await ReadSectionAsync(index);
+            var section = $"{where}, section {index + 1} of {count}";
+            var reading = await ReadSectionAsync(page, index);
 
             foreach (var part in reading.Parts)
             {
                 InsideTheBox(part, reading.Box).Should().BeTrue($"{section}: {part.Name} {part.Left:F1},{part.Top:F1},{part.Width:F1},{part.Height:F1} is outside {reading.Box.Left:F1},{reading.Box.Top:F1},{reading.Box.Width:F1},{reading.Box.Height:F1}");
             }
 
-            var offenders = await EdgeRingOffendersAsync(reading);
+            var offenders = await EdgeRingOffendersAsync(page, reading);
             if (offenders.Count > 0)
             {
-                offenders = await EdgeRingOffendersAsync(await ReadSectionAsync(index));
+                offenders = await EdgeRingOffendersAsync(page, await ReadSectionAsync(page, index));
             }
 
             offenders.Should().BeEmpty($"{section}: the edge ring must be the wall");
@@ -420,14 +454,14 @@ public sealed class LookContainmentTests : CabinetPageTest, IDisposable
         return differing;
     }
 
-    private async Task<SectionRead> ReadSectionAsync(int index)
+    private static async Task<SectionRead> ReadSectionAsync(IPage page, int index)
     {
-        var json = await Page.EvaluateAsync<string>(ReadScript, index);
+        var json = await page.EvaluateAsync<string>(ReadScript, index);
 
         return JsonSerializer.Deserialize<SectionRead>(json, ReadingOptions)!;
     }
 
-    private async Task<List<string>> EdgeRingOffendersAsync(SectionRead reading)
+    private static async Task<List<string>> EdgeRingOffendersAsync(IPage page, SectionRead reading)
     {
         var box = reading.Box;
         var clipLeft = (int)Math.Floor(box.Left) - OutsideDistance - 1;
@@ -435,10 +469,11 @@ public sealed class LookContainmentTests : CabinetPageTest, IDisposable
         var clipRight = (int)Math.Ceiling(box.Left + box.Width) + OutsideDistance + 1;
         var clipBottom = (int)Math.Ceiling(box.Top + box.Height) + OutsideDistance + 1;
 
-        var png = await Page.ScreenshotAsync(new PageScreenshotOptions
+        var png = await page.ScreenshotAsync(new PageScreenshotOptions
         {
             Animations = ScreenshotAnimations.Disabled,
             Clip = new Clip { X = clipLeft, Y = clipTop, Width = clipRight - clipLeft, Height = clipBottom - clipTop },
+            Timeout = CaptureTimeoutMs,
         });
 
         using var bitmap = SKBitmap.Decode(png);
