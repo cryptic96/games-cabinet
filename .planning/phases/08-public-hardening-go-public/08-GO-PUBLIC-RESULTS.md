@@ -161,3 +161,15 @@ From the owner's phone on mobile data (Wi-Fi off), the only vantage point outsid
 If any of the three addresses that must fail answers, the site is closed again at once (the allow-list line goes back into the public router) before anything else.
 
 The owner's words, verbatim: "3 and 4 are not accessible. 2 results in a file download in safari which doesn't download anything (nothing loads)? So I suppose it's invalid?" The orchestrator confirmed the public `/health` answers 404 with an empty body and no content type (so Safari offers an empty download); the health details exist only on the loopback operations port. Every external check passed; nothing private answered, so the site stays open. Every gate of the go-public checklist is passed; the maintenance-key passphrases remain the final step.
+
+## Maintenance keys
+
+from= pinning present on both containers: yes (every authorized key line of the maintenance account on the cabinet container and on the proxy container starts with a `from=` option pinning it to the workstation; checked 2026-10-26 after the switch, while access still worked).
+
+| Item | Status |
+|---|---|
+| Passphrase on the cabinet container's maintenance key (alias `cabinet-lxc`) | pending the owner's step |
+| Passphrase on the proxy container's maintenance key (alias `traefik-lxc`) | pending the owner's step |
+| Both keys removed from the SSH agent (or the agent locked) | pending the owner's step |
+
+The owner sets the passphrases with `ssh-keygen -p -f <key>` (Claude never sees or types them), removes both keys from the agent, and loads them with `ssh-add <key>` only when Claude should work on the servers again. Claude then verifies the lock without any passphrase.
