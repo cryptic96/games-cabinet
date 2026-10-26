@@ -168,8 +168,12 @@ from= pinning present on both containers: yes (every authorized key line of the 
 
 | Item | Status |
 |---|---|
-| Passphrase on the cabinet container's maintenance key (alias `cabinet-lxc`) | pending the owner's step |
-| Passphrase on the proxy container's maintenance key (alias `traefik-lxc`) | pending the owner's step |
-| Both keys removed from the SSH agent (or the agent locked) | pending the owner's step |
+| Passphrase on the cabinet container's maintenance key (alias `cabinet-lxc`) | not set: accepted by the owner without a passphrase |
+| Passphrase on the proxy container's maintenance key (alias `traefik-lxc`) | not set: accepted by the owner without a passphrase |
+| Both keys removed from the SSH agent (or the agent locked) | not needed under the owner's decision |
 
 The owner sets the passphrases with `ssh-keygen -p -f <key>` (Claude never sees or types them), removes both keys from the agent, and loads them with `ssh-add <key>` only when Claude should work on the servers again. Claude then verifies the lock without any passphrase.
+
+Owner's decision at the final step, verbatim: "I think, since you can only access it from within my local network, i'll accept these access tokens." The maintenance keys stay without a passphrase; the accepted mitigation is the `from=` pinning to the workstation (present on both containers) and SSH reachable only from the admin sources on both containers. Residual risk, told to the owner: anything running on the workstation can use the keys, with admin rights on the cabinet and on the reverse proxy that fronts every site; a passphrase can be added at any time. Review point unchanged: 2027-01-24. The registers (AR-08, AR-06-05) carry the same decision.
+
+**Checklist complete.** The site is open, every gate passed (the verification flood's proxy-bound neighbour row accepted by the owner under the amended definition), and the maintenance access is accepted as is by the owner's decision.
