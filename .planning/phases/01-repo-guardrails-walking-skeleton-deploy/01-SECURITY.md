@@ -132,7 +132,7 @@ created: 2026-10-04
 | AR-05 | T-01-122 | The original go-live merge commit carrying a non-noreply email is retrievable by SHA on GitHub; accepted permanently, no purge requested | owner | 2026-10-04 |
 | AR-06 | T-01-154 | The owner's first name appears as author display name on GitHub-created squash and merge commits (emails are noreply) | owner (UAT) | 2026-10-04 |
 | AR-07 | T-01-056, T-01-116 | The owner's account handle is public by design (repository owner, licence holder, release signer); example configs keep the real repository slug | owner (UAT) | 2026-10-04 |
-| AR-08 | (unregistered) | A key-only admin account with passwordless sudo exists on the server, pinned to the owner's workstation, for development. **Expires: revoke or downgrade before the site becomes public** | owner | 2026-10-04 |
+| AR-08 | (unregistered) | A key-only admin account with passwordless sudo exists on the server, pinned to the owner's workstation, for development. Kept past go-public by the owner's decision. Mitigation: passphrase-protected private keys loaded into the SSH agent only while Claude should work on the servers, address pinning (`from=`) to the workstation verified on 2026-10-20; status: mitigation pending, verified in the final step (the owner's passphrase step and Claude's checks in plan 08-24, which finalises this row). Residual risk: while the agent is unlocked, anything on the workstation can use the keys. Review point: 90 days after the go-public date (the exact date is filled in when the site opens, plan 08-22) | owner | 2026-10-26 |
 
 *Accepted risks do not resurface in future audit runs.*
 

@@ -763,17 +763,19 @@ Allow-list entry in place (UTC, router flood only; the direct flood never needed
 | verify-router | neighbour | FAIL |
 | verify-router | ssh | PASS |
 | verify-router | ops-health | PASS |
-| verify-router | host-cpu | pending owner |
+| verify-router | host-cpu | PASS (owner: nothing reached 100 %) |
 | verify-router | recovery | PASS |
 | verify-direct | neighbour | PASS |
 | verify-direct | ssh | PASS |
 | verify-direct | ops-health | PASS |
-| verify-direct | host-cpu | pending owner |
+| verify-direct | host-cpu | PASS (owner: nothing reached 100 %) |
 | verify-direct | recovery | PASS |
 
 Both floods are valid under the plan's rule (no 400 in any step; the app answered 200 and 429). The router flood's
 `neighbour` row is FAIL because of the aborts under the stop rule: `/` at 20, 10 and 5 unthrottled workers and
 `/cabinet/status` at 20 and 10 (planned sizes 50, 100 and 200 were not reached). The direct flood reached the agreed
 largest step of 200 workers on both page routes with the neighbour's step medians between 24.0 and 37.1 ms (no abort),
-so its row is PASS. Host CPU is read by the owner from the Proxmox graphs for the windows above and is filled in plan
-08-21. Going public needs every row PASS, so the router flood's FAIL stops the way to going public until it is settled.
+so its row is PASS. Host CPU was read by the owner from the Proxmox graphs for the windows above (plan 08-21): nothing
+reached 100 %, so both host-cpu rows are PASS. The router flood's `neighbour` FAIL stays recorded as measured; the owner
+accepted it with a written reason under the amended SEC-06 definition (see `08-SIZING-REVIEW.md`), so it no longer stops
+going public.
